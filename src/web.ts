@@ -98,6 +98,7 @@ import { tryHandleAgents } from './web/routes/agents.js'
 import { tryHandleClaudePlans } from './web/routes/claude-plans.js'
 import { tryHandleClaudePlansLogin } from './web/routes/claude-plans-login.js'
 import { tryHandleAlfred } from './web/routes/alfred.js'
+import { tryHandleAlfredVps } from './web/routes/alfred-vps.js'
 import { tryHandleRecall } from './web/routes/recall.js'
 import { tryHandleBackgroundTasks, sweepOrphanedBackgroundTasks } from './web/routes/background-tasks.js'
 import { tryHandleOverview } from './web/routes/overview.js'
@@ -285,6 +286,7 @@ export function startWebServer(port = 3420): http.Server {
       if (await tryHandleClaudePlansLogin(routeCtx)) return
       if (await tryHandleClaudePlans(routeCtx)) return
       if (await tryHandleAlfred(routeCtx, WEB_DIR)) return
+      if (await tryHandleAlfredVps(routeCtx)) return
       if (await tryHandleBackgroundTasks(routeCtx)) return
       if (await tryHandleRecall(routeCtx)) return
       if (await tryHandleOverview(routeCtx)) return

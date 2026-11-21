@@ -1,0 +1,31 @@
+[Unit]
+Description=Alfred Web Dashboard (WEB_ONLY — Kanban, VPS & Chat)
+After=network-online.target alfred-prod.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alfred
+Group=alfred
+WorkingDirectory=/opt/alfred-ops
+EnvironmentFile=/opt/alfred-prod/.env
+Environment=NODE_ENV=production
+Environment=WEB_ONLY=true
+Environment=WEB_HOST=127.0.0.1
+Environment=WEB_PORT=3420
+Environment=ALFRED_DB_PATH=/opt/alfred-prod/store/alfred.db
+Environment=ALFRED_OPS_DIR=/opt/alfred-ops
+Environment=NODE_OPTIONS=--max-old-space-size=256
+ExecStart=/usr/bin/node /opt/alfred-ops/dist/web-only.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/alfred-prod/store /opt/alfred-ops/store
+MemoryHigh=256M
+MemoryMax=384M
+
+[Install]
+WantedBy=multi-user.target

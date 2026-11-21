@@ -6,10 +6,12 @@
   "scripts": {
     "build": "tsc && node scripts/write-built-commit.cjs",
     "build:alfred": "tsc -p tsconfig.alfred.build.json",
+    "build:web": "tsc -p tsconfig.web.build.json",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "alfred": "tsx src/alfred/run.ts",
     "alfred:start": "node dist/alfred/run.js",
+    "web:only": "node dist/web-only.js",
     "setup": "tsx scripts/setup.ts",
     "status": "tsx scripts/status.ts",
     "hook-failures": "tsx scripts/hook-failures.ts",

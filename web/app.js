@@ -610,6 +610,7 @@ function switchPage(pageId) {
   if (pageId === 'archived') loadArchivedPage()
   if (pageId === 'naplo') loadNaplo()
   if (pageId === 'federation') loadFederationPage()
+  if (pageId === 'vps' && typeof window.loadVpsPage === 'function') window.loadVpsPage()
 }
 
 // Mobile off-canvas sidebar toggle. No-op visual effect on desktop (the

@@ -84,6 +84,10 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>
         <span class="sb-label">Kanban</span>
       </a>
+      <a href="#" class="sb-link" data-page="vps">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><circle cx="6" cy="6.5" r="1"/><circle cx="6" cy="17.5" r="1"/></svg>
+        <span class="sb-label">VPS &amp; Chat</span>
+      </a>
       <a href="#" class="sb-link" data-page="notes">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
         <span class="sb-label">Jegyzetek</span>
@@ -2271,6 +2275,62 @@
       </div>
     </div>
 
+    <section class="page" id="vpsPage" hidden>
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <h1 style="margin:0">VPS &amp; Alfred Chat</h1>
+        <button class="btn-secondary btn-compact" id="vpsRefreshBtn">Frissítés</button>
+      </div>
+      <div id="vpsSystemBar" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px">Betöltés...</div>
+      <div id="vpsServicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px"></div>
+
+      <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <strong>Ops műveletek</strong>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-secondary btn-compact" data-vps-ops="check-health">Check Health</button>
+            <button class="btn-secondary btn-compact" data-vps-ops="reload-test">Reload Test</button>
+            <button class="btn-secondary btn-compact" data-vps-ops="teardown-test">Teardown Test</button>
+          </div>
+        </div>
+        <pre id="vpsOpsOutput" hidden style="white-space:pre-wrap;font-family:monospace;font-size:12px;max-height:220px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+        <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <strong>Alfred Chat</strong>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="vpsConvEnv" class="input" style="padding:4px 8px;font-size:12px">
+                <option value="prod">prod</option>
+                <option value="ops">ops</option>
+                <option value="test">test</option>
+              </select>
+              <select id="vpsChatAgent" class="input" style="padding:4px 8px;font-size:12px"></select>
+            </div>
+          </div>
+          <div id="vpsChatHistory" style="height:280px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="vpsChatInput" class="input" placeholder="Üzenet Alfrednek..." style="flex:1">
+            <button class="btn-primary btn-compact" id="vpsChatSend">Küldés</button>
+          </div>
+          <div id="vpsChatStatus" style="font-size:12px;opacity:.75"></div>
+        </div>
+
+        <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <strong>Szolgáltatás naplók (journalctl)</strong>
+            <select id="vpsLogUnit" class="input" style="padding:4px 8px;font-size:12px">
+              <option value="alfred-prod">alfred-prod</option>
+              <option value="alfred-ops">alfred-ops</option>
+              <option value="alfred-test">alfred-test</option>
+              <option value="alfred-web">alfred-web</option>
+            </select>
+          </div>
+          <pre id="vpsLogOutput" style="white-space:pre-wrap;font-family:monospace;font-size:11px;height:320px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Modal: Kanban kártya szerkesztés -->
@@ -3690,5 +3750,6 @@
   </div>
 
   <script src="/app.js"></script>
+  <script src="/vps.js"></script>
 </body>
 </html>
