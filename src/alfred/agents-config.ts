@@ -31,8 +31,12 @@ const ROLE_ALIASES: Record<string, AlfredRoleId> = {
   technikus: 'technikus',
   szakmunkas: 'szakmunkas',
   'szakmunkás': 'szakmunkas',
+  szakerto: 'szakmunkas',
+  'szakértő': 'szakmunkas',
   segedmunkas: 'segedmunkas',
   'segédmunkás': 'segedmunkas',
+  segito: 'segedmunkas',
+  'segítő': 'segedmunkas',
 }
 
 export function normalizeRoleId(raw: string): AlfredRoleId | null {
@@ -56,14 +60,14 @@ const DEFAULT_ROLES: Record<AlfredRoleId, AlfredRoleDefinition> = {
   },
   szakmunkas: {
     id: 'szakmunkas',
-    label: 'Szakmunkás',
+    label: 'Szakértő',
     description: 'Kódolás, implementáció, tool-használat',
     provider: 'deepseek',
     model: 'deepseek-chat',
   },
   segedmunkas: {
     id: 'segedmunkas',
-    label: 'Segédmunkás',
+    label: 'Segítő',
     description: 'Gyors, olcsó rutin feladatok és összefoglalás',
     provider: 'vertex-eu',
     model: 'gemini-3.5-flash-lite',
