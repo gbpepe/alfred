@@ -166,41 +166,89 @@
     } catch { /* ignore */ }
   }
 
+  const PROVIDER_MODELS = {
+    deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+    'vertex-eu': ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    xai: ['grok-3', 'grok-3-mini', 'grok-4'],
+    openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'],
+  }
+
+  function updateInheritedRoleText() {
+    const roleSel = document.getElementById('agentCoreRoleSel')
+    const txtEl = document.getElementById('agentCoreInheritedText')
+    if (!roleSel || !txtEl) return
+    const r = vpsRolesCache.find(function (item) { return item.id === roleSel.value })
+    txtEl.textContent = r ? ('Örökölt modell: ' + r.provider + ' / ' + r.model) : ''
+  }
+
+  function populateCoreModelSelect(provider, currentModel) {
+    const modelSel = document.getElementById('agentCoreModelSel')
+    const modelInp = document.getElementById('agentCoreModelInp')
+    if (!modelSel || !modelInp) return
+    const list = PROVIDER_MODELS[provider] || []
+    modelSel.innerHTML =
+      list.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>' }).join('') +
+      '<option value="__custom__">Egyéni modell...</option>'
+    if (currentModel && list.indexOf(currentModel) >= 0) {
+      modelSel.value = currentModel
+      modelInp.hidden = true
+      modelInp.value = currentModel
+    } else if (currentModel) {
+      modelSel.value = '__custom__'
+      modelInp.hidden = false
+      modelInp.value = currentModel
+    } else if (list.length > 0) {
+      modelSel.value = list[0]
+      modelInp.hidden = true
+      modelInp.value = list[0]
+    } else {
+      modelSel.value = '__custom__'
+      modelInp.hidden = false
+      modelInp.value = ''
+    }
+  }
+
   window.syncAgentCoreOverride = async function (agentName) {
     const box = document.getElementById('agentCoreOverrideBox')
+    const legacyGroup = document.getElementById('legacyAgentModelGroup')
     const chk = document.getElementById('agentCoreOverrideChk')
+    const ovRow = document.getElementById('agentCoreOverrideRow')
     const roleSel = document.getElementById('agentCoreRoleSel')
     const provSel = document.getElementById('agentCoreProvSel')
-    const modelInp = document.getElementById('agentCoreModelInp')
     const statusEl = document.getElementById('agentCoreOverrideStatus')
-    if (!box || !chk || !roleSel || !provSel || !modelInp) return
+    if (!box || !chk || !ovRow || !roleSel || !provSel) return
     try {
       await ensureVpsRolesData(false)
     } catch {
       box.hidden = true
+      if (legacyGroup) legacyGroup.hidden = false
       return
     }
     const ag = vpsAgentsCache.find(function (a) { return a.id === agentName })
     if (!ag) {
       box.hidden = true
+      if (legacyGroup) legacyGroup.hidden = false
       currentModalAgentId = null
       return
     }
     currentModalAgentId = ag.id
     box.hidden = false
+    if (legacyGroup) legacyGroup.hidden = true
     if (statusEl) statusEl.textContent = ''
     roleSel.innerHTML = vpsRolesCache
       .map(function (r) {
         return '<option value="' + esc(r.id) + '"' + (r.id === ag.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
       })
       .join('')
+    updateInheritedRoleText()
     provSel.innerHTML = PROVIDER_OPTIONS.map(function (p) {
       return '<option value="' + p + '"' + (p === ag.provider ? ' selected' : '') + '>' + p + '</option>'
     }).join('')
-    modelInp.value = ag.model || ''
+    populateCoreModelSelect(ag.provider, ag.model || '')
     chk.checked = Boolean(ag.hasOverride)
-    provSel.disabled = !chk.checked
-    modelInp.disabled = !chk.checked
+    ovRow.hidden = !chk.checked
+    ovRow.style.display = chk.checked ? 'flex' : 'none'
   }
 
   const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
@@ -466,13 +514,31 @@
 
     // Agent modal override controls
     const ovChk = document.getElementById('agentCoreOverrideChk')
+    const ovRow = document.getElementById('agentCoreOverrideRow')
+    const ovRole = document.getElementById('agentCoreRoleSel')
+    const ovProv = document.getElementById('agentCoreProvSel')
+    const ovModelSel = document.getElementById('agentCoreModelSel')
+    const ovModelInp = document.getElementById('agentCoreModelInp')
     const ovSave = document.getElementById('agentCoreOverrideSaveBtn')
-    if (ovChk) {
+    if (ovRole) {
+      ovRole.addEventListener('change', updateInheritedRoleText)
+    }
+    if (ovChk && ovRow) {
       ovChk.addEventListener('change', function () {
-        const provSel = document.getElementById('agentCoreProvSel')
-        const modelInp = document.getElementById('agentCoreModelInp')
-        if (provSel) provSel.disabled = !ovChk.checked
-        if (modelInp) modelInp.disabled = !ovChk.checked
+        ovRow.hidden = !ovChk.checked
+        ovRow.style.display = ovChk.checked ? 'flex' : 'none'
+      })
+    }
+    if (ovProv) {
+      ovProv.addEventListener('change', function () {
+        populateCoreModelSelect(ovProv.value, '')
+      })
+    }
+    if (ovModelSel && ovModelInp) {
+      ovModelSel.addEventListener('change', function () {
+        const isCustom = ovModelSel.value === '__custom__'
+        ovModelInp.hidden = !isCustom
+        if (!isCustom) ovModelInp.value = ovModelSel.value
       })
     }
     if (ovSave) {
@@ -480,10 +546,12 @@
         if (!currentModalAgentId) return
         const roleSel = document.getElementById('agentCoreRoleSel')
         const provSel = document.getElementById('agentCoreProvSel')
+        const modelSel = document.getElementById('agentCoreModelSel')
         const modelInp = document.getElementById('agentCoreModelInp')
         const statusEl = document.getElementById('agentCoreOverrideStatus')
-        if (!roleSel || !provSel || !modelInp) return
+        if (!roleSel || !provSel || !modelSel || !modelInp) return
         const useOverride = Boolean(ovChk && ovChk.checked)
+        const chosenModel = modelSel.value === '__custom__' ? modelInp.value.trim() : modelSel.value
         ovSave.disabled = true
         if (statusEl) statusEl.textContent = 'Mentés...'
         try {
@@ -493,13 +561,14 @@
               agentId: currentModalAgentId,
               role: roleSel.value,
               provider: useOverride ? provSel.value : null,
-              model: useOverride ? (modelInp.value.trim() || null) : null,
+              model: useOverride ? (chosenModel || null) : null,
               restartServices: true,
             }),
           })
           const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
           if (statusEl) statusEl.textContent = 'Mentve' + extra
           await ensureVpsRolesData(true)
+          updateInheritedRoleText()
         } catch (err) {
           if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
         } finally {
