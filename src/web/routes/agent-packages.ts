@@ -24,7 +24,7 @@ import { notifyOwner } from '../../notify.js'
 import { json, methodNotAllowed, readBodyOrRefuse } from '../http-helpers.js'
 import { RELEASED_KEYS } from '../agent-package/keys.js'
 import { PACKAGE_ORIGIN, deleteCredential, hasCredential, makeRemote, readCredentialView, type Remote } from '../agent-package/remote.js'
-import { meetsMinMarveenVersion, parseVersion, verifyDelivery, type Jwk } from '../agent-package/verify.js'
+import { meetsMinAlfredVersion, parseVersion, verifyDelivery, type Jwk } from '../agent-package/verify.js'
 import { STRICT_SLUG_RE, agentsBaseDir, isReservedName, markerPathOf } from '../agent-package/marker.js'
 import {
   flushPendingPackageNotices, packageSkillReport, readPackageManifest, reapInterruptedPackageInstalls, runInstallBlock, sameDeviceLayout,
@@ -183,8 +183,8 @@ async function installPackage(ctx: RouteContext, deps: PackageDeps): Promise<voi
   }
   const pkg = v.pkg
   // 8. the minimum version (the publishing side decided it already; this is the safety net).
-  if (!meetsMinMarveenVersion(ownVersion, pkg.minMarveenVersion)) {
-    json(res, { error: 'incompatible', minMarveenVersion: pkg.minMarveenVersion }, 409)
+  if (!meetsMinAlfredVersion(ownVersion, pkg.minAlfredVersion)) {
+    json(res, { error: 'incompatible', minAlfredVersion: pkg.minAlfredVersion }, 409)
     return
   }
   // 9. the model hint: only a Claude model of the picker's closed list that the installed CLI launches (M26: the

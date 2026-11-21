@@ -47,20 +47,20 @@ MASQUERADE = ("3005022 3004904 bun run --cwd /home/user/.local/share/"
 # three channels, three runtimes. Only the bun one used to count as alive, so the
 # gate alarmed "slack-channel, gromzo-channel missing" for running workers.
 CLAUDE_THREE = ("4005921 4001008 /opt/homebrew/bin/claude --continue --channels "
-                "plugin:telegram@claude-plugins-official plugin:slack-channel@marveen-marketplace "
+                "plugin:telegram@claude-plugins-official plugin:slack-channel@alfred-marketplace "
                 "plugin:gromzo-channel@gromzo-local")
-TMUX_THREE = "marveen-channels 4005921\n"
+TMUX_THREE = "alfred-channels 4005921\n"
 BUN_TG3 = ("4006184 4005921 bun run --cwd /home/user/.claude/plugins/cache/"
            "claude-plugins-official/telegram/0.0.6 --shell=bun --silent start")
-NODE_SLACK = ("4006185 4005921 node /home/user/.claude/plugins/cache/marveen-marketplace/"
+NODE_SLACK = ("4006185 4005921 node /home/user/.claude/plugins/cache/alfred-marketplace/"
               "slack-channel/0.1.0/node_modules/.bin/tsx /home/user/.claude/plugins/cache/"
-              "marveen-marketplace/slack-channel/0.1.0/server.ts")
+              "alfred-marketplace/slack-channel/0.1.0/server.ts")
 # A directory marketplace: Claude Code runs the plugin from its source dir, not the cache.
 NODE_GROMZO = "4006187 4005921 node /home/user/local-plugins/gromzo/gromzo-channel/dist/server.js"
 # A shell under the session that merely NAMES the gromzo path is not a worker.
 SHELL_GROMZO = "4006190 4005921 /bin/zsh -c ls /home/user/local-plugins/gromzo/gromzo-channel/dist"
 MARKETS = {"gromzo-local": {"source": {"source": "directory", "path": "/home/user/local-plugins/gromzo"}},
-           "marveen-marketplace": {"source": {"source": "github", "repo": "x/y"}}}
+           "alfred-marketplace": {"source": {"source": "github", "repo": "x/y"}}}
 
 
 # Not a worker even though it is a runtime: the gromzo path is only an argument
@@ -137,7 +137,7 @@ class GateTest(unittest.TestCase):
     def test_a_missing_node_slack_worker_is_red(self):
         r = run_three([CLAUDE_THREE, BUN_TG3, NODE_GROMZO])
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-        self.assertIn("HIANYZO=marveen-marketplace/slack-channel", r.stdout)
+        self.assertIn("HIANYZO=alfred-marketplace/slack-channel", r.stdout)
 
     def test_a_runtime_naming_the_plugin_path_only_as_an_argument_is_not_a_worker(self):
         r = run_three([CLAUDE_THREE, BUN_TG3, NODE_SLACK, NODE_MCP_NAMING])
@@ -387,9 +387,9 @@ class DefaultStatePathTest(unittest.TestCase):
     """The default state path must come from the INSTALL ROOT, not from $HOME.
 
     Why this class exists (upstream review, 2026-09-15): the old default was
-    `~/marveen/store/...`, which assumes the checkout sits at a fixed path under
+    `~/alfred/store/...`, which assumes the checkout sits at a fixed path under
     the home directory. On an install rooted elsewhere the gate CREATED an orphan
-    `~/marveen/store` -- os.makedirs is permissive -- and parked its state where
+    `~/alfred/store` -- os.makedirs is permissive -- and parked its state where
     nobody looks.
 
     It is a separate class because every other test in this file passes
@@ -420,8 +420,8 @@ class DefaultStatePathTest(unittest.TestCase):
             self.assertTrue(
                 os.path.exists(os.path.join(root, "store", ".channel-process-gate-state.json")),
                 "the state did not land under the install root: " + r.stdout + r.stderr)
-            self.assertFalse(os.path.exists(os.path.join(home, "marveen")),
-                             "the gate conjured an orphan ~/marveen")
+            self.assertFalse(os.path.exists(os.path.join(home, "alfred")),
+                             "the gate conjured an orphan ~/alfred")
 
     def test_missing_store_is_a_measurement_error_and_creates_nothing(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as home:
@@ -429,8 +429,8 @@ class DefaultStatePathTest(unittest.TestCase):
             self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
             self.assertFalse(os.path.exists(os.path.join(root, "store")),
                              "the gate created store/ in a tree it does not own")
-            self.assertFalse(os.path.exists(os.path.join(home, "marveen")),
-                             "the gate conjured an orphan ~/marveen")
+            self.assertFalse(os.path.exists(os.path.join(home, "alfred")),
+                             "the gate conjured an orphan ~/alfred")
 
 
 class TestFixtureFalseAlarmTest(unittest.TestCase):
@@ -445,7 +445,7 @@ class TestFixtureFalseAlarmTest(unittest.TestCase):
                     "plugin:telegram@own-uid-35ea0375-foreign-15525-1793543705514")
     # The same fake started INSIDE an agent's pane tree (the suite runs in agent-heimdall's pane): the pane pid
     # 2972889 is the real claude, the suite below it, the fake below that.
-    SUITE_NODE = "5100001 2972889 node /home/user/marveen/node_modules/.bin/vitest run"
+    SUITE_NODE = "5100001 2972889 node /home/user/alfred/node_modules/.bin/vitest run"
     FAKE_IN_PANE = ("5100002 5100001 /tmp/vitest-z/bin/claude --channels "
                     "plugin:telegram@guards-cf075d41-pane-parent-15518-1793543701020")
 
@@ -514,10 +514,10 @@ class TestFixtureFalseAlarmTest(unittest.TestCase):
         self.assertIn("discord", self.sent()[0])
 
     def test_a_known_non_official_marketplace_still_counts(self):
-        # The marveen-marketplace slack worker is missing: a known marketplace, so it is measured and red.
-        r = self._run(["4005921 888007 /opt/homebrew/bin/claude --channels plugin:slack-channel@marveen-marketplace"])
+        # The alfred-marketplace slack worker is missing: a known marketplace, so it is measured and red.
+        r = self._run(["4005921 888007 /opt/homebrew/bin/claude --channels plugin:slack-channel@alfred-marketplace"])
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-        self.assertIn("marveen-marketplace/slack-channel", r.stdout)
+        self.assertIn("alfred-marketplace/slack-channel", r.stdout)
 
     def test_without_a_readable_registry_nothing_is_dropped(self):
         # No registry to read: a dead worker of ANY marketplace inside a pane is still reported, never hidden.

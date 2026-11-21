@@ -50,7 +50,7 @@ import {
 import { resetPeerBackoff } from '../federation/bridge.js'
 import { getFederationStatus, refreshFederationStatus, resetFederationPollerCache } from '../federation/poller.js'
 import { ensureFederationClaudeMdSection } from '../federation/onboarding.js'
-import { hardRestartMarveenChannels } from '../channel-monitor.js'
+import { hardRestartAlfredChannels } from '../channel-monitor.js'
 import { gateManualRestart, MANUAL_RESTART_FORCE_HINT, wantsForceRestart } from '../manual-restart-gate.js'
 import { MAIN_CHANNELS_SESSION } from '../main-agent.js'
 import { mayActAsOwner, OWNER_SESSION_REQUIRED, refuseOwner } from './auth.js'
@@ -73,9 +73,9 @@ export const DIRECTORY_SKILL_DESC_MAX = 120
 // package.json semver, read once at module load (there is no existing
 // version reader in the codebase; the git-sha alternative would fingerprint
 // the exact local fork state to peers, which a manifest does not need).
-let marveenVersion = 'unknown'
+let alfredVersion = 'unknown'
 try {
-  marveenVersion = String(JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8')).version || 'unknown')
+  alfredVersion = String(JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8')).version || 'unknown')
 } catch { /* keep 'unknown' */ }
 
 // ---- inbound dedup (best-effort, in-memory) ---------------------------------
@@ -231,7 +231,7 @@ function buildManifest(cfg: FederationConfig, callerPeerId: string | null): unkn
   }
   return {
     system: cfg.systemId,
-    marveenVersion,
+    alfredVersion,
     federationVersion: FEDERATION_VERSION,
     agents: [
       {
@@ -528,19 +528,19 @@ export async function tryHandleFederation(ctx: RouteContext): Promise<boolean> {
   // Apply federation config to the RUNNING main agent by restarting its
   // channels session, so it reloads CLAUDE.md (with the onboarding +
   // delegation directive). Restarts server-side via MAIN_AGENT_ID -- the
-  // client must NOT depend on knowing the main agent id (window._marveen may
+  // client must NOT depend on knowing the main agent id (window._alfred may
   // not be loaded on the Federation page, which would 404 the generic
   // /api/agents/:name/restart path). Dashboard-token only (not a wire endpoint).
   if (path === '/api/federation/apply' && method === 'POST') {
     // FEDAPPLYGATE1018: the apply is a manual main restart too, so it takes the same gate as
-    // /api/marveen/restart: a busy or unreadable pane refuses (409), an explicit {"force": true} cuts the turn.
+    // /api/alfred/restart: a busy or unreadable pane refuses (409), an explicit {"force": true} cuts the turn.
     const force = wantsForceRestart(await readBody(ctx.req))
     if (force) logger.warn({ route: '/api/federation/apply' }, 'manual main restart forced past the pane gate')
     if (!force) {
       const gate = await gateManualRestart(MAIN_CHANNELS_SESSION)
       if (!gate.allow) { json(res, { error: 'restart-blocked', reason: gate.reason, hint: MANUAL_RESTART_FORCE_HINT }, 409); return true }
     }
-    const r = hardRestartMarveenChannels()
+    const r = hardRestartAlfredChannels()
     if (r.ok) { json(res, { ok: true }); return true }
     json(res, { error: r.error || 'Restart failed' }, 500)
     return true
@@ -612,7 +612,7 @@ export async function tryHandleFederation(ctx: RouteContext): Promise<boolean> {
     if (isErr(payload)) return true
     const enabled = payload !== null && typeof payload === 'object' && (payload as Record<string, unknown>).enabled === true
     // Switching ON admits the paired peers and starts sending our outbound
-    // tokens: the owner's session once a login exists (Marveen, #2175 review).
+    // tokens: the owner's session once a login exists (Alfred, #2175 review).
     // Switching OFF only takes away, so it stays open; telling the two apart
     // needs the (small, capped) body, hence the gate after the read.
     if (enabled && refuseUnlessOwner(ctx)) return true

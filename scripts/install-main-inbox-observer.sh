@@ -29,7 +29,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-# #1873: com.<SERVICE_ID>.main-inbox-observer, not a fixed com.marveen.main-inbox-observer -- two installs
+# #1873: com.<SERVICE_ID>.main-inbox-observer, not a fixed com.alfred.main-inbox-observer -- two installs
 # under one user must not share (and overwrite) one helper job.
 . "$SCRIPT_DIR/launchd-label.sh"
 LABEL="$(helper_launchd_label "$PROJECT_DIR" main-inbox-observer)"

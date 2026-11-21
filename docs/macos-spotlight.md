@@ -2,7 +2,7 @@
 
 ## 🎯 Mit jelent, miért érdekes
 
-Ha a Marveen egy Macen fut, az ügynökök egész nap írnak: naplókat, jsonl-átiratokat (`~/.claude/projects`) és sqlite-adatbázist (`store/`). A macOS Spotlight ezeket is indexeli. Folyamatos írás mellett az index a Data köteten több tíz GiB-ra nőhet. Minden index-összefésüléskor (merge) a macOS ideiglenesen egy teljes új példányt is ír.
+Ha a Alfred egy Macen fut, az ügynökök egész nap írnak: naplókat, jsonl-átiratokat (`~/.claude/projects`) és sqlite-adatbázist (`store/`). A macOS Spotlight ezeket is indexeli. Folyamatos írás mellett az index a Data köteten több tíz GiB-ra nőhet. Minden index-összefésüléskor (merge) a macOS ideiglenesen egy teljes új példányt is ír.
 
 A Rendszerbeállításokban ez **„System Data” (Rendszeradatok)** növekedésként látszik, ami újraindításkor részben eltűnik.
 
@@ -28,7 +28,7 @@ sudo lsof -c mds_stores | grep -iE 'merge|indexPositions'
 ## Javítás (ajánlott)
 
 **Rendszerbeállítások > Spotlight > Keresési adatvédelem** (Search Privacy): add hozzá a listához
-1. a Marveen telepítési mappáját (azt, amelyikben a `scripts/doctor.sh` van; a doctor kiírja a pontos útját);
+1. a Alfred telepítési mappáját (azt, amelyikben a `scripts/doctor.sh` van; a doctor kiírja a pontos útját);
 2. a `~/.claude` mappát.
 
 **Ára:** ez a két mappa nem jelenik meg a Cmd+Szóköz keresésben. A naplókat, a jsonl-t és az adatbázist úgyis a dashboardon és a memória-keresőn át éred el. Minden más (alkalmazások, dokumentumok, levelek) kereshető marad.

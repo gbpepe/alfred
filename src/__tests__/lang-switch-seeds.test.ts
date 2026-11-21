@@ -22,7 +22,7 @@ function put(dir: string, files: Record<string, string>) {
 /** An en install whose skills were seeded in Hungarian: alpha untouched, beta edited, gamma has no English version. */
 function install(lib = LIB) {
   base = mkdtempSync(join(tmpdir(), 'lsseeds-'))
-  const inst = join(base, 'opt-marveen'); const home = join(base, 'home')
+  const inst = join(base, 'opt-alfred'); const home = join(base, 'home')
   mkdirSync(join(inst, 'scripts', 'lib'), { recursive: true })
   for (const f of ['seed-lang.sh', 'persona-template.sh']) cpSync(join(ROOT, 'scripts', 'lib', f), join(inst, 'scripts', 'lib', f))
   writeFileSync(join(inst, 'scripts', 'lib', 'seed-refresh.sh'), lib)
@@ -30,7 +30,7 @@ function install(lib = LIB) {
     'seed-skills/alpha/SKILL.md': 'alpha hu\n', 'i18n/en/seed-skills/alpha/SKILL.md': 'alpha en\n',
     'seed-skills/beta/SKILL.md': 'beta hu\n', 'i18n/en/seed-skills/beta/SKILL.md': 'beta en\n',
     'seed-skills/gamma/SKILL.md': 'gamma\n',
-    '.env': 'MAIN_AGENT_ID=marveen\nBOT_NAME=Marveen\nOWNER_NAME=Owner\nAGENT_TEXT_LANG=en\n',
+    '.env': 'MAIN_AGENT_ID=alfred\nBOT_NAME=Alfred\nOWNER_NAME=Owner\nAGENT_TEXT_LANG=en\n',
   })
   put(home, {
     '.claude/skills/alpha/SKILL.md': 'alpha hu\n',
@@ -39,7 +39,7 @@ function install(lib = LIB) {
   })
   return { inst, home }
 }
-const ENV = (inst: string, home: string) => ({ PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home, MARVEEN_INSTALL_DIR: inst, MARVEEN_DOCKER_DIR: join(ROOT, 'docker') })
+const ENV = (inst: string, home: string) => ({ PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home, ALFRED_INSTALL_DIR: inst, ALFRED_DOCKER_DIR: join(ROOT, 'docker') })
 const skill = (home: string, n: string) => readFileSync(join(home, '.claude', 'skills', n, 'SKILL.md'), 'utf-8')
 
 describe('docker/lang-switch-seeds.sh', () => {
@@ -85,8 +85,8 @@ describe('the report hook in scripts/lib/seed-refresh.sh', () => {
   function refresh(lib: string): { out: string; files: Record<string, string> } {
     const { inst, home } = install(lib)
     const script = [
-      'cd "$MARVEEN_INSTALL_DIR"', '. scripts/lib/seed-lang.sh', '. scripts/lib/seed-refresh.sh', '. "$MARVEEN_DOCKER_DIR/seed-refresh-docker.sh"',
-      'INSTALL_DIR="$MARVEEN_INSTALL_DIR"; MAIN_AGENT_ID=marveen; SEED_LANG="$(seed_lang "$INSTALL_DIR")"', 'mkdir -p .seed-prev',
+      'cd "$ALFRED_INSTALL_DIR"', '. scripts/lib/seed-lang.sh', '. scripts/lib/seed-refresh.sh', '. "$ALFRED_DOCKER_DIR/seed-refresh-docker.sh"',
+      'INSTALL_DIR="$ALFRED_INSTALL_DIR"; MAIN_AGENT_ID=alfred; SEED_LANG="$(seed_lang "$INSTALL_DIR")"', 'mkdir -p .seed-prev',
       'docker_seed_refresh; echo "rc=$? updated=$SEED_REFRESH_UPDATED kept=$SEED_REFRESH_KEPT"',
     ].join('\n')
     const r = spawnSync('bash', ['-c', script], { env: ENV(inst, home), encoding: 'utf-8' })

@@ -8,14 +8,14 @@ import { parseLabelPalette } from './css-color.js'
 import { resolveFleetVenvDir } from './fleet-venv.js'
 import { DISTRIBUTION_DEFAULT_AGENT_MODEL, getSettingDefinition, isOverridesOnly } from './config-registry.js'
 import { FIXED_RESERVED_AGENT_IDS, MESSAGE_LAYER_RESERVED_AGENT_IDS } from './web/sanitize.js'
-import { getProviderType, getMainChannelToken, getChannelChatId, type ChannelProviderType } from './channel-provider.js'
+import { getProviderType, getChannelToken, getChannelChatId, type ChannelProviderType } from './channel-provider.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export const PROJECT_ROOT = join(__dirname, '..')
 export const STORE_DIR = join(PROJECT_ROOT, 'store')
-export const DB_FILENAME = 'claudeclaw.db'
-export const PID_FILENAME = 'claudeclaw.pid'
+export const DB_FILENAME = 'alfred.db'
+export const PID_FILENAME = 'alfred.pid'
 
 const env = readEnvFile()
 
@@ -159,14 +159,7 @@ export const DEFAULT_AGENT_MODEL_IS_DISTRIBUTION = !cfg('DEFAULT_AGENT_MODEL')
 // as the slow worker, so nothing changes until it is set. A separate key because the
 // fast session only gets short conversational jobs (under 300 characters, no
 // analysis keyword -- classifyPriority), for which the strongest model is overkill.
-export const WORKER_MODEL_FAST = cfg('MARVEEN_WORKER_MODEL_FAST') || ''
-
-export const TELEGRAM_BOT_TOKEN = env['TELEGRAM_BOT_TOKEN'] ?? ''
-export const ALLOWED_CHAT_ID = env['ALLOWED_CHAT_ID'] ?? ''
-
-export const SLACK_BOT_TOKEN = env['SLACK_BOT_TOKEN'] ?? ''
-export const SLACK_APP_TOKEN = env['SLACK_APP_TOKEN'] ?? ''
-export const SLACK_CHANNEL_ID = env['SLACK_CHANNEL_ID'] ?? ''
+export const WORKER_MODEL_FAST = cfg('ALFRED_WORKER_MODEL_FAST') || ''
 
 // Distribution placeholder for an unconfigured owner name. Exported so
 // consumers that treat the owner name as PRIVATE data (federation outbound
@@ -181,13 +174,13 @@ export const OWNER_NAME = env['OWNER_NAME'] ?? OWNER_NAME_PLACEHOLDER
 // the settings store (agent-scaffold.ts), where it is overrides-only: set it on
 // the Settings page, a .env line no longer counts (ENVRELAXGATE1104).
 export const OWNER_DRIVE_FOLDER = env['OWNER_DRIVE_FOLDER'] ?? ''
-export const BOT_NAME = env['BOT_NAME'] ?? 'Marveen'
+export const BOT_NAME = env['BOT_NAME'] ?? 'Alfred'
 
 // Product / system brand shown in the dashboard chrome (browser tab title,
 // mobile topbar, sidebar, updates page). Kept SEPARATE from BOT_NAME so an
 // operator can name the product one thing (BRAND_NAME) and the main agent
 // another (BOT_NAME, the agent's display name). Defaults to BOT_NAME -- which
-// itself defaults to 'Marveen' -- so an install that sets neither, or only
+// itself defaults to 'Alfred' -- so an install that sets neither, or only
 // BOT_NAME, behaves exactly as before.
 export const BRAND_NAME = env['BRAND_NAME'] ?? BOT_NAME
 
@@ -295,7 +288,7 @@ export function resolveServiceId(brandSlug: string, mainAgentId: string): string
 // ASCII slug used for agent/service ids, mirroring the install scripts'
 // Python NFKD rule: NFKD-normalize, drop non-ASCII, collapse runs of non-
 // alphanumerics to a single dash, trim dashes, lowercase, and fall back to
-// 'marveen' when the result is empty. Exported so the launchd/systemd label
+// 'alfred' when the result is empty. Exported so the launchd/systemd label
 // derivation is provable for any brand string in one place.
 export function brandSlug(raw: string): string {
   const ascii = (raw ?? '')
@@ -304,14 +297,14 @@ export function brandSlug(raw: string): string {
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^\x00-\x7f]/g, '')
   const slug = ascii.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase()
-  return slug || 'marveen'
+  return slug || 'alfred'
 }
 
 // Canonical identifier for the main agent in the DB, tmux sessions, plist
 // labels, API routing, etc. The installer derives this from BOT_NAME
 // (NFKD + ASCII + lowercase dashes). Older installs without this env var
-// fall back to "marveen" so nothing breaks when upgrading in place.
-export const MAIN_AGENT_ID = env['MAIN_AGENT_ID'] ?? 'marveen'
+// fall back to "alfred" so nothing breaks when upgrading in place.
+export const MAIN_AGENT_ID = env['MAIN_AGENT_ID'] ?? 'alfred'
 // The hidden heartbeat worker's agent id. Lives here (not in
 // heartbeat-agent-scaffold) so agent-scaffold can key gates on it without an
 // import cycle: heartbeat-agent-scaffold already imports agent-scaffold.
@@ -399,13 +392,6 @@ export const RESERVED_AGENT_IDS: readonly string[] =
 // (launchctl unload/load, kickstart) still targets the right unit.
 export const SERVICE_ID = env['SERVICE_ID'] ?? MAIN_AGENT_ID
 
-// Legacy service id from before the OS service units were keyed off SERVICE_ID
-// (the project originally shipped as "claudeclaw"). Retained so the standalone
-// installer can retire a stale unit on re-run and the status command still
-// recognizes a service created by an older install.
-export const LEGACY_SERVICE_ID = 'claudeclaw'
-export const LEGACY_APP_SERVICE_LABEL = `com.${LEGACY_SERVICE_ID}.app`
-
 // launchd Label for the standalone interactive installer's app process
 // (scripts/setup.ts, `npm run setup`). Keyed off SERVICE_ID so a branded
 // install names its background service after the brand, matching how
@@ -414,13 +400,9 @@ export function appServiceLabel(serviceId: string): string {
   return `com.${serviceId}.app`
 }
 
-// grep -E alternation matching this install's dashboard/app launchd unit
-// regardless of which installer created it: the SERVICE_ID-derived app service
-// (com.<id>.app from the standalone installer) or dashboard service
-// (com.<id>.dashboard from install-macos.sh), plus the legacy
-// "com.claudeclaw.app". The status command uses it so a running dashboard is
-// detected on every install shape -- the old check only matched the legacy name
-// and silently reported a modern (brand-aware) install as stopped. Anchored
+// grep -E alternation matching this install's dashboard/app launchd unit:
+// the SERVICE_ID-derived app service (com.<id>.app from the standalone installer)
+// or dashboard service (com.<id>.dashboard from install-macos.sh). Anchored
 // with a trailing `$` (the launchd Label is the last field of a
 // `launchctl list` line) so only the exact unit matches -- an ancillary unit
 // whose final segment merely starts with app/dashboard (e.g.
@@ -429,16 +411,14 @@ export function appServiceLabel(serviceId: string): string {
 // JS RegExp, so it sticks to features common to both (`$`, groups, `\.`).
 // serviceId is an ASCII slug, so no regex escaping is needed.
 export function launchdStatusPattern(serviceId: string): string {
-  return `(com\\.${serviceId}\\.(app|dashboard)|com\\.${LEGACY_SERVICE_ID}\\.app)$`
+  return `com\\.${serviceId}\\.(app|dashboard)$`
 }
 
 // systemd --user unit names to probe for the dashboard, newest install shape
-// first: install-linux.sh's "<id>-dashboard", the standalone installer's
-// "<id>", then the legacy "claudeclaw". The status command reports active if
-// any is active. Deduplicated so an id that already equals the legacy id does
-// not probe the same unit twice.
+// first: install-linux.sh's "<id>-dashboard", then the standalone installer's
+// "<id>". The status command reports active if any is active.
 export function systemdStatusUnits(serviceId: string): string[] {
-  return [...new Set([`${serviceId}-dashboard`, serviceId, LEGACY_SERVICE_ID])]
+  return [...new Set([`${serviceId}-dashboard`, serviceId])]
 }
 
 export const WEB_PORT = parseInt(env['WEB_PORT'] ?? '3420', 10)
@@ -478,7 +458,7 @@ export const KANBAN_AGING_CAUTION_COLOR = env['KANBAN_AGING_CAUTION_COLOR'] ?? '
 export const KANBAN_AGING_CRITICAL_COLOR = env['KANBAN_AGING_CRITICAL_COLOR'] ?? '#c53030'
 // Kanban WIP limits per column (0 = unlimited). Override via .env.
 // NOTE: these constants are frozen at process start (this module reads .env
-// once at import time). The dashboard's Settings page and the /api/marveen
+// once at import time). The dashboard's Settings page and the /api/alfred
 // kanbanWip payload do NOT read these directly anymore -- they resolve
 // through settings-store.ts (config-overrides.json > .env > registry
 // default) so a value saved in the UI takes effect without a restart. These
@@ -521,7 +501,7 @@ export const AGENT_API_ORIGIN = cfg('AGENT_API_ORIGIN') ?? ''
 // is EMPTY (off), and a nonexistent directory disables the prefix too.
 // Resolved by fleet-venv.ts, the same function channels.sh reaches through
 // scripts/fleet-venv-prefix.mjs, so the two launch paths cannot disagree.
-export const FLEET_PYTHON_VENV = resolveFleetVenvDir(PROJECT_ROOT, homedir(), process.env.CLAUDECLAW_ENV_DIR ?? PROJECT_ROOT)
+export const FLEET_PYTHON_VENV = resolveFleetVenvDir(PROJECT_ROOT, homedir(), process.env.ALFRED_ENV_DIR ?? PROJECT_ROOT)
 // Extra browser origins allowed to make state-changing dashboard requests
 // (CORS + CSRF allowlist), comma-separated, e.g. for VPN/LAN addresses that
 // aren't covered by WEB_HOST or DASHBOARD_PUBLIC_URL. Empty by default so
@@ -560,14 +540,14 @@ export const KANBAN_LABEL_COLORS_REJECTED = kanbanLabelPalette.rejected
 export const KANBAN_LABEL_COLORS_OVERFLOW = kanbanLabelPalette.overflow
 
 export const CHANNEL_PROVIDER: ChannelProviderType = getProviderType(env['CHANNEL_PROVIDER'])
-export const CHANNEL_TOKEN = getMainChannelToken(CHANNEL_PROVIDER, env)
+export const CHANNEL_TOKEN = getChannelToken(CHANNEL_PROVIDER, env)
 export const CHANNEL_CHAT_ID = getChannelChatId(CHANNEL_PROVIDER, env)
 // Where OPERATIONAL alerts go (watchdog respawns, stuck sessions, restart
 // notices). Empty = the owner chat; set it when the person who runs the
 // system is not the owner, so the owner is not flooded with plumbing noise.
 // Owner-facing content (heartbeat digest, security events) ignores it.
 export function resolveAlertChatIdSetting(e: Record<string, string | undefined>): string {
-  return (e['MARVEEN_ALERT_CHAT_ID'] || e['ALERT_CHAT_ID'] || '').trim()
+  return (e['ALFRED_ALERT_CHAT_ID'] || e['ALERT_CHAT_ID'] || '').trim()
 }
 export const ALERT_CHAT_ID = resolveAlertChatIdSetting(env)
 
@@ -627,18 +607,6 @@ export const PERMISSION_ALERT_MARKS = (cfg('PERMISSION_ALERT_MARKS') ?? '').trim
 export const NOTIFY_ROUTINE_ALERTS =
   !['0', 'false', 'no', 'off'].includes((cfg('NOTIFY_ROUTINE_ALERTS') ?? '1').trim().toLowerCase())
 
-// Sub-agent Telegram inbox delivery-path tee (opt-in, DEFAULT OFF).
-// When enabled, a telegram sub-agent loads the channel plugin via a per-agent
-// mcp.json wrapped in the inbound-tee (scripts/channel-inbound-tee.mjs), which
-// persists each inbound notification to <state>/inbox-pending.jsonl for the
-// channel-inbox-drain UserPromptSubmit hook to pull into the next turn. This
-// swaps the default `--channels` delivery path, so it is DEFAULT OFF: an install
-// that does not opt in keeps the exact upstream `--channels` behaviour and never
-// writes message content to disk. Enable with SUBAGENT_INBOX_TEE=1 (required for
-// SUBAGENT_TELEGRAM_WAKE_ENABLED to have an inbox to wake on).
-export const SUBAGENT_INBOX_TEE =
-  ['1', 'true', 'yes', 'on'].includes((cfg('SUBAGENT_INBOX_TEE') ?? '').trim().toLowerCase())
-
 // Strict command-syntax group for the memory content filter (opt-in, DEFAULT OFF).
 // The filter in src/web/routes/memories.ts is injection-only by default: the six
 // command-syntax patterns (curl http(s), bash -c, eval(, exec(, import
@@ -650,18 +618,6 @@ export const SUBAGENT_INBOX_TEE =
 // upstream injection-only filter unchanged.
 export const MEMORY_CONTENT_FILTER_STRICT_COMMANDS =
   ['1', 'true', 'yes', 'on'].includes((cfg('MEMORY_CONTENT_FILTER_STRICT_COMMANDS') ?? '').trim().toLowerCase())
-
-// Sub-agent Telegram inbox wake-nudge (opt-in, DEFAULT OFF).
-// The message-router can nudge an idle sub-agent whose derived Telegram inbox
-// (<state>/inbox-pending.jsonl) has stuck inbound messages, so its drain hook
-// fires and claims the backlog. This is the ACTIVE tail of the SUBAGENT_INBOX_TEE
-// delivery path: the tee writer and the UserPromptSubmit drain hook now ship in
-// this repo, but both are gated -- with SUBAGENT_INBOX_TEE off no inbox file is
-// produced and this watcher is a no-op even when enabled. Ships DISABLED so an
-// upstream install sees zero behaviour change and pays no per-tick cost; enable
-// with SUBAGENT_TELEGRAM_WAKE_ENABLED=1 (alongside SUBAGENT_INBOX_TEE=1).
-export const SUBAGENT_TELEGRAM_WAKE_ENABLED =
-  ['1', 'true', 'yes', 'on'].includes((cfg('SUBAGENT_TELEGRAM_WAKE_ENABLED') ?? '').trim().toLowerCase())
 
 // Single designated Claude Code auto-updater (opt-in, DEFAULT OFF).
 // Every launched claude gets DISABLE_AUTOUPDATER=1 so no two sessions race to

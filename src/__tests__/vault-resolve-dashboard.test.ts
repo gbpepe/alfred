@@ -28,7 +28,7 @@ function run(script: string, args: string[], opts: { stdin?: string; env?: Recor
     const child = execFile(
       process.execPath,
       [join(ROOT, 'scripts', script), ...args],
-      { env: { PATH: process.env.PATH || '', HOME: join(ROOT, 'home'), VAULT_RESOLVE_URL: serverUrl, MARVEEN_AGENT_ID: 'zz-agent', ...opts.env } },
+      { env: { PATH: process.env.PATH || '', HOME: join(ROOT, 'home'), VAULT_RESOLVE_URL: serverUrl, ALFRED_AGENT_ID: 'zz-agent', ...opts.env } },
       (error, stdout, stderr) => {
         const code = error && typeof (error as unknown as { code?: number }).code === 'number' ? (error as unknown as { code: number }).code : error ? 1 : 0
         outputs.push(stdout, stderr)
@@ -131,7 +131,7 @@ describe('vault-resolve via the dashboard', () => {
       expect(requests.at(-1)!.headers.authorization).toBe('Bearer tok-x')
       // another agent's claim does not pick zz-agent's file; an explicit VAULT_RESOLVE_TOKEN_FILE still wins
       rmSync(own); writeFileSync(own, 'tok-agent')
-      expect((await resolveRun('X=A\n', { ...session, MARVEEN_AGENT_ID: 'other-agent' })).code).toBe(0)
+      expect((await resolveRun('X=A\n', { ...session, ALFRED_AGENT_ID: 'other-agent' })).code).toBe(0)
       expect(requests.at(-1)!.headers.authorization).toBe('Bearer tok-x')
       expect((await resolveRun('X=A\n', { ...session, VAULT_RESOLVE_TOKEN_FILE: TOKEN_FILE })).code).toBe(0)
       expect(requests.at(-1)!.headers.authorization).toBe('Bearer tok-x')
@@ -370,18 +370,18 @@ describe('token and agent name', () => {
 
   it('S10 claimedAgentName', async () => {
     const mod = await import(join(process.cwd(), 'scripts', 'vault-dashboard-client.mjs'))
-    const saved = { id: process.env.MARVEEN_AGENT_ID, name: process.env.MARVEEN_AGENT_NAME }
+    const saved = { id: process.env.ALFRED_AGENT_ID, name: process.env.ALFRED_AGENT_NAME }
     try {
-      process.env.MARVEEN_AGENT_ID = 'from-env'
+      process.env.ALFRED_AGENT_ID = 'from-env'
       expect(mod.claimedAgentName('/srv/app/agents/zz-sub/work')).toBe('from-env')
-      delete process.env.MARVEEN_AGENT_ID
-      delete process.env.MARVEEN_AGENT_NAME
+      delete process.env.ALFRED_AGENT_ID
+      delete process.env.ALFRED_AGENT_NAME
       expect(mod.claimedAgentName('/srv/app/agents/zz-sub/work')).toBe('zz-sub')
       expect(mod.claimedAgentName('/srv/app')).toBe('')
       expect(mod.claimedAgentName('/x/agents/Bad Name/y')).toBe('')
     } finally {
-      if (saved.id !== undefined) process.env.MARVEEN_AGENT_ID = saved.id
-      if (saved.name !== undefined) process.env.MARVEEN_AGENT_NAME = saved.name
+      if (saved.id !== undefined) process.env.ALFRED_AGENT_ID = saved.id
+      if (saved.name !== undefined) process.env.ALFRED_AGENT_NAME = saved.name
     }
   })
 })

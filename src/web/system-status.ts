@@ -27,9 +27,7 @@ import {
 import { configDirFor } from './main-transcript-root.js'
 import { readConfiguredMainModel } from './channel-monitor.js'
 import { readModelFallbackConfig } from './model-fallback-store.js'
-import { readMarveenTelegramConfig } from './telegram.js'
-import { resolveOwnerChatId } from '../owner-chat.js'
-import { resolveOwnerIdentity, ownerUnsetNotice, readDiscordOwnerSetting } from '../owner-identity.js'
+import { readDiscordOwnerSetting } from '../owner-identity.js'
 import { channelStateDir } from '../channel-provider.js'
 import { readGateConfig } from './context-restart-gate-store.js'
 import { readQuotaSnapshot, DEFAULT_MAX_AGE_SEC, type QuotaSnapshot, type QuotaWindow } from './quota.js'
@@ -238,70 +236,12 @@ export function formatQuota(q: QuotaSnapshot): { fiveHour: string; sevenDay: str
 
 // ---- the live collectors ----------------------------------------------------
 
-// Telegram plugin patch (scripts/patch-telegram-plugin.py, review on #1529):
-// when it is missing, the plugin answers /status and /help itself, and that
-// fallback must not be silent. Measured now, not only at channel start: the
-// state file names the cache the last start patched and why a file failed;
-// each cached version's server.ts is re-read for the marker, so a plugin
-// version that arrived after the start shows up too.
-export const PLUGIN_PATCH_MARKER = 'MARVEEN-PATCH(elsokor922-d4)'
-// The independent patches, each with what the owner loses without it.
-const PLUGIN_PATCHES = [
-  { name: 'd4', marker: PLUGIN_PATCH_MARKER, label: '', fallback: 'a /status és a /help a plugin saját válasza' },
-  { name: 'fwd', marker: 'MARVEEN-PATCH(elsokor922-fwd)', label: ' (továbbítás-jelölő)', fallback: 'egy továbbított parancs úgy fut, mint a begépelt' },
-  { name: 'evid', marker: 'MARVEEN-PATCH(cmd920-evid)', label: ' (bejövő-napló)', fallback: 'az író parancsok (/model, /context clear, saját parancsok) nem futnak, nincs mihez ellenőrizni őket' },
-  { name: 'quote', marker: 'MARVEEN-PATCH(quote1101)', label: ' (idézet-részlet)', fallback: 'egy idézett válasznál az idézett részlet nem jut el az ágenshez' },
-  { name: 'silent', marker: 'MARVEEN-PATCH(tgsilent)', label: ' (hangtalan válasz)', fallback: 'minden válasz hanggal érkezik, a státuszüzenetek is' },
-  { name: 'kbd', marker: 'MARVEEN-PATCH(c67f5f34-kbd)', label: ' (válaszgombok)', fallback: 'a kérdések gomb nélkül mennek ki, a válasz betűvel jön' },
-  { name: 'pairtext', marker: 'MARVEEN-PATCH(pairtext)', label: ' (párosítás-szöveg)', fallback: 'a párosításnál a bot Claude Code-ot mond, a jóváhagyás viszont a dashboardon van' },
-  { name: 'invitetext', marker: 'MARVEEN-PATCH(invitetext)', label: ' (meghívó-szöveg)', fallback: 'a meghívó link senkit nem enged be (a monitor csak a saját tokennel érkezőt hagyja jóvá), marad a dashboardos párosító kód' },
-  { name: 'invis', marker: 'MARVEEN-PATCH(invis1024)', label: ' (láthatatlan karakterek)', fallback: 'a bejövő szövegben maradnak a láthatatlan karakterek, a modell látja őket' },
-]
-// Switchable (TELEGRAM_TOPICS_ENABLED): expected only when the last channel
-// start ran with the switch on, which the state file records.
-const TOPICS_PLUGIN_PATCH = { name: 'topics', marker: 'MARVEEN-PATCH(tgtopics)', label: ' (témák)', fallback: 'a válasz és a gépelés-jelzés nem a témába megy, hanem a témán kívülre' }
-// Switchable the same way (TELEGRAM_REACTIONS_ENABLED).
-const REACT_PLUGIN_PATCH = { name: 'react', marker: 'MARVEEN-PATCH(tgreact1119)', label: ' (reakciók)', fallback: 'a reakciók nem jutnak el az ügynökhöz' }
-
-export function telegramPluginPatchStatus(stateFile = join(STORE_DIR, 'telegram-plugin-patch.json')): string {
-  if (!existsSync(stateFile)) return 'nincs adat (a csatorna-indítás még nem futtatta a patchert; nem Telegram csatorna?)'
-  const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as {
-    root?: string
-    topics?: string
-    reactions?: string
-    files?: Array<{ version: string; status: string; patches?: Record<string, string> }>
-  }
-  if (!state.root) return notMeasurable('az állapotfájlban nincs cache-útvonal')
-  const base = join(state.root, 'claude-plugins-official', 'telegram')
-  const versions = existsSync(base) ? readdirSync(base).filter(v => existsSync(join(base, v, 'server.ts'))).sort() : []
-  if (versions.length === 0) return `nincs Telegram plugin a cache-ben (${state.root})`
-  const texts = new Map(versions.map(v => [v, readFileSync(join(base, v, 'server.ts'), 'utf-8')]))
-  const lines: string[] = []
-  const expected = [...PLUGIN_PATCHES, ...(state.topics === 'on' ? [TOPICS_PLUGIN_PATCH] : []),
-    ...(state.reactions === 'on' ? [REACT_PLUGIN_PATCH] : [])]
-  for (const p of expected) {
-    const missing: string[] = []
-    for (const v of versions) {
-      if (texts.get(v)!.includes(p.marker)) continue
-      const file = state.files?.find(f => f.version === v)
-      const recorded = file ? (file.patches?.[p.name] ?? file.status) : undefined
-      const why = !recorded ? 'új verzió, a következő csatorna-indításkor kerül rá'
-        : recorded === 'patched' || recorded === 'already' ? 'a fájl az indítás óta cserélődött'
-        : recorded
-      missing.push(`${v} (${why})`)
-    }
-    if (missing.length) lines.push(`HIÁNYZIK${p.label}: ${missing.join(', ')} · ${p.fallback}`)
-  }
-  if (lines.length === 0) return `rendben (${versions.join(', ')})`
-  return lines.join('; ')
-}
-
-// The channel a command came from (CommandContext.channel). Unknown = 'telegram': the CSATORNA block as before.
-export type StatusChannel = 'telegram' | 'discord'
+// The channel a command came from (CommandContext.channel).
+export type StatusChannel = 'discord'
 
 // Discord plugin overlay (scripts/patch-discord-plugin.py, DCEXT1111): the state the last channel start recorded,
 // and each recorded server.ts re-read for the overlay's marker, so a plugin file replaced since then shows up.
-export const DISCORD_OVERLAY_MARKER = 'MARVEEN-EXT'
+export const DISCORD_OVERLAY_MARKER = 'ALFRED-EXT'
 
 export function discordPluginPatchStatus(stateFile = join(STORE_DIR, 'discord-plugin-patch.json')): string {
   if (!existsSync(stateFile)) return 'nincs adat (a csatorna-indítás még nem futtatta a patchert; nem Discord csatorna?)'
@@ -323,7 +263,7 @@ export function discordPluginPatchStatus(stateFile = join(STORE_DIR, 'discord-pl
       : f.status
     missing.push(`${f.version} (${why})`)
   }
-  if (missing.length) return `HIÁNYZIK: ${missing.join(', ')} · a Marveen-kiegészítések (gazda-jóváhagyás, slash-parancsok, pótlás) nem futnak`
+  if (missing.length) return `HIÁNYZIK: ${missing.join(', ')} · a Alfred-kiegészítések (gazda-jóváhagyás, slash-parancsok, pótlás) nem futnak`
   const slash = typeof state.slash_commands === 'number' ? `slash-parancsok: ${state.slash_commands}` : 'slash-parancsok: nincs lista'
   return `rendben (${files.map(f => f.version).join(', ')}) · ${slash}`
 }
@@ -354,8 +294,8 @@ function errorLogRow(now: number): BlockSpec['rows'][number] {
   }
 }
 
-// The CSATORNA block for a command that came from Discord: the Discord bot, the Discord owner, the Discord traffic
-// and the Discord plugin overlay, not the Telegram ones.
+// The CSATORNA block for Discord: the Discord bot, the Discord owner, the Discord traffic
+// and the Discord plugin overlay.
 export function discordChannelBlock(now: number): BlockSpec {
   return {
     title: 'CSATORNA',
@@ -439,10 +379,10 @@ function msOf(v: number): number {
   return v > 1e12 ? v : v * 1000
 }
 
-export function liveBlockSpecs(now = Date.now(), channel: StatusChannel = 'telegram'): BlockSpec[] {
+export function liveBlockSpecs(now = Date.now(), _channel: StatusChannel = 'discord'): BlockSpec[] {
   return [
     {
-      title: 'MARVEEN',
+      title: 'ALFRED',
       rows: [
         {
           label: 'Verzió', source: 'package.json, git log -1',
@@ -560,50 +500,7 @@ export function liveBlockSpecs(now = Date.now(), channel: StatusChannel = 'teleg
         },
       ],
     },
-    channel === 'discord' ? discordChannelBlock(now) : {
-      title: 'CSATORNA',
-      rows: [
-        {
-          // The plugin's own /status used to answer "Paired as ..."; the D-4
-          // patch takes that handler out, so the pairing has to be measured
-          // here or it disappears from the chat entirely (owner, 2026-09-23).
-          label: 'Párosítás', source: 'channels/telegram/.env + getMe cache',
-          collect: () => {
-            const cfg = readMarveenTelegramConfig()
-            if (!cfg.hasTelegram) return notMeasurable('nincs bot-token a csatorna .env-jében')
-            const chat = resolveOwnerChatId()
-            // The cache may or may not carry the leading @ -- normalise, never double it.
-            const bot = cfg.botUsername ? `@${cfg.botUsername.replace(/^@+/, '')}` : notMeasurable('a bot neve még nincs lekérdezve')
-            return `${bot} · tulajdonos chat: ${chat ?? notMeasurable('nincs ALLOWED_CHAT_ID')}`
-          },
-        },
-        {
-          // OWNERAUTHGUESS1106 (Samu 71849): the owner works from the dashboard, so a switched-off command gate is
-          // shown here, with where to set the owner.
-          label: 'Chat-parancsok', source: 'TELEGRAM_OWNER_USER_ID + ALLOWED_CHAT_ID + channels/telegram/access.json',
-          collect: () => {
-            const identity = resolveOwnerIdentity()
-            return ownerUnsetNotice(identity) ?? (identity.chatId ? 'engedélyezve (a gazda azonosítva)' : notMeasurable('nincs párosított gazda'))
-          },
-        },
-        {
-          label: 'Forgalom', source: 'conversation_log',
-          collect: () => {
-            const q = getDb().prepare(
-              'SELECT direction, MAX(created_at) AS last FROM conversation_log WHERE agent_id = ? GROUP BY direction',
-            ).all(MAIN_AGENT_ID) as Array<{ direction: string; last: number | null }>
-            const get = (d: string) => q.find(r => r.direction === d)?.last ?? null
-            const fmt = (v: number | null) => v === null ? 'nincs' : formatDayClock(msOf(v))
-            return `bejövő ${fmt(get('in'))} · kimenő ${fmt(get('out'))}`
-          },
-        },
-        {
-          label: 'Telegram plugin-patch', source: 'store/telegram-plugin-patch.json, server.ts jelölő',
-          collect: () => telegramPluginPatchStatus(),
-        },
-        errorLogRow(now),
-      ],
-    },
+    discordChannelBlock(now),
     {
       title: 'RENDSZER',
       rows: [
@@ -630,12 +527,11 @@ export function liveBlockSpecs(now = Date.now(), channel: StatusChannel = 'teleg
 }
 
 const CACHE_MS = 60_000
-// One cache per channel: a Discord /status must not get the Telegram block cached a minute ago, or the other way.
 const cache = new Map<StatusChannel, { at: number; value: SystemStatus }>()
 
 export async function getSystemStatus(opts: { now?: number; specs?: BlockSpec[]; noCache?: boolean; channel?: StatusChannel } = {}): Promise<SystemStatus> {
   const now = opts.now ?? Date.now()
-  const channel = opts.channel ?? 'telegram'
+  const channel = opts.channel ?? 'discord'
   const hit = cache.get(channel)
   if (!opts.noCache && !opts.specs && hit && now - hit.at < CACHE_MS) return hit.value
   const value = await runCollectors(opts.specs ?? liveBlockSpecs(now, channel), now)

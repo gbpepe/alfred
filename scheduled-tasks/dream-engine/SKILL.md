@@ -19,7 +19,7 @@ Nézz végig MINDEN agent (a fő-ágens és az összes sub-agent) tegnapi (24h) 
 
 SQL minta:
 ```bash
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT agent_id, content, keywords FROM memories WHERE created_at > strftime('%s', 'now', '-24 hours') AND category IN ('hot','warm') ORDER BY agent_id, created_at"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT agent_id, content, keywords FROM memories WHERE created_at > strftime('%s', 'now', '-24 hours') AND category IN ('hot','warm') ORDER BY agent_id, created_at"
 ```
 
 Output: 0-2 konkrét skill-javaslat. Mindegyikhez: cím + 1 mondat indoklás + "flotta-szintű" vagy "agent: <név>".
@@ -28,7 +28,7 @@ Output: 0-2 konkrét skill-javaslat. Mindegyikhez: cím + 1 mondat indoklás + "
 
 ```bash
 # Vektorizálás ellenőrzés
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT COUNT(*) as total, COUNT(embedding) as with_emb FROM memories"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT COUNT(*) as total, COUNT(embedding) as with_emb FROM memories"
 # Ha NEM 100%, hívd meg a backfill endpoint-ot (Ollamaval embeddeli a hianyzo ID-kat):
 curl -s -X POST http://localhost:{{WEB_PORT}}/api/memories/backfill -H "Authorization: Bearer $(cat {{INSTALL_DIR}}/store/.dashboard-token)"
 
@@ -43,7 +43,7 @@ curl -s -X POST http://localhost:{{WEB_PORT}}/api/memories/backfill -H "Authoriz
 #   ki, a hot réteg nem ürült (2026-09-16: 57 hot sorból 38 ilyen). Az updated_at a tartalom-
 #   vagy kategória-váltáskor frissül (memories_touch trigger), NULL is lehet -> COALESCE a
 #   created_at-re, ami sosem NULL. Így a ma átírt régi sor sem esik ki.
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT id, content, created_at, updated_at FROM memories WHERE category='hot' AND COALESCE(updated_at, created_at) < CAST(strftime('%s', 'now', '-7 days') AS INTEGER)"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT id, content, created_at, updated_at FROM memories WHERE category='hot' AND COALESCE(updated_at, created_at) < CAST(strftime('%s', 'now', '-7 days') AS INTEGER)"
 ```
 
 **A TÖMEGES UPDATE ELŐTT KÖTELEZŐ:** először futtasd le a fenti `SELECT`-et, nézd meg a
@@ -59,7 +59,7 @@ Műveletek:
 
 A változtatásokat directly SQL-lel csináld:
 ```bash
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "UPDATE memories SET category='cold' WHERE id IN (...)"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "UPDATE memories SET category='cold' WHERE id IN (...)"
 ```
 
 **AZ UPDATE SIKERÉT NE A `changes()`-BŐL OLVASD (2026-08-07).** A `sqlite3 db "SELECT changes()"`
@@ -76,7 +76,7 @@ Output: rövid statisztika ("X memória cold-tier-be áthelyezve, Y vektorizála
 
 ```bash
 # Nyitott kanban-kártyák project + priority szerint
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT id, title, status, project, priority, assignee FROM kanban_cards WHERE status IN ('planned','in_progress','waiting') AND archived_at IS NULL ORDER BY project, priority DESC"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT id, title, status, project, priority, assignee FROM kanban_cards WHERE status IN ('planned','in_progress','waiting') AND archived_at IS NULL ORDER BY project, priority DESC"
 ```
 
 Csoportosíts project szerint. A daily naplóban (utolsó 7 nap) nézd hogy melyik projekten van aktív mozgás (commit, PR, kanban-átmozgás). Hozz ki egy TOP-3 holnapi javaslatot prioritás+aktivitás súlyozva.
@@ -84,7 +84,7 @@ Csoportosíts project szerint. A daily naplóban (utolsó 7 nap) nézd hogy mely
 **A NAPLÓ TÁBLA NEVE `daily_logs`, TÖBBES SZÁMBAN (2026-08-09 02:1x, saját elcsúszás).** A `daily_log` NEM létezik, és az arra futó lekérdezés `Error: in prepare, no such table` sorral elszáll. Ez azért veszélyes, mert a hiba a kör KÖZEPÉN jön, egy `head`-elt kimenet aljára, és a kör simán továbbmegy: aznap a top-3 az aktivitási adat NÉLKÜL állt össze, csak a kanban-prioritásból. A helyes lekérdezés (oszlopok: `agent_id`, `date`, `content`, `created_at`):
 
 ```bash
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT agent_id, date, substr(content,1,120) FROM daily_logs WHERE created_at > CAST(strftime('%s','now','-7 days') AS INTEGER) ORDER BY created_at DESC"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT agent_id, date, substr(content,1,120) FROM daily_logs WHERE created_at > CAST(strftime('%s','now','-7 days') AS INTEGER) ORDER BY created_at DESC"
 ```
 
 **ELJÁRÁS: ha egy bucket lekérdezése HIBÁRA fut, az nem üres eredmény, hanem hiányzó bemenet.** Vagy javítsd és futtasd újra ugyanabban a körben, vagy a DREAM.md `## ⚠️ Hibák` szekciójában mondd ki, hogy az adott bucket csonka bemenetből dolgozott. Csendben továbbmenni a legrosszabb, mert a kimenet ugyanúgy magabiztosnak látszik.
@@ -124,7 +124,7 @@ ls ~/.claude/skills/ | head
 grep -L "^pinned:" ~/.claude/skills/*/SKILL.md  # azok a skillek ahol nincs pinned-flag (NEM gyári)
 ```
 
-Pinned default (mindig védett): claude-video, frontend-design, docx, skill-creator, skill-factory, skill-install-from-git, init, review, security-review, simplify, fewer-permission-prompts, loop, schedule, claude-api, update-config, keybindings-help, telegram:configure, telegram:access.
+Pinned default (mindig védett): claude-video, frontend-design, docx, skill-creator, skill-factory, skill-install-from-git, init, review, security-review, simplify, fewer-permission-prompts, loop, schedule, claude-api, update-config, keybindings-help, discord:configure, discord:access.
 
 Output: 0-3 javaslat: "skill <név> antikvált (utolsó használat >30 nap), törlés vagy frissítés javasolt".
 

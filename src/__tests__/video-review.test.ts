@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, existsSync, readFil
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const base = realpathSync(mkdtempSync(join(tmpdir(), 'marveen-video-review-test-')))
+const base = realpathSync(mkdtempSync(join(tmpdir(), 'alfred-video-review-test-')))
 const root = join(base, 'deliverables')
 const outside = join(base, 'outside')
 const projectRoot = join(base, 'project')

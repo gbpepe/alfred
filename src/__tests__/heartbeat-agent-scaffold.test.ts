@@ -44,7 +44,7 @@ describe('renderHeartbeatClaudeMd', () => {
     // left is the message POST's token read.
     expect(out).toContain('cat /srv/app/store/.dashboard-token')
     expect(out).not.toContain('CLAW_STORE_DIR=')
-    expect(out).not.toContain('claudeclaw.db')
+    expect(out).not.toContain('alfred.db')
   })
 
   it('uses the supplied dashboard origin for the messages API', () => {
@@ -88,7 +88,7 @@ describe('renderHeartbeatClaudeMd', () => {
     const out = renderHeartbeatClaudeMd(ID)
     // With a non-default owner/bot, the upstream default names must not
     // leak through from any hardcoded string.
-    expect(out).not.toMatch(/Szabolcs|Szabi|Marveen/)
+    expect(out).not.toMatch(/Szabolcs|Szabi|Alfred/)
   })
 
   it('contains no em-dash (project style rule)', () => {

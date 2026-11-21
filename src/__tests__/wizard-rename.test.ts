@@ -12,19 +12,19 @@ import { tmpdir } from 'node:os'
 // These tests pin the fix: the always-write + restart decision core, and the
 // fresh-read helpers the display routes now use.
 //
-// Sandboxed .env via the CLAUDECLAW_ENV_DIR hook (see env.test.ts): set
+// Sandboxed .env via the ALFRED_ENV_DIR hook (see env.test.ts): set
 // BEFORE the dynamic import so neither config.js nor env.js ever touches the
 // checkout's real .env.
 const SANDBOX = mkdtempSync(join(tmpdir(), 'wizname-test-'))
 const testEnvPath = join(SANDBOX, '.env')
 
 beforeAll(() => {
-  process.env.CLAUDECLAW_ENV_DIR = SANDBOX
+  process.env.ALFRED_ENV_DIR = SANDBOX
   writeFileSync(testEnvPath, 'BOT_NAME=BootName\n')
 })
 
 afterAll(() => {
-  delete process.env.CLAUDECLAW_ENV_DIR
+  delete process.env.ALFRED_ENV_DIR
   rmSync(SANDBOX, { recursive: true, force: true })
 })
 

@@ -5,7 +5,7 @@ import {
   classifyVersion,
   compareVersions,
   hasEdgeWhiteSpace,
-  meetsMinMarveenVersion,
+  meetsMinAlfredVersion,
   verifyDelivery,
   type Jwk,
 } from '../web/agent-package/verify.js'
@@ -202,7 +202,7 @@ describe('VerifiedPackage', () => {
     privateKey: signer.privateKey,
     slug: 'invoice-helper',
     version: '1.2.3',
-    minMarveenVersion: '1.40.0',
+    minAlfredVersion: '1.40.0',
     displayName: 'Invoice helper',
     modelHint: 'claude-sonnet-5',
     avatar: { path: 'avatar.png', contentType: 'image/png', bytes: avatarBytes },
@@ -216,7 +216,7 @@ describe('VerifiedPackage', () => {
     expect(pkg).toBeInstanceOf(VerifiedPackage)
     expect(pkg.slug).toBe('invoice-helper')
     expect(pkg.version).toBe('1.2.3')
-    expect(pkg.minMarveenVersion).toBe('1.40.0')
+    expect(pkg.minAlfredVersion).toBe('1.40.0')
     expect(pkg.kid).toBe(signer.kid)
     expect(pkg.displayName).toBe('Invoice helper')
     expect(pkg.modelHint).toBe('claude-sonnet-5')
@@ -238,7 +238,7 @@ describe('VerifiedPackage', () => {
     const pkg = result.pkg
     // Pinned: a new property has to be added here, with the pattern or the rule it passed (review of d021f7f2b).
     expect(Object.keys(pkg).sort()).toEqual(
-      ['avatar', 'connectors', 'description', 'displayName', 'files', 'kid', 'minMarveenVersion', 'modelHint', 'payloadSha256', 'slug', 'title', 'version'],
+      ['avatar', 'connectors', 'description', 'displayName', 'files', 'kid', 'minAlfredVersion', 'modelHint', 'payloadSha256', 'slug', 'title', 'version'],
     )
     expect(Reflect.ownKeys(pkg).every((k) => typeof k === 'string')).toBe(true)
     expect('payloadText' in pkg).toBe(false)
@@ -270,7 +270,7 @@ describe('VerifiedPackage', () => {
   const forgedFields = {
     slug: 'x',
     version: '1.0.0',
-    minMarveenVersion: '1.0.0',
+    minAlfredVersion: '1.0.0',
     kid: 'k',
     payloadSha256: 'a'.repeat(64),
     payloadBytes: new Uint8Array([0x7b, 0x7d]),
@@ -382,11 +382,11 @@ describe('classifyVersion (Sz-4.4/7, plan 8.1)', () => {
     expect(classifyVersion({ version: '2.0.0', payloadSha256: h1 }, { version: '1.99.99', payloadSha256: h2 })).toBe('downgrade_refused')
   })
 
-  it('the own version must be at least min_marveen_version', () => {
-    expect(meetsMinMarveenVersion('1.49.1', '1.49.1')).toBe(true)
-    expect(meetsMinMarveenVersion('1.49.1', '1.9.0')).toBe(true)
-    expect(meetsMinMarveenVersion('1.9.0', '1.49.1')).toBe(false)
-    expect(meetsMinMarveenVersion('1.49.1', '1.49.2')).toBe(false)
+  it('the own version must be at least min_alfred_version', () => {
+    expect(meetsMinAlfredVersion('1.49.1', '1.49.1')).toBe(true)
+    expect(meetsMinAlfredVersion('1.49.1', '1.9.0')).toBe(true)
+    expect(meetsMinAlfredVersion('1.9.0', '1.49.1')).toBe(false)
+    expect(meetsMinAlfredVersion('1.49.1', '1.49.2')).toBe(false)
   })
 
   it('a version outside the contract shape throws instead of comparing', () => {

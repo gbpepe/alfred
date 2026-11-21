@@ -25,7 +25,7 @@ chmod +x "$FIX/ps"
 VOL="/System/Volumes/Data"; [ -d "$VOL" ] || VOL="/"
 
 run(){ # run <lib>
-  INSTALL_DIR="/opt/marveen-test" MDUTIL="$FIX/mdutil" PS="$FIX/ps" bash -c ". \"$1\"; spotlight_check" 2>&1
+  INSTALL_DIR="/opt/alfred-test" MDUTIL="$FIX/mdutil" PS="$FIX/ps" bash -c ". \"$1\"; spotlight_check" 2>&1
 }
 
 echo "--- indexing on: two warn lines, the fix and the root-only commands ---"
@@ -33,7 +33,7 @@ fake_mdutil "Indexing enabled. "
 out="$(run "$LIB")"; rc=$?
 [ $rc -eq 0 ] && [ "$(echo "$out" | grep -c '^warn|')" -eq 2 ] \
   && pass "exit 0, two warn lines" || fail "expected two warn lines (rc=$rc): $out"
-echo "$out" | grep -q "Search Privacy, add /opt/marveen-test and ~/.claude" \
+echo "$out" | grep -q "Search Privacy, add /opt/alfred-test and ~/.claude" \
   && pass "names the fix: Search Privacy, the actual install folder and ~/.claude" || fail "fix text missing: $out"
 echo "$out" | grep -q "mds_stores CPU time: 552:26.85" \
   && pass "reports the mds_stores CPU time from ps" || fail "CPU time missing: $out"

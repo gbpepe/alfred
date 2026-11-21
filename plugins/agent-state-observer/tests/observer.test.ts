@@ -15,7 +15,7 @@ type Opts = {
 }
 
 function engine(on: any, opts: Opts = {}) {
-  const env = opts.env ?? { MARVEEN_AGENT_ID: 'alpha', MARVEEN_STATE_OBSERVER_DIR: DIR }
+  const env = opts.env ?? { ALFRED_AGENT_ID: 'alpha', ALFRED_STATE_OBSERVER_DIR: DIR }
   const writes: { path: string; text: string }[] = []
   on('env.get', ($: any, e: { name: string }) => ({ value: env[e.name] }))
   on('fs.exists', ($: any, e: { path: string }) => ({ value: (opts.disabled ?? []).some(n => e.path === `${DIR}/${n}`) }))
@@ -103,7 +103,7 @@ test('an empty rateLimits reading is recorded as empty, not skipped', async ($: 
 })
 
 test('without the agent name from the launcher nothing is written', async ($: any, on: any) => {
-  const writes = engine(on, { env: { MARVEEN_STATE_OBSERVER_DIR: DIR } })
+  const writes = engine(on, { env: { ALFRED_STATE_OBSERVER_DIR: DIR } })
   await start($)
   await turn($)
   await done($)
@@ -112,7 +112,7 @@ test('without the agent name from the launcher nothing is written', async ($: an
 })
 
 test('without the output folder from the launcher nothing is written', async ($: any, on: any) => {
-  const writes = engine(on, { env: { MARVEEN_AGENT_ID: 'alpha' } })
+  const writes = engine(on, { env: { ALFRED_AGENT_ID: 'alpha' } })
   await start($)
   await turn($)
   await settle()
@@ -120,7 +120,7 @@ test('without the output folder from the launcher nothing is written', async ($:
 })
 
 test('a malformed agent name writes nothing (no path escape)', async ($: any, on: any) => {
-  const writes = engine(on, { env: { MARVEEN_AGENT_ID: '../etc', MARVEEN_STATE_OBSERVER_DIR: DIR } })
+  const writes = engine(on, { env: { ALFRED_AGENT_ID: '../etc', ALFRED_STATE_OBSERVER_DIR: DIR } })
   await start($)
   await turn($)
   await settle()
@@ -128,7 +128,7 @@ test('a malformed agent name writes nothing (no path escape)', async ($: any, on
 })
 
 test('a trailing slash on the folder is not doubled', async ($: any, on: any) => {
-  const writes = engine(on, { env: { MARVEEN_AGENT_ID: 'alpha', MARVEEN_STATE_OBSERVER_DIR: `${DIR}/` } })
+  const writes = engine(on, { env: { ALFRED_AGENT_ID: 'alpha', ALFRED_STATE_OBSERVER_DIR: `${DIR}/` } })
   await start($)
   await settle()
   expect(writes[0]!.path).toBe(`${DIR}/alpha.json`)

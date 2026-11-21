@@ -57,7 +57,7 @@ export interface DeviceKeyInfo {
   createdAt: number
   lastUsedAt: number | null
   expiresAt: number | null
-  /** SSH enrollment id (marveen-remote:<uuid>) for Bridge-paired keys; null
+  /** SSH enrollment id (alfred-remote:<uuid>) for Bridge-paired keys; null
    *  for keys minted outside the pairing flow. */
   installId: string | null
   scope: DeviceKeyScope
@@ -180,7 +180,7 @@ export function getDeviceKey(id: number): DeviceKeyInfo | null {
 }
 
 /** Bridge re-pairing: find the key minted by a previous enrollment of the same
- *  device (same marveen-remote:<uuid>), so it can be replaced, not duplicated. */
+ *  device (same alfred-remote:<uuid>), so it can be replaced, not duplicated. */
 export function findDeviceKeyByInstallId(installId: string): DeviceKeyInfo | null {
   const row = getDb().prepare(`SELECT ${INFO_COLUMNS} FROM device_keys WHERE install_id = ?`).get(installId) as Parameters<typeof rowToInfo>[0] | undefined
   return row ? rowToInfo(row) : null
@@ -190,7 +190,7 @@ export function findDeviceKeyByInstallId(installId: string): DeviceKeyInfo | nul
 export const DEVICE_NAME_RE = /^[\p{L}\p{N} ._-]{1,64}$/u
 
 /** Mint the per-device key of a Bridge-paired device, bound to its
- *  marveen-remote:<uuid> install id, and revoke any key a previous pairing of
+ *  alfred-remote:<uuid> install id, and revoke any key a previous pairing of
  *  the same device left behind (replace-by-id, so a device never accumulates
  *  keys). The ONE implementation behind every pairing path -- the dashboard
  *  route and the server-side CLIs the remote installer calls -- so a device

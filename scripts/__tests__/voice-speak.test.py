@@ -30,17 +30,17 @@ INSTALL = os.path.dirname(os.path.dirname(HERE))
 SRC = os.path.join(INSTALL, "scripts", "voice", "_vtools.py")
 
 tmp = tempfile.mkdtemp(prefix="voice-speak-test-")
-# ENVRELAXGATE1104: the ledger DB is always <install>/store/claudeclaw.db (no
+# ENVRELAXGATE1104: the ledger DB is always <install>/store/alfred.db (no
 # environment variable picks it), so the voice call is pointed at a tmp install
-# (scripts/ linked to the repo's) through MARVEEN_INSTALL_DIR, the dashboard's own
+# (scripts/ linked to the repo's) through ALFRED_INSTALL_DIR, the dashboard's own
 # way of naming the install.
 INST = os.path.join(tmp, "install")
 os.makedirs(os.path.join(INST, "store"))
 os.symlink(os.path.join(INSTALL, "scripts"), os.path.join(INST, "scripts"))
-LEDGER = os.path.join(INST, "store", "claudeclaw.db")
+LEDGER = os.path.join(INST, "store", "alfred.db")
 os.environ.pop("LEDGER_DB_PATH", None)
 os.environ["MAIN_AGENT_ID"] = "mainagent"
-os.environ["MARVEEN_INSTALL_DIR"] = INST
+os.environ["ALFRED_INSTALL_DIR"] = INST
 os.environ.pop("VOICE_PITCH", None)
 os.environ.pop("VOICE_TAIL_PAD_S", None)
 PROSODY_VARS = ("VOICE_LENGTH_SCALE", "VOICE_SENTENCE_SILENCE", "VOICE_NOISE_SCALE", "VOICE_NOISE_W_SCALE")
@@ -126,7 +126,7 @@ MAIN_STATE = os.path.join(INSTALL, ".claude", "channels", "telegram")
 
 # Installed-layout copy: _vtools.py alone in a directory outside the install
 # tree, with no lexicon next to it.
-installed_dir = os.path.join(tmp, "marveen-voice")
+installed_dir = os.path.join(tmp, "alfred-voice")
 os.makedirs(installed_dir)
 shutil.copy(SRC, os.path.join(installed_dir, "_vtools.py"))
 

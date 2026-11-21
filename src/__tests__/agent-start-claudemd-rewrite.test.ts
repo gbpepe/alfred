@@ -10,15 +10,15 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync } from 'nod
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-startrewrite-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-startrewrite-test-'))
 // readEnvFile (src/env.ts) takes its folder from this at import time.
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+process.env.ALFRED_ENV_DIR = tmpRoot
 
 vi.mock('../config.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../config.js')>()
   return {
     ...real,
-    STORE_DIR: '/nonexistent/claudeclaw-test-store',
+    STORE_DIR: '/nonexistent/alfred-test-store',
     PROJECT_ROOT: tmpRoot,
     OWNER_NAME: 'TestOwner',
     MAIN_AGENT_ID: 'agent-a',

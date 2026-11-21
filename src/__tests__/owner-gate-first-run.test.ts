@@ -45,7 +45,7 @@ vi.mock('../web/claude-credentials-guard.js', async (orig) => ({
 }))
 vi.mock('../web/channel-monitor.js', async (orig) => ({
   ...(await orig<typeof import('../web/channel-monitor.js')>()),
-  hardRestartMarveenChannels: vi.fn(() => ({ ok: true })),
+  hardRestartAlfredChannels: vi.fn(() => ({ ok: true })),
 }))
 vi.mock('../web/agent-process.js', async (orig) => ({
   ...(await orig<typeof import('../web/agent-process.js')>()),

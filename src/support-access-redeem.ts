@@ -4,7 +4,7 @@
 // and types it in on this machine. This module checks the code's shape, sends
 // it once, and reads the answer strictly. The frozen v1 contract:
 //
-//   POST https://api.marveen.io/support/v1/code-redeem
+//   POST https://api.alfred.io/support/v1/code-redeem
 //   {"code":"msc_<32 chars>","purpose":"support"}
 //   200 {"token":"mst_<43 chars>"}      one key, nothing else
 //   401 the code is not good (unknown, expired, used, wrong purpose: all alike)
@@ -28,7 +28,7 @@ import { isSupportToken } from './support-access-token.js'
 /** `msc_` and exactly 32 URL-safe characters. */
 export const SUPPORT_CODE_SHAPE = /^msc_[A-Za-z0-9_-]{32}$/
 /** The product's own API host. A constant on purpose: see the rules above. */
-export const SUPPORT_SERVICE_ORIGIN = 'https://api.marveen.io'
+export const SUPPORT_SERVICE_ORIGIN = 'https://api.alfred.io'
 export const SUPPORT_REDEEM_PATH = '/support/v1/code-redeem'
 /** A person is waiting at the screen; ten seconds in total, then it is "not available". */
 export const SUPPORT_REDEEM_TIMEOUT_MS = 10_000

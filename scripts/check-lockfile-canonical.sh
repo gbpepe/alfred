@@ -4,7 +4,7 @@
 # Why: a fresh `npm install` (the macOS installer's step until this PR, and the
 # npm ci -> npm install fallback on every platform) rewrites a non-canonical lock,
 # so the customer's tree comes up dirty and every later update goes down the
-# stash path. Measured on marveen2, 11-03: #1251 hand-edited the lock and dropped
+# stash path. Measured on alfred2, 11-03: #1251 hand-edited the lock and dropped
 # better-sqlite3's "hasInstallScript": true; a fresh install added it back (+1 line).
 #
 # How: a FRESH install into an empty directory, the only shape that reproduces

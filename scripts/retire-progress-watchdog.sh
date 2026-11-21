@@ -49,10 +49,10 @@ SETTINGS="$HOME/.claude/settings.json"
 # Read a single key from .env without sourcing it -- an unquoted value with
 # spaces or a $(...) value would otherwise run arbitrary code. Mirrors the
 # read_env in both install-*-progress-hook.sh scripts.
-# MARVEEN_ENV_FILE is set only by the tests (same as in the installers, which
+# ALFRED_ENV_FILE is set only by the tests (same as in the installers, which
 # call this script); when unset, the install's own .env is read as before.
 read_env() {
-  local f="${MARVEEN_ENV_FILE:-$INSTALL_DIR/.env}"
+  local f="${ALFRED_ENV_FILE:-$INSTALL_DIR/.env}"
   [ -f "$f" ] || return 0
   local v
   v="$(grep -E "^${1}=" "$f" | tail -1)" || return 0
@@ -66,7 +66,7 @@ read_env() {
 
 SERVICE_ID="$(read_env SERVICE_ID)"
 MAIN_AGENT_ID_ENV="$(read_env MAIN_AGENT_ID)"
-SERVICE_ID="${SERVICE_ID:-${MAIN_AGENT_ID_ENV:-marveen}}"
+SERVICE_ID="${SERVICE_ID:-${MAIN_AGENT_ID_ENV:-alfred}}"
 ACTIVE_PROVIDER="$(read_env CHANNEL_PROVIDER)"
 
 # Guard: never silently unwire the channel the install is actually using.

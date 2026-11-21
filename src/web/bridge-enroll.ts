@@ -12,7 +12,7 @@
 // shared token keep working unchanged (backward compatibility is not
 // negotiable); they simply do not gain per-device revocation.
 //
-// Re-pairing the same device (same marveen-remote:<uuid>) REPLACES both sides:
+// Re-pairing the same device (same alfred-remote:<uuid>) REPLACES both sides:
 // the authorized_keys line (merge-by-id, existing behavior) and the device key
 // (the old row is revoked, a fresh key is minted) -- so a device never
 // accumulates keys.
@@ -41,7 +41,7 @@ import { mintBridgeDeviceKey } from './auth-device-keys.js'
 export { RemoteEnrollError }
 
 export interface BridgeEnrollInput {
-  /** The pasted `ssh-ed25519 <base64> marveen-remote:<uuid>` line. */
+  /** The pasted `ssh-ed25519 <base64> alfred-remote:<uuid>` line. */
   keyLine: string
   /** Display name for the device key (shown in the device-key list). */
   name: string
@@ -83,12 +83,12 @@ export interface BridgeEnrollOutcome {
 export { sshDirOverride }
 
 /** Shared resolver plus this module's own loud notice. Under a test runner with
- * no MARVEEN_SSH_DIR this THROWS instead of returning the real ~/.ssh: the
+ * no ALFRED_SSH_DIR this THROWS instead of returning the real ~/.ssh: the
  * enroll route calls bridgeEnroll() WITHOUT deps, so a silent fallback here is
  * exactly how a green test enrolled real keys for weeks (ENROLL813). */
 function resolveSshDir(): string {
   return resolveSshDirShared((sshDir) => {
-    logger.warn({ sshDir }, 'MARVEEN_SSH_DIR override active -- authorized_keys writes are redirected (test seam; must be unset in production)')
+    logger.warn({ sshDir }, 'ALFRED_SSH_DIR override active -- authorized_keys writes are redirected (test seam; must be unset in production)')
   })
 }
 
@@ -125,7 +125,7 @@ export function isTailnetIPv4(addr: string): boolean {
 
 /** True for a ZeroTier virtual interface name. Unlike Tailscale, ZeroTier has
  * no fixed, dedicated IP range -- its auto-assign pool is an ordinary RFC1918
- * /24 (eg the elvis-marveen network measured 2026-11-03: 10.76.163.0/24),
+ * /24 (eg the elvis-alfred network measured 2026-11-03: 10.76.163.0/24),
  * indistinguishable by address alone from a real LAN, so address shape can't
  * identify it. The interface name can: the ZeroTier driver always names the
  * device "zt" + a lowercase alphanumeric id (Linux eg "ztdiyqolon"), a

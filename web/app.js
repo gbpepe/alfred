@@ -9,19 +9,19 @@ function bumpAvatarEpoch() { _avatarEpoch = Date.now() }
 function avatarBust() { return _avatarEpoch ? `?t=${_avatarEpoch}` : '' }
 
 // === i18n runtime ===
-// Priority: localStorage['marveen.lang'] > DASHBOARD_LANG (server default, read
+// Priority: localStorage['alfred.lang'] > DASHBOARD_LANG (server default, read
 // from /api/settings on init) > 'hu' (hardcoded fallback).
 // Rick's spec (kanban card 209696a9): t(key,params), window._i18n={hu,en},
 // window._lang; {name} interpolation; EN-fallback then key; dev-mode warning.
 ;(() => {
-  const LS_KEY = 'marveen.lang'
+  const LS_KEY = 'alfred.lang'
   const VALID = new Set(['hu', 'en'])
 
   // Brand tokens ({brand} = product/brand name, {bot} = main agent display
-  // name, {agentId} = canonical slug) are filled from /api/marveen once it
+  // name, {agentId} = canonical slug) are filled from /api/alfred once it
   // resolves (see initSidebarBrand). Until then these defaults keep a stock
   // install byte-identical. Explicit params passed to t() still win over them.
-  window._brandTokens = window._brandTokens || { brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' }
+  window._brandTokens = window._brandTokens || { brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' }
 
   window.t = function t(key, params = {}) {
     const lang = window._lang || 'hu'
@@ -29,7 +29,7 @@ function avatarBust() { return _avatarEpoch ? `?t=${_avatarEpoch}` : '' }
       window._i18n?.[lang]?.[key] ??
       window._i18n?.['en']?.[key] ??
       key
-    if (str === key && localStorage.getItem('marveen.dev') === '1') {
+    if (str === key && localStorage.getItem('alfred.dev') === '1') {
       console.warn('[i18n] missing key:', key)
     }
     const vals = { ...window._brandTokens, ...params }
@@ -96,17 +96,17 @@ function avatarBust() { return _avatarEpoch ? `?t=${_avatarEpoch}` : '' }
 // strip it from the visible URL, and then inject it into every /api/* fetch
 // as a Bearer header so the server lets us through.
 
-// The main (channels) agent's real id. The backend /api/marveen route returns
-// the configured MAIN_AGENT_ID (NOT the literal "marveen") in window._marveen;
+// The main (channels) agent's real id. The backend /api/alfred route returns
+// the configured MAIN_AGENT_ID (NOT the literal "alfred") in window._alfred;
 // use this everywhere an agent id is sent to /api/agents/... or compared to a
-// fleet name, so the dashboard works on non-"marveen" installs. Falls back to
-// "marveen" only before /api/marveen has resolved (or on a legacy backend).
+// fleet name, so the dashboard works on non-"alfred" installs. Falls back to
+// "alfred" only before /api/alfred has resolved (or on a legacy backend).
 function mainAgentId() {
-  return window._marveen?.agentId || 'marveen'
+  return window._alfred?.agentId || 'alfred'
 }
 
 (() => {
-  const TOKEN_KEY = 'marveen-dashboard-token'
+  const TOKEN_KEY = 'alfred-dashboard-token'
   const urlParams = new URLSearchParams(window.location.search)
   const urlToken = urlParams.get('token')
   // Keep the token in memory for the whole session in addition to localStorage.
@@ -151,8 +151,8 @@ function mainAgentId() {
       // a session whose localStorage copy was purged.
       try { localStorage.removeItem(TOKEN_KEY) } catch { /* storage blocked */ }
       if (!urlToken) sessionToken = ''
-      if (!window.__marveenAuthPrompted) {
-        window.__marveenAuthPrompted = true
+      if (!window.__alfredAuthPrompted) {
+        window.__alfredAuthPrompted = true
         handleAuthFailure()
       }
     }
@@ -239,7 +239,7 @@ function mainAgentId() {
     title.textContent = tr('auth.setup_code.title', 'Enter the setup code')
     const desc = document.createElement('p')
     desc.style.cssText = 'margin:0;font-size:14px;opacity:0.8;line-height:1.5;text-align:center'
-    desc.textContent = tr('auth.setup_code.desc', 'Find the "Marveen setup code" line in the server log (on Hostinger: Docker Manager, View logs) and type the code here. It works once; a restart of the container gives a new one.')
+    desc.textContent = tr('auth.setup_code.desc', 'Find the "Alfred setup code" line in the server log (on Hostinger: Docker Manager, View logs) and type the code here. It works once; a restart of the container gives a new one.')
     const input = document.createElement('input')
     input.type = 'text'
     input.autocomplete = 'one-time-code'
@@ -277,9 +277,8 @@ function mainAgentId() {
 
   // Full-screen username+password login overlay. Posts to /api/auth/login; on
   // success the browser has the mv_session cookie and we reload authenticated.
-  // opts.cancellable: opened on purpose from a page that already works (the Bridge, whose
-  // device key authenticates every call: a Gromzo owner action needs the password login on
-  // top of it, GROMZOAGENTPICK1101), so it gets a Cancel button.
+  // opts.cancellable: opened on purpose from a page that already works (the Bridge), so it
+  // gets a Cancel button.
   function showLoginOverlay(opts) {
     if (document.getElementById('mv-login-overlay')) return
     const tr = (k, fallback) => (typeof window.t === 'function' ? window.t(k) : fallback) || fallback
@@ -460,7 +459,7 @@ function mainAgentId() {
   function showStandaloneTokenPrompt(tokenKey) {
     if (document.getElementById('mv-token-overlay')) return
     // Lang files are not yet loaded here; use a local inline lookup so EN mode works.
-    const _lang = localStorage.getItem('marveen.lang') || 'hu'
+    const _lang = localStorage.getItem('alfred.lang') || 'hu'
     const _pwa = {
       hu: {
         title: 'Hozzáférés szükséges',
@@ -640,10 +639,10 @@ navLinks.forEach((link) => {
 })
 
 // === Collapsible sidebar groups ===
-// Open/closed state lives in localStorage (marveen.sidebarGroups) as a JSON
+// Open/closed state lives in localStorage (alfred.sidebarGroups) as a JSON
 // array of open group keys. Missing or corrupt state means everything starts
 // collapsed -- that is the designed default, not an error.
-const SIDEBAR_GROUPS_LS_KEY = 'marveen.sidebarGroups'
+const SIDEBAR_GROUPS_LS_KEY = 'alfred.sidebarGroups'
 // Declarative single source of truth for the group -> pages mapping. The markup
 // order is only the default snapshot: at boot the static links are re-parented
 // into their group containers per this map, so regrouping a page (say, moving
@@ -889,7 +888,7 @@ function renderStaticI18n() {
   // if loadUpdates' refetch is slow or fails.
   if (typeof renderUpdatesVersion === 'function') renderUpdatesVersion(window._updatesStatus)
   if (typeof applyOnboardingProviderTab === 'function') applyOnboardingProviderTab()
-  // DOCKERI18N1119: the "no channel configured" banner's text is drawn from /api/marveen with the language of that
+  // DOCKERI18N1119: the "no channel configured" banner's text is drawn from /api/alfred with the language of that
   // moment; on a fresh install that answer can come before DASHBOARD_LANG (Geri, v1.50.1: Hungarian on an en install).
   if (typeof updateMainChannelUnconfBanner === 'function' && mainChannelUnconfLast) updateMainChannelUnconfBanner(mainChannelUnconfLast)
 }
@@ -1019,7 +1018,7 @@ let kanbanProjectFilter = ''
 // (e.g. card "gorcsevivan" vs list "GorcsevIvan") still filters correctly.
 let kanbanAssigneeFilter = ''
 // Swimlane grouping: 'none' (flat board, default) | 'assignee' | 'priority'.
-// The initial value is pulled from window._marveen.kanbanSwimlanes.defaultGroup
+// The initial value is pulled from window._alfred.kanbanSwimlanes.defaultGroup
 // the first time loadKanban() runs (see kanbanGroupByInitialized below), then
 // fully user-controlled via the toolbar dropdown.
 let kanbanGroupBy = 'none'
@@ -1068,23 +1067,23 @@ document.querySelectorAll('.kanban-add-btn').forEach((btn) => {
 
 async function loadKanban() {
   try {
-    // Always refresh the marveen config so values changed on the Settings page
+    // Always refresh the alfred config so values changed on the Settings page
     // (e.g. WIP limits) show up on the board on the next Kanban open, without a
-    // hard reload. The full /api/marveen payload includes kanbanAging, kanbanWip,
+    // hard reload. The full /api/alfred payload includes kanbanAging, kanbanWip,
     // kanbanSwimlanes and kanbanLabels, so the labels (from the labels feature)
     // stay populated too. Also covers opening the Kanban page first, before the
-    // Agents page populated window._marveen.
+    // Agents page populated window._alfred.
     try {
-      const mr = await fetch('/api/marveen')
-      if (mr.ok) window._marveen = { ...(window._marveen || {}), ...(await mr.json()) }
-    } catch { /* ignore -- aging/WIP/swimlanes/labels just won't render until _marveen loads */ }
+      const mr = await fetch('/api/alfred')
+      if (mr.ok) window._alfred = { ...(window._alfred || {}), ...(await mr.json()) }
+    } catch { /* ignore -- aging/WIP/swimlanes/labels just won't render until _alfred loads */ }
     if (!kanbanGroupByInitialized) {
       kanbanGroupByInitialized = true
       // A user's own past choice (saved to localStorage) wins over the
       // server-configured default, so switching the grouping sticks across
       // page reloads instead of resetting every time.
-      const stored = localStorage.getItem('marveen.kanbanGroupBy')
-      const defaultGroup = window._marveen?.kanbanSwimlanes?.defaultGroup
+      const stored = localStorage.getItem('alfred.kanbanGroupBy')
+      const defaultGroup = window._alfred?.kanbanSwimlanes?.defaultGroup
       const initialGroup = (stored === 'assignee' || stored === 'priority' || stored === 'none')
         ? stored
         : (defaultGroup === 'assignee' || defaultGroup === 'priority' ? defaultGroup : 'none')
@@ -1096,14 +1095,14 @@ async function loadKanban() {
       // Active label-filter selection, restored the same way as the groupBy
       // choice -- a fresh page load should not lose the filters set up.
       try {
-        const storedLabels = JSON.parse(localStorage.getItem('marveen.kanbanLabelFilter') || '[]')
+        const storedLabels = JSON.parse(localStorage.getItem('alfred.kanbanLabelFilter') || '[]')
         if (Array.isArray(storedLabels)) kanbanLabelFilter = new Set(storedLabels)
       } catch { /* ignore malformed storage */ }
       try {
-        const storedHiddenCols = JSON.parse(localStorage.getItem('marveen.kanbanHiddenColumns') || '[]')
+        const storedHiddenCols = JSON.parse(localStorage.getItem('alfred.kanbanHiddenColumns') || '[]')
         if (Array.isArray(storedHiddenCols)) kanbanHiddenColumns = new Set(storedHiddenCols)
       } catch { /* ignore malformed storage */ }
-      const storedSort = localStorage.getItem('marveen.kanbanSortBy')
+      const storedSort = localStorage.getItem('alfred.kanbanSortBy')
       if (KANBAN_SORTS.includes(storedSort)) {
         kanbanSortBy = storedSort
         const sortSel = document.getElementById('kanbanSortBy')
@@ -1224,25 +1223,25 @@ async function renderKanbanSummary() {
     line(a.agent, chips)
   }
   try {
-    box.open = localStorage.getItem('marveen.kanbanSummaryOpen') === '1'
+    box.open = localStorage.getItem('alfred.kanbanSummaryOpen') === '1'
   } catch { /* storage blocked: stays collapsed */ }
   if (!box.dataset.wired) {
     box.dataset.wired = '1'
     box.addEventListener('toggle', () => {
-      try { localStorage.setItem('marveen.kanbanSummaryOpen', box.open ? '1' : '0') } catch { /* ignore */ }
+      try { localStorage.setItem('alfred.kanbanSummaryOpen', box.open ? '1' : '0') } catch { /* ignore */ }
     })
   }
 }
 
 document.getElementById('kanbanGroupBy').addEventListener('change', (e) => {
   kanbanGroupBy = e.target.value
-  localStorage.setItem('marveen.kanbanGroupBy', kanbanGroupBy)
+  localStorage.setItem('alfred.kanbanGroupBy', kanbanGroupBy)
   renderKanban()
 })
 
 document.getElementById('kanbanSortBy')?.addEventListener('change', (e) => {
   kanbanSortBy = e.target.value
-  localStorage.setItem('marveen.kanbanSortBy', kanbanSortBy)
+  localStorage.setItem('alfred.kanbanSortBy', kanbanSortBy)
   renderKanban()
 })
 
@@ -1296,7 +1295,7 @@ function renderKanbanColumnChips() {
     chip.addEventListener('click', () => {
       if (kanbanHiddenColumns.has(def.status)) kanbanHiddenColumns.delete(def.status)
       else kanbanHiddenColumns.add(def.status)
-      localStorage.setItem('marveen.kanbanHiddenColumns', JSON.stringify([...kanbanHiddenColumns]))
+      localStorage.setItem('alfred.kanbanHiddenColumns', JSON.stringify([...kanbanHiddenColumns]))
       renderKanban()
     })
     container.appendChild(chip)
@@ -1499,7 +1498,7 @@ function clearKanbanQuickFilters() {
 }
 
 function persistKanbanFilters() {
-  localStorage.setItem('marveen.kanbanLabelFilter', JSON.stringify([...kanbanLabelFilter]))
+  localStorage.setItem('alfred.kanbanLabelFilter', JSON.stringify([...kanbanLabelFilter]))
 }
 
 // Quick-filter chip row: one chip per defined label (not per priority), tinted
@@ -1651,7 +1650,7 @@ function renderKanbanOwnerStrip() {
   if (mine.length === 0) { el.hidden = true; return }
   el.hidden = false
 
-  const collapsed = localStorage.getItem('marveen.kanbanOwnerStripCollapsed') === '1'
+  const collapsed = localStorage.getItem('alfred.kanbanOwnerStripCollapsed') === '1'
   el.classList.toggle('collapsed', collapsed)
   el.innerHTML = ''
 
@@ -1680,7 +1679,7 @@ function renderKanbanOwnerStrip() {
   head.append(face, label, nick, count, toggle)
   head.addEventListener('click', () => {
     const now = !el.classList.contains('collapsed')
-    localStorage.setItem('marveen.kanbanOwnerStripCollapsed', now ? '1' : '0')
+    localStorage.setItem('alfred.kanbanOwnerStripCollapsed', now ? '1' : '0')
     renderKanbanOwnerStrip()
   })
   el.appendChild(head)
@@ -1887,7 +1886,7 @@ function kanbanSwimlaneMeta(key) {
 //
 // The image is served by the SAME endpoints the agents page already uses, so no
 // new storage and no new upload path: agents/<name>/avatar.png for an agent,
-// store/marveen-avatar.png for the bot, store/owner-avatar.png for the owner.
+// store/alfred-avatar.png for the bot, store/owner-avatar.png for the owner.
 //
 // Why an <img> laid OVER the letter instead of asking first whether a picture
 // exists: the board would otherwise need a per-assignee "hasAvatar" round trip
@@ -1900,8 +1899,8 @@ function kanbanAvatarUrlFor(key) {
   if (!key || key === '__unassigned__') return null
   const m = kanbanAssignees.find(a => a.name === key)
   if (!m) return null
-  if (m.type === 'owner') return '/api/marveen/owner-avatar' + avatarBust()
-  if (m.type === 'bot') return '/api/marveen/avatar' + avatarBust()
+  if (m.type === 'owner') return '/api/alfred/owner-avatar' + avatarBust()
+  if (m.type === 'bot') return '/api/alfred/avatar' + avatarBust()
   if (m.type === 'agent') return `/api/agents/${encodeURIComponent(m.name)}/avatar` + avatarBust()
   return null
 }
@@ -1967,7 +1966,7 @@ function renderSwimlaneBoard(grouped, embeddedSubtaskIds) {
   const leftoverKeys = [...presentKeys].filter(k => !orderedKeys.includes(k)).sort((a, b) => a.localeCompare(b))
   const keys = [...orderedKeys, ...leftoverKeys]
 
-  const separatorColor = window._marveen?.kanbanSwimlanes?.separatorColor
+  const separatorColor = window._alfred?.kanbanSwimlanes?.separatorColor
 
   for (const key of keys) {
     const meta = kanbanSwimlaneMeta(key)
@@ -2052,7 +2051,7 @@ const WIP_COUNT_IDS = {
 }
 
 function updateWipBadges(grouped) {
-  const cfg = window._marveen?.kanbanWip
+  const cfg = window._alfred?.kanbanWip
   for (const [status, cards] of Object.entries(grouped)) {
     const el = document.getElementById(WIP_COUNT_IDS[status])
     if (!el) continue
@@ -2243,9 +2242,9 @@ function createCardEl(card, embeddedChildren = []) {
     : ''
 
   // Card aging: left stripe + top-right badge based on hours since last update.
-  // Skipped for done cards. Config thresholds and colours come from window._marveen.kanbanAging.
+  // Skipped for done cards. Config thresholds and colours come from window._alfred.kanbanAging.
   let agingBadgeHtml = ''
-  const agingCfg = window._marveen?.kanbanAging
+  const agingCfg = window._alfred?.kanbanAging
   // Age from the last STATUS CHANGE, not from updated_at. A comment sets
   // updated_at (see addKanbanComment in src/db.ts), so a card that has not
   // moved in weeks used to look fresh as soon as anyone wrote on it -- and the
@@ -2354,9 +2353,9 @@ function createCardEl(card, embeddedChildren = []) {
 // each /move call names the owner as `actor`. That is what lets the backend tell
 // an assignment ("the owner dragged this onto you") apart from a self-pickup ("the
 // agent moved its own card"), and only wake the agent in the first case. Falls
-// back to undefined until /api/marveen has loaded -- an unnamed mover means the
+// back to undefined until /api/alfred has loaded -- an unnamed mover means the
 // backend dispatches as it always did, never the opposite.
-function kanbanMoveActor() { return window._marveen?.ownerName || undefined }
+function kanbanMoveActor() { return window._alfred?.ownerName || undefined }
 
 // === Drag & Drop ===
 // Wires the drag/drop handlers for one column-body element. Used for the
@@ -2778,7 +2777,7 @@ async function renderCardLabelsSection(card) {
     newNameInput.value = ''
   }
 
-  const palette = window._marveen?.kanbanLabels?.colors || ['#64748b']
+  const palette = window._alfred?.kanbanLabels?.colors || ['#64748b']
   newColorsEl.innerHTML = ''
   let selectedColor = palette[0]
   palette.forEach((color, i) => {
@@ -3246,8 +3245,8 @@ async function showCardDetail(card) {
 
   // Author select for new comment. Default to the bot assignee resolved by
   // type (never a hard-coded display name -- BOT_NAME differs per deployment),
-  // falling back to the first assignee. The old literal 'Marveen' never matched
-  // on non-Marveen installs, so the select stayed on "-- nincs --" and the
+  // falling back to the first assignee. The old literal 'Alfred' never matched
+  // on non-Alfred installs, so the select stayed on "-- nincs --" and the
   // comment submit silently no-opped (addCommentBtn returns when !author).
   // (Resolution of the #254/#241 overlap: keep #241's type-resolved default
   // over #254's hard-coded "Gábor" -- same deployment-agnostic reasoning.)
@@ -3588,7 +3587,7 @@ let agents = []
 let contextGuardPct = {}
 let currentAgent = null
 // API-safe agent id for the currently open detail modal. Sub-agents key off
-// their name; the main agent's detail object carries name:'marveen' for legacy
+// their name; the main agent's detail object carries name:'alfred' for legacy
 // UI checks but its real agent-dir id is agentId (MAIN_AGENT_ID, e.g.
 // 'gorcsevivan') -- the /api/agents/<id>/skills endpoints need that real id.
 function agentApiName() {
@@ -4069,7 +4068,7 @@ document.getElementById('wizardCreateBtn').addEventListener('click', async () =>
     closeModal(agentWizardOverlay)
     showToast(t('agents.wizard.created'))
     await loadAgents()
-    // Drop the operator straight into the Telegram tab of the new agent so
+    // Drop the operator straight into the Channel tab of the new agent so
     // the pairing step is in front of them -- easy to miss otherwise.
     try {
       await openAgentDetail(name)
@@ -4164,9 +4163,9 @@ async function loadAgents() {
     // The federation status fetch is deliberately failure-proof (.catch ->
     // null): it must NEVER take down the Agents page -- including on an
     // older backend where the route 404s.
-    const [agentsRes, marveenRes, fedStatus, ctxGuard] = await Promise.all([
+    const [agentsRes, alfredRes, fedStatus, ctxGuard] = await Promise.all([
       fetch('/api/agents'),
-      fetch('/api/marveen'),
+      fetch('/api/alfred'),
       fetch('/api/federation/status').then((r) => (r.ok ? r.json() : null)).catch(() => null),
       // Same failure-proofing as federation status above: an older backend or a
       // transient error here must not take down the whole Agents page over a
@@ -4181,13 +4180,12 @@ async function loadAgents() {
         if (typeof g.pct === 'number' && isFinite(g.pct)) contextGuardPct[g.agent] = g.pct
       }
     }
-    if (marveenRes.ok) {
-      window._marveen = await marveenRes.json()
-      updateMainChannelUnconfBanner(window._marveen)
-      // A backend CHANNEL_PROVIDER-éhez igazitsuk a kliens-default-ot,
-      // hogy ne 'telegram' jelenjen meg amikor a backend discord-on van.
-      if (window._marveen?.channelProvider) {
-        currentChannelProvider = window._marveen.channelProvider
+    if (alfredRes.ok) {
+      window._alfred = await alfredRes.json()
+      updateMainChannelUnconfBanner(window._alfred)
+      // A backend CHANNEL_PROVIDER-éhez igazítsuk a kliens állapotát.
+      if (window._alfred?.channelProvider) {
+        currentChannelProvider = window._alfred.channelProvider
         const sel = document.getElementById('chProviderSelect')
         if (sel) sel.value = currentChannelProvider
         if (typeof updateProviderUI === 'function') updateProviderUI()
@@ -4475,21 +4473,21 @@ async function showIdleFlushScheduleWarning(agent) {
   } catch { /* the hint is best-effort; never break the pane over it */ }
 }
 
-async function openMarveenDetail() {
-  const m = window._marveen
+async function openAlfredDetail() {
+  const m = window._alfred
   if (!m) return
 
-  // Reuse the agent detail modal for Marveen
+  // Reuse the agent detail modal for Alfred
   currentAgent = { ...m, name: mainAgentId(), claudeMd: '', soulMd: '', mcpJson: '', skills: [] }
   setupAutoRestartUI(currentAgent)
   setupContextGuardUI(agentApiName())
   setupIdleFlushUI(currentAgent)
 
-  const displayName = m.name || 'Marveen'
+  const displayName = m.name || 'Alfred'
   document.getElementById('agentDetailTitle').textContent = displayName
   const avatar = document.getElementById('agentDetailAvatar')
   avatar.className = 'detail-avatar gradient-1'
-  avatar.innerHTML = `<img src="/api/marveen/avatar${avatarBust()}" alt="${escapeHtml(displayName)}">`
+  avatar.innerHTML = `<img src="/api/alfred/avatar${avatarBust()}" alt="${escapeHtml(displayName)}">`
   document.getElementById('agentDetailName').textContent = displayName
   document.getElementById('agentDetailDesc').textContent = m.description || ''
   document.getElementById('agentDetailModel').textContent = m.model || '-'
@@ -4503,16 +4501,16 @@ async function openMarveenDetail() {
   // called, so the main agent's Skills tab always looked empty.
   loadSkills(agentApiName())
 
-  // Process control for Marveen - always running, no start/stop
+  // Process control for Alfred - always running, no start/stop
   document.getElementById('processDot').className = 'process-dot running'
   document.getElementById('processLabel').textContent = t('agents.status.running')
   document.getElementById('processUptime').textContent = `tmux: ${m.tmuxSession || '-'}`
   document.getElementById('agentStartBtn').hidden = true
   document.getElementById('agentStopBtn').hidden = true
-  // Sync the settings tab model select with Marveen's actual model so it
+  // Sync the settings tab model select with Alfred's actual model so it
   // doesn't carry over the previously opened sub-agent's selection.
-  const marveenModelSelect = document.getElementById('editAgentModel')
-  if (marveenModelSelect) {
+  const alfredModelSelect = document.getElementById('editAgentModel')
+  if (alfredModelSelect) {
     // The main agent's real model (e.g. 'claude-opus-4-8') may not match any
     // static option verbatim (the option is 'claude-opus-4-8[1m]'), so a plain
     // .value assignment finds no match and the select silently displays the
@@ -4520,31 +4518,31 @@ async function openMarveenDetail() {
     // Inject the real id as an option so the (read-only) select shows the truth
     // -- same trick as the sub-agent panel's dynamic-model-opt.
     const mv = m.activeModel || m.model || ''
-    Array.from(marveenModelSelect.querySelectorAll('option.dynamic-model-opt')).forEach(o => o.remove())
-    if (mv && !Array.from(marveenModelSelect.options).some(o => o.value === mv)) {
+    Array.from(alfredModelSelect.querySelectorAll('option.dynamic-model-opt')).forEach(o => o.remove())
+    if (mv && !Array.from(alfredModelSelect.options).some(o => o.value === mv)) {
       const opt = document.createElement('option')
       opt.value = mv
       opt.className = 'dynamic-model-opt'
       opt.textContent = mv
-      marveenModelSelect.appendChild(opt)
+      alfredModelSelect.appendChild(opt)
     }
-    marveenModelSelect.value = mv
+    alfredModelSelect.value = mv
   }
   // Populate the model dropdown groups (auto/manual) AND surface the OpenRouter
   // curation button -- this is the main agent, the only place curation lives.
   loadAvailableModels()
   // Surface the "channels restart" button -- destructive, but mobile-safe
-  // when the Telegram plugin wedges and you're away from a terminal.
-  document.getElementById('marveenRestartBtn').hidden = false
+  // when the Discord plugin wedges and you're away from a terminal.
+  document.getElementById('alfredRestartBtn').hidden = false
 
   // Settings tab - load real CLAUDE.md / SOUL.md / .mcp.json (read-only).
   // Editing the main agent's identity files via the dashboard is intentionally
   // not allowed: a leaked dashboard token would otherwise let a remote user
   // rewrite the live agent's instructions. Edit via filesystem or by asking
-  // Marveen on Telegram instead.
+  // Alfred on Discord instead.
   let mFull = m
   try {
-    const claudeRes = await fetch('/api/marveen')
+    const claudeRes = await fetch('/api/alfred')
     if (claudeRes.ok) {
       mFull = await claudeRes.json()
       document.getElementById('editClaudeMd').value = mFull.claudeMd || ''
@@ -4552,22 +4550,20 @@ async function openMarveenDetail() {
       document.getElementById('editMcpJson').value = mFull.mcpJson || ''
     }
   } catch {}
-  applyMarveenReadonlyMode(true)
+  applyAlfredReadonlyMode(true)
   // The main agent's voice reply section stayed blank: only the sub-agent detail loaded it (#2848).
   loadVoiceConfig(mainAgentId())
 
-  // Telegram tab -- without this the tab stays in the default "not connected"
+  // Channel tab -- without this the tab stays in the default "not connected"
   // view even though the bot is running and receiving messages.
   updateChannelTab({
     name: mainAgentId(),
-    hasTelegram: mFull.hasTelegram !== undefined ? mFull.hasTelegram : true,
-    hasDiscord: mFull.hasDiscord,
-    hasSlack: mFull.hasSlack,
-    telegramBotUsername: mFull.telegramBotUsername,
+    hasDiscord: mFull.hasDiscord !== undefined ? mFull.hasDiscord : true,
+    discordBotUsername: mFull.discordBotUsername,
     running: true,
   })
 
-  // Delete button - hide for Marveen
+  // Delete button - hide for Alfred
   document.getElementById('deleteAgentBtn').style.display = 'none'
 
   document.getElementById('detailAvatarGallery').hidden = true
@@ -4576,11 +4572,11 @@ async function openMarveenDetail() {
 }
 
 // `readOnly` is really "this modal is showing the MAIN agent" -- it is called
-// with true from openMarveenDetail and false from openAgentDetail, which makes
+// with true from openAlfredDetail and false from openAgentDetail, which makes
 // it the one hook both open-paths share. Anything that must differ for the main
 // agent belongs here; putting it in openAgentDetail alone silently no-ops for
 // the main agent, whose panel never runs that function.
-function applyMarveenReadonlyMode(readOnly) {
+function applyAlfredReadonlyMode(readOnly) {
   // The Team tab describes a SUB-agent's place in the hierarchy: role
   // (leader | member), who it reports to, who it delegates to. None of it
   // applies to the main agent, which has no team record and cannot have one.
@@ -4594,7 +4590,7 @@ function applyMarveenReadonlyMode(readOnly) {
   const teamTabBtn = document.querySelector('#agentTabNav .tab-btn[data-tab="team"]')
   if (teamTabBtn) teamTabBtn.hidden = readOnly
   const textareaIds = ['editClaudeMd', 'editSoulMd', 'editMcpJson']
-  // saveModelBtn stays VISIBLE but disabled for Marveen, so the settings tab
+  // saveModelBtn stays VISIBLE but disabled for Alfred, so the settings tab
   // doesn't look like the row is missing -- the other save buttons (tied to
   // readonly textareas) are hidden because the textareas are also hidden by
   // the readonly note flow.
@@ -4623,7 +4619,7 @@ function applyMarveenReadonlyMode(readOnly) {
   // CODEMODEFLAG1119: sub-agents only (the main agent does not start through the launcher that reads it)
   const codeModeGroup = document.getElementById('codeModeGroup')
   if (codeModeGroup) codeModeGroup.hidden = readOnly
-  // #2727: the security profile and the Claude plan are per SUB-agent settings. openMarveenDetail never fills
+  // #2727: the security profile and the Claude plan are per SUB-agent settings. openAlfredDetail never fills
   // their selects, so for the main agent they showed whatever the last opened sub-agent left there (or an empty
   // select on a fresh load), above a Save button that returns early for role 'main'. Hidden here, the one hook
   // both open paths run; openAgentDetail used to hide the plan group itself, which the main agent never reached.
@@ -4637,7 +4633,7 @@ function applyMarveenReadonlyMode(readOnly) {
     mainAuthGroup.hidden = !readOnly
     if (readOnly) loadMainAuthPanel()
   }
-  const note = document.getElementById('marveenReadonlyNote')
+  const note = document.getElementById('alfredReadonlyNote')
   if (note) note.hidden = !readOnly
 }
 
@@ -4700,31 +4696,31 @@ function attachTmuxCopyButtons(card, agent) {
 function renderAgents() {
   agentsGrid.querySelectorAll('.agent-card:not(.add-card)').forEach((el) => el.remove())
 
-  // Marveen card (always first)
-  if (window._marveen) {
-    const m = window._marveen
-    const displayName = m.name || 'Marveen'
-    // The model is no longer hardcoded: /api/marveen reports the configured
+  // Alfred card (always first)
+  if (window._alfred) {
+    const m = window._alfred
+    const displayName = m.name || 'Alfred'
+    // The model is no longer hardcoded: /api/alfred reports the configured
     // model (readActiveModelFromProjectDir). Mirror the sub-agent card, which
     // uses the model value as both the badge label and class. Fall back to
-    // 'opus' only before /api/marveen has resolved (or on a legacy backend).
+    // 'opus' only before /api/alfred has resolved (or on a legacy backend).
     const mainModelLabel = m.model || 'opus'
     const mainModelClass = m.model || 'opus'
     const mCard = document.createElement('div')
-    mCard.className = 'agent-card marveen-card'
+    mCard.className = 'agent-card alfred-card'
     mCard.innerHTML = `
       <div class="agent-card-top">
-        <div class="agent-avatar gradient-1"><img src="/api/marveen/avatar${avatarBust()}" alt="${escapeHtml(displayName)}"></div>
+        <div class="agent-avatar gradient-1"><img src="/api/alfred/avatar${avatarBust()}" alt="${escapeHtml(displayName)}"></div>
         <div class="agent-card-info">
-          <div class="agent-name">${escapeHtml(displayName)}${m.nickname ? ` <span class="agent-nickname">${escapeHtml(m.nickname)}</span>` : ''} <span class="marveen-badge">${t('agents.main_badge')}</span></div>
+          <div class="agent-name">${escapeHtml(displayName)}${m.nickname ? ` <span class="agent-nickname">${escapeHtml(m.nickname)}</span>` : ''} <span class="alfred-badge">${t('agents.main_badge')}</span></div>
           <div class="agent-desc">${escapeHtml(m.description || '')}</div>
         </div>
       </div>
       <div class="agent-card-footer">
         <span class="agent-model-badge ${escapeHtml(mainModelClass)}">${escapeHtml(mainModelLabel)}</span>
         ${contextPctBadgeHtml(mainAgentId())}
-        <span class="process-indicator" title="${t('agents.marveen_process_tip')}"><span class="process-dot running"></span>${t('agents.status.running')}</span>
-        <span class="tg-status" title="${t('agents.marveen_channel_tip')}"><span class="tg-dot connected"></span>${t('agents.status.online')}</span>
+        <span class="process-indicator" title="${t('agents.alfred_process_tip')}"><span class="process-dot running"></span>${t('agents.status.running')}</span>
+        <span class="tg-status" title="${t('agents.alfred_channel_tip')}"><span class="tg-dot connected"></span>${t('agents.status.online')}</span>
       </div>
       <div class="agent-card-actions">
         <button class="btn-secondary btn-compact agent-conversation-btn" title="${t('agents.btn.conversation')}">
@@ -4742,15 +4738,15 @@ function renderAgents() {
       e.stopPropagation(); openTerminalModal(mainAgentId())
     })
     mCard.querySelector('.agent-conversation-btn')?.addEventListener('click', (e) => {
-      e.stopPropagation(); openConversationModal(mainAgentId(), t('agents.marveen_boss'))
+      e.stopPropagation(); openConversationModal(mainAgentId(), t('agents.alfred_boss'))
     })
-    mCard.addEventListener('click', () => onAgentCardClick(mainAgentId(), openMarveenDetail))
+    mCard.addEventListener('click', () => onAgentCardClick(mainAgentId(), openAlfredDetail))
     agentsGrid.insertBefore(mCard, addBtn)
   }
 
   for (const agent of agents) {
-    // Skip the main agent — it is already rendered as the dedicated Marveen
-    // card above (window._marveen block). Without this guard a second card
+    // Skip the main agent — it is already rendered as the dedicated Alfred
+    // card above (window._alfred block). Without this guard a second card
     // appears once the agents/atlas/ config directory is created.
     if (agent.name === mainAgentId()) continue
 
@@ -4844,7 +4840,7 @@ function renderAgents() {
 // same working/idle state derived from the tmux pane) to turn an agent card's
 // Terminal button green while that agent is actively working, and clear it when
 // it goes idle or stops. No new backend -- just a second consumer of the same
-// endpoint. The main (Marveen) card matches on mainAgentId(); sub-agent cards
+// endpoint. The main (Alfred) card matches on mainAgentId(); sub-agent cards
 // match on their data-name.
 let agentsBusyTimer = null
 // Last known 'working' ids from the poll below. Shared with the org chart so a
@@ -4892,7 +4888,7 @@ async function refreshAgentTerminalBusy() {
   const mainId = mainAgentId()
   if (agentsGrid) {
     agentsGrid.querySelectorAll('.agent-card:not(.add-card):not(.federated-agent-card)').forEach((card) => {
-      const id = card.classList.contains('marveen-card') ? mainId : card.dataset.name
+      const id = card.classList.contains('alfred-card') ? mainId : card.dataset.name
       const entry = id ? byName.get(id) : null
       const working = !!entry && entry.state === 'working'
       const btn = card.querySelector('.agent-terminal-btn')
@@ -4929,7 +4925,7 @@ async function refreshAgentTerminalBusy() {
 let federatedPeerStatus = []
 
 // System/plumbing agent names never shown as message targets.
-const FEDERATED_HIDDEN_AGENTS = new Set(['heartbeat', 'telegram-coordinator', 'channel-coordinator'])
+const FEDERATED_HIDDEN_AGENTS = new Set(['heartbeat', 'channel-coordinator'])
 
 function federatedAgentEntries() {
   const out = []
@@ -4986,7 +4982,7 @@ function openFederatedThread(qualifiedId) {
 // === Agent Detail ===
 async function openAgentDetail(agentName) {
   if (agentName === mainAgentId()) {
-    return openMarveenDetail()
+    return openAlfredDetail()
   }
 
   try {
@@ -5068,7 +5064,7 @@ async function openAgentDetail(agentName) {
     document.getElementById('editAgentProfileDesc'),
     currentAgent.securityProfile || 'default',
   )
-  // (the main agent has no plan to pick here: applyMarveenReadonlyMode hides the group for it)
+  // (the main agent has no plan to pick here: applyAlfredReadonlyMode hides the group for it)
   populatePlanSelect(
     document.getElementById('editAgentPlan'),
     document.getElementById('editAgentPlanDesc'),
@@ -5090,7 +5086,7 @@ async function openAgentDetail(agentName) {
   setupContextGuardUI(currentAgent.autoRestartId || currentAgent.name)
   setupIdleFlushUI(currentAgent)
 
-  // Telegram tab
+  // Channel tab
   updateChannelTab(currentAgent)
 
   // Skills tab
@@ -5099,11 +5095,11 @@ async function openAgentDetail(agentName) {
   // Process control
   updateProcessControl(currentAgent)
 
-  // Channels restart button is Marveen-only -- hide on normal agents.
-  document.getElementById('marveenRestartBtn').hidden = true
+  // Channels restart button is Alfred-only -- hide on normal agents.
+  document.getElementById('alfredRestartBtn').hidden = true
 
-  // Restore editable Settings (Marveen detail flips this to read-only).
-  applyMarveenReadonlyMode(false)
+  // Restore editable Settings (Alfred detail flips this to read-only).
+  applyAlfredReadonlyMode(false)
 
   // Delete button (restore visibility for normal agents)
   document.getElementById('deleteAgentBtn').style.display = ''
@@ -5154,7 +5150,7 @@ async function openAgentDetail(agentName) {
       const objectUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objectUrl
-      a.download = `marveen-agent-${name}.tar.gz`
+      a.download = `alfred-agent-${name}.tar.gz`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -5209,8 +5205,8 @@ document.getElementById('avatarChangeBtn').addEventListener('click', () => {
   const gallery = document.getElementById('detailAvatarGallery')
   gallery.hidden = !gallery.hidden
   if (!gallery.hidden) {
-    const isMarveen = currentAgent && currentAgent.role === 'main'
-    const avatarEndpoint = isMarveen ? '/api/marveen/avatar' : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar`
+    const isAlfred = currentAgent && currentAgent.role === 'main'
+    const avatarEndpoint = isAlfred ? '/api/alfred/avatar' : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar`
 
     const grid = document.getElementById('detailAvatarGrid')
     grid.innerHTML = ''
@@ -5228,7 +5224,7 @@ document.getElementById('avatarChangeBtn').addEventListener('click', () => {
           if (!res.ok) throw new Error()
           showToast(t('agents.toast.avatar_updated'))
           bumpAvatarEpoch()
-          const imgUrl = isMarveen ? `/api/marveen/avatar${avatarBust()}` : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar${avatarBust()}`
+          const imgUrl = isAlfred ? `/api/alfred/avatar${avatarBust()}` : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar${avatarBust()}`
           document.getElementById('agentDetailAvatar').innerHTML = `<img src="${imgUrl}" alt="">`
           gallery.hidden = true
           loadAgents()
@@ -5294,8 +5290,8 @@ document.getElementById('avatarChangeBtn').addEventListener('click', () => {
 
   async function uploadAvatarFile(file) {
     if (!currentAgent) return
-    const isMarveen = currentAgent.role === 'main'
-    const endpoint = isMarveen ? '/api/marveen/avatar' : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar`
+    const isAlfred = currentAgent.role === 'main'
+    const endpoint = isAlfred ? '/api/alfred/avatar' : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar`
     const form = new FormData()
     form.append('avatar', file, file.name)
     try {
@@ -5303,7 +5299,7 @@ document.getElementById('avatarChangeBtn').addEventListener('click', () => {
       if (!res.ok) throw new Error()
       showToast(t('agents.toast.avatar_uploaded'))
       bumpAvatarEpoch()
-      const imgUrl = isMarveen ? `/api/marveen/avatar${avatarBust()}` : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar${avatarBust()}`
+      const imgUrl = isAlfred ? `/api/alfred/avatar${avatarBust()}` : `/api/agents/${encodeURIComponent(currentAgent.name)}/avatar${avatarBust()}`
       document.getElementById('agentDetailAvatar').innerHTML = `<img src="${imgUrl}" alt="">`
       document.getElementById('detailAvatarGallery').hidden = true
       resetAvatarUpload()
@@ -5479,17 +5475,17 @@ document.getElementById('mainAuthApplyBtn').addEventListener('click', async () =
 
 
 
-function postMarveenRestart(force) {
+function postAlfredRestart(force) {
   return force
-    ? fetch('/api/marveen/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) })
-    : fetch('/api/marveen/restart', { method: 'POST' })
+    ? fetch('/api/alfred/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) })
+    : fetch('/api/alfred/restart', { method: 'POST' })
 }
 
 // The main agent's gated restart: a busy or unreadable pane asks before forcing (the restart button and the
 // MAINAUTHSWITCH1107 switch share it). Resolves true when restarted, false when the owner declined the force;
 // throws on a failed restart.
 async function restartMainAgentGated() {
-  let res = await postMarveenRestart(false)
+  let res = await postAlfredRestart(false)
   if (res.status === 409) {
     const blocked = await res.clone().json().catch(() => ({}))
     if (blocked.error === 'restart-blocked') {
@@ -5501,7 +5497,7 @@ async function restartMainAgentGated() {
         danger: true,
       })
       if (!forced) { showToast(t('agents.toast.restart_not_forced')); return false }
-      res = await postMarveenRestart(true)
+      res = await postAlfredRestart(true)
     }
   }
   if (!res.ok) {
@@ -5511,7 +5507,7 @@ async function restartMainAgentGated() {
   return true
 }
 
-document.getElementById('marveenRestartBtn').addEventListener('click', async () => {
+document.getElementById('alfredRestartBtn').addEventListener('click', async () => {
   const confirmed = await confirmDialog({
     title: t('agents.confirm.hard_restart_title'),
     message: t('agents.confirm.hard_restart'),
@@ -5519,10 +5515,10 @@ document.getElementById('marveenRestartBtn').addEventListener('click', async () 
     danger: true,
   })
   if (!confirmed) return
-  const btn = document.getElementById('marveenRestartBtn')
+  const btn = document.getElementById('alfredRestartBtn')
   btn.disabled = true
   try {
-    if (await restartMainAgentGated()) showToast(t('agents.toast.marveen_restarted'))
+    if (await restartMainAgentGated()) showToast(t('agents.toast.alfred_restarted'))
   } catch (err) {
     showToast(`${t('common.error')}: ${err.message}`, 'error')
   } finally {
@@ -5595,13 +5591,12 @@ document.getElementById('agentTabNav').addEventListener('click', (e) => {
   switchAgentTab(btn.dataset.tab)
 })
 
-let currentChannelProvider = 'telegram'
+let currentChannelProvider = 'discord'
 // Az induláskor a backend CHANNEL_PROVIDER-jét lekérjük, és a dropdown +
-// state default-ot ahhoz igazitjuk -- igy ha a backend discord-on van,
-// a UI nem hardcode-olt 'telegram'-mal indul barmelyik oldalra is navigal a user.
+// state értékét ahhoz igazítjuk.
 ;(async function initChannelProviderDefault() {
   try {
-    const res = await fetch('/api/marveen')
+    const res = await fetch('/api/alfred')
     if (!res.ok) return
     const data = await res.json()
     // CHANNELUNCONF1110: the "no channel configured" banner, from the same payload, on every page load.
@@ -5622,7 +5617,6 @@ function startChannelAutoPoll() {
     refreshPendingPairings()
     refreshAllowedList()
     refreshInvites()
-    refreshChannelRequests()
   }, 4000)
 }
 function stopChannelAutoPoll() {
@@ -5815,7 +5809,7 @@ async function loadAvailableModels() {
     }
     // Browse popup = the curation UI (tick/untick which manual models exist).
     // MAIN AGENT ONLY -- sub-agents just pick from the curated dropdown above.
-    // Keep the name checks for compatibility with legacy /api/marveen payloads
+    // Keep the name checks for compatibility with legacy /api/alfred payloads
     // that predate the explicit role field.
     const mid = (typeof mainAgentId === 'function') ? mainAgentId() : ''
     const isMainAgent = !!currentAgent && (
@@ -6197,7 +6191,7 @@ document.getElementById('analyzeAllModelsBtn').addEventListener('click', async (
               body: JSON.stringify({
                 title: t('agents.model.card_title', { agent: r.agent }),
                 description: t('agents.model.card_desc', { current: r.currentModel, suggested: r.suggestedModel, reason: r.reason }),
-                assignee: 'marveen',
+                assignee: 'alfred',
                 priority: 'normal',
                 status: 'planned',
               }),
@@ -6250,7 +6244,7 @@ if (exportAllAgentsBtn) {
       const objectUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objectUrl
-      a.download = 'marveen-fleet.tar.gz'
+      a.download = 'alfred-fleet.tar.gz'
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -6795,28 +6789,13 @@ document.getElementById('saveMcpJsonBtn').addEventListener('click', async () => 
 })
 
 // === Channel tab ===
-// Provider-aware "connected" check: a sub-agent record carries hasTelegram /
-// hasDiscord / hasSlack flags from the backend, Marveen carries the same
-// shape from /api/marveen. Falls back to hasTelegram for legacy callers.
 function agentIsConnected(agent) {
   if (!agent) return false
-  if (currentChannelProvider === 'discord') return !!agent.hasDiscord
-  if (currentChannelProvider === 'slack') return !!agent.hasSlack
-  if (currentChannelProvider === 'teams') return !!agent.hasTeams
-  return !!agent.hasTelegram
+  return !!agent.hasDiscord
 }
 
-// The agent card and the detail header ask about the agent's OWN channel
-// (agent-config.json channelProvider, carried on the /api/agents summary).
-// An unset or unknown value falls back to agentIsConnected(), i.e. to the
-// dashboard-wide provider. The Channel tab keeps agentIsConnected(): it
-// follows its own provider dropdown.
 const AGENT_CHANNEL_FLAG = {
-  telegram: 'hasTelegram',
   discord: 'hasDiscord',
-  slack: 'hasSlack',
-  teams: 'hasTeams',
-  googlechat: 'hasGooglechat',
 }
 
 function agentOwnChannelConnected(agent) {
@@ -6829,82 +6808,30 @@ function agentOwnChannelConnected(agent) {
 }
 
 function getProviderLabel() {
-  if (currentChannelProvider === 'discord') return 'Discord'
-  if (currentChannelProvider === 'slack') return 'Slack'
-  if (currentChannelProvider === 'teams') return 'Microsoft Teams'
-  return 'Telegram'
+  return 'Discord'
 }
 
-// Connected-view help text per provider. Returns innerHTML for the
-// #chHowtoContent <div> -- swapped on every updateProviderUI() call so the
-// "Hogyan adj hozzá több embert vagy csoportot?" panel matches the active
-// channel provider.
 function buildHowtoHtml() {
-  if (currentChannelProvider === 'discord') return t('channel.howto.discord')
-  if (currentChannelProvider === 'slack') return t('channel.howto.slack')
-  if (currentChannelProvider === 'teams') return t('channel.howto.teams')
-  return t('channel.howto.telegram')
+  return t('channel.howto.discord')
 }
 
 function updateProviderUI() {
-  const isTg = currentChannelProvider === 'telegram'
   const title = document.getElementById('chSetupTitle')
   const steps = document.getElementById('chSetupSteps')
   const label = document.getElementById('chTokenLabel')
   const input = document.getElementById('chTokenInput')
-  const slackGroup = document.getElementById('chSlackAppTokenGroup')
-  const manifestBtnGroup = document.getElementById('chSlackManifestBtnGroup')
-  const smokeTestBtn = document.getElementById('chSmokeTestBtn')
   const reconnectBtn = document.getElementById('chReconnectBtn')
   const howto = document.getElementById('chHowtoContent')
   const pairingInfo = document.getElementById('chPairingInfo')
   const discordChannelGroup = document.getElementById('chDiscordChannelIdGroup')
   const tokenGroup = document.getElementById('chTokenGroup')
-  // Teams config is terminal-driven (creds land in the .env via setup-azure-bot.sh),
-  // not a dashboard token paste -- default the token field visible, hide it for teams.
   if (tokenGroup) tokenGroup.hidden = false
-
-  if (isTg) {
-    if (title) title.textContent = t('channel.setup.tg_title')
-    if (steps) steps.innerHTML = tHtml('channel.setup.tg_steps')
-    if (label) label.textContent = 'Bot API Token'
-    if (input) input.placeholder = '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11'
-    if (slackGroup) slackGroup.hidden = true
-    if (manifestBtnGroup) manifestBtnGroup.hidden = true
-    if (smokeTestBtn) smokeTestBtn.hidden = true
-    if (discordChannelGroup) discordChannelGroup.hidden = true
-    if (pairingInfo) pairingInfo.textContent = t('channel.setup.tg_pairing')
-  } else if (currentChannelProvider === 'discord') {
-    if (title) title.textContent = t('channel.setup.discord_title')
-    if (steps) steps.innerHTML = tHtml('channel.setup.discord_steps')
-    if (label) label.textContent = 'Bot Token'
-    if (input) input.placeholder = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OQ...'
-    if (slackGroup) slackGroup.hidden = true
-    if (manifestBtnGroup) manifestBtnGroup.hidden = true
-    if (smokeTestBtn) smokeTestBtn.hidden = true
-    if (discordChannelGroup) discordChannelGroup.hidden = false
-    if (pairingInfo) pairingInfo.textContent = t('channel.setup.discord_pairing')
-  } else if (currentChannelProvider === 'teams') {
-    if (title) title.textContent = t('channel.setup.teams_title')
-    if (steps) steps.innerHTML = tHtml('channel.setup.teams_steps')
-    if (slackGroup) slackGroup.hidden = true
-    if (manifestBtnGroup) manifestBtnGroup.hidden = true
-    if (smokeTestBtn) smokeTestBtn.hidden = true
-    if (discordChannelGroup) discordChannelGroup.hidden = true
-    // No dashboard token entry for Teams -- creds come from the terminal setup.
-    if (tokenGroup) tokenGroup.hidden = true
-    if (pairingInfo) pairingInfo.textContent = t('channel.setup.teams_pairing')
-  } else {
-    if (title) title.textContent = t('channel.setup.slack_title')
-    if (steps) steps.innerHTML = tHtml('channel.setup.slack_steps')
-    if (label) label.textContent = 'Bot Token (xoxb-...)'
-    if (input) input.placeholder = 'xoxb-...'
-    if (slackGroup) slackGroup.hidden = false
-    if (manifestBtnGroup) manifestBtnGroup.hidden = false
-    if (smokeTestBtn) smokeTestBtn.hidden = false
-    if (discordChannelGroup) discordChannelGroup.hidden = true
-    if (pairingInfo) pairingInfo.textContent = t('channel.setup.slack_pairing')
-  }
+  if (title) title.textContent = t('channel.setup.discord_title')
+  if (steps) steps.innerHTML = tHtml('channel.setup.discord_steps')
+  if (label) label.textContent = 'Bot Token'
+  if (input) input.placeholder = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OQ...'
+  if (discordChannelGroup) discordChannelGroup.hidden = false
+  if (pairingInfo) pairingInfo.textContent = t('channel.setup.discord_pairing')
   if (howto) howto.innerHTML = buildHowtoHtml()
   if (reconnectBtn) {
     reconnectBtn.hidden = !(currentAgent && currentAgent.running && agentIsConnected(currentAgent))
@@ -6917,13 +6844,11 @@ function updateChannelTab(agent) {
   document.getElementById('chNotConnected').hidden = connected
   document.getElementById('chConnected').hidden = !connected
   if (connected) {
-    document.getElementById('chBotUsername').textContent = agent.telegramBotUsername || '@bot'
+    document.getElementById('chBotUsername').textContent = agent.discordBotUsername || '@bot'
     document.getElementById('chRunNotice').hidden = running
     document.getElementById('chRunningNotice').hidden = !running
   }
   document.getElementById('chTokenInput').value = ''
-  const slackInput = document.getElementById('chSlackAppToken')
-  if (slackInput) slackInput.value = ''
   const discordChanInput = document.getElementById('chDiscordChannelId')
   if (discordChanInput) discordChanInput.value = ''
   updateProviderUI()
@@ -6937,7 +6862,6 @@ function updateChannelTab(agent) {
     refreshPendingPairings()
     refreshAllowedList()
     refreshInvites()
-    refreshChannelRequests()
   }
 }
 
@@ -6976,13 +6900,8 @@ document.getElementById('chConnectBtn').addEventListener('click', async () => {
   }
 
   const payload = { botToken: token }
-  if (currentChannelProvider === 'slack') {
-    const appToken = document.getElementById('chSlackAppToken').value.trim()
-    if (appToken) payload.appToken = appToken
-  } else if (currentChannelProvider === 'discord') {
-    const channelId = document.getElementById('chDiscordChannelId').value.trim()
-    if (channelId) payload.channelId = channelId
-  }
+  const channelId = document.getElementById('chDiscordChannelId')?.value.trim()
+  if (channelId) payload.channelId = channelId
 
   const btn = document.getElementById('chConnectBtn')
   btn.disabled = true
@@ -6995,13 +6914,6 @@ document.getElementById('chConnectBtn').addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (res.status === 409) {
-      const err = await res.json()
-      if (err.error === 'managed-settings-missing') {
-        showSudoModal(err.sudoCommand)
-        return
-      }
-    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       throw new Error(err.error || t('channel.toast.connect_error'))
@@ -7010,10 +6922,9 @@ document.getElementById('chConnectBtn').addEventListener('click', async () => {
     // #1878 (6): on the main agent the save restarts the channels session; a failed
     // restart must not read as "connected".
     if (result.restartError) showToast(t('agents.channel.saved_restart_failed', { provider: getProviderLabel(), cmd: result.restartCommand || '' }), 12000)
-    // INSTTGPOLLWARN1119: another install polling the same bot cannot be checked; said with "connected", not blocked.
-    else showToast(t('channel.toast.connected', { provider: getProviderLabel() }) + (result.pollerNote ? ' ' + t('channel.telegram.poller_unverifiable') : ''), result.pollerNote ? 10000 : undefined)
+    else showToast(t('channel.toast.connected', { provider: getProviderLabel() }))
     // Refresh detail
-    // CHANNELUNCONF1110: the main agent's detail draws from /api/marveen; fetch it first so the status and the banner follow.
+    // CHANNELUNCONF1110: the main agent's detail draws from /api/alfred; fetch it first so the status and the banner follow.
     if (currentAgent.name === mainAgentId()) await refreshMainChannelUnconfBanner()
     await openAgentDetail(currentAgent.name)
     loadAgents()
@@ -7031,28 +6942,8 @@ document.getElementById('chTestBtn').addEventListener('click', async () => {
   try {
     const res = await fetch(`${channelApiBase()}/test`, { method: 'POST' })
     if (!res.ok) throw new Error()
-    const data = await res.json().catch(() => ({}))
-    // SLACKSCOPEJELZ1007: a Slack token that lacks a manifest scope works, but
-    // part of the plugin silently does not (im:read: writing to the owner's DM
-    // after a restart). Say so instead of "all right".
-    const missing = Array.isArray(data.missingScopes) ? data.missingScopes : []
-    if (missing.length > 0) {
-      // showToast's 2nd argument is the DURATION (ms). Long enough to read
-      // a sentence that names scopes and what to do.
-      const msg = t('channel.toast.missing_scopes', { scopes: missing.join(', ') })
-        + (missing.includes('im:read') ? ' ' + t('channel.toast.missing_scopes_imread') : '')
-      showToast(msg, 12000)
-    } else {
-      const exp = data.secretExpiry
-      const suffix = !exp ? ''
-        : exp.state === 'missing' ? ' ' + t('channel.toast.teams_secret_expiry_missing')
-        : exp.state === 'invalid' ? ' ' + t('channel.toast.teams_secret_expiry_invalid')
-        : exp.state === 'ok' ? ' ' + t('channel.toast.teams_secret_expiry_ok', { date: exp.date, days: exp.daysLeft })
-        : exp.state === 'soon' ? ' ' + t('channel.toast.teams_secret_expiry_soon', { date: exp.date, days: exp.daysLeft })
-        : exp.state === 'expired' ? ' ' + t('channel.toast.teams_secret_expiry_expired', { date: exp.date })
-        : ''
-      showToast(t('channel.toast.test_ok') + suffix, suffix ? 8000 : undefined)
-    }
+    await res.json().catch(() => ({}))
+    showToast(t('channel.toast.test_ok'))
   } catch {
     showToast(t('channel.toast.smoke_failed'), 'error')
   }
@@ -7080,44 +6971,6 @@ document.getElementById('chReconnectBtn').addEventListener('click', async () => 
     btn.textContent = origText
   }
 })
-
-document.getElementById('chSmokeTestBtn').addEventListener('click', async () => {
-  if (!currentAgent) return
-  const btn = document.getElementById('chSmokeTestBtn')
-  const origText = btn.textContent
-  btn.disabled = true
-  btn.textContent = t('agents.btn.running')
-  try {
-    const res = await fetch(`/api/agents/${encodeURIComponent(currentAgent.name)}/channels/slack/smoke-test`, { method: 'POST' })
-    const data = await res.json()
-    if (!res.ok) {
-      showToast(data.error || t('channel.smoke_test.failed'), 8000)
-      return
-    }
-    showSmokeTestResult(data.output || 'OK')
-  } catch {
-    showToast(t('channel.smoke_test.error'), { kind: 'error', duration: 8000 })
-  } finally {
-    btn.disabled = false
-    btn.textContent = origText
-  }
-})
-
-function showSmokeTestResult(output) {
-  const overlay = document.createElement('div')
-  overlay.className = 'modal-overlay'
-  overlay.innerHTML = `
-    <div class="modal-content" style="max-width:600px">
-      <h3>${t('channel.smoke_test.title')}</h3>
-      <pre style="background:#1a1a2e;color:#e0e0e0;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;max-height:400px;white-space:pre-wrap">${output.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
-      <div style="text-align:right;margin-top:12px">
-        <button class="btn-secondary" id="smokeTestCloseBtn">${t('common.btn.close')}</button>
-      </div>
-    </div>`
-  document.body.appendChild(overlay)
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
-  document.getElementById('smokeTestCloseBtn').addEventListener('click', () => overlay.remove())
-}
 
 // Pairing: refresh pending list
 async function refreshPendingPairings() {
@@ -7342,123 +7195,6 @@ async function revokeInviteToken(token) {
 document.getElementById('chGenerateInviteBtn').addEventListener('click', generateInvite)
 document.getElementById('chRefreshInvitesBtn').addEventListener('click', refreshInvites)
 
-// --- Channel Requests (Slack channel opt-in) ---
-async function refreshChannelRequests() {
-  if (!currentAgent) return
-  const section = document.getElementById('chRequestSection')
-  const listEl = document.getElementById('chRequestList')
-  const badge = document.getElementById('chRequestBadge')
-  if (currentChannelProvider !== 'slack') {
-    section.hidden = true
-    return
-  }
-  try {
-    const res = await fetch(`/api/agents/${encodeURIComponent(currentAgent.name)}/channel-requests`)
-    if (!res.ok) { section.hidden = true; return }
-    const items = await res.json()
-    if (!items.length) {
-      section.hidden = true
-      badge.hidden = true
-      return
-    }
-    section.hidden = false
-    badge.hidden = false
-    badge.textContent = items.length
-    listEl.innerHTML = ''
-    for (const req of items) {
-      const item = document.createElement('div')
-      item.className = 'tg-allowed-item'
-      const name = escapeHtml(req.channel_name || req.channel_id)
-      const ts = new Date(req.requested_at * 1000).toLocaleString('hu-HU')
-      const userId = req.user_id ? `<span class="tg-allowed-id">user: ${escapeHtml(req.user_id)}</span>` : ''
-      item.innerHTML = `
-        <div class="tg-allowed-meta">
-          <span class="tg-allowed-kind tg-allowed-kind-group">#${name}</span>
-          ${userId}
-          <span class="tg-allowed-id" style="font-size:11px;color:var(--text-muted)">${ts}</span>
-        </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn-primary btn-compact" data-approve="${req.id}" style="padding:4px 10px;font-size:11px;margin:0">${t('common.btn.approve')}</button>
-          <button class="btn-icon-danger" data-deny="${req.id}" title="${t('channel.btn.deny')}">&times;</button>
-        </div>
-      `
-      item.dataset.reqId = req.id
-      item.querySelector('[data-approve]').addEventListener('click', () => openApproveModal(req.id, req.channel_name || req.channel_id, req.user_id))
-      item.querySelector('[data-deny]').addEventListener('click', () => denyChannelRequest(req.id, item))
-      listEl.appendChild(item)
-    }
-  } catch { section.hidden = true }
-}
-
-let _approveReqId = null
-
-function openApproveModal(id, channelName, userId) {
-  _approveReqId = id
-  const desc = document.getElementById('chApproveModalDesc')
-  const userNote = userId ? t('channel.approve.requester', { user: userId }) : ''
-  desc.textContent = t('channel.approve.desc', { channel: channelName, requester: userNote })
-  document.getElementById('chApproveRequireMention').checked = true
-  document.getElementById('chApproveAllowFromAll').checked = false
-  document.getElementById('chApproveModalOverlay').hidden = false
-}
-
-async function submitApproveModal() {
-  const id = _approveReqId
-  if (!id) return
-  const requireMention = document.getElementById('chApproveRequireMention').checked
-  const allowFromAll = document.getElementById('chApproveAllowFromAll').checked
-  const confirmBtn = document.getElementById('chApproveModalConfirm')
-  confirmBtn.querySelector('.btn-text').hidden = true
-  confirmBtn.querySelector('.btn-loading').hidden = false
-  confirmBtn.disabled = true
-  try {
-    const res = await fetch(`/api/agents/${encodeURIComponent(currentAgent.name)}/channel-requests/${id}/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requireMention, allowFromAll }),
-    })
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || t('common.failed'))
-    document.getElementById('chApproveModalOverlay').hidden = true
-    const item = document.querySelector(`[data-req-id="${CSS.escape(String(id))}"]`)
-    if (item) item.remove()
-    showToast(t('channel.toast.approved'))
-    refreshChannelRequests()
-  } catch (err) {
-    showToast(`${t('common.error')}: ${err.message}`, 'error')
-  } finally {
-    confirmBtn.querySelector('.btn-text').hidden = false
-    confirmBtn.querySelector('.btn-loading').hidden = true
-    confirmBtn.disabled = false
-  }
-}
-
-async function denyChannelRequest(id, itemEl) {
-  if (itemEl?.dataset.denying) return
-  if (itemEl) itemEl.dataset.denying = '1'
-  if (itemEl) itemEl.remove()
-  try {
-    const res = await fetch(`/api/agents/${encodeURIComponent(currentAgent.name)}/channel-requests/${id}/deny`, { method: 'POST' })
-    if (!res.ok) throw new Error(t('common.failed'))
-    showToast(t('channel.toast.denied'))
-    refreshChannelRequests()
-  } catch (err) {
-    showToast(`${t('common.error')}: ${err.message}`, 'error')
-    refreshChannelRequests()
-  }
-}
-
-;(function initApproveModal() {
-  function closeApproveModal() { document.getElementById('chApproveModalOverlay').hidden = true }
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('chApproveModalConfirm').addEventListener('click', submitApproveModal)
-    document.getElementById('chApproveModalClose').addEventListener('click', closeApproveModal)
-    document.getElementById('chApproveModalCancel').addEventListener('click', closeApproveModal)
-    document.getElementById('chApproveModalOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeApproveModal() })
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !document.getElementById('chApproveModalOverlay').hidden) closeApproveModal()
-    })
-  })
-})()
 
 document.getElementById('chApproveBtn').addEventListener('click', async () => {
   const code = document.getElementById('chPairCode').value.trim()
@@ -7484,7 +7220,7 @@ document.getElementById('chDisconnectBtn').addEventListener('click', async () =>
     const reply = await readActionReply(res)
     if (!reply.ok) { showToast(t('common.not_done', { msg: refusalReason(res, reply.body) }), 'error'); return }
     showToast(t('channel.toast.disconnected', { provider: provLabel }))
-    // CHANNELUNCONF1110: the main agent's detail draws from /api/marveen; fetch it first so the status and the banner follow.
+    // CHANNELUNCONF1110: the main agent's detail draws from /api/alfred; fetch it first so the status and the banner follow.
     if (currentAgent.name === mainAgentId()) await refreshMainChannelUnconfBanner()
     await openAgentDetail(currentAgent.name)
     loadAgents()
@@ -7752,22 +7488,22 @@ fetch('/api/network-info').then(r => r.ok ? r.json() : {}).then(info => {
 const HEARTBEAT_TEMPLATES = {
   calendar: {
     desc: () => t('tasks.heartbeat.tpl.calendar'),
-    prompt: 'Ellenorizd a naptaramat (list-events a mai napra). Ha van meeting 1 oran belul, szolj Telegramon es 10 perccel a meeting elott is emlekeztetess. Ha nincs kozelgo esemeny, ne irj semmit.',
+    prompt: 'Ellenorizd a naptaramat (list-events a mai napra). Ha van meeting 1 oran belul, szolj Discordon es 10 perccel a meeting elott is emlekeztetess. Ha nincs kozelgo esemeny, ne irj semmit.',
     schedule: '*/15 * * * *',
   },
   email: {
     desc: () => t('tasks.heartbeat.tpl.email'),
-    prompt: 'Ellenorizd az emailjeimet (search_emails newer_than:1h). Ha surgos vagy fontos levelet talalsz (pl. ugyfeltol, fonokotol, fizetessel kapcsolatos), szolj Telegramon. Ha csak promo/newsletter, ne irj semmit.',
+    prompt: 'Ellenorizd az emailjeimet (search_emails newer_than:1h). Ha surgos vagy fontos levelet talalsz (pl. ugyfeltol, fonokotol, fizetessel kapcsolatos), szolj Discordon. Ha csak promo/newsletter, ne irj semmit.',
     schedule: '*/30 * * * *',
   },
   kanban: {
     desc: () => t('tasks.heartbeat.tpl.kanban'),
-    prompt: () => `Ellenorizd a kanban tablat (curl -s http://localhost:${__serverPort}/api/kanban). Ha van olyan kartya aminek ma jar le a hatrideje vagy urgent prioritasu es meg nincs done, szolj Telegramon. Ha minden rendben, ne irj semmit.`,
+    prompt: () => `Ellenorizd a kanban tablat (curl -s http://localhost:${__serverPort}/api/kanban). Ha van olyan kartya aminek ma jar le a hatrideje vagy urgent prioritasu es meg nincs done, szolj Discordon. Ha minden rendben, ne irj semmit.`,
     schedule: '0 */2 * * *',
   },
   full: {
     desc: () => t('tasks.heartbeat.tpl.full'),
-    prompt: 'Ellenorizd: 1) Naptar - van-e meeting 1 oran belul? 2) Email - jott-e surgos level az elmult oraban? 3) Kanban - van-e mai hataridovel kartya? Ha BARMIT talalsz ami fontos, szolj Telegramon tomoren. Ha minden csendes, ne irj semmit.',
+    prompt: 'Ellenorizd: 1) Naptar - van-e meeting 1 oran belul? 2) Email - jott-e surgos level az elmult oraban? 3) Kanban - van-e mai hataridovel kartya? Ha BARMIT talalsz ami fontos, szolj Discordon tomoren. Ha minden csendes, ne irj semmit.',
     schedule: '*/15 * * * *',
   },
 }
@@ -8099,7 +7835,7 @@ function scheduleNotFiringNote(task) {
 function makeScheduleRow(task) {
     const row = document.createElement('div')
     row.className = 'schedule-row'
-    const agent = scheduleAgents.find(a => a.name === task.agent) || { name: task.agent || mainAgentId(), avatar: '/api/marveen/avatar', label: task.agent || mainAgentId() }
+    const agent = scheduleAgents.find(a => a.name === task.agent) || { name: task.agent || mainAgentId(), avatar: '/api/alfred/avatar', label: task.agent || mainAgentId() }
 
     row.innerHTML = `
       <div class="schedule-agent-avatar">
@@ -8293,7 +8029,7 @@ function renderTimeline(tasks) {
   }
 
   for (const [agentName, agTasks] of Object.entries(agentTasks)) {
-    const agent = scheduleAgents.find(a => a.name === agentName) || { name: agentName, avatar: '/api/marveen/avatar', label: agentName }
+    const agent = scheduleAgents.find(a => a.name === agentName) || { name: agentName, avatar: '/api/alfred/avatar', label: agentName }
 
     const row = document.createElement('div')
     row.className = 'timeline-row'
@@ -8438,7 +8174,7 @@ function renderWeekView(data) {
       const count = tasks.length
 
       tasks.forEach((task, idx) => {
-        const agent = scheduleAgents.find(a => a.name === task.agent) || { name: task.agent || mainAgentId(), avatar: '/api/marveen/avatar' }
+        const agent = scheduleAgents.find(a => a.name === task.agent) || { name: task.agent || mainAgentId(), avatar: '/api/alfred/avatar' }
 
         const card = document.createElement('div')
         card.className = 'week-task-card'
@@ -9157,7 +8893,7 @@ function renderMemories(memories) {
       })
       if (!confirmed) return
       try {
-        // MARVEENGAPS1020 (a): below data_delete level 3 the first DELETE files
+        // ALFREDGAPS1020 (a): below data_delete level 3 the first DELETE files
         // an approval request (409 approval_required). Once it is approved, the
         // same click finishes the delete with the one-shot approval id.
         let res = await fetch(`/api/memories/${mem.id}`, { method: 'DELETE' })
@@ -9944,7 +9680,7 @@ function showZoomIndicator() {
 async function loadDailyLog() {
   // "Minden ügynök" (empty value) falls back to the first agent in the
   // filter dropdown, which is the main agent on any BOT_NAME -- avoids a
-  // hardcoded "marveen" slug that would 404 on zino/haver/etc installs.
+  // hardcoded "alfred" slug that would 404 on zino/haver/etc installs.
   const sel = document.getElementById('memAgentFilter')
   const agent = sel.value || (sel.options[1] ? sel.options[1].value : '')
   if (!agent) {
@@ -10046,7 +9782,7 @@ document.querySelectorAll('.connector-tab').forEach(tab => {
 
 // Refresh button: triggers the server-side `claude mcp list` refresh.
 // Deliberately manual because every refresh spawns stdio / plugin MCPs
-// for a health check and can race the live Telegram bot. Button is
+// for a health check and can race the live Discord bot. Button is
 // shared by both the Installed and Gallery tabs.
 document.getElementById('connectorRefreshBtn').addEventListener('click', async () => {
   const btn = document.getElementById('connectorRefreshBtn')
@@ -13531,7 +13267,7 @@ async function loadGlobalSkills() {
   }
 }
 
-// MARVEENGAPS1020 (b): skills waiting for approval. A generated or imported
+// ALFREDGAPS1020 (b): skills waiting for approval. A generated or imported
 // skill is not live until it is approved here. The approver sees every file
 // in FULL (the text of every non-binary file, size and sha256 of every file,
 // scripts and executables listed first), the scan's findings, and where the
@@ -14198,7 +13934,7 @@ function renderTeamGraph(container, data, opts = {}) {
     div.dataset.agentId = node.id
     if (activeIds.has(node.id)) div.classList.add('team-node-active')
     const avatarUrl = node.id === mainAgentId
-      ? `/api/marveen/avatar${avatarBust()}`
+      ? `/api/alfred/avatar${avatarBust()}`
       : `/api/agents/${encodeURIComponent(node.id)}/avatar${avatarBust()}`
     div.innerHTML = `
       <div class="team-node-avatar"><img src="${avatarUrl}" alt="${escapeHtml(node.label || node.id)}" onerror="this.style.display='none'"></div>
@@ -14206,7 +13942,7 @@ function renderTeamGraph(container, data, opts = {}) {
       <div class="team-node-meta${tagline ? ' team-node-tagline' : ''}">${escapeHtml(tagline || roleLabel)}</div>
       <div class="team-node-meta team-node-status"><span class="process-dot ${runDotClass}"></span>${escapeHtml(runLabel)}</div>
     `
-    // The main agent opens too: openAgentDetail() hands it to openMarveenDetail(). It used to be
+    // The main agent opens too: openAgentDetail() hands it to openAlfredDetail(). It used to be
     // left without a click (from before the main agent had a detail view), so its card on the
     // overview and in the org chart looked clickable but did nothing.
     div.addEventListener('click', () => openAgentDetail(node.id))
@@ -14417,48 +14153,48 @@ function chatAvatarHtml(agentName, size = 32) {
   const hasAvatar = chatAgentHasAvatar.get(lower)
   if (!hasAvatar) return chatMonogramEl(agentName, size)
   const src = lower === mainAgentId().toLowerCase()
-    ? `/api/marveen/avatar${avatarBust()}`
+    ? `/api/alfred/avatar${avatarBust()}`
     : `/api/agents/${encodeURIComponent(lower)}/avatar${avatarBust()}`
   return `<img class="chat-avatar" src="${src}" width="${size}" height="${size}" alt="${escapeHtml(agentName)}" data-agent-name="${escapeHtml(agentName)}" onerror="chatImgError(this)">`
 }
 
 // Guard against the boot race: the Messages page can be opened before the
-// initial /api/marveen fetch resolves window._marveen. Until it does,
-// mainAgentId() returns the literal 'marveen' FALLBACK, which IS a real agent
+// initial /api/alfred fetch resolves window._alfred. Until it does,
+// mainAgentId() returns the literal 'alfred' FALLBACK, which IS a real agent
 // id on a default install but is NOT one wherever the main agent was renamed
-// -- composing to it creates a phantom "marveen" thread that sits pending
+// -- composing to it creates a phantom "alfred" thread that sits pending
 // forever and shows up as a duplicate of the true main agent (whatever id this
-// install actually uses). Resolve _marveen before rendering any chat target.
-async function ensureMarveenLoaded() {
-  if (window._marveen?.agentId) return
+// install actually uses). Resolve _alfred before rendering any chat target.
+async function ensureAlfredLoaded() {
+  if (window._alfred?.agentId) return
   try {
-    const r = await fetch('/api/marveen')
-    if (r.ok) window._marveen = { ...(window._marveen || {}), ...(await r.json()) }
+    const r = await fetch('/api/alfred')
+    if (r.ok) window._alfred = { ...(window._alfred || {}), ...(await r.json()) }
   } catch { /* sidebar falls back to the literal id -- best effort */ }
 }
 
 async function loadMessagesPage() {
-  await ensureMarveenLoaded()
+  await ensureAlfredLoaded()
   await loadChatAgentList()
 }
 
-const CHAT_SYSTEM_AGENTS = new Set(['heartbeat','telegram-coordinator','channel-coordinator'])
+const CHAT_SYSTEM_AGENTS = new Set(['heartbeat','channel-coordinator'])
 // The owner's own message thread is pinned to the top and labelled "<name> (te)".
-// The owner display name comes from the backend (OWNER_NAME via /api/marveen ->
-// window._marveen.ownerName), not a hardcoded literal, so a renamed install
-// recognizes its real owner. Empty until _marveen resolves (no false match).
-function chatOwnerName() { return window._marveen?.ownerName || '' }
+// The owner display name comes from the backend (OWNER_NAME via /api/alfred ->
+// window._alfred.ownerName), not a hardcoded literal, so a renamed install
+// recognizes its real owner. Empty until _alfred resolves (no false match).
+function chatOwnerName() { return window._alfred?.ownerName || '' }
 
 // The main agent's display name (BOT_NAME). mainAgentId() is the routing id
-// (e.g. "marveen") used for matching, avatar lookups and API calls; this is
-// what the user should SEE. Sourced from the backend (/api/marveen -> name,
+// (e.g. "alfred") used for matching, avatar lookups and API calls; this is
+// what the user should SEE. Sourced from the backend (/api/alfred -> name,
 // mirrored into _brandTokens.bot by initSidebarBrand), so a renamed install
-// shows its real bot name. Falls back to the id before _marveen resolves.
+// shows its real bot name. Falls back to the id before _alfred resolves.
 // Regression #519/#520: keep the four Messages-view display points routing the
 // main agent id through chatDisplayName -- a later refactor once stripped this
 // and leaked the raw routing id again. Guarded by messages-view-display-name.test.ts.
 function mainAgentDisplayName() {
-  return window._marveen?.name || window._brandTokens?.bot || mainAgentId()
+  return window._alfred?.name || window._brandTokens?.bot || mainAgentId()
 }
 // Map a routing agent id to its user-facing label: the main agent's id becomes
 // its BOT_NAME display name; every other agent already carries a human name as
@@ -14494,7 +14230,7 @@ async function loadChatAgentList() {
     const threads = threadsRes.ok ? await threadsRes.json() : []
     if (fedStatus && Array.isArray(fedStatus.peers)) federatedPeerStatus = fedStatus.peers
 
-    // Build fleet list: API agents + marveen, minus system agents; plus
+    // Build fleet list: API agents + alfred, minus system agents; plus
     // federated agents from the poller cache so a remote conversation can be
     // STARTED without prior history. The system-agent filter runs on the
     // unqualified segment too ('teodor/heartbeat' is just as much noise).
@@ -14520,11 +14256,11 @@ async function loadChatAgentList() {
       if (t.agent) threadIndex.set(t.agent, { lastMsg: t.lastMessage, count: t.count || 0 })
     }
     // Also include thread agents not in fleet (e.g. the owner's own direct msgs).
-    // Suppress the literal 'marveen' fallback id when it is NOT the real main
+    // Suppress the literal 'alfred' fallback id when it is NOT the real main
     // agent: a stale phantom thread (from the boot-race bug) would otherwise
     // render as a duplicate of the true main agent.
     for (const t of threads) {
-      if (t.agent === 'marveen' && mainAgentId() !== 'marveen') continue
+      if (t.agent === 'alfred' && mainAgentId() !== 'alfred') continue
       if (t.agent && !fleetNames.includes(t.agent) && !CHAT_SYSTEM_AGENTS.has(t.agent)) {
         fleetNames.push(t.agent)
       }
@@ -14661,7 +14397,7 @@ async function loadChatThread(agentName) {
 function buildBubbleHtml(m) {
   const isOutgoing = m.from_agent === mainAgentId()
   // senderName stays the routing id (avatar lookup keys off it); senderLabel is
-  // what the user sees, so the main agent reads as its BOT_NAME, not "marveen".
+  // what the user sees, so the main agent reads as its BOT_NAME, not "alfred".
   const senderName = isOutgoing ? mainAgentId() : m.from_agent
   const senderLabel = chatDisplayName(senderName)
   const when = m.created_at ? new Date(m.created_at * 1000).toLocaleString('hu-HU', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : ''
@@ -15542,7 +15278,7 @@ async function loadOverview() {
 }
 
 // Brand mark + product-brand chrome: pull the configured brand from
-// /api/marveen and apply it to the dashboard chrome (tab title, mobile topbar,
+// /api/alfred and apply it to the dashboard chrome (tab title, mobile topbar,
 // sidebar name, updates subtitle). brandName is the product/system name and is
 // distinct from the main agent's display name; the backend defaults brandName to
 // BOT_NAME, so a brand-unaware install keeps showing the agent name. If the
@@ -15550,12 +15286,12 @@ async function loadOverview() {
 async function initSidebarBrand() {
   try {
     const img = document.createElement('img')
-    img.src = '/api/marveen/avatar' + avatarBust()
+    img.src = '/api/alfred/avatar' + avatarBust()
     img.onload = () => {
       const mark = document.getElementById('sidebarBrandMark')
       if (mark) { mark.textContent = ''; mark.appendChild(img) }
     }
-    const res = await fetch('/api/marveen')
+    const res = await fetch('/api/alfred')
     if (res.ok) {
       const m = await res.json()
       const brand = m.brandName || m.name
@@ -15563,9 +15299,9 @@ async function initSidebarBrand() {
       // renders the configured names, then re-apply the static i18n so any
       // label painted before this fetch resolved picks up the real brand.
       window._brandTokens = {
-        brand: brand || 'Marveen',
-        bot: m.name || brand || 'Marveen',
-        agentId: m.agentId || 'marveen',
+        brand: brand || 'Alfred',
+        bot: m.name || brand || 'Alfred',
+        agentId: m.agentId || 'alfred',
       }
       if (typeof renderStaticI18n === 'function') renderStaticI18n()
       if (brand) {
@@ -15623,7 +15359,7 @@ function renderUpdatesBadge(status) {
 // to yet another branch re-warns) and a permanent notice on the Updates page.
 // Dev machines follow develop on purpose; one dismissal silences the banner
 // for them while the Updates-page notice stays as the quiet ground truth.
-const BRANCH_DRIFT_DISMISS_PREFIX = 'marveen.branch-drift-dismissed.'
+const BRANCH_DRIFT_DISMISS_PREFIX = 'alfred.branch-drift-dismissed.'
 // The heal command has to work in BOTH states, and `git checkout main` works in
 // neither of them reliably here: with two remotes that both carry main (origin
 // and a fork) git cannot infer the branch to follow and exits 128, and
@@ -15669,11 +15405,11 @@ function wireBranchDriftBanner() {
 }
 
 // === Main channel not configured (CHANNELUNCONF1110) ===
-// /api/marveen carries `mainChannelUnconfigured`: the provider whose token is missing, or null. The main session then
+// /api/alfred carries `mainChannelUnconfigured`: the provider whose token is missing, or null. The main session then
 // runs WITHOUT its channel (channels.sh), so nobody can message the main agent; the dashboard, the scheduled tasks and
 // the other agents keep working. One sentence plus the way to the main agent's Channel tab. Not dismissible.
-const MAIN_CHANNEL_PROVIDER_LABELS = { telegram: 'Telegram', discord: 'Discord', slack: 'Slack', teams: 'Microsoft Teams' }
-// DOCKERI18N1119: the last /api/marveen payload the banner was drawn from, so a language change redraws it
+const MAIN_CHANNEL_PROVIDER_LABELS = { discord: 'Discord' }
+// DOCKERI18N1119: the last /api/alfred payload the banner was drawn from, so a language change redraws it
 // (renderStaticI18n). `var`: renderStaticI18n is defined earlier in the file.
 var mainChannelUnconfLast = null
 function updateMainChannelUnconfBanner(m) {
@@ -15688,10 +15424,10 @@ function updateMainChannelUnconfBanner(m) {
 }
 async function refreshMainChannelUnconfBanner() {
   try {
-    const r = await fetch('/api/marveen')
+    const r = await fetch('/api/alfred')
     if (!r.ok) return
     const m = await r.json()
-    window._marveen = { ...(window._marveen || {}), ...m }
+    window._alfred = { ...(window._alfred || {}), ...m }
     updateMainChannelUnconfBanner(m)
   } catch { /* the banner keeps its last state */ }
 }
@@ -15699,11 +15435,11 @@ function wireMainChannelUnconfBanner() {
   const btn = document.getElementById('mainChannelUnconfSetup')
   if (!btn) return
   btn.addEventListener('click', async () => {
-    // openMarveenDetail draws from window._marveen and returns silently while it is empty, and only the Agents page
+    // openAlfredDetail draws from window._alfred and returns silently while it is empty, and only the Agents page
     // fills it: on a fresh install the owner lands on the overview, so the click opened nothing (live acceptance,
     // measured in a browser). Fetch it first.
     await refreshMainChannelUnconfBanner()
-    if (!window._marveen) return
+    if (!window._alfred) return
     await openAgentDetail(mainAgentId())
     switchAgentTab('channel')
   })
@@ -15714,7 +15450,7 @@ function wireMainChannelUnconfBanner() {
 // left in a tracked file, and writes a report; /api/updates carries it as `conflictGuard`. One sentence: what
 // happened and where the backup is. Dismissal persists per browser and per guard run (`at`), so a later run re-warns.
 // textContent only: the paths are file names from the install, never markup.
-const UPDATE_CONFLICT_DISMISS_PREFIX = 'marveen.update-conflict-dismissed.'
+const UPDATE_CONFLICT_DISMISS_PREFIX = 'alfred.update-conflict-dismissed.'
 function updateConflictGuardUI(status) {
   const banner = document.getElementById('updateConflictBanner')
   if (!banner) return
@@ -16351,7 +16087,7 @@ async function refreshOnboarding() {
 // only. Before the owner is signed in a click switches the wizard's text in this browser and is remembered; the
 // install's own language (its persona files and seeded texts, where untouched) changes once the owner is signed in,
 // through POST /api/onboarding/language, which also says which edited files it kept.
-const ONB_LANG_PENDING = 'marveen.onbLangPending'
+const ONB_LANG_PENDING = 'alfred.onbLangPending'
 let onbLangState = { docker: false, installLang: null, loginStep: true, busy: false }
 function onbLangPending() { try { return localStorage.getItem(ONB_LANG_PENDING) } catch { return null } }
 function setOnbLangPending(lang) { try { if (lang) localStorage.setItem(ONB_LANG_PENDING, lang); else localStorage.removeItem(ONB_LANG_PENDING) } catch { /* ignore */ } }
@@ -16431,13 +16167,11 @@ function onboardingNeedsLogin(auth) {
 function onboardingDisplayStep(base, auth) {
   return onboardingNeedsLogin(auth) ? 1 : base + 1
 }
-let onboardingChannelProvider = 'telegram'
+let onboardingChannelProvider = 'discord'
 let onboardingAgentId = null
-// The step-3 tab is a static HTML label ("Telegram bot") that renderStaticI18n's generic data-i18n sweep would otherwise reset
-// to the Telegram wording on every language switch, so both call sites re-apply the provider-specific text here.
 function applyOnboardingProviderTab() {
   const el = document.querySelector('#onboardingSteps .onboarding-step[data-ostep="4"] span:last-child')
-  if (el) el.textContent = onboardingChannelProvider === 'slack' ? t('onboarding.step2.tab_slack') : t('onboarding.step2.tab')
+  if (el) el.textContent = t('onboarding.step2.tab')
 }
 function renderOnboarding(s, auth) {
   if (onboardingDismissed()) return
@@ -16484,9 +16218,6 @@ function renderOnboarding(s, auth) {
   else if (base === 3) body.innerHTML = onbStep2Html(s)
   else body.innerHTML = onbStep3Html(s)
   wireOnboarding(base)
-  // Step 3, token already on disk, managed-settings.json still missing: the status GET already knows this (no probe/write/restart triggered),
-  // so show the sudo command right away instead of waiting for a Save click. Retry just re-polls status -- no token POST, no channel restart.
-  if (base === 3 && s.sudoCommand) showSudoModal(s.sudoCommand, () => refreshOnboarding())
 }
 function onbMsg(text, isErr) {
   const el = document.getElementById('onbMsg')
@@ -16660,25 +16391,11 @@ function onbStep1Html(s) {
     + `<div id="onbMsg" class="onb-msg"></div>`
 }
 function onbStep2Html(s) {
-  const isSlack = onboardingChannelProvider === 'slack'
-  const desc = isSlack ? t('onboarding.step2.desc_slack') : t('onboarding.step2.desc')
-  const tokenLabel = isSlack ? t('onboarding.step2.token_label_slack') : t('onboarding.step2.token_label')
-  const tokenHint = isSlack ? t('onboarding.step2.token_hint_slack') : t('onboarding.step2.token_hint')
-  const placeholder = isSlack ? 'xoxb-...' : '123456:ABC...'
-  // Pre-fill from a token already on disk (e.g. a prior save that stopped at the managed-settings.json gate) so the operator isn't forced to dig it
-  // back out of ~/.claude/channels/<provider>/.env and repaste it. Saving still re-runs the managed-settings check server-side either way.
   const existingBotToken = (s && s.existingBotToken) || ''
-  const existingAppToken = (s && s.existingAppToken) || ''
-  const appTokenFields = isSlack
-    ? `<label class="form-label-sm">${escapeHtml(t('onboarding.step2.app_token_label_slack'))}</label>`
-      + `<input id="onbSlackAppToken" type="password" class="onb-input" placeholder="xapp-..." value="${escapeHtml(existingAppToken)}" autocomplete="off" required>`
-      + `<div class="onb-hint">${escapeHtml(t('onboarding.step2.app_token_hint_slack'))}</div>`
-    : ''
-  return `<p>${escapeHtml(desc)}</p>`
-    + `<label class="form-label-sm">${escapeHtml(tokenLabel)}</label>`
-    + `<input id="onbBotToken" type="password" class="onb-input" placeholder="${placeholder}" value="${escapeHtml(existingBotToken)}" autocomplete="off">`
-    + `<div class="onb-hint">${escapeHtml(tokenHint)}</div>`
-    + appTokenFields
+  return `<p>${escapeHtml(t('onboarding.step2.desc'))}</p>`
+    + `<label class="form-label-sm">${escapeHtml(t('onboarding.step2.token_label'))}</label>`
+    + `<input id="onbBotToken" type="password" class="onb-input" placeholder="MTIzNDU2..." value="${escapeHtml(existingBotToken)}" autocomplete="off">`
+    + `<div class="onb-hint">${escapeHtml(t('onboarding.step2.token_hint'))}</div>`
     + `<button class="btn-primary btn-compact" id="onbBotBtn">${escapeHtml(t('onboarding.step2.save_btn'))}</button>`
     + `<div id="onbMsg" class="onb-msg"></div>`
 }
@@ -16691,9 +16408,7 @@ function onbStep3Html(s) {
     : `<p class="onb-hint">${escapeHtml(t('onboarding.step3.svc_starting'))}</p>`
   return `<p>${escapeHtml(t('onboarding.step3.desc'))}</p>`
     + svcLine
-    + (onboardingChannelProvider === 'teams'
-      ? `<ol class="onb-list"><li>${escapeHtml(t('onboarding.step3.li1_teams'))}</li><li>${escapeHtml(t('onboarding.step3.li2_teams'))}</li></ol>`
-      : `<ol class="onb-list"><li>${escapeHtml(t('onboarding.step3.li1'))}</li><li>${escapeHtml(t('onboarding.step3.li2'))}</li></ol>`)
+    + `<ol class="onb-list"><li>${escapeHtml(t('onboarding.step3.li1'))}</li><li>${escapeHtml(t('onboarding.step3.li2'))}</li></ol>`
     + `<div id="onbPending" class="onb-pending"></div>`
     + `<button class="btn-secondary btn-compact" id="onbRefreshBtn">${escapeHtml(t('onboarding.step3.refresh_btn'))}</button>`
     + `<div id="onbMsg" class="onb-msg"></div>`
@@ -16712,7 +16427,7 @@ function wireOnboarding(step) {
         // ONBOARDOWNERPW1107: an owner refusal takes the wizard back to its login step (onbOwnerRefused); otherwise the reason.
         if (!res.ok) { idBtn.disabled = false; if (await onbOwnerRefused(d)) return; onbMsg(d.error || t('onboarding.error'), true); return }
         // The name is live in the .env now -- repaint the chrome from
-        // /api/marveen so the sidebar/title reflect it immediately, and
+        // /api/alfred so the sidebar/title reflect it immediately, and
         // surface the automatic channels restart (same pattern as the
         // claude-auth step) instead of silently advancing.
         if (typeof initSidebarBrand === 'function') initSidebarBrand()
@@ -16778,22 +16493,10 @@ function wireOnboarding(step) {
       const botToken = (document.getElementById('onbBotToken').value || '').trim()
       if (!botToken) { onbMsg(t('onboarding.step2.token_empty'), true); return }
       const payload = { botToken }
-      if (onboardingChannelProvider === 'slack') {
-        const appToken = (document.getElementById('onbSlackAppToken')?.value || '').trim()
-        // Required, not optional: without SLACK_APP_TOKEN the channel session starts but Socket Mode never connects,
-        // so "saved" would read as success while Slack silently never comes online.
-        if (!appToken) { onbMsg(t('onboarding.step2.app_token_empty_slack'), true); return }
-        payload.appToken = appToken
-      }
       botBtn.disabled = true; onbMsg(t('onboarding.saving'))
       try {
         const res = await fetch(`/api/agents/${encodeURIComponent(onboardingAgentId || mainAgentId())}/channels/${onboardingChannelProvider}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         const d = await res.json().catch(() => ({}))
-        if (res.status === 409 && d.error === 'managed-settings-missing') {
-          botBtn.disabled = false
-          showSudoModal(d.sudoCommand, () => botBtn.click())
-          return
-        }
         // ONBOARDOWNERPW1107: an owner refusal takes the wizard back to its login step (onbOwnerRefused); otherwise the reason.
         if (!res.ok) { botBtn.disabled = false; if (await onbOwnerRefused(d)) return; onbMsg(d.error || t('onboarding.error'), true); return }
         // The server restarts the channels session so the new bot token goes
@@ -16806,8 +16509,7 @@ function wireOnboarding(step) {
         // #1878 (6): a failed restart is said at once, not after the ~2 min wait below.
         if (d.restartError) { botBtn.disabled = false; onbMsg(t('onboarding.step2.saved_restart_failed', { cmd: d.restartCommand || '' }), true); return }
         onbMsg(d.restarted ? t('onboarding.step2.saved_restarted') : t('onboarding.step2.saved'))
-        // INSTTGPOLLWARN1119: onbMsg replaces its text, so the note rides with the message that stays during the wait.
-        onbMsg(t('onboarding.step2.waiting_channel') + (d.pollerNote ? ' ' + t('channel.telegram.poller_unverifiable') : ''))
+        onbMsg(t('onboarding.step2.waiting_channel'))
         const outcome = await waitForChannelLive(fetchOnboardingStatus, 3000, 40)  // ~2 min bound
         if (outcome === 'live') { await refreshOnboarding() }
         else { botBtn.disabled = false; onbMsg(t('onboarding.step2.channel_slow'), true) }
@@ -16828,13 +16530,13 @@ function wireOnboarding(step) {
     const loadPending = async () => {
       try {
         // Same boot race the Messages page already guards against (see
-        // ensureMarveenLoaded): until /api/marveen resolves window._marveen,
-        // mainAgentId() returns the literal 'marveen' fallback. On a renamed
+        // ensureAlfredLoaded): until /api/alfred resolves window._alfred,
+        // mainAgentId() returns the literal 'alfred' fallback. On a renamed
         // install that is not the main agent, so the backend takes the
         // sub-agent branch, finds no such agent dir and answers 404 -- and the
         // wizard rendered that as "no pending pairing" while the Channel view,
         // which uses the selected agent, listed the very same request.
-        await ensureMarveenLoaded()
+        await ensureAlfredLoaded()
         const res = await fetch(`/api/agents/${encodeURIComponent(onboardingAgentId || mainAgentId())}/channels/${onboardingChannelProvider}/pending`)
         // Surface the failure instead of rendering it as an empty list. This is
         // a separate defect from the id race: without it a 404 or an auth error
@@ -16908,44 +16610,6 @@ document.getElementById('deepseekConfigLink')?.addEventListener('click', (e) => 
   location.hash = 'vault'
 })
 
-// === Sudo modal for managed-settings.json (Slack setup pre-flight) ===
-function showSudoModal(sudoCommand, onRetry) {
-  let overlay = document.getElementById('sudoModalOverlay')
-  if (overlay) overlay.remove()
-  overlay = document.createElement('div')
-  overlay.id = 'sudoModalOverlay'
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10001;display:flex;align-items:center;justify-content:center'
-  const card = document.createElement('div')
-  card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:560px;width:90%'
-  card.innerHTML = `
-    <h3 style="margin:0 0 12px">${t('channel.sudo_modal.title')}</h3>
-    <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">${t('channel.sudo_modal.desc')}</p>
-    <div style="position:relative">
-      <pre id="sudoCmdPre" style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${escapeHtml(sudoCommand)}</pre>
-      <button id="sudoCopyBtn" style="position:absolute;top:6px;right:6px;padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);cursor:pointer">${t('common.copy')}</button>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-      <button id="sudoCancelBtn" class="btn btn-secondary" style="padding:6px 16px;font-size:13px">${t('channel.sudo_modal.cancel')}</button>
-      <button id="sudoDoneBtn" class="btn btn-primary" style="padding:6px 16px;font-size:13px">${t('channel.sudo_modal.retry')}</button>
-    </div>
-  `
-  overlay.appendChild(card)
-  document.body.appendChild(overlay)
-
-  document.getElementById('sudoCopyBtn').addEventListener('click', () => {
-    navigator.clipboard.writeText(sudoCommand).then(() => {
-      document.getElementById('sudoCopyBtn').textContent = t('common.copied')
-      setTimeout(() => { document.getElementById('sudoCopyBtn').textContent = t('common.copy') }, 1500)
-    })
-  })
-  document.getElementById('sudoCancelBtn').addEventListener('click', () => overlay.remove())
-  document.getElementById('sudoDoneBtn').addEventListener('click', () => {
-    overlay.remove()
-    if (onRetry) onRetry()
-    else document.getElementById('chConnectBtn').click()
-  })
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
-}
 
 // === Clipboard fallback (non-secure context / legacy browser) ===
 function fallbackCopyToClipboard(text, btn) {
@@ -16968,70 +16632,6 @@ function fallbackCopyToClipboard(text, btn) {
   document.body.removeChild(ta)
 }
 
-// === Slack App manifest modal ===
-function showSlackManifestModal(manifest, instructions) {
-  let overlay = document.getElementById('slackManifestOverlay')
-  if (overlay) overlay.remove()
-  overlay = document.createElement('div')
-  overlay.id = 'slackManifestOverlay'
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center'
-  const card = document.createElement('div')
-  card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:640px;width:95%;max-height:85vh;overflow-y:auto'
-
-  const stepsHtml = instructions.map((s, i) => `<li style="margin-bottom:6px">${escapeHtml(s)}</li>`).join('')
-
-  card.innerHTML = `
-    <h3 style="margin:0 0 16px">${t('channel.slack_manifest.title')}</h3>
-    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">${t('channel.slack_manifest.desc')}</p>
-    <div style="position:relative;margin-bottom:16px">
-      <pre id="slackManifestPre" style="background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto">${escapeHtml(manifest)}</pre>
-      <button id="slackManifestCopyBtn" style="position:absolute;top:6px;right:6px;padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);cursor:pointer">${t('common.copy')}</button>
-    </div>
-    <h4 style="margin:0 0 8px;font-size:14px">${t('channel.slack_manifest.steps_title')}</h4>
-    <ol style="font-size:13px;padding-left:20px;margin:0 0 16px">${stepsHtml}</ol>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button id="slackManifestCloseBtn" class="btn btn-secondary" style="padding:6px 16px;font-size:13px">${t('common.btn.close')}</button>
-      <a href="https://api.slack.com/apps" target="_blank" rel="noopener" class="btn btn-primary" style="padding:6px 16px;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
-        ${t('channel.slack_manifest.open_btn')}
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-      </a>
-    </div>
-  `
-  overlay.appendChild(card)
-  document.body.appendChild(overlay)
-
-  document.getElementById('slackManifestCopyBtn').addEventListener('click', () => {
-    const copyBtn = document.getElementById('slackManifestCopyBtn')
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(manifest).then(() => {
-        copyBtn.textContent = t('common.copied')
-        setTimeout(() => { copyBtn.textContent = t('common.copy') }, 1500)
-      }).catch(() => {
-        fallbackCopyToClipboard(manifest, copyBtn)
-      })
-    } else {
-      fallbackCopyToClipboard(manifest, copyBtn)
-    }
-  })
-  document.getElementById('slackManifestCloseBtn').addEventListener('click', () => overlay.remove())
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
-}
-
-document.getElementById('chSlackManifestBtn').addEventListener('click', async () => {
-  if (!currentAgent) return
-  const btn = document.getElementById('chSlackManifestBtn')
-  btn.disabled = true
-  try {
-    const res = await fetch(`/api/agents/${encodeURIComponent(currentAgent.name)}/channels/slack/manifest`)
-    if (!res.ok) throw new Error()
-    const data = await res.json()
-    showSlackManifestModal(data.manifest, data.instructions)
-  } catch {
-    showToast(t('channel.toast.manifest_failed'), 'error')
-  } finally {
-    btn.disabled = false
-  }
-})
 
 // ============================================================
 // === Recall / Napló ===
@@ -17563,11 +17163,7 @@ function _renderApprovalsTable() {
            <button class="btn-danger btn-compact approvals-decide" data-id="${escapeAttr(a.id)}" data-decision="rejected" style="font-size:11px">${t('approvals.btn.reject')}</button>
          </div>`
       : (() => {
-          // APPROVALSLACK1030 B: a decision taken in Slack gets a readable label; the raw value stays beside it.
-          const rawBy = a.resolved_by || ''
-          const byLabel = rawBy.startsWith('slack_reply:') ? t('approvals.by.slack_reply')
-            : rawBy.startsWith('slack_reaction:') ? t('approvals.by.slack_reaction') : ''
-          const resolvedBy = byLabel ? `${escapeHtml(byLabel)} <span style="opacity:0.7">(${escapeHtml(rawBy)})</span>` : escapeHtml(rawBy)
+          const resolvedBy = escapeHtml(a.resolved_by || '')
           if (!a.resolved_at) return `<span style="font-size:12px;color:var(--text-muted)">${resolvedBy}</span>`
           const resolvedDate = new Date(a.resolved_at * 1000)
           const requestedDate = a.requested_at ? new Date(a.requested_at * 1000) : null
@@ -18599,7 +18195,7 @@ function renderTokenModePanel(body, status) {
   btn.id = 'authTokenSignIn'
   btn.textContent = t('auth.card.token_mode_signin_btn')
   btn.addEventListener('click', () => {
-    try { localStorage.removeItem('marveen-dashboard-token') } catch { /* storage blocked */ }
+    try { localStorage.removeItem('alfred-dashboard-token') } catch { /* storage blocked */ }
     window.location.reload()
   })
   body.appendChild(p)
@@ -18610,7 +18206,7 @@ function renderTokenModePanel(body, status) {
 // access token, or (OWNERGATE4-1104) the full device key the first device pairing gave this window (the Bridge). The
 // status carries owner_session only for a full key, never for an operator key, so that is the full-key test here.
 // Dismissal persists per browser.
-const AUTH_BANNER_DISMISS_KEY = 'marveen.auth-banner-dismissed'
+const AUTH_BANNER_DISMISS_KEY = 'alfred.auth-banner-dismissed'
 
 async function initAuthBanner() {
   const banner = document.getElementById('authSetupBanner')
@@ -18752,8 +18348,6 @@ async function loadSettings() {
   updateSettingsSaveBar()
 
   renderAuthCard()
-  if (typeof window.loadGromzoCard === 'function') window.loadGromzoCard()
-  if (typeof window.loadGromzoAgents === 'function') window.loadGromzoAgents()
 
   try {
     const res = await fetch('/api/settings')
@@ -20488,7 +20082,7 @@ document.getElementById('settingsResetBtn')?.addEventListener('click', resetAllS
 
 // === Token Usage Monitor ===
 const TU_COLORS = {
-  marveen: '#6366f1',
+  alfred: '#6366f1',
   codi: '#f59e0b',
   dexi: '#ec4899',
   finci: '#10b981',
@@ -21587,9 +21181,9 @@ async function loadNotesAssignees() {
 
 async function loadNotesPage() {
   // The author (kanbanMoveActor) and the assignee list (mainAgentId) both read
-  // window._marveen, which only some pages fill: resolve it first, or a
+  // window._alfred, which only some pages fill: resolve it first, or a
   // token-authenticated first add/delete goes out without a name and gets a 400.
-  await ensureMarveenLoaded()
+  await ensureAlfredLoaded()
   wireNotesPage()
   if (!notesAssigneesLoaded) loadNotesAssignees()
   // A language switch since the options were drawn: relabel them in place.
@@ -21651,7 +21245,7 @@ function wireNotesPage() {
     const dueEl = document.getElementById('notesDue')
     const content = (contentEl?.value || '').trim()
     if (!content) { contentEl?.focus(); return }
-    await ensureMarveenLoaded()
+    await ensureAlfredLoaded()
     // The author is the owner from the page config, as for the board's moves
     // (kanbanMoveActor). A login session or device key overrides it on the
     // server with the name of whoever is actually signed in.
@@ -21679,7 +21273,7 @@ function wireNotesPage() {
     const reason = window.prompt(t('notes.prompt.reason'), '')
     if (reason === null) return // cancelled
     btn.disabled = true
-    await ensureMarveenLoaded()
+    await ensureAlfredLoaded()
     try {
       const r = await fetch(`/api/notes/${encodeURIComponent(btn.dataset.noteDone)}`, {
         method: 'DELETE',
@@ -22303,7 +21897,7 @@ function openTerminalModal(agentName) {
   // token via ?token=; in password-login (session-cookie) mode there is no
   // token, so we open a plain URL and the browser attaches the mv_session
   // cookie automatically -- the gate's cookie branch covers the SSE path.
-  const token = localStorage.getItem('marveen-dashboard-token') || ''
+  const token = localStorage.getItem('alfred-dashboard-token') || ''
   const streamBase = `/api/agents/${encodeURIComponent(agentName)}/pane/stream`
   const sse = new EventSource(token ? `${streamBase}?token=${encodeURIComponent(token)}` : streamBase)
   sse.onmessage = (e) => {
@@ -22406,9 +22000,9 @@ document.getElementById('terminalInputToggle')?.addEventListener('change', (e) =
 
 // === Agent conversation (readable transcript) modal ===
 // Renders the agent's Claude Code transcript as a chat-style timeline: inbound
-// Telegram messages, the agent's replies, and (optionally) its notes/actions.
+// Discord messages, the agent's replies, and (optionally) its notes/actions.
 // Solves what the raw terminal can't: a readable, searchable review of what
-// actually happened -- also the support view for customer-hosted Marveens.
+// actually happened -- also the support view for customer-hosted Alfreds.
 const CONVERSATION_PAGE_SIZE = 400
 let conversationEntries = []
 let conversationAgentName = null
@@ -22430,7 +22024,7 @@ async function openConversationModal(agentName, displayName) {
 // Latest page (offset=0); resets the loaded window.
 async function loadConversation() {
   const container = document.getElementById('conversationContainer')
-  const token = localStorage.getItem('marveen-dashboard-token') || ''
+  const token = localStorage.getItem('alfred-dashboard-token') || ''
   try {
     const r = await fetch(`/api/agents/${encodeURIComponent(conversationAgentName)}/conversation?limit=${CONVERSATION_PAGE_SIZE}&offset=0`, {
       headers: { 'Authorization': 'Bearer ' + token },
@@ -22453,7 +22047,7 @@ async function loadOlderConversation() {
   conversationLoadingOlder = true
   const btn = document.getElementById('conversationLoadOlder')
   if (btn) { btn.disabled = true; btn.textContent = t('conversation.loading') }
-  const token = localStorage.getItem('marveen-dashboard-token') || ''
+  const token = localStorage.getItem('alfred-dashboard-token') || ''
   try {
     const offset = conversationEntries.length
     const r = await fetch(`/api/agents/${encodeURIComponent(conversationAgentName)}/conversation?limit=${CONVERSATION_PAGE_SIZE}&offset=${offset}`, {
@@ -22515,7 +22109,7 @@ function renderConvEntry(e) {
   const ts = fmtConvTs(e.ts)
   const txt = escapeHtml(e.text || '').replace(/\n/g, '<br>')
   if (e.kind === 'in') {
-    return `<div class="conv-row conv-in"><div class="conv-bubble"><div class="conv-meta">Telegram be · ${ts}</div><div class="conv-text">${txt}</div></div></div>`
+    return `<div class="conv-row conv-in"><div class="conv-bubble"><div class="conv-meta">Discord be · ${ts}</div><div class="conv-text">${txt}</div></div></div>`
   }
   if (e.kind === 'out') {
     const lbl = escapeHtml(e.label || t('messages.conv.reply_label'))
@@ -22788,9 +22382,9 @@ async function fedApplyToMainAgent() {
   if (!confirmed) return
   try {
     // Server-side apply: restarts the main channels agent by MAIN_AGENT_ID,
-    // so the client does not depend on window._marveen being loaded (the
+    // so the client does not depend on window._alfred being loaded (the
     // Federation page does not populate it -> the old /api/agents/:name path
-    // 404'd when it fell back to the 'marveen' default).
+    // 404'd when it fell back to the 'alfred' default).
     // FEDAPPLYGATE1018: the apply restarts the main agent, so the server's busy gate applies; a refusal
     // asks a second time, like the main restart button, and only then sends an explicit force.
     const apply = (force) => fetch('/api/federation/apply', {
@@ -23171,7 +22765,7 @@ async function openResearchDoc(agent, name) {
   const closeBtn = document.getElementById('mobileLoginClose')
 
   async function render() {
-    const token = localStorage.getItem('marveen-dashboard-token')
+    const token = localStorage.getItem('alfred-dashboard-token')
     if (!token) {
       qrBox.innerHTML = `<p class="muted">${t('mobile_login.no_token')}</p>`
       return
@@ -23218,462 +22812,6 @@ async function openResearchDoc(agent, name) {
   btn.addEventListener('click', () => { render(); openModal(overlay) })
   if (closeBtn) closeBtn.addEventListener('click', () => closeModal(overlay))
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(overlay) })
-})()
-
-// GROMZOLINKCONFIRM1106: the Gromzo card's status line, pure so the tests can run it. A link that waits for the
-// owner's confirmation says where to confirm and until when (on 2026-11-06 the owner saw only "not linked yet"
-// and the request ran out); a refused or expired one says what to do next. A new pending request wins over an
-// older refusal.
-const GROMZO_LINK_REFUSAL_KINDS = ['expired', 'refused', 'owner_mismatch', 'not_found']
-function gromzoStatusLine(s, nowMs) {
-  if (!s || !s.available) {
-    if (s && (s.code === 'not_running' || s.code === 'no_access')) return { key: 'gromzo.status.not_running' }
-    return { key: 'gromzo.status.unknown', params: { code: String((s && s.code) || '?') } }
-  }
-  if (s.linked) return { key: 'gromzo.status.linked' }
-  if (Number.isInteger(s.linkPendingExpiresIn)) {
-    if (s.linkPendingExpiresIn <= 0) return { key: 'gromzo.status.link_expired' }
-    return { key: 'gromzo.status.link_pending', until: nowMs + s.linkPendingExpiresIn * 1000 }
-  }
-  if (typeof s.linkRefusal === 'string') {
-    if (GROMZO_LINK_REFUSAL_KINDS.includes(s.linkRefusal)) return { key: 'gromzo.status.link_' + s.linkRefusal }
-    return { key: 'gromzo.status.link_failed', params: { kind: s.linkRefusal } }
-  }
-  return { key: 'gromzo.status.not_linked' }
-}
-
-// GROMZOLINKCONFIRM1106 follow-up (Dani, #2555 review): the deadline in the UI's own language (24-hour clock in both),
-// and the re-read of a pending link, both pure so the tests run the shipped code: 15 s after a pending line, once,
-// and only while the card is still on the page.
-const GROMZO_STATUS_REFRESH_MS = 15000
-function gromzoUntilText(untilMs, lang) {
-  return new Date(untilMs).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'hu-HU', { hour: '2-digit', minute: '2-digit' })
-}
-function gromzoScheduleStatusRefresh(isConnected, reload, setT) {
-  return setT(() => { if (isConnected()) reload() }, GROMZO_STATUS_REFRESH_MS)
-}
-
-// === Gromzo card: the link status (GROMZOOWNERQR1030; GROMZOBRIDGEWIZARD1107 D5a) ===
-// The phone hookup and a new phone's code are the Marveen Bridge's ("Gromzo bekötése" wizard). The card's own owner
-// QR is gone: dash.sock never hands out the owner's codes (marveen-mxd #89), so it always ended on consent_required.
-// The card keeps the link status line; the agents are setupGromzoAgents below.
-;(function setupGromzoCard() {
-  const card = document.getElementById('gromzoCard')
-  if (!card) return
-  const statusEl = document.getElementById('gromzoStatus')
-
-  // While a link waits for the owner's confirmation the line is read again, so the card turns to "linked" on its
-  // own once the owner confirms (or to "expired" when the 15 minutes run out). Only while the card is on the page.
-  let statusRefresh = null
-  async function loadStatus() {
-    if (statusRefresh) { clearTimeout(statusRefresh); statusRefresh = null }
-    statusEl.textContent = t('gromzo.status.loading')
-    try {
-      const r = await fetch('/api/gromzo/status', { cache: 'no-store' })
-      const s = r.ok ? await r.json() : { available: false, code: 'http_' + r.status }
-      const line = gromzoStatusLine(s, Date.now())
-      if (line.until) {
-        statusEl.textContent = t(line.key, { until: gromzoUntilText(line.until, window._lang) })
-        statusRefresh = gromzoScheduleStatusRefresh(() => statusEl.isConnected, () => { statusRefresh = null; loadStatus() }, setTimeout)
-      } else {
-        statusEl.textContent = t(line.key, line.params)
-      }
-    } catch (e) {
-      statusEl.textContent = t('gromzo.status.unknown', { code: 'network' })
-    }
-  }
-  window.loadGromzoCard = loadStatus
-})()
-
-// === Gromzo card: which agents are on Gromzo (GROMZOAGENTPICK1101) ===
-// GET /api/gromzo/agents lists the fleet; switching on asks the owner to approve in the
-// app (POST .../enable), then this panel asks POST .../consent every few seconds until the
-// owner decided (the server paces the real mxd check to one per ~11 s). Switching off
-// is POST .../disable. Only the owner's dashboard session may do any of it; the
-// consent id never reaches the browser.
-;(function setupGromzoAgents() {
-  const listEl = document.getElementById('gromzoAgentList')
-  const errEl = document.getElementById('gromzoAgentsError')
-  // MXDAGENTSOCKID1106: mxd could not read its protection state, so it counts every agent as protected (Samu 71344 (1)).
-  const ratchetEl = document.getElementById('gromzoAgentsRatchet')
-  if (!listEl || !errEl) return
-  const POLL_MS = 6000
-  // slug -> { kind: 'pending'|'busy'|'error'|'restarting', text?, until? } (this page's view only)
-  const local = new Map()
-  let rows = []
-  let pollTimer = null
-  // GROMZONAMETAKEN1106: the name the agent gets on Gromzo. A row shows a name field once the controller refused its
-  // name (at the switch-on or at the approval). The codes that mean "pick another name", never "try again later".
-  const NAME_CODES = ['name_taken', 'reserved_name', 'bad_name', 'bad_display_name', 'mixed_script']
-  const nameDraft = new Map() // slug -> what the owner typed (survives the list's re-renders)
-  const nameAsk = new Set() // slugs whose last switch-on came back with a name code
-
-  function agentErr(code) {
-    // The controller says name_taken for a taken AND a reserved name: one sentence that asks for another name.
-    if (code === 'name_taken') code = 'reserved_name'
-    for (const key of ['gromzo.agents.err.' + code, 'gromzo.err.' + code]) {
-      const s = t(key)
-      if (s !== key) return s
-    }
-    return t('gromzo.agents.err.generic', { code })
-  }
-
-  async function codeOf(r) {
-    let code = 'http_' + r.status
-    try { const b = await r.json(); code = String(b.code || b.error || code) } catch { /* keep the HTTP code */ }
-    return code
-  }
-
-  function showError(msg) {
-    errEl.textContent = msg
-    errEl.hidden = !msg
-  }
-
-  // GROMZOMAINAGENT1106: the main agent's own launch side (the server's mainLaunch), after the shared
-  // local/pending states. "running" is observed (the running session was started with the plugin), not
-  // assumed from the switch.
-  function mainStateOf(row) {
-    switch (row.mainLaunch) {
-      case 'running': return { cls: 'is-on', text: t('gromzo.agents.main.running') }
-      case 'restart_waiting': return { cls: 'is-pending', text: t(row.gromzo ? 'gromzo.agents.main.restart_waiting_on' : 'gromzo.agents.main.restart_waiting_off') }
-      case 'waiting_mxd': return { cls: 'is-pending', text: t('gromzo.agents.main.waiting_mxd') }
-      case 'held': return { cls: 'is-error', text: t('gromzo.agents.state.held') }
-      case 'marketplace_failed': return { cls: 'is-error', text: t('gromzo.agents.main.marketplace_failed') }
-      case 'env_failed': return { cls: 'is-error', text: t('gromzo.agents.main.env_failed') }
-      case 'restart_failed': return { cls: 'is-error', text: t('gromzo.agents.main.restart_failed') }
-      case 'on_unknown': return { cls: 'is-on', text: t('gromzo.agents.state.on') }
-      default: return row.gromzo ? { cls: 'is-on', text: t('gromzo.agents.state.on') } : { cls: '', text: t('gromzo.agents.main.off') }
-    }
-  }
-
-  function stateOf(row) {
-    const l = local.get(row.slug)
-    if (l && l.kind === 'busy') return { cls: '', text: t('gromzo.agents.state.busy') }
-    if (l && l.kind === 'restarting') return { cls: 'is-on', text: t('gromzo.agents.state.restarting') }
-    if (l && l.kind === 'error') return { cls: 'is-error', text: l.text }
-    const until = (l && l.kind === 'pending' && l.until) || row.pendingUntil
-    if (until && until > Date.now()) {
-      const min = Math.max(1, Math.ceil((until - Date.now()) / 60000))
-      return { cls: 'is-pending', text: t('gromzo.agents.state.pending', { min }) }
-    }
-    if (row.held) return { cls: 'is-error', text: t('gromzo.agents.state.held') }
-    if (row.main) return mainStateOf(row)
-    return row.gromzo ? { cls: 'is-on', text: t('gromzo.agents.state.on') } : { cls: '', text: t('gromzo.agents.state.off') }
-  }
-
-  // Not on a held row: mxd asks for a held agent again only under the name it lists (marveen-mxd main.rs is_held), so a
-  // new name there could not take effect (Dani 71877).
-  function nameFieldShown(row, pending) {
-    return !pending && !row.gromzo && !row.held && nameAsk.has(row.slug)
-  }
-
-  function nameFor(row) {
-    return nameDraft.has(row.slug) ? nameDraft.get(row.slug) : (row.gromzoName || row.name || row.slug)
-  }
-
-  function render() {
-    // A re-render (the poll, a reload) must not take the name field from under the owner's typing.
-    const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.gromzoName : undefined
-    const sel = focused !== undefined ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null
-    listEl.replaceChildren()
-    for (const row of rows) {
-      const li = document.createElement('li')
-      li.className = 'gromzo-agent-row'
-      const main = document.createElement('div')
-      main.className = 'gromzo-agent-main'
-      const name = document.createElement('span')
-      name.className = 'gromzo-agent-name'
-      name.textContent = row.name || row.slug
-      const st = stateOf(row)
-      const state = document.createElement('span')
-      state.className = 'gromzo-agent-state' + (st.cls ? ' ' + st.cls : '')
-      state.textContent = st.text
-      state.setAttribute('aria-live', 'polite')
-      main.append(name, state)
-      // The agent's picture on Gromzo (Samu 64526): say up front what would stop it (too large, not PNG/JPEG, ...).
-      if (!row.main && row.avatarProblem) {
-        const pic = document.createElement('span')
-        pic.className = 'gromzo-agent-state is-warn'
-        pic.textContent = t('gromzo.agents.avatar.' + row.avatarProblem)
-        main.append(pic)
-      }
-      // MXDAGENTSOCKID1106: the agent's agent.sock protection. Refused: its plugin sends no token for a protected
-      // agent; unprotected: running for 10 minutes without a token yet. Protected shows nothing.
-      if (row.protection === 'refused' || row.protection === 'unprotected') {
-        const prot = document.createElement('span')
-        prot.className = 'gromzo-agent-state ' + (row.protection === 'refused' ? 'is-error' : 'is-warn')
-        prot.textContent = t('gromzo.agents.prot.' + row.protection)
-        main.append(prot)
-      }
-      // The main agent: switching it on or off restarts the main conversation, so the row says so up front.
-      if (row.main) {
-        const note = document.createElement('span')
-        note.className = 'gromzo-agent-state gromzo-agent-note'
-        note.textContent = t('gromzo.agents.main.note')
-        main.append(note)
-      }
-      li.append(main)
-      {
-        const l = local.get(row.slug)
-        const pending = (l && l.kind === 'pending') || (row.pendingUntil && row.pendingUntil > Date.now())
-        const disabled = !!pending || !!(l && (l.kind === 'busy' || l.kind === 'restarting'))
-        if (nameFieldShown(row, pending)) {
-          const field = document.createElement('label')
-          field.className = 'gromzo-agent-namefield'
-          const cap = document.createElement('span')
-          cap.textContent = t('gromzo.agents.name.label')
-          const input = document.createElement('input')
-          input.type = 'text'
-          input.className = 'input'
-          input.maxLength = 64
-          input.autocomplete = 'off'
-          input.spellcheck = false
-          input.value = nameFor(row)
-          input.disabled = disabled
-          input.dataset.gromzoName = row.slug
-          input.addEventListener('input', () => nameDraft.set(row.slug, input.value))
-          input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !input.disabled) { e.preventDefault(); switchOn(row) } })
-          field.append(cap, input)
-          main.append(field)
-        }
-        const label = row.name || row.slug
-        const mk = (on, primary, textKey) => {
-          const b = document.createElement('button')
-          b.className = primary ? 'btn-primary btn-compact' : 'btn-secondary btn-compact'
-          b.textContent = t(textKey)
-          b.setAttribute('aria-label', t(on ? 'gromzo.agents.aria.on' : 'gromzo.agents.aria.off', { name: label }))
-          b.disabled = disabled
-          b.addEventListener('click', () => (on ? switchOn(row) : switchOff(row)))
-          return b
-        }
-        const actions = document.createElement('div')
-        actions.className = 'gromzo-agent-actions'
-        // A held agent: mxd lists it but its last start held it back; ask for a new approval, or take it off.
-        if (row.main && row.mainLaunch === 'restart_waiting' && !pending) {
-          const b = document.createElement('button')
-          b.className = 'btn-primary btn-compact'
-          b.textContent = t('gromzo.agents.main.btn_restart')
-          b.disabled = disabled
-          b.addEventListener('click', () => restartMain(row))
-          actions.append(b)
-        }
-        if (row.held) actions.append(mk(true, true, 'gromzo.agents.btn.reapprove'))
-        // A held sub-agent always gets the switch-off, flag on or not (Dani 71938): mxd lists it, the switch-off is its
-        // agent_remove, and it is the way to another name the held sentence names.
-        if (row.gromzo || (row.held && !row.main)) actions.append(mk(false, false, 'gromzo.agents.btn.off'))
-        else if (!row.held) actions.append(mk(true, true, 'gromzo.agents.btn.on'))
-        li.append(actions)
-      }
-      listEl.append(li)
-    }
-    if (focused !== undefined) {
-      const again = [...listEl.querySelectorAll('input[data-gromzo-name]')].find((x) => x.dataset.gromzoName === focused)
-      if (again && !again.disabled) { again.focus(); if (sel) try { again.setSelectionRange(sel[0], sel[1]) } catch { /* not a text field */ } }
-    }
-  }
-
-  // GROMZOAGENTPICK1101 (Bridge): the Bridge's device key authenticates every call, but an owner
-  // action needs the owner's password login as well (a session cookie next to the key). The login
-  // button opens the dashboard's own login overlay; the logout button ends that session (the
-  // Bridge has no other way to: its Settings show the device, not the session).
-  // Shown AHEAD of any click (the card's first list load answers owner_session_required), as a notice,
-  // not an error: the owner learns up front that the password login is the missing step (Samu 64431 (3)).
-  const ownerInfo = document.getElementById('gromzoOwnerInfo')
-  const loginBtn = document.getElementById('gromzoLoginBtn')
-  const logoutBtn = document.getElementById('gromzoLogoutBtn')
-  window.gromzoOwnerLogin = (needed) => { if (ownerInfo) ownerInfo.hidden = !needed }
-  if (loginBtn) loginBtn.addEventListener('click', () => { if (typeof window.mvShowLogin === 'function') window.mvShowLogin({ cancellable: true }) })
-  if (logoutBtn) logoutBtn.addEventListener('click', async () => {
-    try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* ignore */ }
-    window.location.reload()
-  })
-  async function showLogoutIfDevice() {
-    if (!logoutBtn) return
-    try {
-      const s = await (await fetch('/api/auth/status', { cache: 'no-store' })).json()
-      logoutBtn.hidden = s.method !== 'device'
-    } catch { logoutBtn.hidden = true }
-  }
-
-  // The protection banner: the fail-closed ratchet, or (Samu 71546) the state not available after a failed load.
-  function showProtBanner(key) {
-    if (!ratchetEl) return
-    ratchetEl.textContent = key ? t(key) : ''
-    ratchetEl.hidden = !key
-  }
-
-  async function loadAgents() {
-    showError('')
-    // Dani 71532 (1): a failed reload must not leave the last answer's "every agent protected" banner standing.
-    showProtBanner(null)
-    try {
-      const r = await fetch('/api/gromzo/agents', { cache: 'no-store' })
-      if (!r.ok) {
-        const code = await codeOf(r)
-        rows = []; render()
-        window.gromzoOwnerLogin(code === 'owner_session_required')
-        if (code !== 'owner_session_required') {
-          showError(agentErr(code))
-          showProtBanner('gromzo.agents.prot.unavailable')
-        }
-        if (logoutBtn) logoutBtn.hidden = true
-        return
-      }
-      window.gromzoOwnerLogin(false)
-      void showLogoutIfDevice()
-      const body = await r.json()
-      rows = body.agents || []
-      showProtBanner(body.ratchetUnreadable === true ? 'gromzo.agents.prot.ratchet_unreadable' : null)
-      for (const row of rows) if (row.pendingUntil && row.pendingUntil > Date.now() && !local.has(row.slug)) local.set(row.slug, { kind: 'pending', until: row.pendingUntil })
-      render()
-      ensurePolling()
-    } catch {
-      rows = []; render(); showError(agentErr('network'))
-      showProtBanner('gromzo.agents.prot.unavailable')
-    }
-  }
-
-  async function post(slug, action, body) {
-    return fetch('/api/gromzo/agents/' + encodeURIComponent(slug) + '/' + action, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : '{}', cache: 'no-store',
-    })
-  }
-
-  // A name code: the row keeps (or gets) its name field, prefilled with the name just refused, and says why.
-  function nameRefused(row, code, tried) {
-    nameAsk.add(row.slug)
-    if (!nameDraft.has(row.slug) && tried) nameDraft.set(row.slug, tried)
-    // A held sub-agent has no name field (mxd asks for it again only under its listed name): its way to another name is
-    // switching it off (agent_remove), then on again. The main agent's switch-off does not remove it from mxd, so it
-    // keeps the general sentence (Dani 71903).
-    const text = row.held && !row.main && code === 'name_taken' ? t('gromzo.agents.err.name_taken_held') : agentErr(code)
-    local.set(row.slug, { kind: 'error', text })
-  }
-
-  async function switchOn(row) {
-    // The main agent's switch restarts the main conversation fresh (hardRestartMarveenChannels) after the approval,
-    // through the manual-restart pane gate: a busy pane is not cut off, the row offers "Restart now" instead.
-    if (row.main) {
-      const confirmed = await confirmDialog({
-        title: t('gromzo.agents.main.confirm_on_title'),
-        message: t('gromzo.agents.main.confirm_on'),
-        okLabel: t('gromzo.agents.main.confirm_on_ok'),
-      })
-      if (!confirmed) return
-    }
-    const withName = nameFieldShown(row, false)
-    const name = withName ? nameFor(row).trim() : ''
-    local.set(row.slug, { kind: 'busy' }); render()
-    try {
-      const r = await post(row.slug, 'enable', withName ? { name } : null)
-      if (!r.ok) {
-        const code = await codeOf(r)
-        if (NAME_CODES.includes(code)) nameRefused(row, code, name || row.gromzoName || row.name)
-        else local.set(row.slug, { kind: 'error', text: agentErr(code) })
-        render(); return
-      }
-      nameAsk.delete(row.slug)
-      const b = await r.json()
-      if (b.state === 'pending') local.set(row.slug, { kind: 'pending', until: Date.now() + (Number(b.expires_in) || 600) * 1000 })
-      else local.delete(row.slug)
-      await loadAgents()
-    } catch {
-      local.set(row.slug, { kind: 'error', text: agentErr('network') }); render()
-    }
-  }
-
-  async function switchOff(row) {
-    // A sub-agent's switch-off removes it from mxd (agent_remove), so switching it on again asks for a new approval;
-    // the main agent stays listed in mxd, only its launch side goes, with the same fresh restart as the switch-on.
-    const confirmed = await confirmDialog(row.main
-      ? {
-        title: t('gromzo.agents.main.confirm_off_title'),
-        message: t('gromzo.agents.main.confirm_off'),
-        okLabel: t('gromzo.agents.main.confirm_off_ok'),
-      }
-      : {
-        title: t('gromzo.agents.confirm_off_title'),
-        message: t('gromzo.agents.confirm_off', { name: row.name || row.slug }),
-        okLabel: t('gromzo.agents.confirm_off_ok'),
-        danger: true,
-      })
-    if (!confirmed) return
-    local.set(row.slug, { kind: 'busy' }); render()
-    try {
-      const r = await post(row.slug, 'disable')
-      if (!r.ok) { local.set(row.slug, { kind: 'error', text: agentErr(await codeOf(r)) }); render(); return }
-      local.set(row.slug, { kind: 'restarting' })
-      await loadAgents()
-      setTimeout(() => { if (local.get(row.slug)?.kind === 'restarting') { local.delete(row.slug); loadAgents() } }, 15000)
-    } catch {
-      local.set(row.slug, { kind: 'error', text: agentErr('network') }); render()
-    }
-  }
-
-  // GROMZOMAINAGENT1106: the main conversation's restart, when the pane was busy at the switch. The server
-  // asks the pane gate again; a busy pane keeps the row on "waiting", never forced.
-  async function restartMain(row) {
-    const confirmed = await confirmDialog({
-      title: t('gromzo.agents.main.confirm_restart_title'),
-      message: t('gromzo.agents.main.confirm_restart'),
-      okLabel: t('gromzo.agents.main.confirm_restart_ok'),
-    })
-    if (!confirmed) return
-    local.set(row.slug, { kind: 'busy' }); render()
-    try {
-      const r = await post(row.slug, 'restart')
-      if (!r.ok) { local.set(row.slug, { kind: 'error', text: agentErr(await codeOf(r)) }); render(); return }
-      const b = await r.json()
-      local.delete(row.slug)
-      if (b.state === 'restart_waiting') local.set(row.slug, { kind: 'error', text: t('gromzo.agents.main.still_busy') })
-      await loadAgents()
-    } catch {
-      local.set(row.slug, { kind: 'error', text: agentErr('network') }); render()
-    }
-  }
-
-  async function pollOnce() {
-    const slugs = [...local].filter(([, l]) => l.kind === 'pending').map(([s]) => s)
-    if (!slugs.length || document.hidden) { stopPolling(); return }
-    for (const slug of slugs) {
-      try {
-        const r = await post(slug, 'consent')
-        if (!r.ok) {
-          let code = 'http_' + r.status
-          let added = ''
-          try { const e = await r.json(); code = String(e.code || e.error || code); added = typeof e.added_slug === 'string' ? e.added_slug : '' } catch { /* keep the HTTP code */ }
-          // mxd reloading or a transient refusal: keep waiting; a gone consent ends the wait.
-          if (code === 'no_pending') local.delete(slug)
-          // The approval belonged to another agent and mxd added THAT one (its switch here stays off).
-          else if (code === 'consent_mismatch' && added) local.set(slug, { kind: 'error', text: t('gromzo.agents.err.consent_mismatch_added', { slug: added }) })
-          // The controller checks the name again when the approval is used (a member may have taken it meanwhile).
-          else if (NAME_CODES.includes(code)) { const row = rows.find((x) => x.slug === slug); if (row) nameRefused(row, code, nameFor(row)); else local.set(slug, { kind: 'error', text: agentErr(code) }) }
-          else if (!['not_running', 'timeout', 'rate_limited', 'too_soon', 'unavailable', 'io'].includes(code)) local.set(slug, { kind: 'error', text: agentErr(code) })
-          continue
-        }
-        const b = await r.json()
-        if (b.state === 'pending') continue
-        if (b.state === 'added' || b.state === 'on') {
-          local.set(slug, { kind: 'restarting' })
-          setTimeout(() => { if (local.get(slug)?.kind === 'restarting') { local.delete(slug); loadAgents() } }, 15000)
-        } else {
-          local.set(slug, { kind: 'error', text: t('gromzo.agents.result.' + b.state) })
-        }
-      } catch { /* network blip: the next round asks again */ }
-    }
-    await loadAgents()
-  }
-
-  function ensurePolling() {
-    const any = [...local.values()].some((l) => l.kind === 'pending')
-    if (any && !pollTimer) pollTimer = setInterval(pollOnce, POLL_MS)
-    if (!any) stopPolling()
-  }
-  function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null } }
-
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) ensurePolling() })
-  window.addEventListener('pagehide', stopPolling)
-  window.loadGromzoAgents = loadAgents
 })()
 
 // === Archivalt kartyak ===

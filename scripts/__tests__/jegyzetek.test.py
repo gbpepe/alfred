@@ -10,7 +10,7 @@ Pins the review fixes:
   - an unreachable dashboard or a missing token file is one FAIL line and
     exit 1, never a traceback;
   - the port follows the agent-msg.sh chain (WEB_PORT works without
-    MARVEEN_WEB_PORT);
+    ALFRED_WEB_PORT);
   - `ertesit` relays ids only (never the note text), skips MAIN_AGENT_ID,
     and exits 1 when a message could not be sent.
 
@@ -105,11 +105,11 @@ def check(name, cond, detail=""):
 
 
 def cli(*args, env_extra=None, base=True):
-    env = {k: v for k, v in os.environ.items() if k not in ("MARVEEN_WEB_PORT", "WEB_PORT", "MARVEEN_API_BASE")}
-    env["MARVEEN_TOKEN_FILE"] = TOKEN
+    env = {k: v for k, v in os.environ.items() if k not in ("ALFRED_WEB_PORT", "WEB_PORT", "ALFRED_API_BASE")}
+    env["ALFRED_TOKEN_FILE"] = TOKEN
     env["MAIN_AGENT_ID"] = "boss"
     if base:
-        env["MARVEEN_API_BASE"] = "http://127.0.0.1:%d" % PORT
+        env["ALFRED_API_BASE"] = "http://127.0.0.1:%d" % PORT
     env.update(env_extra or {})
     Fake.calls = []
     r = subprocess.run([sys.executable, SCRIPT, *args], capture_output=True, text=True, env=env, timeout=60)
@@ -139,10 +139,10 @@ check("uj posts a lower-cased assignee and the named author",
       str(post))
 
 # --- clean failures ----------------------------------------------------------------------------
-r, _ = cli("lista", env_extra={"MARVEEN_API_BASE": "http://127.0.0.1:9"})
+r, _ = cli("lista", env_extra={"ALFRED_API_BASE": "http://127.0.0.1:9"})
 check("unreachable dashboard: one FAIL line, exit 1, no traceback",
       r.returncode == 1 and "not reachable" in r.stderr and "Traceback" not in r.stderr, r.stderr)
-r, _ = cli("lista", env_extra={"MARVEEN_TOKEN_FILE": os.path.join(TMP, "missing")})
+r, _ = cli("lista", env_extra={"ALFRED_TOKEN_FILE": os.path.join(TMP, "missing")})
 check("missing token file: one FAIL line, exit 1, no traceback",
       r.returncode == 1 and "dashboard token" in r.stderr and "Traceback" not in r.stderr, r.stderr)
 

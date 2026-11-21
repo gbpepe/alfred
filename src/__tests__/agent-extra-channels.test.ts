@@ -110,8 +110,8 @@ describe('GROMZOAGENTS1028: the Gromzo channel rides the extra-channel launch', 
     expect(l.envExports.endsWith('export MXD_AGENT="zara" && export MXD_SCOPE="both" && ')).toBe(true)
   })
   it('MXDAGENTSOCKID1106: the token path goes in after MXD_AGENT when mxd has one, and only then', () => {
-    const on = buildExtraChannelLaunch([], 'slack', AGENT, none, { slug: 'samu', sockUsable: true, tokenFile: '/run/marveen-mxd/tokens/samu.token' })
-    expect(on.envExports).toBe('export MXD_AGENT="samu" && export MXD_SCOPE="both" && export MXD_AGENT_TOKEN_FILE="/run/marveen-mxd/tokens/samu.token" && ')
+    const on = buildExtraChannelLaunch([], 'slack', AGENT, none, { slug: 'samu', sockUsable: true, tokenFile: '/run/alfred-mxd/tokens/samu.token' })
+    expect(on.envExports).toBe('export MXD_AGENT="samu" && export MXD_SCOPE="both" && export MXD_AGENT_TOKEN_FILE="/run/alfred-mxd/tokens/samu.token" && ')
     for (const tokenFile of [null, undefined]) {
       expect(buildExtraChannelLaunch([], 'slack', AGENT, none, { slug: 'samu', sockUsable: true, tokenFile }).envExports).not.toContain('MXD_AGENT_TOKEN_FILE')
     }
@@ -179,7 +179,7 @@ describe('enableExtraPlugins', () => {
 })
 
 describe('resume with extras: kept only when every plugin comes back', () => {
-  // The decision itself is unchanged by extras (Marveen 34770: an extra must
+  // The decision itself is unchanged by extras (Alfred 34770: an extra must
   // not cost the agent its context on every restart). What protects the resume
   // is the post-launch verification, which now covers the extras too.
   const base = {
@@ -189,7 +189,7 @@ describe('resume with extras: kept only when every plugin comes back', () => {
   it('a measured telegram launch resumes', () => {
     expect(decideContinueFlag(base).useContinue).toBe(true)
   })
-  it('telegram primary + slack extra resumes (Marveen 34770); the post-launch verify guards the extra', () => {
+  it('telegram primary + slack extra resumes (Alfred 34770); the post-launch verify guards the extra', () => {
     expect(decideContinueFlag({ ...base, extraProviders: ['slack'] }).useContinue).toBe(true)
   })
   it('NO primary channel + slack extra: the gates are evaluated on the extra -> fresh, like a slack primary', () => {
@@ -211,7 +211,7 @@ describe('resume with extras: kept only when every plugin comes back', () => {
     '  PID  PPID COMMAND',
     '  100     1 /opt/homebrew/bin/claude --channels plugin:telegram@x plugin:slack-channel@y',
     '  101   100 bun run --cwd /h/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 start',
-    '  102   100 node /h/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0/node_modules/.bin/tsx /h/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0/server.ts',
+    '  102   100 node /h/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0/node_modules/.bin/tsx /h/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0/server.ts',
     '  200     1 /opt/homebrew/bin/claude --channels plugin:telegram@x plugin:slack-channel@y',
     '  201   200 bun run --cwd /h/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 start',
   ].join('\n')

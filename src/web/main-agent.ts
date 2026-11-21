@@ -25,7 +25,7 @@ export function channelsPlistPath(serviceId: string): string {
 
 // The command an operator runs to restart the channels unit by hand, for THIS
 // install (#1878 item 6): the "restart failed" messages used to hardcode
-// `systemctl --user restart marveen-channels`, wrong on a renamed install and
+// `systemctl --user restart alfred-channels`, wrong on a renamed install and
 // with no macOS form. macOS: the launchd job in the GUI login's domain (run from
 // a terminal of that login); Linux: the user unit.
 export function channelsRestartCommand(platform: string = process.platform, serviceId: string = SERVICE_ID): string {
@@ -36,14 +36,14 @@ export function channelsRestartCommand(platform: string = process.platform, serv
   return `systemctl --user restart ${serviceId}-channels`
 }
 
-// The main agent (Marveen) runs in a long-lived `${id}-channels` tmux
+// The main agent (Alfred) runs in a long-lived `${id}-channels` tmux
 // session managed by launchd, not the `agent-${name}` template that
 // sub-agents use. Anything that needs to address it has to use this name
 // rather than agentSessionName().
 export const MAIN_CHANNELS_SESSION = channelsSessionName(MAIN_AGENT_ID)
 
 // The launchd plist that owns MAIN_CHANNELS_SESSION. Used by the recovery
-// path (telegram plugin monitor) to bounce the channels session via
+// path (channel plugin monitor) to bounce the channels session via
 // launchctl when softer reconnect attempts fail. The label keys off SERVICE_ID
 // (the value the installer wrote into the plist filename), which defaults to
 // MAIN_AGENT_ID, so an install without SERVICE_ID in its .env targets the same
@@ -51,7 +51,7 @@ export const MAIN_CHANNELS_SESSION = channelsSessionName(MAIN_AGENT_ID)
 export const MAIN_CHANNELS_PLIST = channelsPlistPath(SERVICE_ID)
 
 // Whether an agent's process lifecycle (start/restart) must go through the
-// channels-session helper (systemd/launchd via hardRestartMarveenChannels)
+// channels-session helper (systemd/launchd via hardRestartAlfredChannels)
 // rather than the `agent-<name>` tmux template that sub-agents use. True only
 // for the main agent: it has no `agents/<name>` dir and no `agent-<name>`
 // session, so the agent-process path would spawn a rogue duplicate session and

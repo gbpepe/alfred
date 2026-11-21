@@ -7,7 +7,7 @@ import {
   retractMemory, saveAgentMemorySuperseding,
   type Memory, type MemoryRow, type Approval,
 } from '../../db.js'
-import { MAIN_AGENT_ID, ALLOWED_CHAT_ID, OLLAMA_URL, MEMORY_IMPORT_CATEGORIZE_MODEL, APP_TZ, MEMORY_CONTENT_FILTER_STRICT_COMMANDS } from '../../config.js'
+import { MAIN_AGENT_ID, CHANNEL_CHAT_ID, OLLAMA_URL, MEMORY_IMPORT_CATEGORIZE_MODEL, APP_TZ, MEMORY_CONTENT_FILTER_STRICT_COMMANDS } from '../../config.js'
 import { createHash } from 'crypto'
 import { readAutonomyLevel } from '../autonomy-level.js'
 import { approvalWindowSeconds, fileServerApproval } from './approvals.js'
@@ -18,7 +18,7 @@ import type { HybridSearchTrace } from '../../db.js'
 import { resolveDateFilter } from '../../date-range.js'
 import { getMemorySupersessions, parseSupersedeRefs } from '../../memory-supersede.js'
 import type { RouteContext } from './types.js'
-import type { ApprovalLang } from '../../approval-slack.js'
+import type { ApprovalLang } from '../approval-texts.js'
 import { findDuplicateMemories, DEDUP_RECENT_LIMIT, type DedupCandidate } from '../memory-dedup.js'
 
 // Canonical memory categories. Kept in sync with the DB CHECK constraint in
@@ -143,7 +143,7 @@ export const STRICT_COMMAND_PATTERNS = [
 // row within seconds used to lose one edit silently -- last writer wins, and
 // nothing told the loser. updated_at alone cannot serve as the version: it has
 // one-second resolution, so two writes in the same second compare equal.
-// MARVEENGAPS1020 (a): what a data_delete approval is bound to. The memory id
+// ALFREDGAPS1020 (a): what a data_delete approval is bound to. The memory id
 // and its content version: an edit after the approval makes the anchor differ,
 // and the approval no longer deletes the edited row.
 export function memoryDeleteAnchor(id: number, content: string | null | undefined): string {
@@ -568,7 +568,7 @@ export async function tryHandleMemories(ctx: RouteContext): Promise<boolean> {
           .all(agentId, ...(searchCategory ? [searchCategory] : []), ...(tsRange ? [tsRange.fromTs, tsRange.toTs] : []), pattern, pattern, limit) as Memory[]
       }
     } else if (q) {
-      results = searchMemories(q, ALLOWED_CHAT_ID, limit, !strictOnly, searchCategory, searchTrace, tsRange)
+      results = searchMemories(q, CHANNEL_CHAT_ID, limit, !strictOnly, searchCategory, searchTrace, tsRange)
       keywordMatchKind = searchTrace.relaxed ? 'relaxed' : 'strict'
       if (results.length === 0) {
         keywordMatchKind = 'substring'
@@ -591,7 +591,7 @@ export async function tryHandleMemories(ctx: RouteContext): Promise<boolean> {
       results = getAgentMemories(agentId, limit, tier || undefined, offset, tsRange, staleBefore)
     } else {
       // Category goes into the query here too, not a post-filter: see getMemoriesForChat.
-      results = getMemoriesForChat(ALLOWED_CHAT_ID, limit, offset, tier || undefined, tsRange, staleBefore)
+      results = getMemoriesForChat(CHANNEL_CHAT_ID, limit, offset, tier || undefined, tsRange, staleBefore)
     }
 
     // Kept as a backstop, not as the mechanism. Since MEMKERESVAK917 every
@@ -988,7 +988,7 @@ Respond ONLY with JSON, nothing else:
     const before = getMemoryById(id)
     if (!before) { json(res, { error: 'Memory not found' }, 404); return true }
 
-    // MARVEENGAPS1020 (a): the delete is final (the versions go with the row),
+    // ALFREDGAPS1020 (a): the delete is final (the versions go with the row),
     // and the autonomy config ships data_delete at level 1, locked. Below level 3
     // the delete runs only with an approved, unused data_delete approval bound to
     // THIS memory in THIS content state (the anchor): without one the server files

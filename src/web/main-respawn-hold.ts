@@ -7,7 +7,7 @@
  *
  *   16:40:02.995  stuck-tool-call-watcher: recovering main channels session
  *   16:40:04.545  Scheduled task fired                    <- into the old pane
- *   16:40:07.720  Marveen session respawned with --continue
+ *   16:40:07.720  Alfred session respawned with --continue
  *   16:40:21.775  Set session /rename                     <- appended to the park
  *   16:40:31.978  Scheduled prompt did NOT arrive as typed (head-lost)
  *
@@ -19,8 +19,8 @@
  *
  * WHAT THIS COVERS, and what it does not. It is in-process state, so it sees
  * only the dashboard's own respawns of the main session: respawnMainSessionFresh
- * (scheduled auto-restart), resumeMarveenSession (--continue recovery, the
- * stuck-tool-call-watcher's path) and respawnMarveenSessionFresh (fresh
+ * (scheduled auto-restart), resumeAlfredSession (--continue recovery, the
+ * stuck-tool-call-watcher's path) and respawnAlfredSessionFresh (fresh
  * recovery, also the hard-restart fallback). It does NOT see a respawn done
  * outside this process: scripts/channel-watchdog.sh's RESPAWN_CMD, a
  * channels.sh start (boot, launchctl reload, createMainChannelsSession). Those
@@ -33,7 +33,7 @@
  */
 
 /** Longest a respawn may count as in flight. The slowest in-process path is
- *  resumeMarveenSession: two pre-respawn reaps, a respawn-pane bounded at 15 s
+ *  resumeAlfredSession: two pre-respawn reaps, a respawn-pane bounded at 15 s
  *  and two 2 s modal waits. One minute is well past that. */
 export const MAIN_RESPAWN_MAX_INFLIGHT_MS = 60_000
 

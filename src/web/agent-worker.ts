@@ -41,9 +41,7 @@ import { injectDbWriteGate, injectEmailSendGate, pythonHookCommand, isUnsafeHook
 //
 // Reliability bonus (beyond billing): the worker is launched WITHOUT any
 // channel plugin (isolated CLAUDE_CONFIG_DIR with enabledPlugins:{}), so it can
-// never open a second Telegram getUpdates long-poll -- which is what caused the
-// 409 Conflict that killed the live bot and clustered ~65% of restarts right
-// after every hourly heartbeat.
+// never open a second channel poller or contend with the live bot.
 //
 // Output capture is via a TEMP-FILE sentinel, NOT pane-scrape: the callers need
 // clean multi-line markdown (full CLAUDE.md / SOUL.md) and JSON, which terminal
@@ -53,13 +51,13 @@ import { injectDbWriteGate, injectEmailSendGate, pythonHookCommand, isUnsafeHook
 
 const TMUX = resolveFromPath('tmux')
 
-// MARVEEN_WORKER_MODEL is an escape hatch (systemd `Environment=`); when set it
+// ALFRED_WORKER_MODEL is an escape hatch (systemd `Environment=`); when set it
 // wins over everything else. Without it the worker inherits the main agent's
 // custom provider (model + endpoint env) if one is configured, so a
 // Claude-subscription-less fleet (e.g. custom LiteLLM endpoint) gets working
 // background workers without any extra config. Falls back to DEFAULT_AGENT_MODEL
 // when neither override nor custom provider is in play.
-const WORKER_MODEL_OVERRIDE = process.env.MARVEEN_WORKER_MODEL ?? null
+const WORKER_MODEL_OVERRIDE = process.env.ALFRED_WORKER_MODEL ?? null
 
 
 // WORKERMODEL1773 (#1773): the worker's --model, resolved in one pure place
@@ -67,7 +65,7 @@ const WORKER_MODEL_OVERRIDE = process.env.MARVEEN_WORKER_MODEL ?? null
 // workerModelSource, which called a custom-provider or an explicit
 // DEFAULT_AGENT_MODEL launch "default").
 // The #1609 guard (DEFAULTCLIGUARD927) only ever looked at the SHIPPED default:
-// an explicit value -- MARVEEN_WORKER_MODEL, or a configured DEFAULT_AGENT_MODEL
+// an explicit value -- ALFRED_WORKER_MODEL, or a configured DEFAULT_AGENT_MODEL
 // -- reached --model unchecked, so on a CLI below the model's minimum the worker
 // came up and every prompt got 400 unrecognized_model. Measured 2026-10-07 with
 // the real guard and CLI 2.1.110: an explicit claude-opus-5-5[1m] passed through
@@ -76,7 +74,7 @@ const WORKER_MODEL_OVERRIDE = process.env.MARVEEN_WORKER_MODEL ?? null
 // The decision now carries `unlaunchable` for an explicit value the measured
 // CLI cannot run (fail-open: an unmeasured CLI flags nothing; a custom-provider
 // model is not a Claude model and is not checked).
-export type WorkerModelSourceLabel = 'env:MARVEEN_WORKER_MODEL' | 'env:MARVEEN_WORKER_MODEL_FAST' | 'custom-provider' | 'env:DEFAULT_AGENT_MODEL' | 'default'
+export type WorkerModelSourceLabel = 'env:ALFRED_WORKER_MODEL' | 'env:ALFRED_WORKER_MODEL_FAST' | 'custom-provider' | 'env:DEFAULT_AGENT_MODEL' | 'default'
 export interface WorkerModelDecision {
   model: string
   source: WorkerModelSourceLabel
@@ -90,7 +88,7 @@ export interface WorkerModelDecision {
   unlaunchable: { requested: string; minCli: string; installedCli: string; fallback: string | null } | null
 }
 export interface WorkerModelInputs {
-  /** MARVEEN_WORKER_MODEL, or null. */
+  /** ALFRED_WORKER_MODEL, or null. */
   override: string | null
   /** Source label for `override` (the fast session's own model reports its own key). */
   overrideSource?: WorkerModelSourceLabel
@@ -125,7 +123,7 @@ export function resolveWorkerModel(i: WorkerModelInputs): WorkerModelDecision {
     const fallback = isModelUnsupportedByCli(candidate, installed) ? null : candidate
     return { model: fallback ?? model, source, unlaunchable: { requested: model, minCli: req.minCli, installedCli: installed, fallback } }
   }
-  if (i.override) return explicit(i.override, i.overrideSource ?? 'env:MARVEEN_WORKER_MODEL')
+  if (i.override) return explicit(i.override, i.overrideSource ?? 'env:ALFRED_WORKER_MODEL')
   if (i.customProviderModel) return { model: i.customProviderModel, source: 'custom-provider', unlaunchable: null }
   if (!i.defaultIsDistribution) return explicit(i.configuredDefault, 'env:DEFAULT_AGENT_MODEL')
   return { model: i.launchableDefault(), source: 'default', unlaunchable: null }
@@ -135,12 +133,12 @@ export function resolveWorkerModel(i: WorkerModelInputs): WorkerModelDecision {
 // systemd `Environment=`), then the config value (.env / dashboard settings). With
 // neither, null: the fast session walks the same chain as the slow one
 // (resolveWorkerModel), so an install that does not set it behaves exactly as before.
-// The config step is deliberate: as noted above, a MARVEEN_WORKER_MODEL line in .env
+// The config step is deliberate: as noted above, a ALFRED_WORKER_MODEL line in .env
 // is silently ignored, and that trap is not worth building a second time. The value
 // becomes resolveWorkerModel's override, so the CLI launchability guard
 // (WORKERMODEL1773) runs on the fast model too.
 const WORKER_MODEL_FAST_OVERRIDE: string | null =
-  process.env.MARVEEN_WORKER_MODEL_FAST || WORKER_MODEL_FAST || null
+  process.env.ALFRED_WORKER_MODEL_FAST || WORKER_MODEL_FAST || null
 
 // How long to wait for a freshly launched worker to reach an idle prompt.
 const WORKER_BOOT_TIMEOUT_MS = 90_000
@@ -157,7 +155,7 @@ const CLEAR_READY_BUDGET_MS = 8_000
 // earlier than the pre-change code in any path, and strictly later in the corner.
 const CLEAR_READY_SETTLE_MS = 500
 // Channel plugins to force-disable in the worker's isolated settings.json.
-const WORKER_DISABLED_PLUGINS = ['telegram', 'slack-channel']
+const WORKER_DISABLED_PLUGINS = ['discord']
 // ~/.claude entries NOT symlinked into the isolated config dir:
 //  - settings.json: we own it (enabledPlugins:{} override).
 //  - CLAUDE.md: skipped so global user memory never tints one-shot gens (refinement #1).
@@ -176,8 +174,8 @@ const WORKER_CONFIG_SKIP = new Set(['settings.json', 'CLAUDE.md', '.claude.json'
 // --- Per-session context ------------------------------------------------------
 //
 // Each interactive Claude Code session (slow + fast) has its own home dir and
-// isolated CLAUDE_CONFIG_DIR so they never share a Telegram long-poll connection
-// (the root cause of the 409 Conflicts; see the comment at the top of this file).
+// isolated CLAUDE_CONFIG_DIR so they never share a channel poller connection
+// (see the comment at the top of this file).
 // All per-session mutable state (promise-chain mutex, stuck-alert timer) lives
 // in WorkerCtx so tests can instantiate independent contexts.
 
@@ -185,7 +183,7 @@ export interface WorkerCtx {
   readonly session: string
   readonly home: string
   /** An explicit model for this session (fast vs slow), or null: then the shared
-   *  chain decides (MARVEEN_WORKER_MODEL > custom provider > default). */
+   *  chain decides (ALFRED_WORKER_MODEL > custom provider > default). */
   readonly modelOverride: string | null
   readonly configDir: string
   readonly scratchDir: string
@@ -210,8 +208,8 @@ export function makeWorkerCtx(session: string, homeDir: string, modelOverride: s
  * the session name (WORKERHOME1): a sandbox or renamed install booted with its
  * own MAIN_AGENT_ID must never resolve to -- and write into -- the default
  * install's live worker config dir (the 2026-07-28 same-host sandbox boot
- * seeded credentials into the live ~/.marveen-worker/.claude-config this way).
- * The default id 'marveen' keeps the historical .marveen-worker path, so
+ * seeded credentials into the live ~/.alfred-worker/.claude-config this way).
+ * The default id 'alfred' keeps the historical .alfred-worker path, so
  * existing installs see no migration and their Keychain path-hash
  * (configDirKeychainService) is unchanged; any other id derives its own dir,
  * which hashes to its own Keychain service automatically.
@@ -230,7 +228,7 @@ export function workerHomeFor(agentId: string, variant: 'slow' | 'fast'): string
  *
  * A second instance (a worktree checkout or a temp-dir clone) is refused too, by the same decision as the
  * background services in web.ts (#2419, Samu 64972): a dashboard action in its UI must not start a live worker
- * session or write the live worker's config dir either. MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES=1 in the process
+ * session or write the live worker's config dir either. ALFRED_ALLOW_SECOND_INSTANCE_SERVICES=1 in the process
  * environment opts in, as it does for the services; WEB_ONLY=true always refuses.
  */
 export function workerStartAllowed(
@@ -287,17 +285,17 @@ export function isNativeClaudeBin(bin: string | null, home: string = homedir()):
 // worker -- all existing callers default to this. Session name AND worker home
 // key off MAIN_AGENT_ID (per #611 + WORKERHOME1) so notify.sh's
 // "${MAIN_AGENT_ID}-worker" branch matches on renamed installs and a non-default
-// id gets its own isolated home; default installs stay "marveen-worker" /
-// ~/.marveen-worker (byte-identical to the historical fixed path).
+// id gets its own isolated home; default installs stay "alfred-worker" /
+// ~/.alfred-worker (byte-identical to the historical fixed path).
 const ctxSlow = makeWorkerCtx(
-  process.env.MARVEEN_WORKER_SESSION || `${MAIN_AGENT_ID}-worker`,
-  process.env.MARVEEN_WORKER_DIR || workerHomeFor(MAIN_AGENT_ID, 'slow'),
+  process.env.ALFRED_WORKER_SESSION || `${MAIN_AGENT_ID}-worker`,
+  process.env.ALFRED_WORKER_DIR || workerHomeFor(MAIN_AGENT_ID, 'slow'),
 )
 // Fast session: short, conversational tasks (< 300 chars, no analysis keywords).
 // Separate home + config dir eliminates any shared state with the slow session.
 const ctxFast = makeWorkerCtx(
-  process.env.MARVEEN_WORKER_SESSION_FAST || `${MAIN_AGENT_ID}-worker-fast`,
-  process.env.MARVEEN_WORKER_DIR_FAST || workerHomeFor(MAIN_AGENT_ID, 'fast'),
+  process.env.ALFRED_WORKER_SESSION_FAST || `${MAIN_AGENT_ID}-worker-fast`,
+  process.env.ALFRED_WORKER_DIR_FAST || workerHomeFor(MAIN_AGENT_ID, 'fast'),
   WORKER_MODEL_FAST_OVERRIDE,
 )
 
@@ -343,7 +341,7 @@ const WORKER_AUTH_FAILURE_RX =
 /**
  * The macOS Keychain service name Claude Code uses for a given CLAUDE_CONFIG_DIR.
  * sha256(configDir)[0:8] suffix -- reverse-engineered + verified 2026-06-10
- * against the live worker (sha256("/Users/marvin/.marveen-worker/.claude-config")
+ * against the live worker (sha256("/Users/marvin/.alfred-worker/.claude-config")
  * -> "1d2e1367"). Pure + exported so the locked test vector guards the algorithm.
  */
 export function configDirKeychainService(configDir: string): string {
@@ -509,13 +507,13 @@ export function withFleetFreezeGate(settings: WorkerSettings): WorkerSettings {
   return { ...settings, hooks: { ...hooks, PreToolUse: preToolUse } }
 }
 
-// ENVRELAXGATE1104 (Samu 67818, Marveen 67806). Lives here, not in agent-scaffold.ts: these entries reach the two
-// workers ONLY, never a sub-agent (sub-agents keep the email-send-gate's hard deny). The two workers (marveen-worker, marveen-worker-fast) run the main
+// ENVRELAXGATE1104 (Samu 67818, Alfred 67806). Lives here, not in agent-scaffold.ts: these entries reach the two
+// workers ONLY, never a sub-agent (sub-agents keep the email-send-gate's hard deny). The two workers (alfred-worker, alfred-worker-fast) run the main
 // agent's runAgent prompts (heartbeat, daily digest, second review, schedule prompts) on untrusted text, with Bash and
 // Write, in their own CLAUDE_CONFIG_DIR. The main agent's tracked project settings never reach them (their cwd is
 // outside the install), so only the fleet-freeze gate ran there. This puts the outgoing-copy gate on them the way the
 // main agent carries it, on Bash and the email tools. EMAIL_GATE_MATCHER already starts with `Bash|`, so ONE entry
-// covers both (two entries would run the gate twice on every Bash call). The Telegram/Discord copy entries are left
+// covers both (two entries would run the gate twice on every Bash call). The Discord copy entries are left
 // out: the worker has every channel plugin disabled. The command is absolute (the tracked file's $CLAUDE_PROJECT_DIR
 // form would point into the worker's own home there). The send side is the sub-agents' hard email-send-gate (see
 // withWorkerGates), not the main agent's approval gate.
@@ -530,7 +528,7 @@ function injectWorkerMailGate(existing: Record<string, unknown>, script: string)
   if (isUnsafeHookCommand(command)) return
   const prev = Array.isArray(hooks.PreToolUse) ? (hooks.PreToolUse as unknown[]) : []
   hooks.PreToolUse = [
-    // same dedupe discipline as injectTelegramCopyGate: only this script under this matcher is replaced
+    // Only this script under this matcher is replaced
     ...prev.filter((e) => !(JSON.stringify(e).includes(script) && (e as { matcher?: unknown })?.matcher === WORKER_MAIL_GATE_MATCHER)),
     { matcher: WORKER_MAIL_GATE_MATCHER, hooks: [{ type: 'command', command, timeout: 10 }] },
   ]
@@ -893,7 +891,7 @@ function startWorkerSessionFor(ctx: WorkerCtx): void {
   // failed 4x after a cold start). Mirror the agent-process.ts launcher,
   // which already disables the suggestion for the same scrape-misread reason.
   // Resolve model and optional custom-provider env prefix.
-  // Priority: MARVEEN_WORKER_MODEL override > main-agent custom provider > default.
+  // Priority: ALFRED_WORKER_MODEL override > main-agent custom provider > default.
   let customEnvPrefix = ''
   let customProviderModel: string | null = null
   if (!WORKER_MODEL_OVERRIDE) {
@@ -910,8 +908,8 @@ function startWorkerSessionFor(ctx: WorkerCtx): void {
       logger.warn({ err }, 'agent-worker: could not resolve main-agent custom provider; falling back to default model')
     }
   }
-  // WORKERMODELFAST1109: the fast session may carry its own model (MARVEEN_WORKER_MODEL_FAST).
-  // It is an explicit Claude model like MARVEEN_WORKER_MODEL, so the main agent's
+  // WORKERMODELFAST1109: the fast session may carry its own model (ALFRED_WORKER_MODEL_FAST).
+  // It is an explicit Claude model like ALFRED_WORKER_MODEL, so the main agent's
   // custom provider (model AND endpoint env) must not ride along with it.
   const override = ctx.modelOverride ?? WORKER_MODEL_OVERRIDE
   if (ctx.modelOverride) { customEnvPrefix = ''; customProviderModel = null }
@@ -919,7 +917,7 @@ function startWorkerSessionFor(ctx: WorkerCtx): void {
   // flags an explicit value the measured CLI cannot run.
   const decision = resolveWorkerModel({
     override,
-    overrideSource: ctx.modelOverride ? 'env:MARVEEN_WORKER_MODEL_FAST' : 'env:MARVEEN_WORKER_MODEL',
+    overrideSource: ctx.modelOverride ? 'env:ALFRED_WORKER_MODEL_FAST' : 'env:ALFRED_WORKER_MODEL',
     customProviderModel,
     configuredDefault: DEFAULT_AGENT_MODEL,
     defaultIsDistribution: DEFAULT_AGENT_MODEL_IS_DISTRIBUTION,
@@ -1086,7 +1084,7 @@ export function workerModelFallbackKey(d: WorkerModelDecision): string {
 /** Pure: the operator text for an unlaunchable configured worker model. */
 export function workerModelFallbackText(d: WorkerModelDecision): string {
   const u = d.unlaunchable!
-  const head = `⚠️ Marveen worker: a beállított worker-modellt (${u.requested}, forrás: ${d.source}) a telepített Claude Code ${u.installedCli} nem tudja elindítani (legalább ${u.minCli} kell).`
+  const head = `⚠️ Alfred worker: a beállított worker-modellt (${u.requested}, forrás: ${d.source}) a telepített Claude Code ${u.installedCli} nem tudja elindítani (legalább ${u.minCli} kell).`
   return u.fallback
     ? `${head} Ez a futás helyette ezzel indult: ${u.fallback}. A beállítást nem írtuk át; Claude Code-frissítés után a beállított modell magától visszajön.`
     : `${head} A tartalék modell sem indítható ezen a verzión, ezért a beállított modellel indult: minden kérés hibát fog adni. Frissítsd a Claude Code-ot, vagy állíts be indítható modellt.`
@@ -1108,7 +1106,7 @@ function alertWorkerStuck(ctx: WorkerCtx, paneTail: string): void {
   if (Date.now() - ctx.lastStuckAlert < WORKER_STUCK_ALERT_COOLDOWN_MS) return
   ctx.lastStuckAlert = Date.now()
   void notifyChannel(
-    `⚠️ Marveen worker [${ctx.session}]: a háttér-worker session nem áll készen (beragadt dialógus vagy ismeretlen képernyő). Önjavítás lefutott (Escape + restart), de a készenlét nem állt helyre. Érintett: ágens-generálás, capability-összefoglaló, heartbeat, digest. Nézz rá: tmux attach -t ${ctx.session}`,
+    `⚠️ Alfred worker [${ctx.session}]: a háttér-worker session nem áll készen (beragadt dialógus vagy ismeretlen képernyő). Önjavítás lefutott (Escape + restart), de a készenlét nem állt helyre. Érintett: ágens-generálás, capability-összefoglaló, heartbeat, digest. Nézz rá: tmux attach -t ${ctx.session}`,
   ).catch(() => { /* notifyChannel logs internally */ })
 }
 

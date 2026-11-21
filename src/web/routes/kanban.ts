@@ -102,10 +102,10 @@ export function isAgentActor(actor: string | undefined): boolean {
 // result goes where the work was asked for, with zero extra board clutter. The
 // token is read from the store at call time (never embedded in the message).
 export function kanbanMoveInstructions(id: string, target: string): string {
-  // VOICETOKENLEAK1101 round 2 (#2080 review 5727304277): every step goes through scripts/marveen-api.sh, which reads
-  // the token itself (scripts/lib/marveen_api.py), so the token is never on a command line (argv, the pane, the
+  // VOICETOKENLEAK1101 round 2 (#2080 review 5727304277): every step goes through scripts/alfred-api.sh, which reads
+  // the token itself (scripts/lib/alfred_api.py), so the token is never on a command line (argv, the pane, the
   // transcript); a text the agent writes (the result, the evidence) goes in a file, never on the command line either.
-  const api = `bash ${shellWord(join(PROJECT_ROOT, 'scripts', 'marveen-api.sh'))}`
+  const api = `bash ${shellWord(join(PROJECT_ROOT, 'scripts', 'alfred-api.sh'))}`
   // The agent writes these with its file tool, in its own directory (a strict profile writes nowhere else).
   const own = target === MAIN_AGENT_ID ? PROJECT_ROOT : agentDir(target)
   const resultFile = shellWord(join(own, `kanban-${id}-eredmeny.txt`))
@@ -248,7 +248,7 @@ function kanbanWriteActor(actor: unknown, auth: RouteContext['auth']): { error: 
 // The id is caller-supplied on POST /api/kanban (a readable slug, trimmed, not
 // shape-checked), so it is free text too: only an id of this shape is put in
 // the message, anything else is reported instead of dispatched. The shape is the
-// one scripts/lib/marveen_api.py takes (CARD_ID_RE), since every step of the recipe
+// one scripts/lib/alfred_api.py takes (CARD_ID_RE), since every step of the recipe
 // goes through it (VOICETOKENLEAK1101, Dani 64894): no '.', so never a '..' path
 // segment; at most 64 characters.
 export const DISPATCH_SAFE_CARD_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
@@ -708,8 +708,8 @@ export async function tryHandleKanban(ctx: RouteContext): Promise<boolean> {
     // configured name (OWNER_NAME, BOT_NAME, fleet agents -- what /api/kanban/assignees
     // advertises) OR any assignee that already exists on the board (external contributors
     // get cards too). Both sides compare case-insensitively: configured names are
-    // capitalised (BOT_NAME=Marveen) while stored assignees are usually lowercase
-    // (`marveen`), and an exact compare rejected the bot's and owner's own names.
+    // capitalised (BOT_NAME=Alfred) while stored assignees are usually lowercase
+    // (`alfred`), and an exact compare rejected the bot's and owner's own names.
     if (agent !== undefined) {
       const wanted = agent.toLowerCase()
       const isConfigured = [OWNER_NAME, BOT_NAME, ...listAgentNames()]
@@ -1251,7 +1251,7 @@ export async function tryHandleKanban(ctx: RouteContext): Promise<boolean> {
     // Same rule as /move: null, an array or a scalar is a 400, not a 500 on the
     // property read below.
     if (rawBody === null || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
-      json(res, { error: 'A törzs JSON objektum legyen, pl. {"agent":"marveen"}' }, 400)
+      json(res, { error: 'A törzs JSON objektum legyen, pl. {"agent":"alfred"}' }, 400)
       return true
     }
     const parsed = rawBody as {
@@ -1262,7 +1262,7 @@ export async function tryHandleKanban(ctx: RouteContext): Promise<boolean> {
     const rawAgent = parsed.agent ?? parsed.actor
     const agent = typeof rawAgent === 'string' ? rawAgent.trim() : ''
     if (!agent || agent.length > 100) {
-      json(res, { error: 'Az "agent" mező kötelező (a foglaló ügynök neve, pl. {"agent":"marveen"})' }, 400)
+      json(res, { error: 'Az "agent" mező kötelező (a foglaló ügynök neve, pl. {"agent":"alfred"})' }, 400)
       return true
     }
     if (action === 'claim') {

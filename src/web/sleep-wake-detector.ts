@@ -5,7 +5,7 @@ import { logger } from '../logger.js'
 // 83b8c4c3): the scheduler and channel-monitor alert paths must be able to
 // tell "something broke WHILE the machine was running" apart from "the machine
 // was asleep / powered off, and every wall-clock timer aged past its threshold
-// while nothing was actually wrong". The first is worth a Telegram ping; the
+// while nothing was actually wrong". The first is worth a channel ping; the
 // second is pure noise (the operator closed the lid, they know).
 //
 // Implementation choice: a sample-GAP trigger, then a platform-specific proof

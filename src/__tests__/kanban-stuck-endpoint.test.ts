@@ -56,7 +56,7 @@ function insertCard(db: ReturnType<typeof getDb>, opts: {
 }
 
 // Default author 'dev' = the default assignee 'Dev' (case differs on purpose:
-// the board stores "Marveen", the agent writes "marveen").
+// the board stores "Alfred", the agent writes "alfred").
 function insertComment(db: ReturnType<typeof getDb>, cardId: string, createdAt: number, opts: { author?: string; automated?: boolean } = {}) {
   db.prepare(`INSERT INTO kanban_comments (card_id, author, content, created_at, automated) VALUES (?, ?, 'note', ?, ?)`)
     .run(cardId, opts.author ?? 'dev', createdAt, opts.automated ? 1 : 0)

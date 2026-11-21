@@ -32,7 +32,7 @@ REPLY_TOOL_RX = re.compile(r"^mcp__plugin_[A-Za-z0-9_-]+__reply$")
 
 # GROMZOLEDGERIN1102: the Gromzo reply names its conversation in its RESULT, not
 # in its input (the input has reply_to / to: "owner", never a chat id). The
-# plugin (marveen-mxd plugin/gromzo-channel, withLedgerChat) adds one line
+# plugin (alfred-mxd plugin/gromzo-channel, withLedgerChat) adds one line
 # "chat_id: gz<20 hex>" to the result of a reply that went to the owner DM.
 GROMZO_REPLY_TOOL = "mcp__plugin_gromzo-channel_gromzo__reply"
 GROMZO_CHAT_RX = re.compile(r"(?m)^chat_id: (gz[0-9a-f]{20})$")

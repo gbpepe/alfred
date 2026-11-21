@@ -61,9 +61,9 @@ describe('mcpFileTargets', () => {
     expect(m.targets.map((t: { path: string }) => t.path).sort()).toEqual(['notes.md', 'store'])
   })
   it('a leaf naming the dashboard DB is flagged, whatever the class', () => {
-    expect(mcpFileTargets('mcp__sqlite__read_query', { db: 'store/claudeclaw.db', q: 'select 1' }).dbNamed).toBe(true)
-    expect(mcpFileTargets('mcp__x__search', { q: 'claudeclaw.db-wal' }).dbNamed).toBe(true)
-    expect(mcpFileTargets('mcp__x__search', { q: 'about claudeclaw.db files' }).dbNamed).toBe(false)
+    expect(mcpFileTargets('mcp__sqlite__read_query', { db: 'store/alfred.db', q: 'select 1' }).dbNamed).toBe(true)
+    expect(mcpFileTargets('mcp__x__search', { q: 'alfred.db-wal' }).dbNamed).toBe(true)
+    expect(mcpFileTargets('mcp__x__search', { q: 'about alfred.db files' }).dbNamed).toBe(false)
   })
   it('for the other class, prose (whitespace) is not a path; a lone path is', () => {
     const m = mcpFileTargets('mcp__plugin_telegram_telegram__reply', { text: 'see store/x.json now', files: ['/tmp/a.png'] })

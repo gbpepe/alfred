@@ -24,7 +24,7 @@
   },
   {
    "name": "kanban dispatch",
-   "cmd": "printf 'header = \"Authorization: Bearer %s\"\\n' \"$(cat '/srv/mv/pro ject root/store/.dashboard-token')\" | curl -s -X PUT http://127.0.0.1:3420/api/kanban/abc123  -K -  -H 'Content-Type: application/json'  -d '{\"assignee\":\"marveen\"}'",
+   "cmd": "printf 'header = \"Authorization: Bearer %s\"\\n' \"$(cat '/srv/mv/pro ject root/store/.dashboard-token')\" | curl -s -X PUT http://127.0.0.1:3420/api/kanban/abc123  -K -  -H 'Content-Type: application/json'  -d '{\"assignee\":\"alfred\"}'",
    "cwd": "/srv/mv/pro ject root"
   },
   {
@@ -54,7 +54,7 @@
   },
   {
    "name": "autonomy section",
-   "cmd": "curl -s -X POST http://localhost:3420/api/messages  -H \"Content-Type: application/json\"  -K <(printf 'header = \"Authorization: Bearer %s\"\\n' \"$(cat '/srv/mv/pro ject root/store/.dashboard-token')\")  --data-binary @- <<'JSON'\n{\"from\":\"agent-a\",\"to\":\"marveen\",\"content\":\"[FELHÍVÁS] CATEGORY_KEY: MIT akartam elvégezni, de level 1 miatt csak jelzek.\"}\nJSON",
+   "cmd": "curl -s -X POST http://localhost:3420/api/messages  -H \"Content-Type: application/json\"  -K <(printf 'header = \"Authorization: Bearer %s\"\\n' \"$(cat '/srv/mv/pro ject root/store/.dashboard-token')\")  --data-binary @- <<'JSON'\n{\"from\":\"agent-a\",\"to\":\"alfred\",\"content\":\"[FELHÍVÁS] CATEGORY_KEY: MIT akartam elvégezni, de level 1 miatt csak jelzek.\"}\nJSON",
    "cwd": "/srv/mv/pro ject root"
   },
   {
@@ -94,7 +94,7 @@
   },
   {
    "name": "heartbeat scaffold",
-   "cmd": "TOKEN=$(cat '/srv/mv/pro ject root/store/.dashboard-token')\nprintf 'header = \"Authorization: Bearer %s\"\\n' \"$TOKEN\" | curl -s -X POST http://127.0.0.1:3420/api/messages  -H \"Content-Type: application/json\"  -K -  -d '{\"from\":\"heartbeat\",\"to\":\"marveen\",\"content\":\"<the formatted text>\"}'",
+   "cmd": "TOKEN=$(cat '/srv/mv/pro ject root/store/.dashboard-token')\nprintf 'header = \"Authorization: Bearer %s\"\\n' \"$TOKEN\" | curl -s -X POST http://127.0.0.1:3420/api/messages  -H \"Content-Type: application/json\"  -K -  -d '{\"from\":\"heartbeat\",\"to\":\"alfred\",\"content\":\"<the formatted text>\"}'",
    "cwd": "/srv/mv/pro ject root"
   },
   {

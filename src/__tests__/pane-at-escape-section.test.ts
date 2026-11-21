@@ -12,15 +12,15 @@ import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-paneatesc-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-paneatesc-test-'))
 // readEnvFile (src/env.ts) takes its folder from this at import time.
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+process.env.ALFRED_ENV_DIR = tmpRoot
 
 vi.mock('../config.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../config.js')>()
   return {
     ...real,
-    STORE_DIR: '/nonexistent/claudeclaw-test-store',
+    STORE_DIR: '/nonexistent/alfred-test-store',
     PROJECT_ROOT: tmpRoot,
     OWNER_NAME: 'TestOwner',
     MAIN_AGENT_ID: 'agent-a',

@@ -13,7 +13,7 @@
 // SYSTEM_SENDER_IDS is empty by default (src/config.ts) and there is no
 // agents/channels-sh-guard/ directory -- so the alert about a silent channel was
 // itself undeliverable. Card ecb62920 closed the identical shape for
-// `from=marveen` in the prod-tree-guard hook.
+// `from=alfred` in the prod-tree-guard hook.
 //
 // SCOPE, BECAUSE IT MATTERS FOR HOW THIS READS: nothing has been lost to this on
 // this install. store/channels-failures.log has zero "starting on SHARED" lines,

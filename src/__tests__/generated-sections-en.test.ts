@@ -14,15 +14,15 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, readdirSyn
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-sections-en-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-sections-en-test-'))
 // readEnvFile (src/env.ts) takes its folder from this at import time.
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+process.env.ALFRED_ENV_DIR = tmpRoot
 
 vi.mock('../config.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../config.js')>()
   return {
     ...real,
-    STORE_DIR: '/nonexistent/claudeclaw-test-store',
+    STORE_DIR: '/nonexistent/alfred-test-store',
     PROJECT_ROOT: tmpRoot,
     OWNER_NAME: 'TestOwner',
     MAIN_AGENT_ID: 'agent-a',
@@ -290,7 +290,7 @@ describe('the new sub-agent\'s CLAUDE.md prompt and SOUL/SKILL prompts in Englis
   it('the curl-recipe agent really is on curl recipes, the others on the helper (the cases cover both forms)', async () => {
     setLang('en')
     expect(await claudeMdPrompt(CURL)).toContain('curl -s -X POST')
-    expect(await claudeMdPrompt(SHARED)).toContain('marveen-api.sh memory-save AGENT_NAME')
+    expect(await claudeMdPrompt(SHARED)).toContain('alfred-api.sh memory-save AGENT_NAME')
     expect(await claudeMdPrompt(OWN)).toContain('The helper sends your OWN token (AGENT_TOKENS)')
   })
 
@@ -349,7 +349,7 @@ describe('the new sub-agent\'s CLAUDE.md prompt and SOUL/SKILL prompts in Englis
     writeFileSync(file, `# Sub\n\n${curlForm}\n\n## After\n\nkept\n`, 'utf-8')
     expect(sc.ensureSkillSectionCurrent(SHARED)).toBe(true)
     const up = readFileSync(file, 'utf-8')
-    expect(up).toContain(`marveen-api.sh skill-propose SKILL-NEV`)
+    expect(up).toContain(`alfred-api.sh skill-propose SKILL-NEV`)
     expect(up).not.toContain('/api/skills/propose -H')
     expect(up).toContain('## After\n\nkept\n')
     expect(sc.ensureSkillSectionCurrent(SHARED)).toBe(false)

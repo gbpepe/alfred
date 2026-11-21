@@ -275,7 +275,7 @@ describe('install-prod-tree-guard-hook.sh: the generated post-checkout hook\'s a
     execFileSync('git', ['-C', repo, 'branch', 'feature-x'])
     // Async: the capture server lives in this worker (a synchronous checkout would block its answer).
     await execFileAsync('git', ['-C', repo, 'checkout', '-q', 'feature-x'], {
-      timeout: 20000, env: { ...process.env, PATH, MARVEEN_DASHBOARD_ORIGIN: `http://127.0.0.1:${port()}`, MARVEEN_GUARD_ALERT_TO: 'alert-recipient' },
+      timeout: 20000, env: { ...process.env, PATH, ALFRED_DASHBOARD_ORIGIN: `http://127.0.0.1:${port()}`, ALFRED_GUARD_ALERT_TO: 'alert-recipient' },
     })
     for (let i = 0; i < 100 && seen.length === 0; i++) await new Promise((r) => setTimeout(r, 20))
     expect(seen.map((s) => [s.method, s.url, s.headers.authorization])).toEqual([['POST', '/api/messages', `Bearer ${TOKEN}`]])

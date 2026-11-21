@@ -57,7 +57,7 @@ def run(card_id, status, api, extra=(), token='tok-test'):
         f.write(f'Kártya {card_id}: kész, a teszt lefutott.')
     env = dict(os.environ)
     env['KARTYA_DB'] = M.DB_PATH
-    env['CLAUDECLAW_ROOT'] = M.SANDBOX_ROOT
+    env['ALFRED_ROOT'] = M.SANDBOX_ROOT
     env['KARTYA_API'] = api + '/api/messages'
     env.pop('KARTYA_KANBAN_API', None)
     if token is None:

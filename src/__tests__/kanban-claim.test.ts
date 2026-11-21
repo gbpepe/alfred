@@ -164,7 +164,7 @@ describe('claimKanbanCard / releaseKanbanCardClaim (db layer)', () => {
     createKanbanCard({ id: 'b', title: 'B', assignee: 'samu' })
     createKanbanCard({ id: 'c', title: 'C', assignee: 'cody' })
     for (const id of ['a', 'b', 'c']) claimKanbanCard(id, 'cody')
-    updateKanbanCard('a', { assignee: 'marveen' })
+    updateKanbanCard('a', { assignee: 'alfred' })
     updateKanbanCard('b', { assignee: 'Cody' })       // to the holder (case-insensitive)
     updateKanbanCard('c', { assignee: 'cody', title: 'C2' }) // echo, no real change
     expect(getKanbanCard('a')!.claimed_by).toBeNull()
@@ -184,12 +184,12 @@ describe('the documented handoff: the new assignee can claim', () => {
     createKanbanCard({ id: 'h', title: 'Handoff', assignee: 'cody' })
     expect((await route('POST', '/api/kanban/h/claim', { agent: 'cody' })).status).toBe(200)
     await route('POST', '/api/kanban/h/move', { status: 'in_progress', actor: 'cody' })
-    await route('POST', '/api/kanban/h/comments', { author: 'cody', content: 'marveen: dontes kell X-rol' })
-    expect((await route('PUT', '/api/kanban/h', { assignee: 'marveen' })).status).toBe(200)
+    await route('POST', '/api/kanban/h/comments', { author: 'cody', content: 'alfred: dontes kell X-rol' })
+    expect((await route('PUT', '/api/kanban/h', { assignee: 'alfred' })).status).toBe(200)
     await route('POST', '/api/kanban/h/move', { status: 'waiting', actor: 'cody' })
-    const r = await route('POST', '/api/kanban/h/claim', { agent: 'marveen' })
+    const r = await route('POST', '/api/kanban/h/claim', { agent: 'alfred' })
     expect(r.status).toBe(200)
-    expect(r.body).toMatchObject({ claimed_by: 'marveen', took_over_from: null })
+    expect(r.body).toMatchObject({ claimed_by: 'alfred', took_over_from: null })
   })
 
   it('reassignment alone (card stays in_progress) already frees the card for the new assignee', async () => {
@@ -203,7 +203,7 @@ describe('the documented handoff: the new assignee can claim', () => {
     createKanbanCard({ id: 'h', title: 'Review me', assignee: 'cody' })
     await route('POST', '/api/kanban/h/claim', { agent: 'cody' })
     await route('POST', '/api/kanban/h/move', { status: 'testing', actor: 'cody' })
-    expect((await route('POST', '/api/kanban/h/claim', { agent: 'marveen' })).status).toBe(200)
+    expect((await route('POST', '/api/kanban/h/claim', { agent: 'alfred' })).status).toBe(200)
   })
 })
 
@@ -757,7 +757,7 @@ describe('the dispatch text carries the claim step only where the lock is on', (
     claimLock.value = '1'
     createKanbanCard({ id: 'c1', title: 'One' })
     const out = kanbanMoveInstructions('c1', 'cody')
-    // The claim line run for real (scripts/marveen-api.sh against a capture server); its body goes to the real route.
+    // The claim line run for real (scripts/alfred-api.sh against a capture server); its body goes to the real route.
     const sent = await runRecipeLine(recipeLine(out, 'kanban-claim', 'c1', 'cody'))
     expect([sent.method, sent.url]).toEqual(['POST', '/api/kanban/c1/claim'])
     const r = await route('POST', '/api/kanban/c1/claim', sent.body)

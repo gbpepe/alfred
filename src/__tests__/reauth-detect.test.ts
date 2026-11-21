@@ -81,7 +81,7 @@ describe('detectReauthNeeded', () => {
   })
 
   it('ISSUE2817: a revoked token is detected and named as revoked, not as the generic /login', () => {
-    // The verbatim error a customer's main session failed with for ~10 h (marveen#2817).
+    // The verbatim error a customer's main session failed with for ~10 h (alfred#2817).
     const r = detectReauthNeeded('  ⎿  OAuth token revoked · Please run /login')
     expect(r.needsReauth).toBe(true)
     expect(r.reason).toBe('OAuth token revoked')

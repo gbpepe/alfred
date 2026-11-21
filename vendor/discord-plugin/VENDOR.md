@@ -5,11 +5,11 @@
 - **Pinned**: version 0.0.4. `0.0.4/upstream/server.ts` is the upstream file **verbatim**
   (sha256 `6edc17d9e9d04930967361ba51c8e03b8f8508647a1dfc11d79ee6a0eb1010b7`), identical to the
   marketplace copy and to upstream main on 2026-11-11 (last code commit there: 48aa4351, 2026-04-14).
-- **Ours**: `0.0.4/overlay/` -- the plugin as Marveen runs it. Changed lines in `server.ts` carry
-  a `MARVEEN-PATCH(...)` / `MARVEEN-EXT` marker; the new logic lives in `marveen-ext.ts`.
+- **Ours**: `0.0.4/overlay/` -- the plugin as Alfred runs it. Changed lines in `server.ts` carry
+  a `ALFRED-PATCH(...)` / `ALFRED-EXT` marker; the new logic lives in `alfred-ext.ts`.
   Review it as a diff: `diff 0.0.4/upstream/server.ts 0.0.4/overlay/server.ts`.
 - **What the overlay changes** (DCEXT1111):
-  - answer buttons on `reply` (the former DCBTN1023 patch, its lines still tagged `MARVEEN-PATCH(dcbtn1023)`);
+  - answer buttons on `reply` (the former DCBTN1023 patch, its lines still tagged `ALFRED-PATCH(dcbtn1023)`);
   - F1: a tool-permission prompt goes to the owner only (`DISCORD_OWNER_USER_ID`, else the sole paired DM, else
     nobody), and only the owner, in a DM, decides it (upstream: every paired DM, and a typed `yes <code>` from
     any guild channel too);
@@ -53,12 +53,12 @@
     - C2: a `rename_thread` tool, only for a thread the bot opened itself;
     - C4: `reply` to an allowed forum channel opens a new post (title: the first line, max 100; files on the
       starter message);
-    - F1s-F3s: the dashboard's command menu (written into `marveen-ext.json` by the applier) is registered as
+    - F1s-F3s: the dashboard's command menu (written into `alfred-ext.json` by the applier) is registered as
       slash commands, offered only in the bot's DMs, again only when the list changed
       (`$DISCORD_STATE_DIR/slash-sync.json`). Only the owner (`DISCORD_OWNER_USER_ID`, paired, in a DM) may use
       them; the plugin acks privately within Discord's 3 s and passes the same `/word` text with `slash="1"`, and
-      the main command hook (`scripts/hooks/marveen-commands.py`) answers it as on Telegram. Only READ commands run
-      from Discord: a write needs the Telegram inbound evidence. Without an owner setting nothing is registered
+      the main command hook (`scripts/hooks/alfred-commands.py`) answers it. Only READ commands run
+      from Discord without write evidence: a write needs channel inbound evidence. Without an owner setting nothing is registered
       (commands registered earlier stay, and are refused);
     - A6: the bot's own threads (A1 list) get a recovery cursor too; at start at most 20 of them are looked into,
       with the same 10-minute lock and per-channel caps.

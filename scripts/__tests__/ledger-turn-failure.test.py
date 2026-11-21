@@ -2,7 +2,7 @@
 """Test the StopFailure hook (scripts/hooks/ledger-turn-failure.py).
 
 Drives the hook as a subprocess from a tmp install (<tmp>/scripts linked to the
-repo's), so its ledger DB is <tmp>/store/claudeclaw.db and the failures file lands
+repo's), so its ledger DB is <tmp>/store/alfred.db and the failures file lands
 next to it. Since ENVRELAXGATE1104 no environment variable picks the ledger DB. Run:  python3 <thisfile>
 Exit 0 = all pass; non-zero = a failure.
 """
@@ -33,7 +33,7 @@ def hook(tmp):
 
 
 def lib(tmp):
-    """ledger_lib loaded from the tmp install, so its DB is <tmp>/store/claudeclaw.db."""
+    """ledger_lib loaded from the tmp install, so its DB is <tmp>/store/alfred.db."""
     spec = importlib.util.spec_from_file_location("ledger_lib_" + os.path.basename(tmp),
                                                   os.path.join(install(tmp), "ledger_lib.py"))
     mod = importlib.util.module_from_spec(spec)
@@ -52,7 +52,7 @@ def check(name, ok):
 def run(tmp, payload, notify=None):
     env = dict(os.environ)
     env.pop("LEDGER_DB_PATH", None)
-    env["MARVEEN_AGENT_ID"] = "tester"
+    env["ALFRED_AGENT_ID"] = "tester"
     if notify is None:
         env.pop("LEDGER_TURN_FAILURE_NOTIFY", None)
     else:
@@ -130,9 +130,9 @@ with tempfile.TemporaryDirectory() as tmp:
 # ENVRELAXGATE1104: a ledger DB named in the environment is not used.
 with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as elsewhere:
     setup(tmp, answered=False)
-    open_db = os.path.join(elsewhere, "claudeclaw.db")
+    open_db = os.path.join(elsewhere, "alfred.db")
     r = subprocess.run([sys.executable, hook(tmp)], input=json.dumps(FAIL), capture_output=True, text=True,
-                       env=dict(os.environ, LEDGER_DB_PATH=open_db, MARVEEN_AGENT_ID="tester"), timeout=30)
+                       env=dict(os.environ, LEDGER_DB_PATH=open_db, ALFRED_AGENT_ID="tester"), timeout=30)
     check("ENVRELAXGATE1104: LEDGER_DB_PATH in the environment is ignored (the install DB answers)",
           r.returncode == 0 and len(rows(tmp)) == 1 and not os.path.exists(open_db)
           and not os.path.exists(os.path.join(elsewhere, "ledger-turn-failures.jsonl")))

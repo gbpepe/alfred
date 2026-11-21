@@ -170,7 +170,7 @@
             // The owner route's gate refuses a busy main agent, and an operator cannot force it (OPERRESTART409_1018).
             const confirmed = await askConfirm({
               title: 'A fő ágens újraindítása',
-              message: 'Újraindítod a fő ágenst? Új beszélgetéssel indul, és vele a gazda csatornája (például a Telegram) is újraindul. Ha épp dolgozik, nem indul el: a futó kört csak a gazda szakíthatja meg.',
+              message: 'Újraindítod a fő ágenst? Új beszélgetéssel indul, és vele a gazda csatornája (Discord) is újraindul. Ha épp dolgozik, nem indul el: a futó kört csak a gazda szakíthatja meg.',
               okLabel: 'Újraindítás',
             })
             if (!confirmed) return

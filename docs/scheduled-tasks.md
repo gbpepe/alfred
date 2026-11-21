@@ -249,7 +249,7 @@ A prompt injektálás előtt egy "untrusted" preamble kerül eléje, hogy az ese
 ### Forrás-oldali védelem: csak regisztrált feladat fut
 
 A runner egy feladatot CSAK akkor indít (cron, catch-up, pending retry, "Run now"), ha a fájljainak sha256-ja
-egyezik a szerver saját nyilvántartásával (`scheduled_task_registry` tábla a `store/claudeclaw.db`-ben, NEM a
+egyezik a szerver saját nyilvántartásával (`scheduled_task_registry` tábla a `store/alfred.db`-ben, NEM a
 `~/.claude/scheduled-tasks/` alatt). A hash a `SKILL.md` + `task-config.json` bájtjaiból készül, plusz a
 feladatkönyvtár MINDEN további fájljából, rekurzívan (relatív úttal címkézve, hossz-keretezve; symlinknél a cél
 bájtjaiból, hurok nélkül; fifo/socket csak a nevével), plusz a
@@ -310,7 +310,7 @@ runner indulásakor regisztrál MINDEN akkor a lemezen lévő feladatot (egyszer
 Ez ugyanaz a bizalom, amit a runner a frissítés előtt is megadott; utána már csak a fenti utak regisztrálnak.
 Ha a backfill előtt gyanús feladat került a könyvtárba, a frissítés előtt nézd át (`ls ~/.claude/scheduled-tasks`).
 
-A backfill jelölője a DB-ben van: egy újra létrehozott (törölt, üresről induló) `store/claudeclaw.db` mellett az első
+A backfill jelölője a DB-ben van: egy újra létrehozott (törölt, üresről induló) `store/alfred.db` mellett az első
 indulás ISMÉT mindent elfogad, ami a lemezen van. DB-csere vagy -visszaállítás előtt nézd át a feladatkönyvtárat.
 
 Korlátok:
@@ -335,7 +335,7 @@ Korlátok:
 A dashboard Bearer tokennel védett (token: `store/.dashboard-token`).
 
 ```bash
-TOKEN=$(cat /Users/jonasgergo/Documents/marveen/store/.dashboard-token)
+TOKEN=$(cat /Users/jonasgergo/Documents/alfred/store/.dashboard-token)
 ```
 
 ### Lista

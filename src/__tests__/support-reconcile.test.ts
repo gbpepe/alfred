@@ -98,7 +98,7 @@ describe('the support reconcile (terv-v7 3.8; Dani 32056 G1-G6)', () => {
 
   beforeEach(async () => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-reconcile-')))
-    supportDir = join(root, 'home', '.marveen', 'support')
+    supportDir = join(root, 'home', '.alfred', 'support')
     sshDir = join(root, 'home', '.ssh')
     mkdirSync(sshDir, { recursive: true, mode: 0o700 })
     writeFileSync(join(sshDir, 'authorized_keys'), OWN_LINE + '\n', { mode: 0o600 })
@@ -121,7 +121,7 @@ describe('the support reconcile (terv-v7 3.8; Dani 32056 G1-G6)', () => {
         { name: KIT_DISPATCHER_NAME, content: dispatcher, sha256: sha(dispatcher), executable: false },
         { name: KIT_ROUTINE_NAME, content: routine, sha256: sha(routine), executable: false },
       ],
-      installRoot: '/opt/marveen',
+      installRoot: '/opt/alfred',
       nodePath: '/usr/bin/node',
       nodeMin: 20,
       release: '37c85a884',

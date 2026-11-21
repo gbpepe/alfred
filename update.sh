@@ -1,5 +1,5 @@
 #!/bin/bash
-# Marveen Updater
+# Alfred Updater
 
 set -e
 
@@ -15,14 +15,14 @@ cd "$INSTALL_DIR"
 
 # HOSTINGERDOCKER1107: in the container the image owns the code (docker/code-sync.py) and the claude CLI version; a
 # git pull here would be overwritten by the next start, or fail on a tree with no .git. Update with a new image.
-if [ -f "$INSTALL_DIR/.env" ] && grep -qx 'MARVEEN_DEPLOYMENT=docker' "$INSTALL_DIR/.env"; then
-  echo "This Marveen runs in a container, and its image owns the version: update it with a new image"
+if [ -f "$INSTALL_DIR/.env" ] && grep -qx 'ALFRED_DEPLOYMENT=docker' "$INSTALL_DIR/.env"; then
+  echo "This Alfred runs in a container, and its image owns the version: update it with a new image"
   echo "(docker compose pull && docker compose up -d). update.sh does nothing here."
   exit 3
 fi
 # ── Language (saved by installer, falls back to HU) ──────────────────────────
-MARVEEN_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
-export MARVEEN_LANG
+ALFRED_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
+export ALFRED_LANG
 # shellcheck source=install-lang.sh
 source "$(dirname "$0")/install-lang.sh"
 
@@ -274,10 +274,10 @@ fi
 exec > >(tee -a "$UPDATE_LOG") 2>&1
 
 echo ""
-if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
-  echo -e "${BOLD}Marveen update...${NC} [$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
+if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
+  echo -e "${BOLD}Alfred update...${NC} [$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 else
-  echo -e "${BOLD}Marveen frissítés...${NC} [$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
+  echo -e "${BOLD}Alfred frissítés...${NC} [$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 fi
 echo ""
 
@@ -301,7 +301,7 @@ fi
 # this is defense-in-depth for manual invocations.
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 if [ "$CURRENT_BRANCH" = "HEAD" ] || [ -z "$CURRENT_BRANCH" ]; then
-  if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+  if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
     echo -e "${RED}ERROR:${NC} The repo is in detached-HEAD state."
   else
     echo -e "${RED}HIBA:${NC} A repo detached-HEAD állapotban van."
@@ -337,7 +337,7 @@ if [ "$CURRENT_BRANCH" = "HEAD" ] || [ -z "$CURRENT_BRANCH" ]; then
   # there is nothing for either form to switch TO, which is why the fetch
   # steps still come first here.
   if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ] || [ -f .git/shallow ]; then
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo "       This is a SHALLOW clone with no branch refs, so no switch to main can work here yet."
       echo "       Fetch the release branch first, then switch to it:"
     else
@@ -352,7 +352,7 @@ if [ "$CURRENT_BRANCH" = "HEAD" ] || [ -z "$CURRENT_BRANCH" ]; then
     # MAGYARUL ment, mikozben a folotte allo HIBA/ERROR fejlec helyesen valtott.
     # A #1438-ban szandekosan maradt igy, mert a kartya a regresszio-merest a
     # valtozatlan HU alakra kotte ki; a HU szoveg itt BAJTRA ugyanaz maradt.
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo "       Switch to a release branch, then you can start the update again, e.g.:"
     else
       echo "       Allj at egy release branchre, majd indithatod ujra a frissitest, pl.:"
@@ -365,7 +365,7 @@ fi
 # ref to fast-forward to (e.g. a local-only feature branch). Fail early with
 # a clear message instead of letting set -e abort mid-run.
 if ! git ls-remote --exit-code --heads origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
-  if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+  if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
     echo -e "${RED}ERROR:${NC} Branch '${CURRENT_BRANCH}' does not exist on origin."
   else
     echo -e "${RED}HIBA:${NC} A '${CURRENT_BRANCH}' branch nem létezik az origin-on."
@@ -374,7 +374,7 @@ if ! git ls-remote --exit-code --heads origin "$CURRENT_BRANCH" >/dev/null 2>&1;
   # nyelvfuggo volt, az alatta allo ket sor nem. Ugyanabban a kepernyoben all,
   # mint a Guard 1 uzenete, ezert a ketto EGYUTT valt nyelvet -- egy felig javitott
   # kepernyo rosszabb, mint egy egyseges magyar.
-  if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+  if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
     echo "       You can only update from a branch that also exists on origin (a tracked branch)."
     echo "       Switch to a release branch, e.g.:"
   else
@@ -424,8 +424,8 @@ if [ -n "$DIRTY" ]; then
     # fast-forward leaves them where they are. The one case they matter, an
     # upstream commit adding a tracked file at the same path, stops the pull
     # loudly below, with the local file untouched.
-    if ! git stash push -m "marveen-update-auto-stash $(date +%Y%m%d-%H%M%S)"; then
-      if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if ! git stash push -m "alfred-update-auto-stash $(date +%Y%m%d-%H%M%S)"; then
+      if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
         echo -e "${RED}ERROR:${NC} Auto-stash failed. Check: git status"
       else
         echo -e "${RED}HIBA:${NC} Auto-stash sikertelen. Nézd meg: git status"
@@ -434,7 +434,7 @@ if [ -n "$DIRTY" ]; then
     fi
     STASHED_AUTO=1
   else
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo -e "${RED}ERROR:${NC} The working tree has uncommitted changes."
     else
       echo -e "${RED}HIBA:${NC} A working tree módosult állapotban van."
@@ -530,8 +530,8 @@ pop_auto_stash() {
   else
     add_update_warn "A git nem tudta az osszes helyi valtozast visszatenni (pl. egy fajl mar ott volt)."
   fi
-  add_update_warn "Visszakerult: ${STASH_RESTORED:-semmi}. NEM kerult vissza, csak a stash-ben van: ${STASH_NOT_RESTORED:-semmi}. A stash megmaradt (git stash list, \"marveen-update-auto-stash\"); megnezni: git diff HEAD 'stash@{0}' -- <fajl>."
-  if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+  add_update_warn "Visszakerult: ${STASH_RESTORED:-semmi}. NEM kerult vissza, csak a stash-ben van: ${STASH_NOT_RESTORED:-semmi}. A stash megmaradt (git stash list, \"alfred-update-auto-stash\"); megnezni: git diff HEAD 'stash@{0}' -- <fajl>."
+  if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
     echo -e "${RED}WARNING:${NC} Auto-stash pop failed; the stash remains in 'git stash list'."
     [ -n "$STASH_CONFLICT_PATHS" ] && echo -e "          Conflicted paths were put back to the upstream version: ${STASH_CONFLICT_PATHS}"
   else
@@ -608,7 +608,7 @@ settings_json_gate() {
 npm_ci_failed() {
   local rc="$1"
   if [ "$rc" -eq 137 ]; then
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo -e "${RED}ERROR:${NC} npm ci was killed (exit 137, SIGKILL) -- most likely the machine ran out of memory."
       echo -e "  Check with: dmesg | grep -i 'killed process'  (the lockfile is not the cause)"
     else
@@ -616,7 +616,7 @@ npm_ci_failed() {
       echo -e "  Ellenőrzés: dmesg | grep -i 'killed process'  (nem a package-lock.json a hiba)"
     fi
   else
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo -e "${RED}ERROR:${NC} npm ci failed (exit code ${rc}). Details: npm ci"
     else
       echo -e "${RED}HIBA:${NC} az npm ci sikertelen (kilépési kód: ${rc}). Részletek: npm ci"
@@ -753,7 +753,7 @@ if [ "${AHEAD:-0}" -gt 0 ] && [ "${BEHIND:-0}" -gt 0 ]; then
     case "$REBASE_RC" in 0) REBASE_OUTCOME=rebased ;; 3) REBASE_OUTCOME=conflict ;; *) REBASE_OUTCOME=refused ;; esac
     case "$REBASE_RC" in
       0)
-        if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+        if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
           echo -e "  ${GREEN}✓${NC} Rebase done: ${AHEAD} local commit(s) replayed onto the new upstream, with the owner's approval."
           RESULT_MSG="${AHEAD} local commit(s) replayed onto origin/${CURRENT_BRANCH} with the owner's approval. Recovery ref: ${REBASE_BACKUP}."
         else
@@ -767,7 +767,7 @@ if [ "${AHEAD:-0}" -gt 0 ] && [ "${BEHIND:-0}" -gt 0 ]; then
         # (the result file is JSON-escaped, the dashboard shows it with textContent). notify.sh is not plain text: Telegram
         # parses HTML (a '<' in the subject fails the send, lost behind || true) and Slack mrkdwn turns <url|text> into a
         # link, so the alert gets & < > escaped once (Dani 74994 N5); the result file keeps the raw text.
-        if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+        if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
           RESULT_MSG="The update did not run, nothing changed. Your local change ${REBASE_COMMIT} \"${REBASE_SUBJECT}\" conflicts with the new version in: ${REBASE_FILES}. To do: adapt that local change to the new version by hand (a developer or support), then ask for the update again. Recovery ref: ${REBASE_BACKUP}."
           echo -e "${RED}ERROR:${NC} rebase conflict in ${REBASE_FILES} (local change ${REBASE_COMMIT}); nothing changed."
         else
@@ -781,12 +781,12 @@ if [ "${AHEAD:-0}" -gt 0 ] && [ "${BEHIND:-0}" -gt 0 ]; then
         ;;
       *)
         if [ "$REBASE_WHY" = "local-dependency-without-lock" ]; then
-          if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+          if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
             RESULT_MSG="The update did not run and the approval was not used: a local change edits package.json without package-lock.json, so installing the dependencies would fail on any version. That change needs fixing first (npm install, then commit both files)."
           else
             RESULT_MSG="A frissítés nem futott le, és a jóváhagyás nem fogyott el: egy helyi módosítás a package.json-t a package-lock.json nélkül írja át, ezért a függőségek telepítése bármelyik verzión elbukna. Előbb ezt kell rendbe tenni (npm install, majd mindkét fájl commit)."
           fi
-        elif [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+        elif [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
           RESULT_MSG="The update did not run, nothing changed: replaying the ${AHEAD} local change(s) needs the owner's approval for exactly this update (${REBASE_WHY:-unknown}). Ask for it on the dashboard's update dialog or through your agent."
         else
           RESULT_MSG="A frissítés nem futott le, semmi nem változott: a(z) ${AHEAD} helyi módosítás átrakásához a tulajdonos jóváhagyása kell, pontosan erre a frissítésre (${REBASE_WHY:-unknown}). A dashboard frissítés-ablakában vagy az ügynököd útján kérhető."
@@ -822,7 +822,7 @@ if ! retry 3 3 git pull --ff-only origin "$CURRENT_BRANCH"; then
       | head -n 20 | paste -sd, - | sed 's/,/, /g')"
   fi
   if [ -n "$PULL_BLOCKERS" ]; then
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       RESULT_MSG="git pull --ff-only failed: the update adds tracked files where local untracked files already are (${PULL_BLOCKERS}). Nothing was overwritten. Move or rename those files, then run the update again."
     else
       RESULT_MSG="git pull --ff-only sikertelen: a frissites kovetett fajlt hoz oda, ahol helyben egy nem kovetett fajl all (${PULL_BLOCKERS}). Semmi nem irodott felul. Mozgasd el vagy nevezd at ezeket, majd inditsd ujra a frissitest."
@@ -879,7 +879,7 @@ repair_morning_timer() {
   for morn_timer in "$units_dir/"*-morning.timer; do
     [ -f "$morn_timer" ] || continue
     if grep -q '^Requires=.*-morning\.service' "$morn_timer"; then
-      sed -i.marveen-bak '/^Requires=.*-morning\.service/d' "$morn_timer" && rm -f "${morn_timer}.marveen-bak"
+      sed -i.alfred-bak '/^Requires=.*-morning\.service/d' "$morn_timer" && rm -f "${morn_timer}.alfred-bak"
       systemctl --user daemon-reload 2>/dev/null || true
       echo -e "  Reggeli-napindito timer javitva (Requires= a [Unit]-bol eltavolitva): $(basename "$morn_timer")"
     fi
@@ -901,8 +901,8 @@ migrate_channels_restart() {
   for chan_unit in "$units_dir/"*-channels.service; do
     [ -f "$chan_unit" ] || continue
     if grep -q '^Restart=on-failure[[:space:]]*$' "$chan_unit"; then
-      if sed -i.marveen-bak 's/^Restart=on-failure[[:space:]]*$/Restart=always/' "$chan_unit" 2>/dev/null; then
-        rm -f "${chan_unit}.marveen-bak"
+      if sed -i.alfred-bak 's/^Restart=on-failure[[:space:]]*$/Restart=always/' "$chan_unit" 2>/dev/null; then
+        rm -f "${chan_unit}.alfred-bak"
         _patched=1
         echo -e "  Csatorna-unit javitva (Restart=on-failure -> always): $(basename "$chan_unit")"
       else
@@ -992,7 +992,7 @@ install_keepalive_probe_timer() {
     # BOT_NAME is only assigned further down this script, so read it here
     # instead of inheriting an empty one into the unit Description.
     _bot_name="$(sed -n 's/^BOT_NAME=//p' "$INSTALL_DIR/.env" 2>/dev/null | head -1 | tr -d '"')"
-    [ -n "$_bot_name" ] || _bot_name="Marveen"
+    [ -n "$_bot_name" ] || _bot_name="Alfred"
     _tz_line="# no explicit TZ detected; inheriting host default"
     _tz="$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || true)"
     [ -n "$_tz" ] && [ "$_tz" != "UTC" ] && _tz_line="Environment=TZ=$_tz"
@@ -1040,7 +1040,7 @@ EOF
 # runs weekly on the machines that already have the bug, had no Darwin branch at
 # all, so every Mac installed before 2026-09-14 still has no probe.
 # Measured on this install 2026-09-26 05:07: launchctl had no
-# com.marveen.channel-keepalive-probe, and store/channels-failures.log shows
+# com.alfred.channel-keepalive-probe, and store/channels-failures.log shows
 # main-agent respawns ONLY between 22:00 and 07:00 (19 that night, one every
 # ~15 minutes, zero between 07:00 and 22:00) -- the same quiet-night-reads-as-a-
 # wedge loop the Linux comment above describes. The respawn never clears the
@@ -1056,7 +1056,7 @@ install_keepalive_probe_launchd() {
   command -v launchctl >/dev/null 2>&1 || return 0
   # #1873: the installer resolves its own com.<SERVICE_ID>.* label.
   _ka_label="$("$_ka_installer" --print-label 2>/dev/null | head -1)"
-  [ -n "$_ka_label" ] || _ka_label="com.marveen.channel-keepalive-probe"
+  [ -n "$_ka_label" ] || _ka_label="com.alfred.channel-keepalive-probe"
   # ISSUE1891 (#1891): keyed on the job being LOADED, not on the plist existing
   # (the stuck-modal guard below learned this in #1694): a plist whose job never
   # ran -- a Mac without a GUI login, a failed load -- used to make this return
@@ -1095,7 +1095,7 @@ install_stuck_modal_guard_launchd() {
   [ "$_sm_mode" = "off" ] && return 0
   # #1873: the installer resolves its own com.<SERVICE_ID>.* label.
   _sm_label="$("$_sm_installer" --print-label 2>/dev/null | head -1)"
-  [ -n "$_sm_label" ] || _sm_label="com.marveen.stuck-modal-guard"
+  [ -n "$_sm_label" ] || _sm_label="com.alfred.stuck-modal-guard"
   if launchctl list "$_sm_label" >/dev/null 2>&1; then
     return 0
   fi
@@ -1243,7 +1243,7 @@ install_main_inbox_observer_unit() {
       continue
     fi
     _bot_name="$(sed -n 's/^BOT_NAME=//p' "$INSTALL_DIR/.env" 2>/dev/null | head -1 | tr -d '"')"
-    [ -n "$_bot_name" ] || _bot_name="Marveen"
+    [ -n "$_bot_name" ] || _bot_name="Alfred"
     _tz_line="# no explicit TZ detected; inheriting host default"
     _tz="$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || true)"
     [ -n "$_tz" ] && [ "$_tz" != "UTC" ] && _tz_line="Environment=TZ=$_tz"
@@ -1308,13 +1308,13 @@ strip_legacy_notifier_telegram_env() {
     [ -n "$_uhome" ] || _uhome="$HOME"
     _legacy1="Environment=TELEGRAM_ENV=${_uhome}/.claude/channels/telegram/.env"
     if grep -qxF -e "$_legacy1" "$_unit"; then
-      if grep -vxF -e "$_legacy1" "$_unit" >"${_unit}.marveen-new" 2>/dev/null \
-         && cat "${_unit}.marveen-new" >"$_unit" 2>/dev/null; then
-        rm -f "${_unit}.marveen-new"
+      if grep -vxF -e "$_legacy1" "$_unit" >"${_unit}.alfred-new" 2>/dev/null \
+         && cat "${_unit}.alfred-new" >"$_unit" 2>/dev/null; then
+        rm -f "${_unit}.alfred-new"
         _patched=1
         echo -e "  Hiba-ertesito unit javitva (regi TELEGRAM_ENV sor ki): $(basename "$_unit")"
       else
-        rm -f "${_unit}.marveen-new"
+        rm -f "${_unit}.alfred-new"
         echo -e "  FIGYELEM: a hiba-ertesito unit nem volt irhato: $_unit"
       fi
     fi
@@ -1517,7 +1517,7 @@ run_seed_refresh() {
   return 0
 }
 # Scheduled-task registry: the schedule runner fires a task only if its
-# files hash-match the dashboard's registry (store/claudeclaw.db). A task dir
+# files hash-match the dashboard's registry (store/alfred.db). A task dir
 # THIS script creates from the seed is entirely shipped content, so it is
 # registered here through the registry CLI of the CURRENTLY built dist (a
 # REFRESHED dir goes through register_refreshed_schedule below, which checks
@@ -1571,7 +1571,7 @@ run_seed_refresh
 # Marketplace channel plugins (SLACKPLUGINVER1006): the official
 # `claude plugin update`, on every config dir that already has the plugin.
 # Here, before the "already up to date" exit, so a plugin release also reaches
-# an install whose marveen code did not move; the new version is loaded at the
+# an install whose alfred code did not move; the new version is loaded at the
 # next channel start (the restart below, or the next natural one). Outside any
 # channel session, never installs, never fatal: scripts/lib/channel-plugin-refresh.sh.
 if [ -f "$INSTALL_DIR/scripts/lib/channel-plugin-refresh.sh" ]; then
@@ -1606,7 +1606,7 @@ if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
       echo -e "  ${ORANGE}↻${NC} Mar a legfrissebb verzion ($NEW_VERSION), de a dist elavult (built=${BUILT_COMMIT:-none}) -> ongyogyito ujraforditas + restart"
     fi
   elif [ "$RESEED_FLEET" != "1" ] && [ "$REGEN_CLAUDEMD" != "1" ]; then
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo -e "  ${GREEN}✓${NC} Already on the latest version ($NEW_VERSION)"
     else
       echo -e "  ${GREEN}✓${NC} Már a legfrissebb verzión vagy ($NEW_VERSION)"
@@ -1631,7 +1631,7 @@ if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
     # run even when the code is already current. dist is verified fresh (marker
     # == HEAD), so skip the dep-install + build below and jump to the
     # seed/identity refresh.
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo -e "  ${GREEN}✓${NC} Already on the latest version ($NEW_VERSION), continuing due to fleet-reseed/regen flag"
     else
       echo -e "  ${GREEN}✓${NC} Már a legfrissebb verzión ($NEW_VERSION), folytatás a kért fleet-reseed/regen miatt"
@@ -1670,7 +1670,7 @@ if git diff "$OLD_VERSION" "$NEW_VERSION" --name-only | grep -qE "^package(-lock
   # whether to roll back.
   echo -e "  Biztonsagi ellenorzes..."
   if ! npm audit --audit-level=high --omit=dev --silent; then
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo -e "  WARNING: npm audit reported high-severity item(s)."
     else
       echo -e "  FIGYELEM: npm audit magas-súlyosságú tételt jelzett."
@@ -1983,13 +1983,13 @@ fi
 # Slack channel plugin smoke-test: if the marketplace slack-channel ref
 # changed since the last update, and a slack-provider agent exists, run
 # the smoke-test (if SLACK_SMOKE_TEST_ALLOWED=true in its .env).
-SLACK_REF_FILE="$INSTALL_DIR/store/marveen-marketplace-slack-channel-ref.txt"
-MARKETPLACE_PLUGIN_DIR="$HOME/.claude/plugins/cache/marveen-marketplace/slack-channel"
+SLACK_REF_FILE="$INSTALL_DIR/store/alfred-marketplace-slack-channel-ref.txt"
+MARKETPLACE_PLUGIN_DIR="$HOME/.claude/plugins/cache/alfred-marketplace/slack-channel"
 if [ -d "$MARKETPLACE_PLUGIN_DIR" ]; then
   # The registry's installPath (and commit) is the version in use; the dir
   # listing alone keeps returning the oldest version dir (SLACKPLUGINVER1006B).
   CURRENT_REF="$( . "$INSTALL_DIR/scripts/lib/channel-plugin-refresh.sh" 2>/dev/null \
-    && channel_plugin_current_ref "$HOME/.claude" "slack-channel@marveen-marketplace" )" || true
+    && channel_plugin_current_ref "$HOME/.claude" "slack-channel@alfred-marketplace" )" || true
   if [ -z "$CURRENT_REF" ]; then
     CURRENT_REF="$(ls "$MARKETPLACE_PLUGIN_DIR" 2>/dev/null | head -1)"
   fi
@@ -2008,7 +2008,7 @@ if [ -d "$MARKETPLACE_PLUGIN_DIR" ]; then
       if grep -q 'SLACK_SMOKE_TEST_ALLOWED=true' "$AGENT_ENV" 2>/dev/null; then
         echo -e "  Slack smoke-test futtatasa ($SLACK_AGENT)..."
         if ! bash "$INSTALL_DIR/scripts/smoke-test-slack-channel.sh" "$SLACK_AGENT"; then
-          if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+          if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
             echo -e "${RED}WARNING:${NC} Slack smoke-test FAILED. Check the plugin integration."
           else
             echo -e "${RED}FIGYELEM:${NC} Slack smoke-test SIKERTELEN. Ellenőrizd a plugin integrációt."
@@ -2057,7 +2057,7 @@ if [ "$STASHED_AUTO" = "1" ]; then
     if [ "${SKIP_BUILD:-0}" != "1" ]; then
       echo -e "  Ujraforditas a visszaallitott helyi valtozasokkal..."
       if ! retry 2 3 npm run build --silent; then
-        if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+        if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
           echo -e "${RED}WARNING:${NC} Rebuild after stash-restore failed; dist/ may not reflect local changes."
         else
           echo -e "${RED}FIGYELEM:${NC} Az ujraforditas a stash-visszaallitas utan sikertelen; a dist/ lehet hogy nem tartalmazza a helyi valtozasokat."
@@ -2077,7 +2077,7 @@ settings_json_gate
 #
 # Two hard constraints force this shape:
 #   1) Self-kill: when triggered from the dashboard, update.sh runs INSIDE the
-#      marveen-*-dashboard systemd cgroup. stop.sh tears that cgroup down, which
+#      alfred-*-dashboard systemd cgroup. stop.sh tears that cgroup down, which
 #      reaps THIS script before start.sh runs -> services stay dead. setsid is
 #      NOT enough (same cgroup); only a separate cgroup (systemd-run --scope)
 #      survives. So the restart must run OUTSIDE our cgroup.
@@ -2175,7 +2175,7 @@ _unit_drift() {
     | sed -E 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//; s/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/')"
   local main_id
   main_id="$(grep -E '^MAIN_AGENT_ID=' "$INSTALL_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2-)"
-  main_id="${main_id:-marveen}"
+  main_id="${main_id:-alfred}"
   slug="${slug:-$main_id}"
   # Same fallback as scripts/resolve-unit-id.sh: no unit under SERVICE_ID but one
   # under MAIN_AGENT_ID -> check the one that exists.
@@ -2247,10 +2247,10 @@ echo -e "  Szolgaltatasok ujrainditasa..."
 RESULT_PHASE="restart"
 # The finalizer owns the result file from here; do not let our EXIT trap write.
 FINALIZE_LAUNCHED=1
-# MARVEEN_UPDATE_NOTIFY=1 (set by the unattended auto-update task) makes the
+# ALFRED_UPDATE_NOTIFY=1 (set by the unattended auto-update task) makes the
 # finalizer send a channel report after the restart+health outcome. A manual
 # dashboard-triggered run leaves it unset -> silent (the UI polls the status).
-FINALIZE_ARGS=("$INSTALL_DIR" "$OLD_VERSION_FULL" "$OLD_VERSION" "${WEB_PORT:-3420}" "$RESULT_FILE" "$BUILT_COMMIT_FILE" "$NEW_VERSION" "${NODE_PIN_DIR:-}" "${MARVEEN_UPDATE_NOTIFY:-0}" "$UPDATE_WARN")
+FINALIZE_ARGS=("$INSTALL_DIR" "$OLD_VERSION_FULL" "$OLD_VERSION" "${WEB_PORT:-3420}" "$RESULT_FILE" "$BUILT_COMMIT_FILE" "$NEW_VERSION" "${NODE_PIN_DIR:-}" "${ALFRED_UPDATE_NOTIFY:-0}" "$UPDATE_WARN")
 # AUTOUPDATEDIVERG1110: the rebase object rides as the 11th argument (empty when no rebase ran).
 FINALIZE_ARGS+=("$(rebase_json)")
 XDG_RUN="${XDG_RUNTIME_DIR:-/run/user/$(id -u 2>/dev/null)}"
@@ -2329,7 +2329,7 @@ _env_check_cli="$INSTALL_DIR/dist/settings-env-check-cli.js"
 if [ -f "$_env_check_cli" ] && command -v node >/dev/null 2>&1; then
   _ignored_env_keys="$(node "$_env_check_cli" 2>/dev/null || true)"
   for _ik in $_ignored_env_keys; do
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo -e "  ${ORANGE:-}⚠${NC:-} The .env line for ${_ik} is IGNORED: it would loosen a security control. Set it on the Settings page instead."
     else
       echo -e "  ${ORANGE:-}⚠${NC:-} A .env ${_ik} sora NEM hat: egy biztonsági kapcsolót lazítana. A Beállítások oldalon állítható."
@@ -2338,7 +2338,7 @@ if [ -f "$_env_check_cli" ] && command -v node >/dev/null 2>&1; then
 fi
 
 echo ""
-if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
   echo -e "${GREEN}✓ Update applied (${OLD_VERSION} -> ${NEW_VERSION}); restarting and health-checking...${NC}"
 else
   echo -e "${GREEN}✓ Frissites alkalmazva (${OLD_VERSION} -> ${NEW_VERSION}); ujrainditas es health-check folyamatban...${NC}"

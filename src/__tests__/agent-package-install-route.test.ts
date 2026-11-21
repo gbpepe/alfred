@@ -9,8 +9,8 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSyn
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-agent-package-install-route-'))
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-agent-package-install-route-'))
+process.env.ALFRED_ENV_DIR = tmpRoot
 const STORE = join(tmpRoot, 'store')
 const AGENTS = join(tmpRoot, 'agents')
 mkdirSync(STORE, { recursive: true })
@@ -38,7 +38,7 @@ mkdirSync(join(tmpRoot, 'templates', 'profiles'), { recursive: true })
 for (const f of readdirSync(join(__dirname, '..', '..', 'templates', 'profiles'))) {
   copyFileSync(join(__dirname, '..', '..', 'templates', 'profiles', f), join(tmpRoot, 'templates', 'profiles', f))
 }
-writeFileSync(join(tmpRoot, 'package.json'), JSON.stringify({ name: 'marveen', version: '1.50.0' }))
+writeFileSync(join(tmpRoot, 'package.json'), JSON.stringify({ name: 'alfred', version: '1.50.0' }))
 
 const { initDatabase, getDb, createDashboardUser } = await import('../db.js')
 const { _clearSessionCacheForTest } = await import('../web/auth-sessions.js')
@@ -62,7 +62,7 @@ const notified: string[] = []
 const install = (body: unknown, auth: RouteContext['auth'] = SESSION, d: PackageDeps = deps) =>
   callRoute((ctx) => tryHandleAgentPackages(ctx, d), 'POST', '/api/agents/install-package', auth, body).then((r) => { expect(r.handled).toBe(true); return r.out })
 const storeCredential = () => { writeFileSync(CRED, JSON.stringify({ schema: 1, token: TEST_TOKEN, deviceTokenId: TEST_DEVICE_ID, label: 'Mac', connectedAt: NOW.toISOString() }), { mode: 0o600 }); chmodSync(CRED, 0o600) }
-const delivery = (over: Record<string, unknown> = {}) => Buffer.from(makeSignedDelivery({ kid: KEY.kid, privateKey: KEY.privateKey, slug: 'invoice-helper', version: '1.2.0', minMarveenVersion: '1.0.0', ...over }))
+const delivery = (over: Record<string, unknown> = {}) => Buffer.from(makeSignedDelivery({ kid: KEY.kid, privateKey: KEY.privateKey, slug: 'invoice-helper', version: '1.2.0', minAlfredVersion: '1.0.0', ...over }))
 const messagesTo = (to: string) => (getDb().prepare('SELECT content FROM agent_messages WHERE to_agent = ?').all(to) as Array<{ content: string }>).map((r) => r.content)
 
 beforeAll(() => { initDatabase(':memory:') })
@@ -95,7 +95,7 @@ describe('the success path (plan 6.1)', () => {
     expect(r.url).toBe(`${TEST_ORIGIN}/functions/v1/agent-package-download`)
     expect(r.method).toBe('POST')
     expect(r.redirect).toBe('manual')
-    expect(r.headers['x-marveen-version']).toBe('1.50.0')
+    expect(r.headers['x-alfred-version']).toBe('1.50.0')
     expect(r.headers.authorization).toBe(`Bearer ${TEST_TOKEN}`)
     expect(JSON.parse(r.body!)).toEqual({ slug: 'invoice-helper' })
     expect(existsSync(join(AGENTS, 'invoice-helper', 'PACKAGE.md'))).toBe(true)
@@ -239,8 +239,8 @@ describe('after the download (plan 6.1 steps 6-9)', () => {
   })
 
   it('an own version under the minimum: 409 incompatible, nothing on disk', async () => {
-    fake.answer({ status: 200, body: delivery({ minMarveenVersion: '9.0.0' }) })
-    expect(await install({ slug: 'invoice-helper' })).toMatchObject({ status: 409, body: { error: 'incompatible', minMarveenVersion: '9.0.0' } })
+    fake.answer({ status: 200, body: delivery({ minAlfredVersion: '9.0.0' }) })
+    expect(await install({ slug: 'invoice-helper' })).toMatchObject({ status: 409, body: { error: 'incompatible', minAlfredVersion: '9.0.0' } })
     expect(readdirSync(AGENTS)).toEqual([])
   })
 

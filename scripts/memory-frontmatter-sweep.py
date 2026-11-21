@@ -14,7 +14,7 @@ realpath counted once: .claude-config/projects is a symlink, a naive walk counts
 the same file up to 15 times.
 
 WHAT IT SAYS, and when: the state file keeps the last broken set. The message to
-Marveen goes out only when the set CHANGES (a new broken file, or one repaired),
+Alfred goes out only when the set CHANGES (a new broken file, or one repaired),
 with the full list of what is broken now. An unchanged set is one stdout line, not
 a daily repeat of the same news (a repeated alarm is read past).
 
@@ -25,7 +25,7 @@ EXIT CODES (the scheduler's command task maps 0/1 to 0; only 2+ is an alert):
      or missing directory silently: the home projects tree yields no memory file,
      or agent config dirs exist but none of them yields one. A sweep that sees
      nothing (or only half) must not look like a clean fleet.
-  3  the message to Marveen could not be delivered
+  3  the message to Alfred could not be delivered
 """
 import argparse
 import glob
@@ -71,7 +71,7 @@ def main():
     ap.add_argument('--home', default=os.path.expanduser('~'))
     ap.add_argument('--repo', default=REPO)
     ap.add_argument('--state', default=os.path.join(REPO, 'store', 'memory-frontmatter-sweep.json'))
-    ap.add_argument('--notify', action='store_true', help='message Marveen when the broken set changes')
+    ap.add_argument('--notify', action='store_true', help='message Alfred when the broken set changes')
     ap.add_argument('--agent-msg', default=os.path.join(REPO, 'scripts', 'agent-msg.sh'))
     a = ap.parse_args()
 
@@ -106,7 +106,7 @@ def main():
             sorok.append(f'marad: {p}')
         for p in javult:
             sorok.append(f'javult: {p}')
-        r = subprocess.run(['bash', a.agent_msg, 'heartbeat', 'marveen', '-'], input='\n'.join(sorok), text=True, capture_output=True)
+        r = subprocess.run(['bash', a.agent_msg, 'heartbeat', 'alfred', '-'], input='\n'.join(sorok), text=True, capture_output=True)
         if r.returncode != 0 or not r.stdout.startswith('OK'):
             print(f'ERTESITES SIKERTELEN: {r.stdout.strip()[:200]} {r.stderr.strip()[:200]}')
             return 3  # the state is NOT advanced: the next run tries again

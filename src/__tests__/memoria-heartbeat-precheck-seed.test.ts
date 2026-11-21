@@ -61,7 +61,7 @@ describe('memoria-heartbeat preCheck seed', () => {
   it('names no install, user or agent of ours (the distribution hardcode rule)', () => {
     for (const f of [WRAPPER, LOGIC, join(TASK_DIR, 'task-config.json')]) {
       const src = readFileSync(f, 'utf-8')
-      expect(src, f).not.toMatch(/\/Users\/|\/home\/|marvin|ClaudeClaw|szabolcs/i)
+      expect(src, f).not.toMatch(/\/Users\/|\/home\/|marvin|Alfred|szabolcs/i)
     }
   })
 })

@@ -157,7 +157,7 @@ describe('gate: Bash is fail-closed on the allowlist', () => {
     'ls -la store/egress-allowlist.json',
     'cat store/egress-allowlist.json > /tmp/copy.json',
     // talking ABOUT the file is not writing it
-    `curl -X POST http://localhost:3420/api/messages -d '{"to":"marveen","content":"please add x.example to store/egress-allowlist.json"}'`,
+    `curl -X POST http://localhost:3420/api/messages -d '{"to":"alfred","content":"please add x.example to store/egress-allowlist.json"}'`,
     'git commit -m "docs: store/egress-allowlist.json is owner-managed"',
     "cat > /tmp/note.md <<'EOF'\nsub-agents may not edit store/egress-allowlist.json\nEOF",
     'cp a.txt b.txt',

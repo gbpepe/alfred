@@ -2,7 +2,7 @@
 // `requires`). A task can declare `requires.mcp_servers` in task-config.json;
 // before the runner injects the prompt it verifies that each named MCP server
 // has a LIVE process under the target session's claude process tree. A dead
-// server then defers the task (pending-retry queue + reasoned Telegram alert)
+// server then defers the task (pending-retry queue + reasoned channel alert)
 // instead of the prompt failing at runtime inside the session -- the
 // 2026-07-08 failure class, where the morning briefing ran against a silently
 // dead gmail MCP and nobody was told.

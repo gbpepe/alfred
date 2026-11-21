@@ -31,16 +31,16 @@ const GRANT = {
   fromCidrs: ['203.0.113.7/32'],
   grantId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
   consentVersion: 1,
-  dispatchPath: '/home/marveen/.marveen/support-dispatch.sh',
+  dispatchPath: '/home/alfred/.alfred/support-dispatch.sh',
   sshd: { major: 9, minor: 6 },
 }
 // The line, frozen as text: it must not change with the node version or with a rebuild.
 const EXPECTED_LINE =
-  'restrict,command="/bin/sh /home/marveen/.marveen/support-dispatch.sh --key key1 --fp ' +
+  'restrict,command="/bin/sh /home/alfred/.alfred/support-dispatch.sh --key key1 --fp ' +
   TEST_ONLY_FINGERPRINT +
   ' --grant 3f2504e0-4f89-41d3-9a0c-0305e82c3301 --consent 1",from="203.0.113.7/32",verify-required sk-ssh-ed25519@openssh.com ' +
   TEST_ONLY_BLOB +
-  ' marveen-support:3f2504e0-4f89-41d3-9a0c-0305e82c3301:key1'
+  ' alfred-support:3f2504e0-4f89-41d3-9a0c-0305e82c3301:key1'
 const PERSONAL = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH someone'
 
 function scratch() {

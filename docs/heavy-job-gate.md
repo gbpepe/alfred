@@ -34,7 +34,7 @@ Angol változat: [en/heavy-job-gate.md](en/heavy-job-gate.md).
   bizonyítottan érvényes, akkor nem futtatja a feladatot, és saját kilépési kóddal
   megmondja, miért.
 
-**Opt-in:** a Marveen magától sehol nem hívja. Egy ügynök (a `CLAUDE.md`-jében lévő
+**Opt-in:** a Alfred magától sehol nem hívja. Egy ügynök (a `CLAUDE.md`-jében lévő
 szabály alapján) vagy egy szkript csomagolja bele a nehéz parancsot. **Csak Linuxon**
 működik (a `/proc/meminfo`-t olvassa, és systemd user scope-ot használ).
 

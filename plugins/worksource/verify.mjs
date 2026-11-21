@@ -125,7 +125,7 @@ try {
     join(root, 'pending', 'job-routed.json'),
     JSON.stringify({
       content: 'Kesz a riport, 3 sor beolvasva.',
-      meta: { message_id: 9001, from: 'marveen-is' },
+      meta: { message_id: 9001, from: 'alfred-is' },
     }),
   )
   const routedNote = await waitFor(

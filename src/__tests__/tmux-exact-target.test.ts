@@ -28,7 +28,7 @@ const SK = 'send' + '-keys'
 describe('exactTmuxTarget', () => {
   it('a bare session name becomes =NAME: (the form every subcommand accepts)', () => {
     expect(exactTmuxTarget('agent-foo')).toBe('=agent-foo:')
-    expect(exactTmuxTarget('marveen-channels')).toBe('=marveen-channels:')
+    expect(exactTmuxTarget('alfred-channels')).toBe('=alfred-channels:')
   })
   it('a target that already names a window or pane only gets the =', () => {
     expect(exactTmuxTarget('agent-foo:0.1')).toBe('=agent-foo:0.1')

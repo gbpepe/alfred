@@ -5,7 +5,7 @@ Every case builds a throwaway git repo shaped like an install (the shipped
 .claude/settings.json is the repo's own, so the compact shape is real), applies the
 drift a v1.45/v1.46 install produced, and runs the script as a subprocess -- the way
 update.sh, the dashboard and the Bridge run it. The unmerged cases are produced by a
-REAL conflicting `git stash pop`, the marveen2 sequence of 11-03.
+REAL conflicting `git stash pop`, the alfred2 sequence of 11-03.
 
 Run: python3 scripts/__tests__/install-drift-repair.test.py
 """
@@ -17,7 +17,7 @@ import sys
 import tempfile
 import unittest
 
-# A run without --backup-dir would write ~/.marveen-repair: point HOME at a temp dir for
+# A run without --backup-dir would write ~/.alfred-repair: point HOME at a temp dir for
 # the whole test process, so no test can touch the real one.
 os.environ["HOME"] = tempfile.mkdtemp(prefix="driftrepair-home-")
 
@@ -42,7 +42,7 @@ LAUNCHERS_V1461 = {  # verbatim from main 00d82dbb: channels.sh:684, channel-wat
 
 
 def cli_enable(raw, key, value=True):
-    """What `claude plugin enable --scope project` produced on marveen2: indent=2, enabledPlugins last."""
+    """What `claude plugin enable --scope project` produced on alfred2: indent=2, enabledPlugins last."""
     d = json.loads(raw)
     plugins = d.pop("enabledPlugins", {})
     plugins[key] = value
@@ -114,10 +114,10 @@ class Restores(Base):
         code, out = self.r.repair()
         self.assertEqual((code, out["state"], out["results"]), (0, "nothing_to_do", []))
 
-    def test_marveen2_fresh_bridge_install_all_three(self):
-        # The exact marveen2 shape: telegram@marveen-marketplace added + reformat,
+    def test_alfred2_fresh_bridge_install_all_three(self):
+        # The exact alfred2 shape: telegram@alfred-marketplace added + reformat,
         # the Bridge's headless installer at 0644, the npm lock line.
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         self.r.write("install-macos.sh", INSTALLER + (MARKER + "\nprompt_or_preset() { :; }\n").encode(), mode=0o644)
         self.r.write("package-lock.json", LOCK_NPM)
         self.r.write("README.md", b"customer note\n")  # unrelated: never touched
@@ -133,7 +133,7 @@ class Restores(Base):
         self.assertEqual(os.stat(os.path.join(self.r.dir, "install-macos.sh")).st_mode & 0o777, 0o777 & ~m)
 
     def test_slack_install_shipped_channel_value_flip(self):
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True))
         code, out = self.r.repair()
         self.assertEqual((code, self.r.actions(out)), (0, {".claude/settings.json": "restored"}))
 
@@ -163,16 +163,16 @@ class Leaves(Base):
 
     def test_customer_enabled_their_own_plugin(self):
         # Samu 67320 point 2: a project-level plugin the CUSTOMER enabled must survive.
-        raw = cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace")
+        raw = cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace")
         self.r.write(".claude/settings.json", cli_enable(raw, "frontend-design@claude-plugins-official"))
         self.assertLeft(".claude/settings.json", "key added: frontend-design@claude-plugins-official")
 
     def test_customer_enabled_an_unknown_marketplace_key(self):
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "whatsapp@marveen-marketplace"))
-        self.assertLeft(".claude/settings.json", "key added: whatsapp@marveen-marketplace")
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "whatsapp@alfred-marketplace"))
+        self.assertLeft(".claude/settings.json", "key added: whatsapp@alfred-marketplace")
 
     def test_generated_key_set_false_is_not_ours(self):
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace", False))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace", False))
         self.assertLeft(".claude/settings.json", "key added")
 
     def test_hook_or_permission_edit(self):
@@ -183,7 +183,7 @@ class Leaves(Base):
 
     def test_shipped_channel_key_removed(self):
         d = json.loads(SHIPPED_SETTINGS)
-        del d["enabledPlugins"]["slack-channel@marveen-marketplace"]
+        del d["enabledPlugins"]["slack-channel@alfred-marketplace"]
         self.r.write(".claude/settings.json", (json.dumps(d, indent=2) + "\n").encode())
         self.assertLeft(".claude/settings.json", "key removed")
 
@@ -203,7 +203,7 @@ class Leaves(Base):
         raw = cli_enable(SHIPPED_SETTINGS, "frontend-design@claude-plugins-official")
         self.r.write(".claude/settings.json", raw)
         self.r.git("add", ".claude/settings.json")
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         self.assertLeft(".claude/settings.json", "index")
 
     def test_merge_in_progress_touches_nothing(self):
@@ -223,12 +223,12 @@ class Leaves(Base):
 
 
 class ConflictedStashPop(Base):
-    """marveen2, 11-03: dirty install -> auto-stash -> pull (upstream changed settings.json) -> stash pop UU."""
+    """alfred2, 11-03: dirty install -> auto-stash -> pull (upstream changed settings.json) -> stash pop UU."""
 
     def make_conflict(self, local_settings):
         self.r.write(".claude/settings.json", local_settings)
         self.r.write("README.md", b"customer note\n")
-        self.r.git("stash", "push", "-q", "-m", "marveen-update-auto-stash test")
+        self.r.git("stash", "push", "-q", "-m", "alfred-update-auto-stash test")
         # A real upstream edit inside a compact one-line hook entry: the reformatted
         # local side rewrote exactly those lines, so the 3-way merge must conflict.
         upstream = SHIPPED_SETTINGS.replace(b'ledger-capture.py\\"", "timeout": 15', b'ledger-capture.py\\"", "timeout": 20', 1)
@@ -241,17 +241,17 @@ class ConflictedStashPop(Base):
         return upstream
 
     def test_ours_on_the_stash_side_is_resolved_to_head_and_the_stash_stays(self):
-        upstream = self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        upstream = self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         code, out = self.r.repair()
         self.assertEqual(code, 0, out)
         self.assertEqual(self.r.actions(out), {".claude/settings.json": "restored"})
         self.assertEqual(self.r.read(".claude/settings.json"), upstream)
         json.loads(self.r.read(".claude/settings.json"))
         self.assertNotIn("UU", self.r.status())
-        self.assertIn("marveen-update-auto-stash test", self.r.git("stash", "list").stdout.decode())
+        self.assertIn("alfred-update-auto-stash test", self.r.git("stash", "list").stdout.decode())
 
     def test_a_customer_key_on_the_stash_side_stays_unmerged(self):
-        raw = cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace")
+        raw = cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace")
         self.make_conflict(cli_enable(raw, "frontend-design@claude-plugins-official"))
         code, out = self.r.repair()
         self.assertEqual((code, out["state"]), (3, "refused:unknown_change"))
@@ -265,7 +265,7 @@ class ResolveConflictsMode(Base):
     make_conflict = ConflictedStashPop.make_conflict
 
     def test_customer_key_on_the_stash_side_is_resolved_and_preserved_in_the_stash(self):
-        raw = cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace")
+        raw = cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace")
         local = cli_enable(raw, "frontend-design@claude-plugins-official")
         upstream = self.make_conflict(local)
         stash_commit = self.r.git("rev-parse", "stash@{0}").stdout.decode().strip()
@@ -288,7 +288,7 @@ class ResolveConflictsMode(Base):
         self.r.write("CLAUDE.md", b"line\n")
         self.r.commit("add CLAUDE.md")
         self.r.write("CLAUDE.md", b"customer line\n")
-        self.r.git("stash", "push", "-q", "-m", "marveen-update-auto-stash x")
+        self.r.git("stash", "push", "-q", "-m", "alfred-update-auto-stash x")
         self.r.write("CLAUDE.md", b"upstream line\n")
         self.r.commit("upstream")
         self.assertNotEqual(self.r.git("stash", "pop", check=False).returncode, 0)
@@ -299,8 +299,8 @@ class ResolveConflictsMode(Base):
         self.assertTrue(out["stash"]["kept"])
 
     def test_refuses_without_an_auto_stash_entry(self):
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
-        # rename the entry: no marveen-update-auto-stash left in the list
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
+        # rename the entry: no alfred-update-auto-stash left in the list
         c = self.r.git("rev-parse", "stash@{0}").stdout.decode().strip()
         self.r.git("stash", "drop", "-q")
         self.r.git("stash", "store", "-m", "someone else's stash", c)
@@ -310,7 +310,7 @@ class ResolveConflictsMode(Base):
         self.assertIn("UU .claude/settings.json", self.r.status())
 
     def test_dry_run_reports_and_changes_nothing(self):
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         before = self.r.status()
         code, out = self.r.repair("--resolve-conflicts", "--dry-run")
         self.assertEqual([(c["path"], c["action"]) for c in out["resolvedConflicts"]],
@@ -335,7 +335,7 @@ class ResolveConflictsMode(Base):
         spec = importlib.util.spec_from_file_location("install_drift_repair", SCRIPT)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         real = mod.resolve_all_conflicts
 
         def dropping(cwd, dry_run, backup_dir):
@@ -375,8 +375,8 @@ class LineProtocol(Base):
         self.assertTrue(out[-1].startswith("REPAIR_RESULT "))
         return p.returncode, out
 
-    def test_marveen2_conflict_from_stdin_exact_lines_then_idempotent(self):
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+    def test_alfred2_conflict_from_stdin_exact_lines_then_idempotent(self):
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         self.r.write("install-macos.sh", INSTALLER + (MARKER + "\n").encode(), mode=0o644)
         self.r.write("package-lock.json", LOCK_NPM)
         code, out = self.lines("--resolve-conflicts", stdin=True)
@@ -393,7 +393,7 @@ class LineProtocol(Base):
         self.assertEqual((code, out[-2:]), (0, ["REPAIR_STASH before=1 after=1", "REPAIR_RESULT nothing_to_do"]))
 
     def test_dry_run_lines_change_nothing(self):
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         before = self.r.status()
         code, out = self.lines("--resolve-conflicts", "--dry-run")
         self.assertEqual(code, 0)
@@ -402,7 +402,7 @@ class LineProtocol(Base):
         self.assertEqual(self.r.status(), before)
 
     def test_left_and_cleaned_with_a_settings_pattern(self):
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace"))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace"))
         self.r.write("install-linux.sh", INSTALLER + b"echo mine\n", mode=0o755)
         code, out = self.lines()
         self.assertEqual(code, 0)
@@ -413,7 +413,7 @@ class LineProtocol(Base):
         self.r.write("my notes é.md", b"a\n")
         self.r.commit("add")
         self.r.write("my notes é.md", b"customer\n")
-        self.r.git("stash", "push", "-q", "-m", "marveen-update-auto-stash enc")
+        self.r.git("stash", "push", "-q", "-m", "alfred-update-auto-stash enc")
         self.r.write("my notes é.md", b"upstream\n")
         self.r.commit("upstream")
         self.assertNotEqual(self.r.git("stash", "pop", check=False).returncode, 0)
@@ -427,7 +427,7 @@ class LineProtocol(Base):
         p = subprocess.run([sys.executable, "-I", SCRIPT, "--install-dir", os.path.join(self.r.dir, ".claude"), "--lines"],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertEqual((p.returncode, p.stdout.decode()), (3, "REPAIR_RESULT refused:not_a_repo\n"))
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         c = self.r.git("rev-parse", "stash@{0}").stdout.decode().strip()
         self.r.git("stash", "drop", "-q")
         self.r.git("stash", "store", "-m", "not ours", c)
@@ -448,13 +448,13 @@ class GeriReview(Base):
         self.assertEqual(self.r.read("package-lock.json"), LOCK_NPM)
 
     def test_whole_tree_status_next_to_exit_0(self):
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))  # README.md also dirty
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))  # README.md also dirty
         code, out = self.r.repair("--resolve-conflicts")
         self.assertEqual((code, out["state"]), (0, "ok"))
         self.assertEqual((out["treeClean"], out["dirtyLeft"]), (False, ["README.md"]))
 
     def test_every_overwritten_file_is_backed_up_first_markers_included(self):
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         self.r.write("package-lock.json", LOCK_NPM)
         code, out = self.r.repair("--resolve-conflicts")
         self.assertEqual(code, 0, out)
@@ -468,7 +468,7 @@ class GeriReview(Base):
         self.assertEqual(out["backupDir"], os.path.realpath(self.r.backups))
 
     def test_dry_run_writes_no_backup(self):
-        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.make_conflict(cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         self.r.repair("--resolve-conflicts", "--dry-run")
         self.assertEqual(os.listdir(self.r.backups), [])
 
@@ -480,12 +480,12 @@ class GeriReview(Base):
         self.assertEqual((p.returncode, json.loads(p.stdout)["state"]), (3, "refused:backup_inside_tree"))
         self.assertEqual(self.r.read("package-lock.json"), LOCK_NPM)
 
-    def test_default_backup_dir_is_under_home_marveen_repair(self):
+    def test_default_backup_dir_is_under_home_alfred_repair(self):
         self.r.write("package-lock.json", LOCK_NPM)
         p = subprocess.run([sys.executable, "-I", SCRIPT, "--install-dir", self.r.dir, "--json"],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out = json.loads(p.stdout)
-        self.assertTrue(out["backupDir"].startswith(os.path.realpath(os.path.join(os.environ["HOME"], ".marveen-repair", "backup-"))))
+        self.assertTrue(out["backupDir"].startswith(os.path.realpath(os.path.join(os.environ["HOME"], ".alfred-repair", "backup-"))))
 
 
 class UnresolvableConflict(Base):
@@ -495,7 +495,7 @@ class UnresolvableConflict(Base):
         self.r.write("notes.md", b"base\n")
         self.r.commit("add notes")
         self.r.write("notes.md", b"customer\n")
-        self.r.git("stash", "push", "-q", "-m", "marveen-update-auto-stash md")
+        self.r.git("stash", "push", "-q", "-m", "alfred-update-auto-stash md")
         self.r.git("rm", "-q", "notes.md")
         self.r.commit("upstream deletes notes")
         self.assertNotEqual(self.r.git("stash", "pop", check=False).returncode, 0)
@@ -531,7 +531,7 @@ class PrimaryPluginStaysOn(unittest.TestCase):
         return [r for r in out["results"] if r["path"] == path][0]["reason"]
 
     def test_v1461_slack_enabled_by_the_installer_is_left_not_restored(self):
-        enabled = cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True)
+        enabled = cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True)
         self.r.write(".claude/settings.json", enabled)
         code, out = self.r.repair()
         self.assertEqual(code, 0, out)
@@ -540,7 +540,7 @@ class PrimaryPluginStaysOn(unittest.TestCase):
         self.assertEqual(self.r.read(".claude/settings.json"), enabled, "the file is untouched: slack stays true")
 
     def test_v1461_an_added_marketplace_channel_is_left_too(self):
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@marveen-marketplace"))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "telegram@alfred-marketplace"))
         code, out = self.r.repair()
         self.assertEqual(self.r.actions(out), {".claude/settings.json": "leave"})
 
@@ -552,13 +552,13 @@ class PrimaryPluginStaysOn(unittest.TestCase):
         self.assertEqual(self.r.read(".claude/settings.json"), SHIPPED_SETTINGS)
 
     def test_v1461_other_cleanups_still_run(self):
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True))
         self.r.write("install-linux.sh", INSTALLER + (MARKER + "\n").encode(), mode=0o644)
         code, out = self.r.repair()
         self.assertEqual(self.r.actions(out), {".claude/settings.json": "leave", "install-linux.sh": "restored"})
 
     def test_v1461_bridge_lines_say_left(self):
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True))
         p = subprocess.run([sys.executable, "-I", SCRIPT, "--install-dir", self.r.dir, "--backup-dir", self.r.backups,
                             "--lines", "--dry-run"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out = p.stdout.decode().splitlines()
@@ -568,13 +568,13 @@ class PrimaryPluginStaysOn(unittest.TestCase):
     def test_a_commented_out_primary_line_does_not_count(self):
         self.r.write("scripts/channels.sh", b"# " + LAUNCHERS_PRIMARY["scripts/channels.sh"])
         self.r.write("scripts/channel-watchdog.sh", LAUNCHERS_PRIMARY["scripts/channel-watchdog.sh"])
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True))
         code, out = self.r.repair()
         self.assertEqual(self.r.actions(out), {".claude/settings.json": "leave"})
 
     def test_both_launchers_are_required_and_a_missing_one_fails_closed(self):
         self.r.write("scripts/channels.sh", LAUNCHERS_PRIMARY["scripts/channels.sh"])  # watchdog still v1.46.1
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True))
         code, out = self.r.repair()
         self.assertEqual(self.r.actions(out), {".claude/settings.json": "leave"})
         os.remove(os.path.join(self.r.dir, "scripts", "channel-watchdog.sh"))
@@ -590,7 +590,7 @@ class PrimaryPluginStaysOn(unittest.TestCase):
         os.remove(os.path.join(self.r.dir, "scripts", "channels.sh"))
         os.symlink(real, os.path.join(self.r.dir, "scripts", "channels.sh"))
         self.r.write("scripts/channel-watchdog.sh", LAUNCHERS_PRIMARY["scripts/channel-watchdog.sh"])
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True))
         code, out = self.r.repair()
         self.assertEqual(self.r.actions(out), {".claude/settings.json": "leave"})
 
@@ -598,7 +598,7 @@ class PrimaryPluginStaysOn(unittest.TestCase):
         for rel, data in LAUNCHERS_PRIMARY.items():
             self.r.write(rel, data)
         self.r.commit("launchers from this branch")
-        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@marveen-marketplace", True))
+        self.r.write(".claude/settings.json", cli_enable(SHIPPED_SETTINGS, "slack-channel@alfred-marketplace", True))
         code, out = self.r.repair()
         self.assertEqual((code, self.r.actions(out)), (0, {".claude/settings.json": "restored"}))
 

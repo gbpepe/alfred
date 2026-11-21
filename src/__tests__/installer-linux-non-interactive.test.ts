@@ -2,7 +2,7 @@
 // out of the script and run with bash, as the other installer tests do; the installer itself never runs. Every slice
 // is checked for host-changing commands before it runs, and the ones that touch files get a fresh temp dir.
 //   - the start-of-run check: missing values are named (exit 1), a secret given as an env VALUE is refused, auth is
-//     the pre-placed store/.claude-oauth-token, and without the flag (the Bridge's MARVEEN_NONINTERACTIVE=1 run) the
+//     the pre-placed store/.claude-oauth-token, and without the flag (the Bridge's ALFRED_NONINTERACTIVE=1 run) the
 //     block does nothing;
 //   - every prompt is answered without touching stdin; a secret comes from its file into the SAME variable the
 //     interactive read fills, and nowhere else (the whole shell state holds it once, nothing prints it);
@@ -80,26 +80,26 @@ describe('the start-of-run check (before any step)', () => {
       'echo "PASSED choice=${NI_PROVIDER_CHOICE:-}"',
     ].join('\n'), env)
   }
-  const TG = () => ({ MARVEEN_OWNER_NAME: 'Teszt Elek', MARVEEN_BOT_NAME: 'Robi', MARVEEN_CHANNEL: 'telegram', MARVEEN_TELEGRAM_TOKEN_FILE: secretFile('123456:AAbb\n') })
+  const TG = () => ({ ALFRED_OWNER_NAME: 'Teszt Elek', ALFRED_BOT_NAME: 'Robi', ALFRED_CHANNEL: 'telegram', ALFRED_TELEGRAM_TOKEN_FILE: secretFile('123456:AAbb\n') })
 
   it('happy path: each channel with its values passes and maps to the menu number', () => {
     expect(check(TG()).stdout).toContain('PASSED choice=1')
-    const base = { MARVEEN_OWNER_NAME: 'O', MARVEEN_BOT_NAME: 'B' }
-    expect(check({ ...base, MARVEEN_CHANNEL: 'slack', MARVEEN_SLACK_BOT_TOKEN_FILE: secretFile('xoxb-1'), MARVEEN_SLACK_APP_TOKEN_FILE: secretFile('xapp-1') }).stdout).toContain('PASSED choice=2')
-    expect(check({ ...base, MARVEEN_CHANNEL: 'discord', MARVEEN_DISCORD_BOT_TOKEN_FILE: secretFile('d'), MARVEEN_DISCORD_CHANNEL_ID: '1', MARVEEN_DISCORD_USER_ID: '2' }).stdout).toContain('PASSED choice=3')
-    expect(check({ ...base, MARVEEN_CHANNEL: 'gromzo' }).stdout).toContain('PASSED choice=4')
-    expect(check({ ...base, MARVEEN_CHANNEL: 'teams', MARVEEN_TEAMS_BOT_APP_ID: 'a', MARVEEN_TEAMS_BOT_TENANT_ID: 't', MARVEEN_TEAMS_BOT_APP_PASSWORD_FILE: secretFile('pw') }).stdout).toContain('PASSED choice=5')
+    const base = { ALFRED_OWNER_NAME: 'O', ALFRED_BOT_NAME: 'B' }
+    expect(check({ ...base, ALFRED_CHANNEL: 'slack', ALFRED_SLACK_BOT_TOKEN_FILE: secretFile('xoxb-1'), ALFRED_SLACK_APP_TOKEN_FILE: secretFile('xapp-1') }).stdout).toContain('PASSED choice=2')
+    expect(check({ ...base, ALFRED_CHANNEL: 'discord', ALFRED_DISCORD_BOT_TOKEN_FILE: secretFile('d'), ALFRED_DISCORD_CHANNEL_ID: '1', ALFRED_DISCORD_USER_ID: '2' }).stdout).toContain('PASSED choice=3')
+    expect(check({ ...base, ALFRED_CHANNEL: 'gromzo' }).stdout).toContain('PASSED choice=4')
+    expect(check({ ...base, ALFRED_CHANNEL: 'teams', ALFRED_TEAMS_BOT_APP_ID: 'a', ALFRED_TEAMS_BOT_TENANT_ID: 't', ALFRED_TEAMS_BOT_APP_PASSWORD_FILE: secretFile('pw') }).stdout).toContain('PASSED choice=5')
   })
 
   it.each([
-    ['MARVEEN_OWNER_NAME', {}],
-    ['MARVEEN_BOT_NAME', {}],
-    ['MARVEEN_CHANNEL', {}],
-    ['MARVEEN_TELEGRAM_TOKEN_FILE', {}],
-    ['MARVEEN_SLACK_APP_TOKEN_FILE', { MARVEEN_CHANNEL: 'slack', MARVEEN_SLACK_BOT_TOKEN_FILE: 'SET' }],
-    ['MARVEEN_DISCORD_USER_ID', { MARVEEN_CHANNEL: 'discord', MARVEEN_DISCORD_BOT_TOKEN_FILE: 'SET', MARVEEN_DISCORD_CHANNEL_ID: '1' }],
-    ['MARVEEN_TEAMS_BOT_TENANT_ID', { MARVEEN_CHANNEL: 'teams', MARVEEN_TEAMS_BOT_APP_ID: 'a', MARVEEN_TEAMS_BOT_APP_PASSWORD_FILE: 'SET' }],
-    ['MARVEEN_TEAMS_BOT_APP_PASSWORD_FILE', { MARVEEN_CHANNEL: 'teams', MARVEEN_TEAMS_BOT_APP_ID: 'a', MARVEEN_TEAMS_BOT_TENANT_ID: 't' }],
+    ['ALFRED_OWNER_NAME', {}],
+    ['ALFRED_BOT_NAME', {}],
+    ['ALFRED_CHANNEL', {}],
+    ['ALFRED_TELEGRAM_TOKEN_FILE', {}],
+    ['ALFRED_SLACK_APP_TOKEN_FILE', { ALFRED_CHANNEL: 'slack', ALFRED_SLACK_BOT_TOKEN_FILE: 'SET' }],
+    ['ALFRED_DISCORD_USER_ID', { ALFRED_CHANNEL: 'discord', ALFRED_DISCORD_BOT_TOKEN_FILE: 'SET', ALFRED_DISCORD_CHANNEL_ID: '1' }],
+    ['ALFRED_TEAMS_BOT_TENANT_ID', { ALFRED_CHANNEL: 'teams', ALFRED_TEAMS_BOT_APP_ID: 'a', ALFRED_TEAMS_BOT_APP_PASSWORD_FILE: 'SET' }],
+    ['ALFRED_TEAMS_BOT_APP_PASSWORD_FILE', { ALFRED_CHANNEL: 'teams', ALFRED_TEAMS_BOT_APP_ID: 'a', ALFRED_TEAMS_BOT_TENANT_ID: 't' }],
   ])('a missing %s is named, exit 1, nothing passes', (missing, extra) => {
     const env: Env = { ...TG(), ...extra }
     for (const k of Object.keys(env)) if (env[k] === 'SET') env[k] = secretFile('v')
@@ -111,44 +111,44 @@ describe('the start-of-run check (before any step)', () => {
     expect(r.stdout).not.toContain('PASSED')
   })
 
-  it('the messages follow MARVEEN_LANG (en)', () => {
-    const env: Env = { ...TG(), MARVEEN_LANG: 'en' }
-    delete env.MARVEEN_BOT_NAME
+  it('the messages follow ALFRED_LANG (en)', () => {
+    const env: Env = { ...TG(), ALFRED_LANG: 'en' }
+    delete env.ALFRED_BOT_NAME
     const r = check(env)
-    expect(r.stderr).toContain('Error (--non-interactive): a required value is missing, set the env variable: MARVEEN_BOT_NAME')
+    expect(r.stderr).toContain('Error (--non-interactive): a required value is missing, set the env variable: ALFRED_BOT_NAME')
   })
 
   it('an unknown channel, a two-line value, an i/y/n answer out of range: named, exit 1', () => {
-    let r = check({ ...TG(), MARVEEN_CHANNEL: 'signal' })
-    expect([r.status, r.stderr.includes('MARVEEN_CHANNEL (telegram|slack|discord|gromzo|teams)')]).toEqual([1, true])
-    r = check({ ...TG(), MARVEEN_OWNER_NAME: 'Elek\nCLAUDE_CODE_OAUTH_TOKEN=x' })
-    expect([r.status, r.stderr.includes('MARVEEN_OWNER_NAME')]).toEqual([1, true])
-    r = check({ ...TG(), MARVEEN_SWAP: 'yes' })
-    expect([r.status, r.stderr.includes('MARVEEN_SWAP (i|y|n)')]).toEqual([1, true])
-    r = check({ ...TG(), MARVEEN_WHISPER: 'maybe' })
-    expect([r.status, r.stderr.includes('MARVEEN_WHISPER')]).toEqual([1, true])
+    let r = check({ ...TG(), ALFRED_CHANNEL: 'signal' })
+    expect([r.status, r.stderr.includes('ALFRED_CHANNEL (telegram|slack|discord|gromzo|teams)')]).toEqual([1, true])
+    r = check({ ...TG(), ALFRED_OWNER_NAME: 'Elek\nCLAUDE_CODE_OAUTH_TOKEN=x' })
+    expect([r.status, r.stderr.includes('ALFRED_OWNER_NAME')]).toEqual([1, true])
+    r = check({ ...TG(), ALFRED_SWAP: 'yes' })
+    expect([r.status, r.stderr.includes('ALFRED_SWAP (i|y|n)')]).toEqual([1, true])
+    r = check({ ...TG(), ALFRED_WHISPER: 'maybe' })
+    expect([r.status, r.stderr.includes('ALFRED_WHISPER')]).toEqual([1, true])
   })
 
   it('a secret file that is missing, empty or only whitespace is named, exit 1', () => {
     for (const f of [join(tempDir(), 'nope'), secretFile(''), secretFile('  \n\n')]) {
-      const r = check({ ...TG(), MARVEEN_TELEGRAM_TOKEN_FILE: f })
+      const r = check({ ...TG(), ALFRED_TELEGRAM_TOKEN_FILE: f })
       expect(r.status).toBe(1)
-      expect(r.stderr).toContain('MARVEEN_TELEGRAM_TOKEN_FILE')
+      expect(r.stderr).toContain('ALFRED_TELEGRAM_TOKEN_FILE')
     }
   })
 
   it('a secret file whose FIRST line is empty is refused, even when a later line has the token (only the first line is read)', () => {
     for (const body of ['\nSECRET-LATER-9f8e7d\n', '   \nSECRET-LATER-9f8e7d\n', '\r\nSECRET-LATER-9f8e7d\r\n']) {
-      const r = check({ ...TG(), MARVEEN_TELEGRAM_TOKEN_FILE: secretFile(body) })
+      const r = check({ ...TG(), ALFRED_TELEGRAM_TOKEN_FILE: secretFile(body) })
       expect(r.status).toBe(1)
-      expect(r.stderr).toContain('MARVEEN_TELEGRAM_TOKEN_FILE')
+      expect(r.stderr).toContain('ALFRED_TELEGRAM_TOKEN_FILE')
       expect(r.stdout + r.stderr).not.toContain('SECRET-LATER-9f8e7d')
     }
   })
 
   it.each([
-    'MARVEEN_TELEGRAM_TOKEN', 'MARVEEN_BOT_TOKEN', 'MARVEEN_SLACK_BOT_TOKEN', 'MARVEEN_SLACK_APP_TOKEN',
-    'MARVEEN_DISCORD_BOT_TOKEN', 'MARVEEN_TEAMS_BOT_APP_PASSWORD', 'MARVEEN_API_KEY', 'MARVEEN_OAUTH_TOKEN',
+    'ALFRED_TELEGRAM_TOKEN', 'ALFRED_BOT_TOKEN', 'ALFRED_SLACK_BOT_TOKEN', 'ALFRED_SLACK_APP_TOKEN',
+    'ALFRED_DISCORD_BOT_TOKEN', 'ALFRED_TEAMS_BOT_APP_PASSWORD', 'ALFRED_API_KEY', 'ALFRED_OAUTH_TOKEN',
   ])('a secret given as an env VALUE (%s) is refused, and the value is never printed', (name) => {
     const VALUE = 'SECRET-VALUE-9f8e7d'
     const r = check({ ...TG(), [name]: VALUE })
@@ -176,11 +176,11 @@ describe('the start-of-run check (before any step)', () => {
 
   it('--admin-prereq with the flag checks only the secret refusal and the i/y/n values', () => {
     expect(check({}, { admin: true, dir: checkout(false, false) }).stdout).toContain('PASSED')
-    expect(check({ MARVEEN_BOT_TOKEN: 'x' }, { admin: true }).status).toBe(1)
+    expect(check({ ALFRED_BOT_TOKEN: 'x' }, { admin: true }).status).toBe(1)
   })
 
-  it('without the flag the block does nothing: the Bridge run (MARVEEN_NONINTERACTIVE=1 + its env secrets) passes untouched', () => {
-    const r = check({ MARVEEN_NONINTERACTIVE: '1', MARVEEN_BOT_TOKEN: 'x', MARVEEN_TEAMS_BOT_APP_PASSWORD: 'y' }, { flag: false, dir: checkout(false, false) })
+  it('without the flag the block does nothing: the Bridge run (ALFRED_NONINTERACTIVE=1 + its env secrets) passes untouched', () => {
+    const r = check({ ALFRED_NONINTERACTIVE: '1', ALFRED_BOT_TOKEN: 'x', ALFRED_TEAMS_BOT_APP_PASSWORD: 'y' }, { flag: false, dir: checkout(false, false) })
     expect(r.status).toBe(0)
     expect(r.stdout).toContain('PASSED choice=')
     expect(r.stderr).toBe('')
@@ -197,7 +197,7 @@ describe('the mode is on only with the flag', () => {
     expect(on('--non-interactive')).toBe('ON')
     expect(on('--port 3421 --non-interactive')).toBe('ON')
     expect(on('')).toBe('OFF')
-    expect(on('', { INSTALL_NONINTERACTIVE: '1', MARVEEN_NONINTERACTIVE: '1' })).toBe('OFF')
+    expect(on('', { INSTALL_NONINTERACTIVE: '1', ALFRED_NONINTERACTIVE: '1' })).toBe('OFF')
   })
   it('--help documents it', () => {
     expect(SCRIPT).toContain('[--non-interactive]"')
@@ -220,7 +220,7 @@ describe('every prompt is answered without stdin', () => {
 
   it('telegram: every value from env/file, stdin untouched, the token in BOT_TOKEN only and never printed', () => {
     const TOKEN = '987654321:AAsecret_token-value'
-    const r = personal(true, { MARVEEN_OWNER_NAME: 'Teszt Elek', MARVEEN_BOT_NAME: 'Robi', MARVEEN_TELEGRAM_TOKEN_FILE: secretFile(`${TOKEN}\r\n`) }, undefined, '1')
+    const r = personal(true, { ALFRED_OWNER_NAME: 'Teszt Elek', ALFRED_BOT_NAME: 'Robi', ALFRED_TELEGRAM_TOKEN_FILE: secretFile(`${TOKEN}\r\n`) }, undefined, '1')
     expect(r.status).toBe(0)
     const s = state(r.stdout)
     expect(s).toContain('OWNER_NAME="Teszt Elek"')
@@ -240,27 +240,27 @@ describe('every prompt is answered without stdin', () => {
 
   it('the state after the block is the same as after typing the same answers interactively', () => {
     const typed = personal(false, {}, 'Teszt Elek\ni\n1\n987654321:AAx\nRobi\n')
-    const ni = personal(true, { MARVEEN_OWNER_NAME: 'Teszt Elek', MARVEEN_BOT_NAME: 'Robi', MARVEEN_TELEGRAM_TOKEN_FILE: secretFile('987654321:AAx\n') }, undefined, '1')
+    const ni = personal(true, { ALFRED_OWNER_NAME: 'Teszt Elek', ALFRED_BOT_NAME: 'Robi', ALFRED_TELEGRAM_TOKEN_FILE: secretFile('987654321:AAx\n') }, undefined, '1')
     expect(state(ni.stdout)).toBe(state(typed.stdout))
     const tTyped = personal(false, {}, 'O\ni\n5\n11111111-2222-3333-4444-555555555555\n66666666-7777-8888-9999-000000000000\nS3cr3t-pw\nTB\n')
     const tNi = personal(true, {
-      MARVEEN_OWNER_NAME: 'O', MARVEEN_BOT_NAME: 'TB', MARVEEN_TEAMS_BOT_APP_ID: '11111111-2222-3333-4444-555555555555',
-      MARVEEN_TEAMS_BOT_TENANT_ID: '66666666-7777-8888-9999-000000000000', MARVEEN_TEAMS_BOT_APP_PASSWORD_FILE: secretFile('S3cr3t-pw\n'),
+      ALFRED_OWNER_NAME: 'O', ALFRED_BOT_NAME: 'TB', ALFRED_TEAMS_BOT_APP_ID: '11111111-2222-3333-4444-555555555555',
+      ALFRED_TEAMS_BOT_TENANT_ID: '66666666-7777-8888-9999-000000000000', ALFRED_TEAMS_BOT_APP_PASSWORD_FILE: secretFile('S3cr3t-pw\n'),
     }, undefined, '5')
     expect(state(tNi.stdout)).toBe(state(tTyped.stdout))
     expect(tNi.stdout.split('--STATE--')[0] + tNi.stderr).not.toContain('S3cr3t-pw')
   })
 
   it('slack and discord: tokens from their files, ids from env', () => {
-    let s = state(personal(true, { MARVEEN_OWNER_NAME: 'O', MARVEEN_BOT_NAME: 'B', MARVEEN_SLACK_BOT_TOKEN_FILE: secretFile('xoxb-1-2'), MARVEEN_SLACK_APP_TOKEN_FILE: secretFile('xapp-3-4\n') }, undefined, '2').stdout)
+    let s = state(personal(true, { ALFRED_OWNER_NAME: 'O', ALFRED_BOT_NAME: 'B', ALFRED_SLACK_BOT_TOKEN_FILE: secretFile('xoxb-1-2'), ALFRED_SLACK_APP_TOKEN_FILE: secretFile('xapp-3-4\n') }, undefined, '2').stdout)
     expect(s).toContain('CHANNEL_PROVIDER="slack"')
     expect(s).toContain('SLACK_BOT_TOKEN="xoxb-1-2"')
     expect(s).toContain('SLACK_APP_TOKEN="xapp-3-4"')
-    s = state(personal(true, { MARVEEN_OWNER_NAME: 'O', MARVEEN_BOT_NAME: 'B', MARVEEN_DISCORD_BOT_TOKEN_FILE: secretFile('dtok'), MARVEEN_DISCORD_CHANNEL_ID: '111', MARVEEN_DISCORD_USER_ID: '222' }, undefined, '3').stdout)
+    s = state(personal(true, { ALFRED_OWNER_NAME: 'O', ALFRED_BOT_NAME: 'B', ALFRED_DISCORD_BOT_TOKEN_FILE: secretFile('dtok'), ALFRED_DISCORD_CHANNEL_ID: '111', ALFRED_DISCORD_USER_ID: '222' }, undefined, '3').stdout)
     expect(s).toContain('DISCORD_BOT_TOKEN="dtok"')
     expect(s).toContain('DISCORD_CHANNEL_ID="111"')
     expect(s).toContain('OPERATOR_DISCORD_USER_ID="222"')
-    s = state(personal(true, { MARVEEN_OWNER_NAME: 'O', MARVEEN_BOT_NAME: 'B' }, undefined, '4').stdout)
+    s = state(personal(true, { ALFRED_OWNER_NAME: 'O', ALFRED_BOT_NAME: 'B' }, undefined, '4').stdout)
     expect(s).toContain('CHANNEL_PROVIDER="gromzo"')
   })
 
@@ -271,15 +271,15 @@ describe('every prompt is answered without stdin', () => {
     expect(r.stdout + r.stderr).not.toContain('STDIN-WAS-READ')
     return r.stdout
   }
-  it('swap: MARVEEN_SWAP or the default i (create); whisper: MARVEEN_WHISPER or the default n', () => {
+  it('swap: ALFRED_SWAP or the default i (create); whisper: ALFRED_WHISPER or the default n', () => {
     const swap = (env: Env) => yn('if [ "$TOTAL_SWAP_MB" -lt 1024 ]; then', '\n    fi\n', 'TOTAL_SWAP_MB=0; swapon() { echo /swapfile; }; fallocate() { :; }; mkswap() { :; }', 'CREATE_SWAP', env)
     expect(swap({})).toContain('CREATE_SWAP="i"')
-    expect(swap({ MARVEEN_SWAP: 'n' })).toContain('CREATE_SWAP="n"')
-    expect(swap({ MARVEEN_SWAP: 'y' })).toContain('CREATE_SWAP="i"')
+    expect(swap({ ALFRED_SWAP: 'n' })).toContain('CREATE_SWAP="n"')
+    expect(swap({ ALFRED_SWAP: 'y' })).toContain('CREATE_SWAP="i"')
     const wh = (env: Env) => yn('# --- Whisper (opcionalis) ---', '\nINSTALL_STEP="bumblebee"', 'command() { return 1; }', 'DO_WHISPER', env, false)
     expect(wh({})).toContain('DO_WHISPER="n"')
-    expect(wh({ MARVEEN_WHISPER: 'y' })).toContain('DO_WHISPER="i"')
-    expect(wh({ MARVEEN_WHISPER: 'y' })).toContain('STUB pipx install openai-whisper')
+    expect(wh({ ALFRED_WHISPER: 'y' })).toContain('DO_WHISPER="i"')
+    expect(wh({ ALFRED_WHISPER: 'y' })).toContain('STUB pipx install openai-whisper')
   })
   it('the error helper never offers to open Claude Code (OPEN_CLAUDE = n, documented)', () => {
     const fn = between(SCRIPT, 'offer_claude_fallback() {', '\n}\n').replace('if [ -t 0 ]; then', 'if true; then')
@@ -317,7 +317,7 @@ describe('pairing is skipped and the end of the run says so', () => {
     expect(r.stdout + r.stderr).not.toContain('STDIN-WAS-READ')
     const lines = r.stdout.split('\n').filter((l) => l.trim() !== '' && !/^(declare|unset) /.test(l))
     expect(lines[lines.length - 1]).toContain('Nem-interaktív telepítés: a csatorna párosítása kimaradt. Párosítsd a dashboardon: http://localhost:3421')
-    expect(run(true, { MARVEEN_LANG: 'en' }).stdout).toContain('Non-interactive install: channel pairing was skipped. Pair the channel on the dashboard: http://localhost:3421')
+    expect(run(true, { ALFRED_LANG: 'en' }).stdout).toContain('Non-interactive install: channel pairing was skipped. Pair the channel on the dashboard: http://localhost:3421')
   })
   it('without the flag: the pairing step runs as before and the closing line is not printed', () => {
     const r = run(false)
@@ -329,19 +329,19 @@ describe('pairing is skipped and the end of the run says so', () => {
 
 describe('install.sh: --non-interactive skips the language question', () => {
   const WRAPPER = readFileSync(join(ROOT, 'install.sh'), 'utf8')
-  const LANG_BLOCK = between(WRAPPER, '# INSTNONINTER1118', '\nexport MARVEEN_LANG\n')
-  const run = (args: string, env: Env = {}) => bash([`set -- ${args}`, LANG_BLOCK, 'echo "LANG=$MARVEEN_LANG"'].join('\n'), env, '2\n')
-  it('the flag: no question, MARVEEN_LANG or hu; without it the question is asked as before', () => {
+  const LANG_BLOCK = between(WRAPPER, '# INSTNONINTER1118', '\nexport ALFRED_LANG\n')
+  const run = (args: string, env: Env = {}) => bash([`set -- ${args}`, LANG_BLOCK, 'echo "LANG=$ALFRED_LANG"'].join('\n'), env, '2\n')
+  it('the flag: no question, ALFRED_LANG or hu; without it the question is asked as before', () => {
     expect(run('--non-interactive').stdout.trim()).toBe('LANG=hu')
-    expect(run('--non-interactive', { MARVEEN_LANG: 'en' }).stdout.trim()).toBe('LANG=en')
+    expect(run('--non-interactive', { ALFRED_LANG: 'en' }).stdout.trim()).toBe('LANG=en')
     expect(run('').stdout).toContain('LANG=en') // "2" typed on stdin
   })
 })
 
-describe('the Bridge contract (marveen-bridge-installer derive-headless.mjs + read-presets.json)', () => {
+describe('the Bridge contract (alfred-bridge-installer derive-headless.mjs + read-presets.json)', () => {
   // The Bridge derives its paid headless installer from THIS file: every `read -r?p "<prompt>" VAR` line is matched by
   // VAR, prompt text and mode, and replaced; a new, changed or missing one fails its build. Measured on
-  // marveen-bridge-installer 633c685 (read-presets.json, 22 reads / 21 VARs). The flag adds no read and changes none.
+  // alfred-bridge-installer 633c685 (read-presets.json, 22 reads / 21 VARs). The flag adds no read and changes none.
   const PINNED: Array<[string, string, 'rp' | 'p']> = [
     ['OPEN_CLAUDE', '"$(_t prompt_open_claude)"', 'rp'],
     ['CREATE_SWAP', '"$(_t prompt_swap)"', 'rp'],
@@ -382,27 +382,27 @@ describe('the Bridge contract (marveen-bridge-installer derive-headless.mjs + re
     expect(SCRIPT.split('\n').filter((l) => l === '# Kesz!').length).toBe(1)
     expect(SCRIPT).toContain('exec bash "$TARGET_DIR/install-linux.sh"')
   })
-  it('the mode never reads the Bridge\'s switch: MARVEEN_NONINTERACTIVE is on no code line of the script', () => {
+  it('the mode never reads the Bridge\'s switch: ALFRED_NONINTERACTIVE is on no code line of the script', () => {
     const code = SCRIPT.split('\n').filter((l) => !l.trimStart().startsWith('#'))
-    expect(code.filter((l) => l.includes('MARVEEN_NONINTERACTIVE'))).toEqual([])
+    expect(code.filter((l) => l.includes('ALFRED_NONINTERACTIVE'))).toEqual([])
   })
 })
 
 describe('docs and texts', () => {
   const DOC = readFileSync(join(ROOT, 'docs', 'install-non-interactive.md'), 'utf8')
-  it('every MARVEEN_* variable the mode reads or refuses is in the doc', () => {
+  it('every ALFRED_* variable the mode reads or refuses is in the doc', () => {
     const block = NI_CHECK + SCRIPT.split('\n').filter((l) => /^\s*ni_answer /.test(l)).join('\n')
-    const names = [...new Set(block.match(/MARVEEN_[A-Z_]+/g) ?? [])]
+    const names = [...new Set(block.match(/ALFRED_[A-Z_]+/g) ?? [])]
     expect(names.length).toBeGreaterThan(15)
     for (const n of names) expect(DOC, n).toContain(n)
-    expect(DOC).toContain('MARVEEN_LANG')
+    expect(DOC).toContain('ALFRED_LANG')
   })
   it('every ni.* text has a Hungarian and an English line', () => {
     const keys = [...new Set(SCRIPT.match(/_t ni\.[a-z_]+/g) ?? [])].map((k) => k.slice(3))
     expect(keys.length).toBe(8)
     for (const lng of ['hu', 'en']) {
       for (const k of keys) {
-        const out = spawnSync('bash', ['-c', `. '${LANG}'; MARVEEN_LANG=${lng}; _t ${k}`], { encoding: 'utf8' }).stdout.trim()
+        const out = spawnSync('bash', ['-c', `. '${LANG}'; ALFRED_LANG=${lng}; _t ${k}`], { encoding: 'utf8' }).stdout.trim()
         expect(out, `${lng}:${k}`).not.toBe(k)
         expect(out.length).toBeGreaterThan(5)
       }

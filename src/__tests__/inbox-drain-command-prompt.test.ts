@@ -1,5 +1,5 @@
 // scripts/hooks/inbox-drain.py must not drain INTO an owner command prompt.
-// The command hook (marveen-commands.py) blocks that prompt with exit 2, so
+// The command hook (alfred-commands.py) blocks that prompt with exit 2, so
 // whatever a parallel UserPromptSubmit hook prints into it never reaches the
 // model. Measured on the test bot (2026-09-23): agent message #10 (a custom
 // /osszefoglalo prompt) was marked delivered into a blocked /osszefoglalo and
@@ -39,7 +39,7 @@ beforeEach(() => { drains = 0 })
 function run(prompt: string): Promise<{ code: number | null; stdout: string }> {
   return new Promise(resolve => {
     const p = spawn('python3', [join(install, 'scripts', 'hooks', 'inbox-drain.py')], {
-      env: { ...process.env, WEB_PORT: String(port), MAIN_AGENT_ID: 'marveen', MARVEEN_AGENT_ID: 'marveen' },
+      env: { ...process.env, WEB_PORT: String(port), MAIN_AGENT_ID: 'alfred', ALFRED_AGENT_ID: 'alfred' },
     })
     let stdout = ''
     p.stdout.on('data', d => { stdout += d })

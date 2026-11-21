@@ -2,7 +2,7 @@
 //
 // Why: the check used to run as a scheduled task of the MAIN agent. An exhausted main agent (429) cannot run a turn,
 // so the very turn that would rotate it never ran. Here the dashboard process runs the same decision
-// (rotateCheckOnce), sends the owner signal itself (notifyOwner: Slack target, else the channel's bot, gromzo relays)
+// (rotateCheckOnce), sends the owner signal itself (notifyOwner)
 // and calls the same rotation the route does (rotatePlan).
 //
 // Per action, in order (the order of rotateCheckOnce):

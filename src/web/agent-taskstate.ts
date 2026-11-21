@@ -127,7 +127,7 @@ function quoteForeignValue(s: string): string {
 /**
  * Build the additionalContext string. The structured do-not-resend lists are
  * the concrete defense against re-execution / re-delegation -- not the soft
- * framing alone (review hardening, Marveen 2026-06-03).
+ * framing alone (review hardening, Alfred 2026-06-03).
  *
  * The shared token cannot prove who wrote a record, so a record that is not
  * demonstrably the recipient's own is replayed as data naming its writer, never

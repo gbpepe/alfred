@@ -99,6 +99,6 @@ describe('the main agent card in the hierarchy graph', () => {
   it('openAgentDetail() hands the main agent to its own detail view', () => {
     const i = APP.indexOf('async function openAgentDetail(agentName) {')
     expect(i).toBeGreaterThan(-1)
-    expect(APP.slice(i, i + 200)).toMatch(/if \(agentName === mainAgentId\(\)\) \{\s*return openMarveenDetail\(\)/)
+    expect(APP.slice(i, i + 200)).toMatch(/if \(agentName === mainAgentId\(\)\) \{\s*return openAlfredDetail\(\)/)
   })
 })

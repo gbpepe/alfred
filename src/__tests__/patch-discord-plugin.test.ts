@@ -1,4 +1,4 @@
-// scripts/patch-discord-plugin.py (DCEXT1111): Marveen's version of the Discord
+// scripts/patch-discord-plugin.py (DCEXT1111): Alfred's version of the Discord
 // channel plugin (vendor/discord-plugin/<ver>/overlay) put over the cached
 // official one, only when that is the vendored upstream file. Run for real on a
 // copy of the verbatim upstream 0.0.4 server.ts in a scratch plugins cache; the
@@ -17,7 +17,7 @@ const SCRIPT = join(ROOT, 'scripts', 'patch-discord-plugin.py')
 const VENDOR = join(ROOT, 'vendor', 'discord-plugin', '0.0.4')
 const UPSTREAM = join(VENDOR, 'upstream', 'server.ts')
 const OVERLAY = join(VENDOR, 'overlay')
-const TAG = 'MARVEEN-PATCH(dcbtn1023)'
+const TAG = 'ALFRED-PATCH(dcbtn1023)'
 const UPSTREAM_SHA = '6edc17d9e9d04930967361ba51c8e03b8f8508647a1dfc11d79ee6a0eb1010b7'
 
 let cache = ''
@@ -60,7 +60,7 @@ function syntaxErrors(text: string): string[] {
 }
 
 const overlayFiles = () => readdirSync(OVERLAY).sort()
-const ext = () => JSON.parse(readFileSync(join(dir, 'marveen-ext.json'), 'utf-8'))
+const ext = () => JSON.parse(readFileSync(join(dir, 'alfred-ext.json'), 'utf-8'))
 
 // What the live cache held before DCEXT1111: upstream + the DCBTN1023 anchor patch (the old script's output,
 // sha256 9a3fe104..., byte-identical to the live cache measured 2026-11-11).
@@ -78,7 +78,7 @@ describe('the vendored plugin', () => {
     const ov = readFileSync(join(OVERLAY, 'server.ts'), 'utf-8')
     expect(syntaxErrors(ov)).toEqual([])
     const upSet = new Set(up)
-    const unmarked = ov.split('\n').filter(l => !upSet.has(l) && !/MARVEEN-(PATCH|EXT)/.test(l))
+    const unmarked = ov.split('\n').filter(l => !upSet.has(l) && !/ALFRED-(PATCH|EXT)/.test(l))
     expect(unmarked).toEqual([])
   })
 })
@@ -88,10 +88,10 @@ describe('patch-discord-plugin.py', () => {
     const state = join(cache, 'state.json')
     const r = run(['--state', state])
     expect(r.status).toBe(0)
-    expect(r.stderr).toMatch(/overlaid .*server\.ts \(Marveen's Discord plugin 0\.0\.4, from upstream\)/)
+    expect(r.stderr).toMatch(/overlaid .*server\.ts \(Alfred's Discord plugin 0\.0\.4, from upstream\)/)
     for (const n of overlayFiles()) expect(readFileSync(join(dir, n), 'utf-8')).toBe(readFileSync(join(OVERLAY, n), 'utf-8'))
     expect(ext()).toEqual({ backfill: true, ownerUserId: '', channelPolicy: {}, slashCommands: null })
-    const manifest = JSON.parse(readFileSync(join(dir, '.marveen-overlay.json'), 'utf-8'))
+    const manifest = JSON.parse(readFileSync(join(dir, '.alfred-overlay.json'), 'utf-8'))
     expect(manifest.upstream).toBe(UPSTREAM_SHA)
     expect(manifest.files['server.ts']).toBe(sha(readFileSync(server)))
     expect(readState(state)).toMatchObject({ mode: 'on', owner_set: false, backfill: true, files: [{ version: '0.0.4', path: server, status: 'overlaid' }] })
@@ -115,10 +115,10 @@ describe('patch-discord-plugin.py', () => {
     const r = run(['--state', state])
     expect(r.stderr).toMatch(/overlaid .*from dcbtn/)
     expect(readState(state).files[0].status).toBe('overlaid')
-    expect(existsSync(join(dir, '.marveen-overlay.json'))).toBe(true)
+    expect(existsSync(join(dir, '.alfred-overlay.json'))).toBe(true)
     // an older DCBTN version (lines missing) is recognised too: the tagged lines are stripped before the match
     writeFileSync(server, dcbtnPatched().split('\n').filter(l => !(l.includes("access.dmPolicy === 'disabled'") && l.endsWith(TAG))).join('\n'))
-    rmSync(join(dir, '.marveen-overlay.json'))
+    rmSync(join(dir, '.alfred-overlay.json'))
     expect(run().stderr).toMatch(/overlaid .*from dcbtn/)
   })
 
@@ -126,16 +126,16 @@ describe('patch-discord-plugin.py', () => {
     run()
     const older = readFileSync(server, 'utf-8').replace('Not authorized.', 'Nope.')
     writeFileSync(server, older)
-    const m = JSON.parse(readFileSync(join(dir, '.marveen-overlay.json'), 'utf-8'))
+    const m = JSON.parse(readFileSync(join(dir, '.alfred-overlay.json'), 'utf-8'))
     m.files['server.ts'] = sha(older)
-    writeFileSync(join(dir, '.marveen-overlay.json'), JSON.stringify(m))
+    writeFileSync(join(dir, '.alfred-overlay.json'), JSON.stringify(m))
     const r = run()
     expect(r.stderr).toMatch(/upgraded .*from ours/)
     expect(readFileSync(server, 'utf-8')).toBe(readFileSync(join(OVERLAY, 'server.ts'), 'utf-8'))
     expect(run().stderr).toBe('')
   })
 
-  it('a settings change rewrites marveen-ext.json ("upgraded")', () => {
+  it('a settings change rewrites alfred-ext.json ("upgraded")', () => {
     run()
     setOverrides({ DISCORD_OWNER_USER_ID: '290903699524550656', DISCORD_BACKFILL: '0' })
     const state = join(cache, 'state.json')
@@ -162,18 +162,18 @@ describe('patch-discord-plugin.py', () => {
       p.on('close', (c: number | null) => resolve(c))
     })
     try {
-      expect(await runAsync({ MARVEEN_API_BASE: apiBase })).toBe(0)
+      expect(await runAsync({ ALFRED_API_BASE: apiBase })).toBe(0)
       expect(ext().slashCommands).toBeNull() // no token in the install: not even asked
       expect(seen).toEqual([])
       writeFileSync(join(install, 'store', '.dashboard-token'), 'dash-tok\n')
-      expect(await runAsync({ MARVEEN_API_BASE: apiBase })).toBe(0)
+      expect(await runAsync({ ALFRED_API_BASE: apiBase })).toBe(0)
       expect(ext().slashCommands).toEqual([{ name: 'status', description: 'rendszer-állapot' }, { name: 'usage', description: 'token' }])
       expect(seen).toEqual(['Bearer dash-tok'])
-      expect(await runAsync({ MARVEEN_API_BASE: 'http://127.0.0.1:9' })).toBe(0)
+      expect(await runAsync({ ALFRED_API_BASE: 'http://127.0.0.1:9' })).toBe(0)
       expect(ext().slashCommands).toBeNull()
       setOverrides({ DISCORD_PLUGIN_EXT: '0' })
       seen.length = 0
-      expect(await runAsync({ MARVEEN_API_BASE: apiBase })).toBe(0)
+      expect(await runAsync({ ALFRED_API_BASE: apiBase })).toBe(0)
       expect(seen).toEqual([]) // the overlay off: the menu is not read
     } finally {
       srv.close()
@@ -192,7 +192,7 @@ describe('patch-discord-plugin.py', () => {
     expect(ext().backfill).toBe(true)
   })
 
-  it('DISCORD_CHANNEL_POLICY (overrides-only) goes to marveen-ext.json; bad JSON is dropped loudly; .env never counts', () => {
+  it('DISCORD_CHANNEL_POLICY (overrides-only) goes to alfred-ext.json; bad JSON is dropped loudly; .env never counts', () => {
     const policy = { '1438000000000000700': { allowRoles: ['1438000000000009001'] } }
     setOverrides({ DISCORD_CHANNEL_POLICY: JSON.stringify(policy) })
     run()
@@ -297,10 +297,10 @@ describe('patch-discord-plugin.py', () => {
     const abs = join(install, 'victim-abs.txt')
     writeFileSync(rel, 'keep me')
     writeFileSync(abs, 'keep me too')
-    const m = JSON.parse(readFileSync(join(dir, '.marveen-overlay.json'), 'utf-8'))
+    const m = JSON.parse(readFileSync(join(dir, '.alfred-overlay.json'), 'utf-8'))
     m.files['../victim-rel.txt'] = 'x'
     m.files[abs] = 'x'
-    writeFileSync(join(dir, '.marveen-overlay.json'), JSON.stringify(m))
+    writeFileSync(join(dir, '.alfred-overlay.json'), JSON.stringify(m))
     return { rel, abs }
   }
 
@@ -311,9 +311,9 @@ describe('patch-discord-plugin.py', () => {
         // an older overlay of ours, so the update path runs
         const older = readFileSync(server, 'utf-8').replace('Not authorized.', 'Nope.')
         writeFileSync(server, older)
-        const m = JSON.parse(readFileSync(join(dir, '.marveen-overlay.json'), 'utf-8'))
+        const m = JSON.parse(readFileSync(join(dir, '.alfred-overlay.json'), 'utf-8'))
         m.files['server.ts'] = sha(older)
-        writeFileSync(join(dir, '.marveen-overlay.json'), JSON.stringify(m))
+        writeFileSync(join(dir, '.alfred-overlay.json'), JSON.stringify(m))
       } else {
         setOverrides({ DISCORD_PLUGIN_EXT: '0' })
       }
@@ -322,12 +322,12 @@ describe('patch-discord-plugin.py', () => {
       expect(r.status).toBe(0)
       expect(readFileSync(rel, 'utf-8')).toBe('keep me')
       expect(readFileSync(abs, 'utf-8')).toBe('keep me too')
-      expect(r.stderr).toContain(`LOUD: .marveen-overlay.json names '../victim-rel.txt', which is not one of the overlay's own files -- not removed`)
-      expect(r.stderr).toContain(`LOUD: .marveen-overlay.json names '${abs}', which is not one of the overlay's own files -- not removed`)
+      expect(r.stderr).toContain(`LOUD: .alfred-overlay.json names '../victim-rel.txt', which is not one of the overlay's own files -- not removed`)
+      expect(r.stderr).toContain(`LOUD: .alfred-overlay.json names '${abs}', which is not one of the overlay's own files -- not removed`)
       if (mode === 'update') {
         expect(r.stderr).toMatch(/upgraded .*from ours/)
         // the rewritten manifest no longer carries the bad names: the next run is a silent no-op
-        expect(Object.keys(JSON.parse(readFileSync(join(dir, '.marveen-overlay.json'), 'utf-8')).files).sort()).toEqual(overlayFiles())
+        expect(Object.keys(JSON.parse(readFileSync(join(dir, '.alfred-overlay.json'), 'utf-8')).files).sort()).toEqual(overlayFiles())
         expect(run().stderr).toBe('')
       } else {
         expect(r.stderr).toMatch(/restored/)
@@ -340,7 +340,7 @@ describe('patch-discord-plugin.py', () => {
     const target = join(install, 'race-target.txt')
     writeFileSync(target, 'outside')
     const dest = join(dir, 'race.txt')
-    symlinkSync(target, dest + '.marveen-tmp')
+    symlinkSync(target, dest + '.alfred-tmp')
     const py = [
       'import importlib.util, os, sys',
       'spec = importlib.util.spec_from_file_location("pdp", sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)',
@@ -366,24 +366,24 @@ describe('patch-discord-plugin.py', () => {
   it('a symlink planted at the temp name is not followed: its target is untouched, the file is written', () => {
     const target = join(install, 'link-target.txt')
     writeFileSync(target, 'outside')
-    symlinkSync(target, server + '.marveen-tmp')
+    symlinkSync(target, server + '.alfred-tmp')
     const r = run()
     expect(r.status).toBe(0)
     expect(r.stderr).toMatch(/overlaid/)
     expect(readFileSync(target, 'utf-8')).toBe('outside')
     expect(lstatSync(server).isSymbolicLink()).toBe(false)
     expect(readFileSync(server, 'utf-8')).toBe(readFileSync(join(OVERLAY, 'server.ts'), 'utf-8'))
-    expect(existsSync(server + '.marveen-tmp')).toBe(false)
+    expect(existsSync(server + '.alfred-tmp')).toBe(false)
   })
 
   // Review F-A1 (#2700): server.ts is in place before the manifest; a failed manifest write must not strand the overlay.
   it('a manifest write that fails after server.ts: the overlay is still ours, the off switch still restores, the next run heals', () => {
-    const blocker = join(dir, '.marveen-overlay.json.marveen-tmp')
+    const blocker = join(dir, '.alfred-overlay.json.alfred-tmp')
     mkdirSync(blocker) // a directory at the manifest's temp name: write_atomic fails there, after server.ts was replaced
     const first = run()
     expect(first.stderr).toMatch(/cannot write in .*0\.0\.4: \w+Error -- left as it was/)
     expect(readFileSync(server, 'utf-8')).toBe(readFileSync(join(OVERLAY, 'server.ts'), 'utf-8'))
-    expect(existsSync(join(dir, '.marveen-overlay.json'))).toBe(false)
+    expect(existsSync(join(dir, '.alfred-overlay.json'))).toBe(false)
     // switch on, still blocked: recognised as ours (not the LOUD "left as shipped"), nothing worse
     const state = join(cache, 'state.json')
     const second = run(['--state', state])
@@ -394,14 +394,14 @@ describe('patch-discord-plugin.py', () => {
     const off = run(['--state', state])
     expect(off.stderr).toMatch(/restored .*server\.ts to the official plugin 0\.0\.4/)
     expect(sha(readFileSync(server))).toBe(UPSTREAM_SHA)
-    expect(readdirSync(dir).sort()).toEqual(['.marveen-overlay.json.marveen-tmp', 'server.ts'])
+    expect(readdirSync(dir).sort()).toEqual(['.alfred-overlay.json.alfred-tmp', 'server.ts'])
     // the blocker gone and the switch on: overlaid, and a manifest-less overlay heals to a current one
     rmSync(blocker, { recursive: true })
     setOverrides({ DISCORD_PLUGIN_EXT: 'on' })
     expect(run().stderr).toMatch(/overlaid .*from upstream/)
-    rmSync(join(dir, '.marveen-overlay.json'))
+    rmSync(join(dir, '.alfred-overlay.json'))
     expect(run(['--state', state]).stderr).toMatch(/upgraded .*from ours/)
-    expect(JSON.parse(readFileSync(join(dir, '.marveen-overlay.json'), 'utf-8')).files['server.ts']).toBe(sha(readFileSync(server)))
+    expect(JSON.parse(readFileSync(join(dir, '.alfred-overlay.json'), 'utf-8')).files['server.ts']).toBe(sha(readFileSync(server)))
     expect(run().stderr).toBe('')
   })
 
@@ -411,7 +411,7 @@ describe('patch-discord-plugin.py', () => {
       for (const f of readdirSync(dir)) if (f !== 'server.ts') rmSync(join(dir, f))
       setOverrides({ DISCORD_PLUGIN_EXT: v })
       run()
-      expect(existsSync(join(dir, '.marveen-overlay.json')), v).toBe(on)
+      expect(existsSync(join(dir, '.alfred-overlay.json')), v).toBe(on)
     }
   })
 
@@ -588,7 +588,7 @@ function clickHandler(access: Access) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let extMod: any
-beforeAll(async () => { extMod = await import(pathToFileURL(join(ROOT, 'vendor', 'discord-plugin', '0.0.4', 'overlay', 'marveen-ext.ts')).href) })
+beforeAll(async () => { extMod = await import(pathToFileURL(join(ROOT, 'vendor', 'discord-plugin', '0.0.4', 'overlay', 'alfred-ext.ts')).href) })
 
 describe('the inserted click handler', () => {
   const access: Access = { allowFrom: ['1'], groups: {} }

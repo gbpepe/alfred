@@ -384,7 +384,7 @@ describe('browser-content-notice (envelope layer)', () => {
   })
 
   it('caps the log: past the size limit the file moves to .1 and a new one starts, both owner-only', () => {
-    // The hook runs on every WebSearch of every agent (MARVEENGAPS1020 (c)),
+    // The hook runs on every WebSearch of every agent (ALFREDGAPS1020 (c)),
     // so an unbounded log would only grow. One record here is about 1.5 KB.
     const dir = mkdtempSync(join(tmpdir(), 'bcn-cap-'))
     const logPath = join(dir, 'browser-content.log')
@@ -533,7 +533,7 @@ describe('browser-content-notice (documented scope)', () => {
     expect(source).toContain('2.1.278')
   })
 
-  it('is wired by default on WebSearch, WebFetch (MARVEENGAPS1020 (c)) and the catalog mail/calendar/Drive/browser MCP servers (MCPUNTRUSTED1114)', () => {
+  it('is wired by default on WebSearch, WebFetch (ALFREDGAPS1020 (c)) and the catalog mail/calendar/Drive/browser MCP servers (MCPUNTRUSTED1114)', () => {
     // The main agent: the repo-shipped project settings. Sub-agents: the
     // scaffold (agent-scaffold.ts injectWebSearchEnvelope), pinned in
     // websearch-envelope-wiring.test.ts.

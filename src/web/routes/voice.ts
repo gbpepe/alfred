@@ -1,8 +1,8 @@
 // /api/voice/* -- central STT and TTS service for the agent fleet.
 //
 // All endpoints require Bearer auth (enforced by src/web.ts before routing).
-// STT: POST /api/voice/stt     -- transcribe a Telegram voice file_id
-// TTS: POST /api/voice/tts     -- synthesize text to ogg/opus, send via Telegram sendVoice
+// STT: POST /api/voice/stt     -- transcribe a channel voice file_id
+// TTS: POST /api/voice/tts     -- synthesize text to ogg/opus, send via channel voice
 // Config: GET/PUT /api/agents/:id/voice-config  (handled in agents.ts; see there)
 // Modality: GET /api/voice/modality?agent=X&chat=Y
 //           POST /api/voice/modality/set -- set last inbound modality (future plugin hook use)
@@ -11,7 +11,7 @@
 // Security:
 //   - voiceModel is whitelisted against KNOWN_VOICE_MODELS (no path traversal)
 //   - spawn uses arg-array, shell:false (no shell injection)
-//   - file_id validated to Telegram's safe character set before use
+//   - file_id validated to safe character set before use
 //   - state_dir resolved only to known agent channel dirs, never raw user paths
 
 import { spawn } from 'node:child_process'
@@ -23,10 +23,10 @@ import { readBody, json } from '../http-helpers.js'
 import { KNOWN_VOICE_MODELS, AGENTS_BASE_DIR, readAgentVoiceConfig } from '../agent-config.js'
 import { getLastInboundModality, setLastInboundModality } from '../voice-modality.js'
 import { buildTtsDirective, resolveAgentChannelStateDir, inboundIsAudio, parseTtsRequest } from '../voice-directive.js'
-import { PROJECT_ROOT } from '../../config.js'
+import { PROJECT_ROOT, CHANNEL_PROVIDER } from '../../config.js'
 import type { RouteContext } from './types.js'
 
-const VOICE_DIR = join(homedir(), '.local', 'share', 'marveen-voice')
+const VOICE_DIR = join(homedir(), '.local', 'share', 'alfred-voice')
 const VTOOLS_PY = join(VOICE_DIR, '_vtools.py')
 const VENV_PY = join(VOICE_DIR, 'venv', 'bin', 'python')
 
@@ -50,7 +50,7 @@ const VENV_PY = join(VOICE_DIR, 'venv', 'bin', 'python')
 // exists to remove, just later. Raising one of the three alone changes nothing.
 const STT_TIMEOUT_MS = 160_000
 
-// Telegram file_ids are base64url + some punctuation; reject anything else.
+// Voice file_ids are base64url + some punctuation; reject anything else.
 const SAFE_FILE_ID_RE = /^[A-Za-z0-9_\-]{10,200}$/
 
 // Known agent channel dirs -- only these are accepted as state_dir.
@@ -111,7 +111,7 @@ function runProc(
 // Concurrency guard: prevents parallel installs racing on the same venv/DEST.
 let _installInProgress = false
 
-// Transcribe a Telegram voice file via the local whisper toolkit. This is the
+// Transcribe a channel voice file via the local whisper toolkit. This is the
 // single in-process entry point for STT -- both the /api/voice/stt route AND
 // the message-router tick call it DIRECTLY. The router must never self-HTTP to
 // /api/voice/stt: a process HTTP-calling its own dashboard from the 5s tick
@@ -167,7 +167,7 @@ export async function tryHandleVoice(ctx: RouteContext): Promise<boolean> {
     if (!agentId || !/^[a-zA-Z0-9_-]+$/.test(agentId)) { json(res, { error: 'Invalid agent' }, 400); return true }
     if (!chatId || !/^\d+$/.test(chatId)) { json(res, { error: 'Invalid chat_id' }, 400); return true }
     const voiceCfg = readAgentVoiceConfig(agentId)
-    const stateDir = resolveAgentChannelStateDir(agentId, 'telegram')
+    const stateDir = resolveAgentChannelStateDir(agentId, CHANNEL_PROVIDER)
     const kindParam = ctx.url.searchParams.get('kind') ?? ''
     const fileIdOk = !!fileParam && SAFE_FILE_ID_RE.test(fileParam)
     // Audio is decided by the declared attachment kind, never by the mere
@@ -284,7 +284,7 @@ export async function tryHandleVoice(ctx: RouteContext): Promise<boolean> {
       [VTOOLS_PY, 'speak', onnxPath, stateDir, chatId, text],
       // The installed toolkit lives outside the install tree; tell it which
       // install it serves so it can find the conversation ledger.
-      { timeoutMs: 90_000, env: { ...process.env, MARVEEN_INSTALL_DIR: PROJECT_ROOT } },
+      { timeoutMs: 90_000, env: { ...process.env, ALFRED_INSTALL_DIR: PROJECT_ROOT } },
     )
     if (result.code !== 0) {
       logger.warn({ voiceModel, chatId, stderr: result.stderr }, '/api/voice/tts: piper/sendVoice failed')

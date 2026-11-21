@@ -172,8 +172,8 @@ describe('/model set (CMD920 tests 5, 6)', () => {
   it('keep replaces the existing .env line, it does not duplicate it (real updateEnvFile)', async () => {
     const envDir = mkdtempSync(join(tmpdir(), 'env-'))
     writeFileSync(join(envDir, '.env'), 'FOO=1\nMAIN_AGENT_MODEL=claude-sonnet-5\nBAR=2\n')
-    const saved = process.env.CLAUDECLAW_ENV_DIR
-    process.env.CLAUDECLAW_ENV_DIR = envDir
+    const saved = process.env.ALFRED_ENV_DIR
+    process.env.ALFRED_ENV_DIR = envDir
     try {
       vi.resetModules()
       const { updateEnvFile } = await import('../env.js')
@@ -184,8 +184,8 @@ describe('/model set (CMD920 tests 5, 6)', () => {
       expect(lines).toContain('FOO=1')
       expect(lines).toContain('BAR=2')
     } finally {
-      if (saved === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-      else process.env.CLAUDECLAW_ENV_DIR = saved
+      if (saved === undefined) delete process.env.ALFRED_ENV_DIR
+      else process.env.ALFRED_ENV_DIR = saved
       rmSync(envDir, { recursive: true, force: true })
     }
   })

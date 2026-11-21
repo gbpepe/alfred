@@ -155,8 +155,8 @@ of the colleague's agent that calls this endpoint and sends `text`.
   can present it and is no longer scoped. File permissions cannot prevent
   that while the user is shared. Real isolation needs one OS user per agent.
 - **The database is not scoped.** The scope covers the HTTP API only. The
-  board itself lives in `store/claudeclaw.db`, and an agent that reads that
-  file directly (for example `sqlite3 store/claudeclaw.db "select * from
+  board itself lives in `store/alfred.db`, and an agent that reads that
+  file directly (for example `sqlite3 store/alfred.db "select * from
   kanban_cards"`, which the fleet's own instructions present as a normal way
   to read the kanban) sees every card. Without a deny on the database file,
   the scope holds only for API calls.
@@ -164,7 +164,7 @@ of the colleague's agent that calls this endpoint and sends `text`.
   profile whose permissions deny reading the master token, the other
   agents' token files and the database (for example deny `Read` and Bash
   access to `store/.dashboard-token`, `agents/*/.dashboard-token` other than
-  its own, and `store/claudeclaw.db` with its `-wal` and `-shm` files),
+  its own, and `store/alfred.db` with its `-wal` and `-shm` files),
   run with `AGENT_TOKENS=1` so the agent only ever holds its own token, and do
   not hand such an agent a shell recipe that embeds the master token. This
   raises the bar for a confused agent; it is still a permission layer, not an

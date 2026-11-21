@@ -79,7 +79,7 @@ for c in w['overdue']:
    (see Pitfalls), so run the SQL with python3's built-in sqlite3 module:
    ```bash
    python3 -c "import sqlite3
-for r in sqlite3.connect('{{INSTALL_DIR}}/store/claudeclaw.db').execute('''<SQL GOES HERE>'''):
+for r in sqlite3.connect('{{INSTALL_DIR}}/store/alfred.db').execute('''<SQL GOES HERE>'''):
     print(*r, sep=' | ')"
    ```
    The blocks below document the SQL; the `sqlite3 db "..."` form in the examples shows the LOGIC,
@@ -180,7 +180,7 @@ except Exception: print(0)
       FRESH card WITH A NAMED ASSIGNEE, not the count.
 
    **THE CONDITION DELIBERATELY ACCEPTS ANY message that mentions the card ID, not only the
-   marveen -> assignee direction.** If the assignee raised it THEMSELVES (their own card, feedback), then they know
+   alfred -> assignee direction.** If the assignee raised it THEMSELVES (their own card, feedback), then they know
    about it, and the purpose of the send-out is met. Do not "fix" it into outgoing-only filtering: then a card
    the assignee created themselves would raise a false alarm in every round.
    **BUT DO NOT REPORT THE 117 AS A FINDING: BROKEN DOWN, IT SAYS SOMETHING ELSE (same measurement).** `planned` 110/244,

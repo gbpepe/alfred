@@ -74,7 +74,7 @@ export function gateWakePrompt(name: string): string {
     'ebben az elso korben minden kartya nelkuli tetelre hozz letre kartyat (vagy ird a tetel melle, miert nem kell). ' +
     'Ha nem volt futo munkad es az atadoban sincs nyitott tetel, az is teljes erteku allapot -- olyankor ne talalj ki magadnak feladatot. ' +
     // Owner request 2026-10-21: no channel notice about the fresh context (several
-    // agents' channel is the owner's Telegram); only a faulty restart is reported,
+    // agents share the owner's channel); only a faulty restart is reported,
     // by a sub-agent to the main agent over the inter-agent queue.
     'A friss kontextusrol a csatornadra NE kuldj uzenetet. ' +
     (name === MAIN_AGENT_ID
@@ -94,7 +94,7 @@ const tmuxBin = makeLazyBinResolver('tmux')
 
 // Child-process measurement constants.
 //
-// Two-tier filter to separate "infrastructure" (MCP servers, telegram plugin,
+// Two-tier filter to separate "infrastructure" (MCP servers, channel plugin,
 // gmail runner) from "work" (Task-tool subagents, background Bash):
 //
 //   CHILD_MIN_AGE_S     -- lower bound: skip children younger than this to
@@ -383,7 +383,7 @@ const MCP_ARGV_SHAPE = /mcp[-_]server|@[\w.-]+\/[\w.-]*mcp[\w.-]*|\/_npx\//i
  * MCP server and should be treated as infrastructure regardless of age.
  *
  * Three criteria (any is sufficient):
- *   - args contains '/plugins/cache/' → channel plugin (telegram, slack, etc.)
+ *   - args contains '/plugins/cache/' → channel plugin (discord, etc.)
  *   - args contains a package name from mcpPatterns → .mcp.json MCP server
  *   - args has the shape of an MCP server launch → config-independent fallback
  *

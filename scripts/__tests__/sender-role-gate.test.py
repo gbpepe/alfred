@@ -539,7 +539,7 @@ class SenderRoleGateTest(unittest.TestCase):
             transcript_path=os.path.join(self.dir.name, "no-such.jsonl")))
 
 
-# The gromzo channel's envelope (marveen-mxd plugin, MXD_SCOPE=both): Claude Code writes
+# The gromzo channel's envelope (alfred-mxd plugin, MXD_SCOPE=both): Claude Code writes
 # source from the server name, and the plugin's meta carries sender_role (CLI 2.1.310).
 GROMZO_SERVER = "plugin:gromzo-channel:gromzo"
 GROMZO_OWNER = ('<channel source="plugin:gromzo-channel:gromzo" sender_role="owner" '

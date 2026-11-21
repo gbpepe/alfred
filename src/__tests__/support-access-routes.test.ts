@@ -174,7 +174,7 @@ describe('/api/support-access', () => {
     runs = []
     runAnswer = enabledBy(GRANT)
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-routes-')))
-    supportDir = join(root, 'home', '.marveen', 'support')
+    supportDir = join(root, 'home', '.alfred', 'support')
     sshDir = join(root, 'home', '.ssh')
     mkdirSync(supportDir, { recursive: true, mode: 0o700 })
     mkdirSync(sshDir, { recursive: true, mode: 0o700 })
@@ -308,7 +308,7 @@ describe('/api/support-access', () => {
     expect(rows[0]).toMatchObject({
       grant_id: GRANT,
       consent_version: 2,
-      // which text: the language the owner used (locale hu) and that text's sha256, the marveen.io value for '2:hu'
+      // which text: the language the owner used (locale hu) and that text's sha256, the alfred.io value for '2:hu'
       consent_lang: 'hu',
       consent_sha256: '1edde713149d360f3aef27d51e3e379557ece268f8716380acbfee7621e1152b',
       consent_at: '2026-11-15T07:40:00Z',

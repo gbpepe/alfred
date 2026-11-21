@@ -79,7 +79,7 @@ for c in w['overdue']:
    (lasd Buktatok), ezert az SQL-t a python3 beepitett sqlite3-moduljaval futtasd:
    ```bash
    python3 -c "import sqlite3
-for r in sqlite3.connect('{{INSTALL_DIR}}/store/claudeclaw.db').execute('''<IDE AZ SQL>'''):
+for r in sqlite3.connect('{{INSTALL_DIR}}/store/alfred.db').execute('''<IDE AZ SQL>'''):
     print(*r, sep=' | ')"
    ```
    Az alabbi blokkok az SQL-t dokumentaljak; a `sqlite3 db "..."` alak a peldakban a LOGIKAT
@@ -180,7 +180,7 @@ except Exception: print(0)
       MEGNEVEZETT GAZDAS, FRISS kartya, nem a darabszam.
 
    **A FELTETEL SZANDEKOSAN BARMILYEN uzenetet elfogad, ami a kartya ID-jet emliti, nem csak a
-   marveen -> gazda iranyt.** Ha a gazda MAGA hozta szoba (sajat kartyazas, visszajelzes), akkor tud
+   alfred -> gazda iranyt.** Ha a gazda MAGA hozta szoba (sajat kartyazas, visszajelzes), akkor tud
    rola, es a kikuldes celja teljesult. Ne "javitsd" ki kimeno-only szuresre: azzal a sajat maga
    altal felvett kartya minden korben hamis riasztast adna.
    **DE A 117-ET NE JELENTSD LELETKENT: SZETBONTVA MAST MOND (ugyanaz a meres).** `planned` 110/244,

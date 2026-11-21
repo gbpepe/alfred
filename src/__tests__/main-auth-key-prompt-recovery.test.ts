@@ -59,7 +59,7 @@ describe('the API-key question on the main pane', () => {
   })
   it('the channel-monitor menu recovery walks the main session and answers a plain blocking menu with Escape', () => {
     const src = readFileSync(join(process.cwd(), 'src', 'web', 'channel-monitor.ts'), 'utf-8')
-    expect(src).toContain('const targets: Target[] = [{ session: MAIN_CHANNELS_SESSION, isMarveen: true, provider: mainProvider }]')
+    expect(src).toContain('const targets: Target[] = [{ session: MAIN_CHANNELS_SESSION, isAlfred: true, provider: mainProvider }]')
     expect(src).toContain("const inMenu = firstRunGate != null || (!t.gateOnly && pane != null && detectsBlockingMenu(pane))")
     expect(src).toMatch(/'Session parked in a blocking interactive menu -- sending Escape to recover'\)\n\s+try \{\n\s+execFileSync\(tmuxBin\(\), \['send-keys', '-t', exactTmuxTarget\(t\.session\), 'Escape'\]/)
   })

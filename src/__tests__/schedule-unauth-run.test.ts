@@ -8,7 +8,7 @@ import { projectsDirFor } from '../web/active-model.js'
 
 // DOCKERUNAUTHRUN1118: a scheduled prompt typed into a session that is NOT logged in must not end as a
 // successful run. Measured 2026-11-18 on a fresh Docker install without a Claude login (srv2127946, container
-// marveen-marveen-1, Claude Code 2.1.311): memoria-heartbeat fired at 21:30:09Z and task_runs row 10 closed
+// alfred-alfred-1, Claude Code 2.1.311): memoria-heartbeat fired at 21:30:09Z and task_runs row 10 closed
 // status fired / outcome done / delivery intact, while the pane showed
 //   ⎿  Not logged in · Please run /login
 //   ✻ Worked for 0s · done 9:30 PM
@@ -22,7 +22,7 @@ const MEASURED_USER = {
   type: 'user', message: { role: 'user', content: 'SCHEDULED TASK NOTICE -- [Heartbeat: memoria-heartbeat] <scheduled-task source="scheduled-task:memoria-heartbeat"> ... </scheduled-task>' },
   uuid: 'dc76dc56-9b30-4db6-b8bb-2daef22d7a84', timestamp: '2026-11-18T21:30:09.266Z', permissionMode: 'bypassPermissions',
   origin: { kind: 'human' }, promptSource: 'typed', turnOrigin: 'human', turnPosition: { promptIndex: 2, turnIndex: 2 },
-  userType: 'external', entrypoint: 'cli', cwd: '/opt/marveen', sessionId: '19504962-ffad-42e0-bc12-ed9a432bb395', version: '2.1.311', gitBranch: 'HEAD',
+  userType: 'external', entrypoint: 'cli', cwd: '/opt/alfred', sessionId: '19504962-ffad-42e0-bc12-ed9a432bb395', version: '2.1.311', gitBranch: 'HEAD',
 }
 
 const MEASURED_AUTH_REPLY = {
@@ -34,13 +34,13 @@ const MEASURED_AUTH_REPLY = {
     content: [{ type: 'text', text: 'Not logged in · Please run /login' }], context_management: null,
   },
   error: 'authentication_failed', isApiErrorMessage: true, perTurnEffort: 'medium', session_id: '19504962-ffad-42e0-bc12-ed9a432bb395',
-  userType: 'external', entrypoint: 'cli', cwd: '/opt/marveen', sessionId: '19504962-ffad-42e0-bc12-ed9a432bb395', version: '2.1.311', gitBranch: 'HEAD',
+  userType: 'external', entrypoint: 'cli', cwd: '/opt/alfred', sessionId: '19504962-ffad-42e0-bc12-ed9a432bb395', version: '2.1.311', gitBranch: 'HEAD',
 }
 
 const MEASURED_TURN_DURATION = {
   parentUuid: 'ec4d93f1-cc42-47bb-b2a3-5f4465b355cb', isSidechain: false, type: 'system', subtype: 'turn_duration', durationMs: 355,
   messageCount: 23, timestamp: '2026-11-18T21:30:09.586Z', uuid: 'a98478b7-c731-4b1d-afaa-be2736fe8f8c', isMeta: false,
-  userType: 'external', entrypoint: 'cli', cwd: '/opt/marveen', sessionId: '19504962-ffad-42e0-bc12-ed9a432bb395', version: '2.1.311', gitBranch: 'HEAD',
+  userType: 'external', entrypoint: 'cli', cwd: '/opt/alfred', sessionId: '19504962-ffad-42e0-bc12-ed9a432bb395', version: '2.1.311', gitBranch: 'HEAD',
 }
 
 // The same structured pair with another wording, seen in this host's own transcripts (a Cloudflare 403 the CLI
@@ -114,13 +114,13 @@ describe('sessionAuthFailedSince: the transcript of a not-logged-in session', ()
 })
 
 describe('checkTaskAuthFailure (the sweep decision)', () => {
-  const base = { typedAt: TYPED_AT, workingDir: '/opt/marveen', configDirs: ['/cfg/a', undefined, '/cfg/a'] as ReadonlyArray<string | undefined> }
+  const base = { typedAt: TYPED_AT, workingDir: '/opt/alfred', configDirs: ['/cfg/a', undefined, '/cfg/a'] as ReadonlyArray<string | undefined> }
 
   it('reads the transcript dirs of every config root, once each, since typing began', () => {
     let seen: { dirs: readonly string[]; since: number } | null = null
     expect(checkTaskAuthFailure(base, (dirs, since) => { seen = { dirs, since }; return true })).toBe(true)
     expect(seen!.since).toBe(TYPED_AT)
-    expect(seen!.dirs).toEqual([projectsDirFor('/opt/marveen', '/cfg/a'), projectsDirFor('/opt/marveen', undefined)])
+    expect(seen!.dirs).toEqual([projectsDirFor('/opt/alfred', '/cfg/a'), projectsDirFor('/opt/alfred', undefined)])
   })
 
   it('no typedAt (remote agent, worksource run) -> false without reading', () => {
@@ -136,7 +136,7 @@ describe('checkTaskAuthFailure (the sweep decision)', () => {
   it('end to end on disk: the measured turn under the projects dir of the agent config root -> true', () => {
     const root = mkdtempSync(join(tmpdir(), 'unauth-run-e2e-'))
     try {
-      const pdir = projectsDirFor('/opt/marveen', root)
+      const pdir = projectsDirFor('/opt/alfred', root)
       mkdirSync(pdir, { recursive: true })
       writeFileSync(join(pdir, '19504962-ffad-42e0-bc12-ed9a432bb395.jsonl'), line(MEASURED_USER) + line(MEASURED_AUTH_REPLY) + line(MEASURED_TURN_DURATION))
       expect(checkTaskAuthFailure({ ...base, configDirs: [root] })).toBe(true)

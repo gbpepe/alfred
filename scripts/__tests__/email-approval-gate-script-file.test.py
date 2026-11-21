@@ -60,7 +60,7 @@ def make_store(td, level=2):
     cat = {"key": "email_send", "label": "Email", "level": level, "locked": False}
     with open(os.path.join(store, "autonomy-config.json"), "w", encoding="utf-8") as fh:
         json.dump({"version": 1, "categories": [cat]}, fh)
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute("""
       CREATE TABLE approvals (
         id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, category TEXT NOT NULL,

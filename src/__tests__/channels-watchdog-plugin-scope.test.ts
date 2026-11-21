@@ -128,7 +128,7 @@ describe('SLACKWATCHDOGNODE1113: the Slack plugin (Node, not bun) counts as aliv
 
   it('plugin_child_pid finds a slack-channel child under slack and ignores it under telegram (live)', async () => {
     const fn = extractPluginChildPid()
-    const child = spawn('/bin/bash', ['-c', 'exec -a /cache/marveen-marketplace/slack-channel/0.2.5/serve /bin/sleep 30'], { stdio: 'ignore' })
+    const child = spawn('/bin/bash', ['-c', 'exec -a /cache/alfred-marketplace/slack-channel/0.2.5/serve /bin/sleep 30'], { stdio: 'ignore' })
     try {
       await new Promise(r => setTimeout(r, 300))
       const run = (provider: string) => execFileSync('/bin/bash', ['-c', `${fn}\nCHANNEL_PROVIDER=${provider}\nplugin_child_pid ${process.pid}`], { encoding: 'utf-8' }).trim()

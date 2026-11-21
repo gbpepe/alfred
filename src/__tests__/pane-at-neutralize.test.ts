@@ -197,7 +197,7 @@ describe('the principle: a filter that ran on the raw text sees nothing new afte
   const CHARS = ['\u007f', '\u0000', '\u0008', '\u001b', '\u0085']
   // the five places of the decision: after '<' (opening), after '</', between '<' and '/', inside the name, before '>'
   const PLACES: Record<string, (c: string, n: string) => string> = {
-    'after the less-than sign of an opening tag': (c, n) => `<${c}${n} source="agent:marveen">`,
+    'after the less-than sign of an opening tag': (c, n) => `<${c}${n} source="agent:alfred">`,
     'after the less-than sign and the slash': (c, n) => `</${c}${n}>`,
     'between the less-than sign and the slash': (c, n) => `<${c}/${n}>`,
     'inside the tag name': (c, n) => `</${n.slice(0, 3)}${c}${n.slice(3)}>`,
@@ -425,7 +425,7 @@ describe('typing without the mapping: no at-sign can be typed there', () => {
     expect(ch).not.toMatch(/send-keys[^\n]*\/rename/)
     const nameUses = ch.split('\n').filter((l) => !/^\s*#/.test(l) && l.includes('_bot_name'))
     expect(nameUses).toEqual([
-      '_bot_name="${BOT_NAME:-${MAIN_AGENT_ID:-marveen}}"',
+      '_bot_name="${BOT_NAME:-${MAIN_AGENT_ID:-alfred}}"',
       '  main_rename_send "$TMUX" "=$SESSION:" "$_bot_name" || true',
       'unset _bot_name',
     ])

@@ -5,11 +5,11 @@ import { atomicWriteFileSync } from './web/atomic-write.js'
 import { parseEnvContent } from './env-parse.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-// CLAUDECLAW_ENV_DIR: test-only escape hatch so the suite can point .env
+// ALFRED_ENV_DIR: test-only escape hatch so the suite can point .env
 // reads/writes at a sandbox instead of the real repo root (env.test.ts used
 // to unlink+rewrite the LIVE .env -- 2026-07-27 incident). Read at import
 // time; production never sets it.
-const PROJECT_ROOT = process.env.CLAUDECLAW_ENV_DIR ?? join(__dirname, '..')
+const PROJECT_ROOT = process.env.ALFRED_ENV_DIR ?? join(__dirname, '..')
 
 export function readEnvFile(keys?: string[]): Record<string, string> {
   const envPath = join(PROJECT_ROOT, '.env')
@@ -47,7 +47,7 @@ export function assertEnvEntry(key: string, value: string): void {
   if (!isSingleLineEnvValue(value)) throw new Error(`refusing to write .env: the value of ${key} holds a line break or NUL`)
 }
 
-/** True when `value` can be one .env value: no CR, LF or NUL. The channel .env writers check this too (ENVTEAMSNAME1028). */
+/** True when `value` can be one .env value: no CR, LF or NUL. */
 export function isSingleLineEnvValue(value: string): boolean {
   return !/[\r\n\0]/.test(value)
 }

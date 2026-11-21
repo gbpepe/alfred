@@ -39,13 +39,13 @@ vi.mock('../web/routes/auth.js', async (importOriginal) => ({
   },
 }))
 
-const savedEnvDir = process.env.CLAUDECLAW_ENV_DIR
-process.env.CLAUDECLAW_ENV_DIR = STORE
+const savedEnvDir = process.env.ALFRED_ENV_DIR
+process.env.ALFRED_ENV_DIR = STORE
 const { tryHandleConnectors } = await import('../web/routes/connectors.js')
 
 afterAll(() => {
-  if (savedEnvDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = savedEnvDir
+  if (savedEnvDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = savedEnvDir
   rmSync(STORE, { recursive: true, force: true })
 })
 beforeEach(() => { setSecret.mockClear(); deleteSecret.mockClear() })
@@ -73,14 +73,14 @@ async function call(method: string, path: string, body: unknown, auth: Auth) {
 }
 
 describe('generic vault routes: agent API keys are owner-only to write or delete', () => {
-  it.each(['agent-marveen-api-key', 'agent-samu-api-key'])('POST %s with the shared token: 403, nothing stored', async (id) => {
+  it.each(['agent-alfred-api-key', 'agent-samu-api-key'])('POST %s with the shared token: 403, nothing stored', async (id) => {
     const r = await call('POST', '/api/vault', { id, label: 'x', value: 'fake-key' }, TOKEN)
     expect(r.statusCode).toBe(403)
     expect(JSON.parse(r.body).code).toBe('owner_session_required')
     expect(setSecret).not.toHaveBeenCalled()
   })
   it('POST with an owner session: stored', async () => {
-    const r = await call('POST', '/api/vault', { id: 'agent-marveen-api-key', label: 'x', value: 'fake-key' }, SESSION)
+    const r = await call('POST', '/api/vault', { id: 'agent-alfred-api-key', label: 'x', value: 'fake-key' }, SESSION)
     expect(r.statusCode).toBe(200)
     expect(setSecret).toHaveBeenCalledTimes(1)
   })
@@ -90,15 +90,15 @@ describe('generic vault routes: agent API keys are owner-only to write or delete
     expect(setSecret).toHaveBeenCalledTimes(1)
   })
   it('DELETE agent-<name>-api-key: token 403 and kept, owner deletes', async () => {
-    const t = await call('DELETE', '/api/vault/agent-marveen-api-key', undefined, TOKEN)
+    const t = await call('DELETE', '/api/vault/agent-alfred-api-key', undefined, TOKEN)
     expect(t.statusCode).toBe(403)
     expect(deleteSecret).not.toHaveBeenCalled()
-    const s = await call('DELETE', '/api/vault/agent-marveen-api-key', undefined, SESSION)
+    const s = await call('DELETE', '/api/vault/agent-alfred-api-key', undefined, SESSION)
     expect(s.statusCode).toBe(200)
     expect(deleteSecret).toHaveBeenCalledTimes(1)
   })
   it('import into agent-<name>-api-key with the shared token: 403 before anything is read or stored', async () => {
-    const r = await call('POST', '/api/vault/import', { imports: [{ serverName: 's', envVar: 'K', vaultId: 'agent-marveen-api-key', label: 'x', createBinding: false, targets: [] }] }, TOKEN)
+    const r = await call('POST', '/api/vault/import', { imports: [{ serverName: 's', envVar: 'K', vaultId: 'agent-alfred-api-key', label: 'x', createBinding: false, targets: [] }] }, TOKEN)
     expect(r.statusCode).toBe(403)
     expect(setSecret).not.toHaveBeenCalled()
   })

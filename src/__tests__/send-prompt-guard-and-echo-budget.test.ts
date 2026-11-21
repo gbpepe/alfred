@@ -169,7 +169,7 @@ describe('#2143: the emit guard looks again right before the submitting Enter', 
 })
 
 describe('#2143: the orchestrator notice says whether the row was typed', () => {
-  const msg = { id: 7, from_agent: 'marveen', to_agent: 'worker' }
+  const msg = { id: 7, from_agent: 'alfred', to_agent: 'worker' }
   const hold = { kind: 'permission-prompt', ask: null } as unknown as Parameters<typeof formatUrgentHoldNotice>[2]
 
   it('typed before the refusal: says the text WAS typed and is not submitted, and that the retry types it again', () => {

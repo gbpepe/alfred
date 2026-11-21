@@ -101,10 +101,10 @@ function makeRepo(dirName: string): string {
 async function switchTo(repo: string, branch: string, alertTo: string | null = ALERT_TO): Promise<string> {
   captured = []
   execFileSync('git', ['-C', repo, 'branch', branch])
-  const env: NodeJS.ProcessEnv = { ...process.env, MARVEEN_DASHBOARD_ORIGIN: origin }
+  const env: NodeJS.ProcessEnv = { ...process.env, ALFRED_DASHBOARD_ORIGIN: origin }
   // null = no override, so the hook falls back to its own default recipient.
-  if (alertTo === null) delete env.MARVEEN_GUARD_ALERT_TO
-  else env.MARVEEN_GUARD_ALERT_TO = alertTo
+  if (alertTo === null) delete env.ALFRED_GUARD_ALERT_TO
+  else env.ALFRED_GUARD_ALERT_TO = alertTo
   // Never fails the checkout: the hook is best-effort by contract.
   await execFileAsync('git', ['-C', repo, 'checkout', '-q', branch], { timeout: 20000, env })
   for (let i = 0; i < 100 && captured.length === 0; i++) await new Promise((r) => setTimeout(r, 20))
@@ -151,7 +151,7 @@ describe('prod-tree-guard post-checkout alert: the payload is encoded, not inter
 
 // WHO the alert is sent AS. /api/messages answers an unregistered `from` with
 // HTTP 403 (src/web/routes/messages.ts, isKnownAgent), and the main agent id is
-// install-specific. The hook used to send as a literal 'marveen': measured
+// install-specific. The hook used to send as a literal 'alfred': measured
 // 2026-09-27 on an install whose main agent is 'lean-chief', that sender is
 // rejected, so the branch-switch alert could never arrive there. The installed
 // hook now reads MAIN_AGENT_ID from the install's .env (GUARDFROM924, #1569);
@@ -176,7 +176,7 @@ describe('prod-tree-guard post-checkout alert: the sender is this install\'s mai
 
   it('without MAIN_AGENT_ID in .env it falls back to the stock main agent name', async () => {
     const parsed = JSON.parse(await switchTo(makeRepo('stock'), 'feature-ordinary', null))
-    expect(parsed.from).toBe('marveen')
-    expect(parsed.to).toBe('marveen')
+    expect(parsed.from).toBe('alfred')
+    expect(parsed.to).toBe('alfred')
   })
 })

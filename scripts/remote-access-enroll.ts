@@ -5,7 +5,7 @@
 // operator can hand back to the device.
 //
 // Usage:
-//   npm run remote-enroll -- "ssh-ed25519 <base64 key> marveen-remote:<uuid>"
+//   npm run remote-enroll -- "ssh-ed25519 <base64 key> alfred-remote:<uuid>"
 //   npm run remote-enroll -- --host 203.0.113.10 --port 2222 "<public key line>"
 //   npm run remote-enroll -- --web-port 3421 "<public key line>"
 //   npm run remote-enroll -- --no-dashboard-token "<public key line>"
@@ -196,7 +196,7 @@ function readDashboardToken(): string | null {
  * The bundle's dashboard credential for this run (see chooseBundleToken).
  * `openDb` exists for the tests: they open an in-memory database first and pass
  * a no-op, so the device-key path is exercised end to end without ever opening
- * the install's real store/claudeclaw.db.
+ * the install's real store/alfred.db.
  */
 export function bundleCredential(
   args: Pick<Args, 'tokenMode' | 'name'>,
@@ -261,7 +261,7 @@ export async function runEnroll(args: Args, deps: EnrollDeps): Promise<EnrollOut
     note(`warning: ${w}`)
   }
   note(
-    `${result.action === 'replaced' ? 'Replaced' : 'Added'} restricted entry for marveen-remote:${parsed.installId} in ${result.authorizedKeysPath}`,
+    `${result.action === 'replaced' ? 'Replaced' : 'Added'} restricted entry for alfred-remote:${parsed.installId} in ${result.authorizedKeysPath}`,
   )
 
   // Assemble the connection bundle. The consuming side requires the host key,
@@ -308,7 +308,7 @@ export async function runEnroll(args: Args, deps: EnrollDeps): Promise<EnrollOut
   if (!choice.ok) return { ok: false, reason: choice.reason }
   if (choice.source === 'device') {
     note(
-      `device key ${choice.replaced ? 'replaced' : 'minted'} for marveen-remote:${parsed.installId}; ` +
+      `device key ${choice.replaced ? 'replaced' : 'minted'} for alfred-remote:${parsed.installId}; ` +
         'it is listed and revocable under the dashboard device keys. The bundle carries it: treat the bundle as a secret.',
     )
   } else if (choice.source === 'shared') {
@@ -325,13 +325,13 @@ export async function runEnroll(args: Args, deps: EnrollDeps): Promise<EnrollOut
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2))
   // ENROLL813: this CLI used to hardcode homedir()/.ssh and did not know the
-  // MARVEEN_SSH_DIR seam at all (grep -c MARVEEN_SSH_DIR on this file was 0).
+  // ALFRED_SSH_DIR seam at all (grep -c ALFRED_SSH_DIR on this file was 0).
   // Nothing automated calls it today -- but any future automated caller would
   // have written the operator's real authorized_keys with no way to redirect it,
   // which is the same shape as the leak this change closes. One resolver for
   // every writer, or the next copy drifts again.
   const sshDir = resolveSshDir((dir) => {
-    process.stderr.write(`warning: MARVEEN_SSH_DIR override active -- writing to ${dir}, not the real ~/.ssh\n`)
+    process.stderr.write(`warning: ALFRED_SSH_DIR override active -- writing to ${dir}, not the real ~/.ssh\n`)
   })
   const outcome = await runEnroll(args, {
     sshDir,
@@ -350,7 +350,7 @@ async function main(): Promise<void> {
 // above, and an unguarded main() would execute the whole enrollment
 // (host-key scan, authorized_keys write) at import time.
 //
-// Realpath on BOTH sides (Marveen review, msg 23506, measured): a bare URL
+// Realpath on BOTH sides (Alfred review, msg 23506, measured): a bare URL
 // comparison silently no-ops when the script is invoked through a SYMLINKED
 // ABSOLUTE path -- exit 0, zero output, and the installer reads that as
 // "no bundle", which is exactly the silent-failure family this card exists

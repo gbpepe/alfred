@@ -26,7 +26,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..', '..')
 
 // `curl`: the surface hands out the raw search URL and dumps the headers itself. `helper`: the surface
-// calls scripts/marveen-api.sh, whose memory-search verb prints the X-Memory-Search line first (and
+// calls scripts/alfred-api.sh, whose memory-search verb prints the X-Memory-Search line first (and
 // takes --strict); the main agent's template moved there so no token sits on a curl argv.
 const SURFACES: Array<{ label: string; path: string; recipe: 'curl' | 'helper' }> = [
   { label: 'agent-scaffold (generated per-agent CLAUDE.md)', path: join(ROOT, 'src', 'web', 'agent-scaffold.ts'), recipe: 'curl' },
@@ -39,7 +39,7 @@ describe.each(SURFACES)('memory-search recipe in $label', ({ path, recipe }) => 
   // Guard the guard: if the recipe ever moves out of this file, the assertions
   // below would pass vacuously on a file that no longer documents anything.
   it('still documents a memory search', () => {
-    expect(src).toMatch(recipe === 'curl' ? /\/api\/memories\?[^"'\n]*q=/ : /marveen-api\.sh memory-search \S/)
+    expect(src).toMatch(recipe === 'curl' ? /\/api\/memories\?[^"'\n]*q=/ : /alfred-api\.sh memory-search \S/)
   })
 
   // The bound is what makes this an assertion about the RECIPE rather than
@@ -50,7 +50,7 @@ describe.each(SURFACES)('memory-search recipe in $label', ({ path, recipe }) => 
     expect(src).toMatch(
       recipe === 'curl'
         ? /curl[\s\S]{0,200}?-D [\s\S]{0,200}?\/api\/memories\?[^"'\n]*q=/
-        : /marveen-api\.sh memory-search [^\n]*\n[\s\S]{0,400}?X-Memory-Search/,
+        : /alfred-api\.sh memory-search [^\n]*\n[\s\S]{0,400}?X-Memory-Search/,
     )
   })
 

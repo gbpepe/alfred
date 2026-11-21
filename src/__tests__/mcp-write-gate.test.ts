@@ -41,7 +41,7 @@ describe('db-write-gate: an MCP write onto a protected path is denied, a free pa
     expect(db(tool, { path: join(agent, 'work', 'notes.md'), content: 'x' })).toEqual({ deny: false })
   })
   it('the database file by name, anywhere', () => {
-    expect(db('mcp__Filesystem__write_file', { path: join(store, 'claudeclaw.db'), content: 'x' })).toEqual({ deny: true, reason: 'db' })
+    expect(db('mcp__Filesystem__write_file', { path: join(store, 'alfred.db'), content: 'x' })).toEqual({ deny: true, reason: 'db' })
   })
   it('a relative path is measured against the payload cwd AND the project dir', () => {
     // the Bash cwd moved to work/, the MCP server still resolves against the project dir
@@ -110,12 +110,12 @@ describe('Dani 68192: create/update/replace writers, bare names, a known mover\'
   it('(1) create_file / update_file / replace_in_file onto a protected path: denied for the main agent too', () => {
     for (const tool of ['mcp__x__create_file', 'mcp__x__update_file', 'mcp__x__replace_in_file']) {
       expect(denied(db(tool, { path: join(root, '.claude', 'settings.json'), content: 'x' }, { ...atRoot(), subAgent: false }))).toBe(true)
-      expect(db(tool, { path: join(store, 'claudeclaw.db'), content: 'x' }, { ...atRoot(), subAgent: false })).toEqual({ deny: true, reason: 'db' })
+      expect(db(tool, { path: join(store, 'alfred.db'), content: 'x' }, { ...atRoot(), subAgent: false })).toEqual({ deny: true, reason: 'db' })
     }
   })
   it('(1) the DB by name in ANY class, for the main agent too (as the native Write)', () => {
-    expect(db('mcp__sqlite__read_query', { db: join(store, 'claudeclaw.db'), q: 'select 1' }, { ...atRoot(), subAgent: false })).toEqual({ deny: true, reason: 'db' })
-    expect(db('mcp__x__search', { q: 'claudeclaw.db' }, { ...atRoot(), subAgent: false })).toEqual({ deny: true, reason: 'db' })
+    expect(db('mcp__sqlite__read_query', { db: join(store, 'alfred.db'), q: 'select 1' }, { ...atRoot(), subAgent: false })).toEqual({ deny: true, reason: 'db' })
+    expect(db('mcp__x__search', { q: 'alfred.db' }, { ...atRoot(), subAgent: false })).toEqual({ deny: true, reason: 'db' })
   })
   it('(2) an unknown writer\'s bare relative name is a path', () => {
     expect(denied(db('mcp__notes__save_note', { filename: '.mcp.json', body: 'x' }, atRoot()))).toBe(true)

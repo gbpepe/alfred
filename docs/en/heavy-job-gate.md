@@ -26,7 +26,7 @@
   cannot create a scope whose memory cap is verified to be in effect, it does not
   run the job, and it says why with its own exit code.
 
-It is **opt-in**: nothing in Marveen calls it on its own. An agent (by a rule in its
+It is **opt-in**: nothing in Alfred calls it on its own. An agent (by a rule in its
 `CLAUDE.md`) or a script wraps a heavy command in it. **Linux only** (it reads
 `/proc/meminfo` and uses a systemd user scope).
 

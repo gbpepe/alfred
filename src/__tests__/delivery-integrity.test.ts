@@ -141,7 +141,7 @@ describe('checkTaskDeliveryIntegrity (the sweep decision)', () => {
     sentText: sent,
     typedAt: 1000,
     deliveryVerdict: undefined,
-    workingDir: '/Users/x/ClaudeClaw',
+    workingDir: '/Users/x/Alfred',
     configDirs: ['/cfg/a', undefined, '/cfg/a'] as ReadonlyArray<string | undefined>,
   }
 
@@ -151,8 +151,8 @@ describe('checkTaskDeliveryIntegrity (the sweep decision)', () => {
     expect(seen).not.toBeNull()
     expect(seen!.since).toBe(1000)
     expect([...seen!.dirs].sort()).toEqual([
-      projectsDirFor('/Users/x/ClaudeClaw', '/cfg/a'),
-      projectsDirFor('/Users/x/ClaudeClaw', undefined),
+      projectsDirFor('/Users/x/Alfred', '/cfg/a'),
+      projectsDirFor('/Users/x/Alfred', undefined),
     ].sort())
   })
 
@@ -180,7 +180,7 @@ describe('checkTaskDeliveryIntegrity (the sweep decision)', () => {
   })
 
   it("the closing look never leaves it NULL: nothing arrived + readable transcript = 'not-arrived'", () => {
-    // Marveen's #1506 review: in flight "nothing yet" is right, at the close
+    // Alfred's #1506 review: in flight "nothing yet" is right, at the close
     // there is no "yet" -- a wholly lost prompt must not look like a row
     // nobody checked.
     expect(checkTaskDeliveryIntegrity(base, false, () => [], () => true)).toBeNull()
@@ -199,7 +199,7 @@ describe('checkTaskDeliveryIntegrity (the sweep decision)', () => {
   it('end to end on disk: the 2026-09-13 shape is recorded as head-lost', () => {
     const root = mkdtempSync(join(tmpdir(), 'deliv-e2e-'))
     try {
-      const pdir = projectsDirFor('/Users/x/ClaudeClaw', root)
+      const pdir = projectsDirFor('/Users/x/Alfred', root)
       mkdirSync(pdir, { recursive: true })
       writeFileSync(join(pdir, 'fresh.jsonl'), JSON.stringify({
         type: 'user', timestamp: new Date(2000).toISOString(), message: { content: sent.slice(880) },
@@ -277,10 +277,10 @@ describe('queued into a running turn: intact-queued (card c8a6c2cc)', () => {
       expect(readUserPromptsSince([dir], T0)).toEqual([{ text: 'typed while busy', queued: true }])
     })
 
-    const base ={ typedAt: T0 + 6_000, deliveryVerdict: undefined, workingDir: '/Users/x/ClaudeClaw' }
+    const base ={ typedAt: T0 + 6_000, deliveryVerdict: undefined, workingDir: '/Users/x/Alfred' }
     function onDisk(rows: string): string {
       const root = mkdtempSync(join(tmpdir(), 'deliv-queued-e2e-'))
-      const pdir = projectsDirFor('/Users/x/ClaudeClaw', root)
+      const pdir = projectsDirFor('/Users/x/Alfred', root)
       mkdirSync(pdir, { recursive: true })
       writeFileSync(join(pdir, 'fresh.jsonl'), rows)
       return root

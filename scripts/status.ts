@@ -21,7 +21,7 @@ const warn = (label: string, detail?: string) =>
 const fail = (label: string, detail?: string) =>
   console.log(`  ${RED}✗${RESET} ${label}${detail ? ` — ${detail}` : ''}`)
 
-console.log(`\n${BOLD}Marveen Allapot${RESET}\n`)
+console.log(`\n${BOLD}Alfred Allapot${RESET}\n`)
 
 // Node.js
 const nodeVersion = process.version
@@ -80,7 +80,7 @@ if (existsSync(envPath)) {
 }
 
 // Adatbázis
-const dbPath = join(PROJECT_ROOT, 'store', 'claudeclaw.db')
+const dbPath = join(PROJECT_ROOT, 'store', 'alfred.db')
 if (existsSync(dbPath)) {
   ok('Adatbazis', 'letezik')
   try {
@@ -130,7 +130,7 @@ if (os === 'darwin') {
 }
 
 // PID
-const pidPath = join(PROJECT_ROOT, 'store', 'claudeclaw.pid')
+const pidPath = join(PROJECT_ROOT, 'store', 'alfred.pid')
 if (existsSync(pidPath)) {
   const pid = readFileSync(pidPath, 'utf-8').trim()
   try {

@@ -28,9 +28,9 @@ agent's name, and a note is any writer's free text. Agents with nothing on the l
 not woken; a stopped agent with lines is printed as NOT RUNNING. The main agent is
 skipped. Exit 1 if any message could not be sent.
 
-Environment: MARVEEN_API_BASE, else the port chain of scripts/agent-msg.sh
-(MARVEEN_WEB_PORT, WEB_PORT, WEB_PORT in .env, 3420); MARVEEN_TOKEN_FILE (default
-store/.dashboard-token); MAIN_AGENT_ID (else .env, else marveen).
+Environment: ALFRED_API_BASE, else the port chain of scripts/agent-msg.sh
+(ALFRED_WEB_PORT, WEB_PORT, WEB_PORT in .env, 3420); ALFRED_TOKEN_FILE (default
+store/.dashboard-token); MAIN_AGENT_ID (else .env, else alfred).
 """
 import datetime
 import json
@@ -68,21 +68,21 @@ def read_env_keys(keys):
 
 
 def api_base():
-    base = os.environ.get("MARVEEN_API_BASE")
+    base = os.environ.get("ALFRED_API_BASE")
     if base:
         return base.rstrip("/")
-    port = (os.environ.get("MARVEEN_WEB_PORT") or os.environ.get("WEB_PORT")
+    port = (os.environ.get("ALFRED_WEB_PORT") or os.environ.get("WEB_PORT")
             or read_env_keys(("WEB_PORT",)).get("WEB_PORT") or "3420")
     return "http://localhost:%s" % port
 
 
 def main_agent_id():
     return (os.environ.get("MAIN_AGENT_ID")
-            or read_env_keys(("MAIN_AGENT_ID",)).get("MAIN_AGENT_ID") or "marveen")
+            or read_env_keys(("MAIN_AGENT_ID",)).get("MAIN_AGENT_ID") or "alfred")
 
 
 def token():
-    path = os.environ.get("MARVEEN_TOKEN_FILE") or os.path.join(ROOT, "store", ".dashboard-token")
+    path = os.environ.get("ALFRED_TOKEN_FILE") or os.path.join(ROOT, "store", ".dashboard-token")
     try:
         with open(path) as f:
             return f.read().strip()

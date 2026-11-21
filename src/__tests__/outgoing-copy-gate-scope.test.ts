@@ -28,24 +28,24 @@ print(json.dumps(g.is_send_invocation(sys.argv[1])))
 
 describe('outgoing-copy gate: content cannot fake a send (the four measured FP classes)', () => {
   it('an inter-agent curl whose CONTENT mentions send.py and carries a "to" envelope passes', () => {
-    // Marveen's real morning case: a message TO an agent ABOUT the mail gate.
+    // Alfred's real morning case: a message TO an agent ABOUT the mail gate.
     expect(isSend(
       `curl -s -X POST http://localhost:3420/api/messages -H "Content-Type: application/json" ` +
-      `-d '{"from":"marveen","to":"samu","content":"a scripts/support-mail/send.py hookon fennakadt, --to hianyzott"}'`,
+      `-d '{"from":"alfred","to":"samu","content":"a scripts/support-mail/send.py hookon fennakadt, --to hianyzott"}'`,
     )).toBe(false)
   })
 
   it('a sqlite write whose text talks about a newsletter and a provider passes', () => {
     // Zara's real case: internal write, blocked on provider-name + "hirlevel".
     expect(isSend(
-      `sqlite3 store/claudeclaw.db "INSERT INTO kanban_comments (card_id, author, content) ` +
+      `sqlite3 store/alfred.db "INSERT INTO kanban_comments (card_id, author, content) ` +
       `VALUES ('X', 'Zara', 'a hirlevel az api.resend.com-on megy ki, sendmail nincs')"`,
     )).toBe(false)
   })
 
   it('READING the send script passes (cat, grep --to)', () => {
     // Iris's real case: a file read classified as a send.
-    expect(isSend('cat /Users/marvin/ClaudeClaw/scripts/support-mail/send.py')).toBe(false)
+    expect(isSend('cat /Users/marvin/Alfred/scripts/support-mail/send.py')).toBe(false)
     expect(isSend('grep -n -- "--to" scripts/support-mail/send.py')).toBe(false)
   })
 
@@ -58,14 +58,14 @@ describe('outgoing-copy gate: content cannot fake a send (the four measured FP c
   it('an inter-agent message quoting a full send command in its content passes', () => {
     expect(isSend(
       `curl -s -X POST http://localhost:3420/api/messages ` +
-      `-d '{"from":"samu","to":"marveen","content":"futtasd: python3 scripts/support-mail/send.py --to ugyfel@ceg.hu"}'`,
+      `-d '{"from":"samu","to":"alfred","content":"futtasd: python3 scripts/support-mail/send.py --to ugyfel@ceg.hu"}'`,
     )).toBe(false)
   })
 })
 
 describe('outgoing-copy gate: every real send shape still fires (no false negatives from the narrowing)', () => {
   it('send.py invoked with a recipient fires (python3 and direct path)', () => {
-    expect(isSend('python3 /Users/marvin/ClaudeClaw/scripts/support-mail/send.py --to a@b.hu --subject "X" --body "Y"')).toBe(true)
+    expect(isSend('python3 /Users/marvin/Alfred/scripts/support-mail/send.py --to a@b.hu --subject "X" --body "Y"')).toBe(true)
     expect(isSend('./scripts/support-mail/send.py --to=a@b.hu < /tmp/body.txt')).toBe(true)
   })
 
@@ -94,7 +94,7 @@ describe('outgoing-copy gate: every real send shape still fires (no false negati
   })
 })
 
-// Marveen's adversarial round (msg 14282): the first version stripped quoted
+// Alfred's adversarial round (msg 14282): the first version stripped quoted
 // strings BLINDLY, which opened two false negatives -- and the first is the
 // NORMAL way people write curl, so it needed no intent to slip through. The
 // quote is a good boundary against content, but it does not say whether the
@@ -124,7 +124,7 @@ describe('outgoing-copy gate: quoted tokens in OPERATION position still fire (ms
   })
 
   it('a multi-line quoted payload does not leak fake program positions', () => {
-    expect(isSend(`curl -s http://localhost:3420/api/messages -d '{"to":"marveen","content":"elso sor\nsendmail emlitve a masodik sorban"}'`)).toBe(false)
+    expect(isSend(`curl -s http://localhost:3420/api/messages -d '{"to":"alfred","content":"elso sor\nsendmail emlitve a masodik sorban"}'`)).toBe(false)
   })
 
   it('naive exec-shape in interpreter code fires; exec alone or mailer-name alone does not (msg 14298)', () => {

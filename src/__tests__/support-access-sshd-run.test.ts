@@ -109,9 +109,9 @@ function fake(
       return typeof out === 'string' ? { code: 0, stdout: out, stderr: '' } : out
     },
     user: {
-      name: over.isRoot === false ? 'marveen' : 'root',
+      name: over.isRoot === false ? 'alfred' : 'root',
       isRoot: over.isRoot !== false,
-      home: over.home ?? (over.isRoot === false ? '/home/marveen' : '/root'),
+      home: over.home ?? (over.isRoot === false ? '/home/alfred' : '/root'),
     },
     interfaceAddresses: () => {
       if (over.interfacesThrow === true) throw new Error('interface list exploded')
@@ -313,7 +313,7 @@ describe('probeSshd', () => {
     })
     for (const q of queries(calls)) {
       expect(q.args.slice(0, 3)).toEqual(['-T', '-h', '/scratch/probe-1/probe_host_key'])
-      expect(part(q.args, 'user')).toBe('marveen')
+      expect(part(q.args, 'user')).toBe('alfred')
     }
     // The discovery query, the same one with -f, then the rest of the plan (the first answer is reused).
     expect(queries(calls)[1].args.slice(3, 5)).toEqual(['-f', '/etc/ssh/sshd_config'])
@@ -433,7 +433,7 @@ describe('probeSshd', () => {
   })
 
   it('as another user: the proof does not skip a single check (a tunnel under Match User is still refused)', async () => {
-    const answer = (args: readonly string[]): string => sshdT({ ports: [22], tunnel: part(args, 'user') === 'marveen' && !args.includes('-f') && part(args, 'laddr') === '2001:db8::10' ? 'yes' : 'no' })
+    const answer = (args: readonly string[]): string => sshdT({ ports: [22], tunnel: part(args, 'user') === 'alfred' && !args.includes('-f') && part(args, 'laddr') === '2001:db8::10' ? 'yes' : 'no' })
     expect(await probeSshd({ fromCidrs: SOURCES }, fake({ isRoot: false, answer }).deps)).toMatchObject({ ok: false, problem: 'tunnel_permitted' })
   })
 
@@ -578,7 +578,7 @@ describe('probeSshd', () => {
   it('reads the keys file setting against the home of the user database', async () => {
     const own = { answer: () => sshdT({ keysFile: '/root/.ssh/authorized_keys' }) }
     expect(await probeSshd({ fromCidrs: SOURCES }, fake({ ...own }).deps)).toMatchObject({ ok: true, keysFiles: ['authorized_keys'] })
-    const other = { answer: () => sshdT({ keysFile: '/home/marveen/.ssh/authorized_keys' }) }
+    const other = { answer: () => sshdT({ keysFile: '/home/alfred/.ssh/authorized_keys' }) }
     expect(await probeSshd({ fromCidrs: SOURCES }, fake({ ...other }).deps)).toMatchObject({
       ok: false,
       problem: 'authorized_keys_path_unsupported',

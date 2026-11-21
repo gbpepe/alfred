@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { PROJECT_ROOT, MAIN_AGENT_ID, DEFAULT_AGENT_MODEL } from '../config.js'
 import { atomicWriteFileSync } from './atomic-write.js'
 import { readEnvFile } from '../env.js'
-import { parseExtraChannels, wantsGromzo } from './agent-extra-channels.js'
+import { parseExtraChannels } from './agent-extra-channels.js'
 import type { ChannelProviderType } from '../channel-provider.js'
 import { logger } from '../logger.js'
 import { safeJoin } from './sanitize.js'
@@ -436,8 +436,8 @@ export function writeAgentChannelProvider(name: string, provider: string): void 
 }
 
 // Per-agent CO-LISTEN channels (AGENTEXTRACH1006): providers an agent serves IN
-// ADDITION to its channelProvider, e.g. a Telegram agent that also answers on
-// Slack. The sub-agent counterpart of the main agent's CHANNEL_PLUGINS_EXTRA.
+// ADDITION to its channelProvider.
+// The sub-agent counterpart of the main agent's CHANNEL_PLUGINS_EXTRA.
 // Absent field -> [] -> the launch is byte-identical to before. Unknown values
 // and the primary provider itself are dropped (see parseExtraChannels).
 export function readAgentExtraChannels(name: string): ChannelProviderType[] {
@@ -449,25 +449,6 @@ export function readAgentExtraChannels(name: string): ChannelProviderType[] {
   } catch {
     return []
   }
-}
-
-// GROMZOAGENTS1028: whether the agent also listens on Gromzo (agent-config `gromzo: true`).
-export function readAgentGromzo(name: string): boolean {
-  const configPath = join(agentDir(name), 'agent-config.json')
-  try {
-    return wantsGromzo((JSON.parse(readFileOr(configPath, '{}')) as Record<string, unknown>).gromzo)
-  } catch {
-    return false
-  }
-}
-
-// GROMZOAGENTPICK1101: the dashboard's switch writes the same flag readAgentGromzo reads.
-export function writeAgentGromzo(name: string, on: boolean): void {
-  const configPath = join(agentDir(name), 'agent-config.json')
-  const config = readJsonObjectForWrite(configPath)
-  if (on) config.gromzo = true
-  else delete config.gromzo
-  atomicWriteFileSync(configPath, JSON.stringify(config, null, 2))
 }
 
 export function writeAgentExtraChannels(name: string, extras: readonly string[]): void {
@@ -609,7 +590,7 @@ export function senderRoleGatePolicyArg(config: unknown): string | null {
 }
 
 /**
- * The gate's --policy for an agent, from the store only (GROMZOGATECONF1030 (c), Samu 59516): the agent's own
+ * The gate's --policy for an agent, from the store only (role-gate store hardening, Samu 59516): the agent's own
  * agent-config.json is no source any more (the agent can write it). An unreadable store fails closed: the gate is
  * wired with a policy the hook reads as malformed (every tool denied in a non-owner's turn).
  */
@@ -780,9 +761,9 @@ const warnedRosterAliases = new Set<string>()
 export function listAllAgentNames(): string[] {
   if (!existsSync(AGENTS_BASE_DIR)) return []
   // The main agent has no agents/<id> directory: it runs in the channels
-  // session. A directory of that name (old drafts left in agents/marveen) is
+  // session. A directory of that name (old drafts left in agents/alfred) is
   // not a sub-agent, and listing it gave the team graph a second, stopped
-  // 'marveen' node that replaced the main one (MAINGHOST1024).
+  // 'alfred' node that replaced the main one (MAINGHOST1024).
   let baseReal: string
   try { baseReal = realpathSync(AGENTS_BASE_DIR) } catch { baseReal = resolve(AGENTS_BASE_DIR) }
   return readdirSync(AGENTS_BASE_DIR).filter((f) => {

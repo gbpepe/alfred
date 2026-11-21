@@ -1,7 +1,7 @@
 #!/bin/sh
 # SUPPORTMENTOUT1114: the kit's sh launcher, end to end, against a real kit.
 #
-# It WRITES a kit under the running user's home (~/.marveen/support), because
+# It WRITES a kit under the running user's home (~/.alfred/support), because
 # the launcher finds the home in the user database and no variable moves it.
 # So it refuses to run anywhere but a throwaway machine: a CI runner (CI=true)
 # or a container (/.dockerenv). Locally:
@@ -12,7 +12,7 @@
 set -u
 if [ "${CI:-}" != "true" ] && [ ! -f /.dockerenv ]; then
   # The runner's skip contract (src/__tests__/setup/suite-outcome.ts): exit 77 with a reason line.
-  echo "SKIP (control unmet): this test writes ~/.marveen/support; it runs in CI or in a container (see the header)"
+  echo "SKIP (control unmet): this test writes ~/.alfred/support; it runs in CI or in a container (see the header)"
   exit 77
 fi
 ROOT=$(cd "$(dirname "$0")/../.." && pwd -P)
@@ -25,7 +25,7 @@ contains() { case "$2" in *"$3"*) pass "$1" ;; *) fail "$1 (no [$3] in output)" 
 
 ME=$(id -un)
 HOMEDIR=$(getent passwd "$ME" | cut -d: -f6)
-SUPPORT="$HOMEDIR/.marveen/support"
+SUPPORT="$HOMEDIR/.alfred/support"
 KIT="$SUPPORT/kit"
 L="$KIT/support-access"
 rm -rf "$SUPPORT"

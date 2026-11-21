@@ -8,10 +8,10 @@ import { describe, expect, it, vi } from 'vitest'
 const OTHER_SLACK_PID = process.pid
 const PS = [
   '  PID  PPID COMMAND',
-  '  100     1 claude --channels plugin:telegram@claude-plugins-official plugin:slack-channel@marveen-marketplace',
+  '  100     1 claude --channels plugin:telegram@claude-plugins-official plugin:slack-channel@alfred-marketplace',
   '  101   100 bun run --cwd /home/u/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 --shell=bun --silent start',
-  '  200     1 claude --channels plugin:slack-channel@marveen-marketplace',
-  `${String(OTHER_SLACK_PID).padStart(5)}   200 bun run --cwd /home/u/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0 --silent start`,
+  '  200     1 claude --channels plugin:slack-channel@alfred-marketplace',
+  `${String(OTHER_SLACK_PID).padStart(5)}   200 bun run --cwd /home/u/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0 --silent start`,
 ].join('\n')
 
 vi.mock('node:child_process', async (orig) => {

@@ -10,7 +10,7 @@ agent behaviour (which can fail or restart).
 
 **Mechanism (zero agent discretion).**
 
-1. **Durable rolling transcript** — `store/claudeclaw.db` → table `conversation_log`
+1. **Durable rolling transcript** — `store/alfred.db` → table `conversation_log`
    (`id, agent_id, chat_id, direction('in'|'out'), message_id, text, ts, created_at`,
    `UNIQUE(agent_id, chat_id, direction, message_id)`). Every channel turn — inbound
    user messages AND outbound replies — is appended here. Created by the `db.ts`
@@ -56,7 +56,7 @@ agent behaviour (which can fail or restart).
    prompt answers via the telegram reply tool only when a block is printed.
 
 **Multi-agent scope.** The hooks are **generic across all channel agents**
-(marveen / dia / erno-ba): `agent_id` is derived from the session's cwd
+(alfred / dia / erno-ba): `agent_id` is derived from the session's cwd
 (`<install>/agents/<id>` → `<id>`; `<install>` → `MAIN_AGENT_ID`). Every read and
 write is scoped by `agent_id`, so a session only ever replays its **own** chat and
 agents never cross-contaminate.
@@ -71,12 +71,12 @@ agents never cross-contaminate.
   shorthand to the owner chat in `ledger-outbound.py`.
 - `LEDGER_DB_PATH` — test-only DB path override.
 
-## settings.json block to add (`/home/marveen/marveen/.claude/settings.json`)
+## settings.json block to add (`/home/alfred/alfred/.claude/settings.json`)
 
 Wire the hooks in the **project** settings (NOT user scope). The main channels
-session runs with cwd `/home/marveen/marveen`, so it picks these up. The hooks
+session runs with cwd `/home/alfred/alfred`, so it picks these up. The hooks
 self-scope by cwd, so they are safe even if inherited. Merge this `hooks` object
-(`$CLAUDE_PROJECT_DIR` → `/home/marveen/marveen` for the main session).
+(`$CLAUDE_PROJECT_DIR` → `/home/alfred/alfred` for the main session).
 
 ```json
 {
@@ -144,7 +144,7 @@ however healthy the totals look.
   The replay is a no-op when the transcript is empty.
 
 **No systemd needed** — these are event-driven Claude Code hooks, not timers. The
-hooks read `store/claudeclaw.db` via `python3` stdlib `sqlite3` (no node startup,
+hooks read `store/alfred.db` via `python3` stdlib `sqlite3` (no node startup,
 no `jq`). Take effect on the next session start after the settings change.
 
 ## Tests

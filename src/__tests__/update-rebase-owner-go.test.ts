@@ -178,11 +178,11 @@ describe('update.sh auto-rebase needs the owner GO (AUTOUPDATEDIVERG1110)', () =
     expect(behind(inst)).toBe('0')
     expect(g(inst, 'log', '-1', '--format=%s')).toBe('local-fix')
     // the committer is the explicit one, not read from any config file (Dani, second delta review)
-    expect(g(inst, 'log', '-1', '--format=%cn <%ce>')).toBe('Marveen update <update@marveen.invalid>')
+    expect(g(inst, 'log', '-1', '--format=%cn <%ce>')).toBe('Alfred update <update@alfred.invalid>')
     const row = getApproval(id)!
     expect(row.consumed_by).toBe('update.sh auto-rebase')
     expect(row.consumed_ref).toBe(`main ${head}..${target}`)
-    expect(r.log).toContain(`update_rebase: rc=0 consumed id=${id} head=${head} target=${target} rebased=${g(inst, 'rev-parse', 'HEAD')} backup=refs/marveen/pre-update/`)
+    expect(r.log).toContain(`update_rebase: rc=0 consumed id=${id} head=${head} target=${target} rebased=${g(inst, 'rev-parse', 'HEAD')} backup=refs/alfred/pre-update/`)
   })
 
   it('the same GO a second time (after resetting the install back) is refused: already_consumed', async () => {
@@ -366,7 +366,7 @@ function install(opts: { local: [string, string]; upstream: [string, string]; en
   writeFileSync(join(inst, '.git', 'info', 'exclude'), 'store/\nscripts/\n.env\n')
   return { inst, head: g(inst, 'rev-parse', 'HEAD'), target: g(seed, 'rev-parse', 'HEAD') }
 }
-const backups = (inst: string) => g(inst, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/marveen/pre-update/').split('\n').filter(Boolean)
+const backups = (inst: string) => g(inst, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/alfred/pre-update/').split('\n').filter(Boolean)
 
 describe('2nd PR: the F4 order, the recovery ref, the git-config lock, the conflict report', () => {
   it('a local package.json change without the lock is refused BEFORE the consume: the GO stays unspent, no recovery ref', async () => {
@@ -382,7 +382,7 @@ describe('2nd PR: the F4 order, the recovery ref, the git-config lock, the confl
 
   it('a recovery ref that cannot be written stops the run BEFORE the consume: the GO stays unspent', async () => {
     const { inst, head, target } = install({ local: ['local.txt', 'l\n'], upstream: ['other.txt', 'u\n'], envPort: port })
-    g(inst, 'update-ref', 'refs/marveen/pre-update', head) // a ref at the namespace itself: no ref can be created under it
+    g(inst, 'update-ref', 'refs/alfred/pre-update', head) // a ref at the namespace itself: no ref can be created under it
     const id = await ownerGo(hashFor('main', head, target))
     const r = await runBlock(inst, { UPDATE_REBASE_APPROVAL: id })
     expect(r.code).toBe(5)
@@ -399,7 +399,7 @@ describe('2nd PR: the F4 order, the recovery ref, the git-config lock, the confl
     const refs = backups(inst)
     expect(refs.length).toBe(1)
     const [ref, sha] = refs[0].split(' ')
-    expect(ref).toMatch(/^refs\/marveen\/pre-update\/\d{8}T\d{6}Z$/)
+    expect(ref).toMatch(/^refs\/alfred\/pre-update\/\d{8}T\d{6}Z$/)
     expect(sha).toBe(head)
     expect(r.log).toContain(`backup=${ref}`)
     g(inst, 'reset', '-q', '--hard', head) // what update.sh's rollback does (OLD_VERSION_FULL)
@@ -408,10 +408,10 @@ describe('2nd PR: the F4 order, the recovery ref, the git-config lock, the confl
 
   it('retention: the newest 5 recovery refs stay, older ones are deleted one by one', async () => {
     const { inst, head, target } = install({ local: ['local.txt', 'l\n'], upstream: ['other.txt', 'u\n'], envPort: port })
-    for (let d = 1; d <= 7; d++) g(inst, 'update-ref', `refs/marveen/pre-update/2026010${d}T000000Z`, head)
+    for (let d = 1; d <= 7; d++) g(inst, 'update-ref', `refs/alfred/pre-update/2026010${d}T000000Z`, head)
     const id = await ownerGo(hashFor('main', head, target))
     expect((await runBlock(inst, { UPDATE_REBASE_APPROVAL: id })).code).toBe(0)
-    const names = backups(inst).map((l) => l.split(' ')[0].replace('refs/marveen/pre-update/', ''))
+    const names = backups(inst).map((l) => l.split(' ')[0].replace('refs/alfred/pre-update/', ''))
     expect(names.length).toBe(5)
     expect(names).toContain('20260107T000000Z')
     expect(names).toContain('20260104T000000Z')
@@ -436,7 +436,7 @@ describe('2nd PR: the F4 order, the recovery ref, the git-config lock, the confl
     for (const lang of ['hu', 'en']) {
       const { inst, head, target } = install({ local: ['shared.txt', 'line 1 LOCAL\nline 2\n'], upstream: ['shared.txt', 'line 1 UPSTREAM\nline 2\n'], envPort: port })
       const id = await ownerGo(hashFor('main', head, target))
-      const r = await runBlock(inst, { UPDATE_REBASE_APPROVAL: id, MARVEEN_LANG: lang })
+      const r = await runBlock(inst, { UPDATE_REBASE_APPROVAL: id, ALFRED_LANG: lang })
       expect(r.code, lang).toBe(5)
       expect(g(inst, 'rev-parse', 'HEAD')).toBe(head)
       expect(existsSync(join(inst, '.git', 'rebase-merge')) || existsSync(join(inst, '.git', 'rebase-apply'))).toBe(false)
@@ -456,13 +456,13 @@ describe('2nd PR: the F4 order, the recovery ref, the git-config lock, the confl
     const fn = (name: string) => { const m = new RegExp(`^${name}\\(\\) \\{\\n[\\s\\S]*?^\\}\\n`, 'm').exec(UPDATE_SH); expect(m, name).not.toBeNull(); return m![0] }
     const script = `_json_escape() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || printf '"%s"' "$1"; }
 ${fn('rebase_json')}
-UPDATE_REBASE_APPROVAL=id-1 REBASE_HEAD=h REBASE_TARGET=t REBASE_NEW=n REBASE_BACKUP=refs/marveen/pre-update/x REBASE_OUTCOME=conflict REBASE_WHY='a "q" <x>'
+UPDATE_REBASE_APPROVAL=id-1 REBASE_HEAD=h REBASE_TARGET=t REBASE_NEW=n REBASE_BACKUP=refs/alfred/pre-update/x REBASE_OUTCOME=conflict REBASE_WHY='a "q" <x>'
 RESULT_STATUS=failed; rebase_json; echo
 RESULT_STATUS=rolled-back; rebase_json; echo
 REBASE_OUTCOME=''; printf '[%s]' "$(rebase_json)"`
     const out = execFileSync('/bin/bash', ['-c', script], { encoding: 'utf-8' }).split('\n')
     const a = JSON.parse(out[0]); const b = JSON.parse(out[1])
-    expect(a).toEqual({ approval: 'id-1', head: 'h', target: 't', rebased_head: 'n', backup_ref: 'refs/marveen/pre-update/x', outcome: 'conflict', reason: 'a "q" <x>', rollback: false })
+    expect(a).toEqual({ approval: 'id-1', head: 'h', target: 't', rebased_head: 'n', backup_ref: 'refs/alfred/pre-update/x', outcome: 'conflict', reason: 'a "q" <x>', rollback: false })
     expect(b.rollback).toBe(true)
     expect(out[2]).toBe('[]')
   })

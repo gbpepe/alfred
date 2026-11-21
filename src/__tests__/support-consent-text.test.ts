@@ -10,14 +10,14 @@ import {
 } from '../support-consent-text.js'
 import { SUPPORT_CONSENT_VERSION } from '../support-standby-enable.js'
 
-// The marveen.io server accepts these sha256 values for '2:hu' and '2:en' (supabase/functions/_shared/
+// The alfred.io server accepts these sha256 values for '2:hu' and '2:en' (supabase/functions/_shared/
 // support-consent.ts, Tomi 79448): the machine's version 2 is the same text in each language, so the values must stay
 // equal (Mira 79456, Samu 79453). If either side moves, this fails.
 const SERVER_SHA256_V2 = {
-  hu: '1edde713149d360f3aef27d51e3e379557ece268f8716380acbfee7621e1152b',
-  en: '77decc75121d9a0aaf22a0a63983488574dd122320def7d363a2ecce04a80703',
+  hu: '94de94ebcbfd691f99b2f26b848ab374363844e425944b782b0abcde37eb4c81',
+  en: 'cb3c5a9c8f15ede473c609887a235abda73cd10db01ca50d206a576e0a95938c',
 } as const
-const BYTES_V2 = { hu: 1477, en: 1344 } as const
+const BYTES_V2 = { hu: 1473, en: 1339 } as const
 const HEADINGS_V2 = {
   hu: ['Mit tehetünk a gépeden', 'Mit látunk', 'Nyom és ellenőrzés'],
   en: ['What we can do on your machine', 'What we see', 'Record and control'],
@@ -47,7 +47,7 @@ describe('the consent text by version (Geri 78479)', () => {
   })
 })
 
-describe('consent version 2: the approved text in both languages, the same as marveen.io shows (Mira 79450 / 79456, Tomi 79448)', () => {
+describe('consent version 2: the approved text in both languages, the same as alfred.io shows (Mira 79450 / 79456, Tomi 79448)', () => {
   it('this release enables version 2, in hu and en', () => {
     expect(SUPPORT_CONSENT_VERSION).toBe(2)
     expect(Object.keys(SUPPORT_CONSENT_TEXTS[2] ?? {}).sort()).toEqual([...SUPPORT_CONSENT_LANGS].sort())

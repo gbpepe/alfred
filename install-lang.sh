@@ -1,10 +1,10 @@
 #!/bin/bash
 # Install script i18n helper — sourced by install-macos.sh and install-linux.sh
-# MARVEEN_LANG=hu (default) or MARVEEN_LANG=en
+# ALFRED_LANG=hu (default) or ALFRED_LANG=en
 
 _t() {
   local key="$1"
-  local lang="${MARVEEN_LANG:-hu}"
+  local lang="${ALFRED_LANG:-hu}"
   case "${lang}:${key}" in
     # ── Sections ──────────────────────────────────────────────────────
     en:section_1) echo "[1/7] Checking prerequisites..." ;;
@@ -48,8 +48,8 @@ _t() {
     # already released Bridge's vendored installer fetches this file from main and still asks with them.
     en:prompt_channel_select4) echo "  Choose (1/2/3/4) [1]: " ;;
     hu:prompt_channel_select4) echo "  Válassz (1/2/3/4) [1]: " ;;
-    en:channel_option_gromzo) echo "Gromzo (the Marveen app on your phone; no bot, no Bun)" ;;
-    hu:channel_option_gromzo) echo "Gromzo (a Marveen alkalmazás a telefonodon; bot és Bun nélkül)" ;;
+    en:channel_option_gromzo) echo "Gromzo (the Alfred app on your phone; no bot, no Bun)" ;;
+    hu:channel_option_gromzo) echo "Gromzo (a Alfred alkalmazás a telefonodon; bot és Bun nélkül)" ;;
     # EE2392D3: the 5-option prompt is a NEW key, like the 4-option one above (released Bridges keep asking with theirs).
     en:prompt_channel_select5) echo "  Choose (1/2/3/4/5) [1]: " ;;
     hu:prompt_channel_select5) echo "  Válassz (1/2/3/4/5) [1]: " ;;
@@ -73,8 +73,8 @@ _t() {
     hu:prompt_discord_channel_id) echo "  Discord channel ID: " ;;
     en:prompt_discord_user_id) echo "  Your Discord user ID (operator): " ;;
     hu:prompt_discord_user_id) echo "  A Te Discord user ID-d (operator): " ;;
-    en:prompt_bot_name) echo "  What should your bot be named? [Marveen]: " ;;
-    hu:prompt_bot_name) echo "  Mi legyen a botod neve? [Marveen]: " ;;
+    en:prompt_bot_name) echo "  What should your bot be named? [Alfred]: " ;;
+    hu:prompt_bot_name) echo "  Mi legyen a botod neve? [Alfred]: " ;;
     en:prompt_pair_code) echo "  Pairing code (or leave empty, do it later): " ;;
     hu:prompt_pair_code) echo "  Párosító kód (vagy hagyd üresen, ha később csinálod): " ;;
     en:prompt_migrate) echo "  Would you like to run the migration now? (y/n) [n]: " ;;
@@ -90,10 +90,10 @@ _t() {
     # ── Key messages ─────────────────────────────────────────────────
     en:warn_pair_missing) echo "  WARNING: Telegram pairing was not completed!" ;;
     hu:warn_pair_missing) echo "  FIGYELEM: Telegram párosítás nem történt meg!" ;;
-    en:success_installed) echo "  ✓ Marveen successfully installed!" ;;
-    hu:success_installed) echo "  ✓ Marveen sikeresen telepítve!" ;;
-    en:success_installed_services_down) echo "  ! Marveen is installed, but its services are NOT running yet (see below)." ;;
-    hu:success_installed_services_down) echo "  ! Marveen telepítve, de a szolgáltatások MÉG NEM FUTNAK (lásd lent)." ;;
+    en:success_installed) echo "  ✓ Alfred successfully installed!" ;;
+    hu:success_installed) echo "  ✓ Alfred sikeresen telepítve!" ;;
+    en:success_installed_services_down) echo "  ! Alfred is installed, but its services are NOT running yet (see below)." ;;
+    hu:success_installed_services_down) echo "  ! Alfred telepítve, de a szolgáltatások MÉG NEM FUTNAK (lásd lent)." ;;
     # ── Tagline / wizard ─────────────────────────────────────────────
     en:tagline) echo "Your AI team, running while you sleep." ;;
     hu:tagline) echo "AI csapatod, ami fut amíg te alszol." ;;
@@ -345,11 +345,11 @@ _t() {
     hu:linux.adminprereq_gate_ok) echo "a managed-settings csatorna-kapu be van kapcsolva" ;;
     en:linux.adminprereq_gate_manual) echo "the managed-settings channel gate could not be set; its script prints the manual step (sudo bash scripts/ensure-managed-channels-enabled.sh)" ;;
     hu:linux.adminprereq_gate_manual) echo "a managed-settings csatorna-kapu nem állt be; a szkriptje kiírja a kézi lépést (sudo bash scripts/ensure-managed-channels-enabled.sh)" ;;
-    en:linux.adminprereq_next_lead) echo "Next, as the user Marveen will run as (no sudo needed):" ;;
-    hu:linux.adminprereq_next_lead) echo "Következő lépés, annak a felhasználónak a nevében, akivel a Marveen futni fog (sudo nem kell):" ;;
+    en:linux.adminprereq_next_lead) echo "Next, as the user Alfred will run as (no sudo needed):" ;;
+    hu:linux.adminprereq_next_lead) echo "Következő lépés, annak a felhasználónak a nevében, akivel a Alfred futni fog (sudo nem kell):" ;;
     # LINUXINSTPREREQ1104: Node.js >= 20, checked after the package step too.
-    en:linux.node_too_old) echo "Node.js is too old for Marveen (v20 or newer is needed). The installed major version:" ;;
-    hu:linux.node_too_old) echo "A Node.js túl régi a Marveenhez (legalább v20 kell). A telepített fő verzió:" ;;
+    en:linux.node_too_old) echo "Node.js is too old for Alfred (v20 or newer is needed). The installed major version:" ;;
+    hu:linux.node_too_old) echo "A Node.js túl régi a Alfredhez (legalább v20 kell). A telepített fő verzió:" ;;
     en:linux.node_distro_too_old) echo "The nodesource repository could not be added, and this distribution's own nodejs package is too old (v20 or newer is needed), so it was not installed. Its major version:" ;;
     hu:linux.node_distro_too_old) echo "A nodesource tárolót nem sikerült hozzáadni, a disztribúció saját nodejs csomagja pedig túl régi (legalább v20 kell), ezért nem telepítettem. A fő verziója:" ;;
     en:linux.node_fix_lead) echo "Fix: run this (it needs internet access to deb.nodesource.com), then start the installer again:" ;;
@@ -409,8 +409,8 @@ _t() {
     en:stop.stopped) echo "stopped" ;;
     hu:stop.stopped) echo "leallitva" ;;
     # ── scripts/migrate.sh ────────────────────────────────────────────
-    en:migrate.title) echo "Marveen - System Migration" ;;
-    hu:migrate.title) echo "Marveen - Rendszer költöztetés" ;;
+    en:migrate.title) echo "Alfred - System Migration" ;;
+    hu:migrate.title) echo "Alfred - Rendszer költöztetés" ;;
     en:migrate.subtitle) echo "Migrating previous AI assistant" ;;
     hu:migrate.subtitle) echo "Korábbi AI asszisztens átmigrálása" ;;
     en:migrate.section_1) echo "[1/4] Source selection" ;;
@@ -425,8 +425,8 @@ _t() {
     hu:migrate.prompt_choose) echo "  Válassz (1/2/3): " ;;
     en:migrate.prompt_path) echo "  Workspace / directory path: " ;;
     hu:migrate.prompt_path) echo "  Workspace / mappa útvonala: " ;;
-    en:migrate.prompt_agent) echo "  Import to which agent? [marveen]: " ;;
-    hu:migrate.prompt_agent) echo "  Melyik ágenshez importáljak? [marveen]: " ;;
+    en:migrate.prompt_agent) echo "  Import to which agent? [alfred]: " ;;
+    hu:migrate.prompt_agent) echo "  Melyik ágenshez importáljak? [alfred]: " ;;
     en:migrate.section_2) echo "[2/4] Scanning source..." ;;
     hu:migrate.section_2) echo "[2/4] Rendszer feltérképezése..." ;;
     en:migrate.found_memory) echo "(cold memory)" ;;
@@ -512,8 +512,8 @@ _t() {
     hu:ni.secret_env) echo "titkot nem veszünk át környezeti változó értékéből; tedd fájlba, és az útját a megfelelő _FILE változóban add meg (docs/install-non-interactive.md):" ;;
     en:ni.bad_file) echo "the file is missing, unreadable or empty:" ;;
     hu:ni.bad_file) echo "a fájl nem létezik, nem olvasható vagy üres:" ;;
-    en:ni.no_checkout) echo "run it from a Marveen checkout (git clone, then bash install-linux.sh --non-interactive); no package.json in:" ;;
-    hu:ni.no_checkout) echo "egy Marveen-checkoutból futtasd (git clone, utána bash install-linux.sh --non-interactive); nincs package.json itt:" ;;
+    en:ni.no_checkout) echo "run it from a Alfred checkout (git clone, then bash install-linux.sh --non-interactive); no package.json in:" ;;
+    hu:ni.no_checkout) echo "egy Alfred-checkoutból futtasd (git clone, utána bash install-linux.sh --non-interactive); nincs package.json itt:" ;;
     en:ni.no_auth) echo "no Claude auth: place the token (claude setup-token, sk-ant-oat01-...) in this file, mode 600:" ;;
     hu:ni.no_auth) echo "nincs Claude-hitelesítés: a tokent (claude setup-token, sk-ant-oat01-...) tedd ebbe a fájlba, 600-as joggal:" ;;
     en:ni.pairing_skipped) echo "Non-interactive install: channel pairing was skipped. Pair the channel on the dashboard:" ;;

@@ -30,7 +30,7 @@ describe('normalizeCssColor (shared vectors)', () => {
 
 // the old regex trim was quadratic on a long internal
 // whitespace run (rgb(1 <64k spaces> 2 3) took ~5.8 s, synchronously, on every
-// /api/marveen read of such a setting). Now: a length budget before any
+// /api/alfred read of such a setting). Now: a length budget before any
 // parsing, and trim / split as single character scans.
 describe('normalizeCssColor: bounded work', () => {
   it(`a value longer than ${MAX_CSS_COLOR_LENGTH} characters is not a colour; the boundary itself is`, () => {
@@ -278,8 +278,8 @@ describe('reportNonColourSetting (WIP / aging / separator colours served to the 
     reportNonColourSetting('KANBAN_WIP_OK_COLOR', 'var(--a, red)', warn)
     expect(warn).toHaveBeenCalledTimes(1)
   })
-  it('marveen.ts serves all eight colour settings through it', () => {
-    const src = readFileSync(join(root, 'web', 'routes', 'marveen.ts'), 'utf8')
+  it('alfred.ts serves all eight colour settings through it', () => {
+    const src = readFileSync(join(root, 'web', 'routes', 'alfred.ts'), 'utf8')
     for (const key of ['KANBAN_AGING_WARN_COLOR', 'KANBAN_AGING_CAUTION_COLOR', 'KANBAN_AGING_CRITICAL_COLOR', 'KANBAN_WIP_OK_COLOR',
       'KANBAN_WIP_WARN_COLOR', 'KANBAN_WIP_FULL_COLOR', 'KANBAN_WIP_OVER_COLOR', 'KANBAN_SWIMLANE_SEPARATOR_COLOR']) {
       expect(src).toContain(`colourSetting('${key}')`)
@@ -287,7 +287,7 @@ describe('reportNonColourSetting (WIP / aging / separator colours served to the 
     }
   })
   it('colourSetting itself reports through reportNonColourSetting and returns the setting', () => {
-    const src = readFileSync(join(root, 'web', 'routes', 'marveen.ts'), 'utf8')
+    const src = readFileSync(join(root, 'web', 'routes', 'alfred.ts'), 'utf8')
     const body = src.match(/function colourSetting\(key: string\): unknown \{\n([\s\S]*?)\n\}/)
     expect(body).not.toBeNull()
     expect(body![1].trim()).toBe('return reportNonColourSetting(key, getEffectiveSettingValue(key), (ctx, msg) => logger.warn(ctx, msg))')

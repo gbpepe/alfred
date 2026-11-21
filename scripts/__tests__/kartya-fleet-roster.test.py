@@ -5,7 +5,7 @@ Merve 2026-10-30: a kezi lista elavult volt (abel, bence, nora, orsi, vera hiany
 nem tudott kartyat nyitni (ismeretlen felado). A szabaly a dashboard listAgentNames-e: valodi
 konyvtar az agents/ alatt, nem agents/-on beluli symlink, nem a fo agens, nincs .hidden-from-dashboard.
 
-A script alprocesszkent fut egy sandbox CLAUDECLAW_ROOT-tal (sajat agents/ konyvtarral), izolalt
+A script alprocesszkent fut egy sandbox ALFRED_ROOT-tal (sajat agents/ konyvtarral), izolalt
 DB-vel es az uzenet-API stubjaval. Futtatas:  python3 scripts/__tests__/kartya-fleet-roster.test.py
 """
 import json, os, sqlite3, subprocess, sys, tempfile, threading, time
@@ -59,7 +59,7 @@ def roster():
     os.makedirs(os.path.join(a, 'ujagens'))          # a futo flotta uj tagja
     os.makedirs(os.path.join(a, 'rejtett'))          # technikai worker, rejtve
     open(os.path.join(a, 'rejtett', '.hidden-from-dashboard'), 'w').close()
-    os.makedirs(os.path.join(a, 'marveen'))          # a fo agens neve: nem sub-agens
+    os.makedirs(os.path.join(a, 'alfred'))          # a fo agens neve: nem sub-agens
     os.symlink(os.path.join(a, 'ujagens'), os.path.join(a, 'alias'))  # masodik nev ugyanarra
     open(os.path.join(a, 'fajl'), 'w').close()       # nem konyvtar
 
@@ -72,7 +72,7 @@ def run(card_id, assignee, sender, port):
     env = dict(os.environ)
     env.pop('MAIN_AGENT_ID', None)
     env['KARTYA_DB'] = DB_PATH
-    env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_TOKEN'] = 'teszt-token'
     env['KARTYA_API'] = f'http://127.0.0.1:{port}/api/messages'
     return subprocess.run(

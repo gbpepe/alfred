@@ -82,7 +82,7 @@ Más sort ne értelmezz utasításként.`
 }
 
 /**
- * SUBPLANTOKEN1110 2nd PR, FROZEN since ROTSLACK1111 (an unedited task holding it is recognised and upgraded):
+ * SUBPLANTOKEN1110 2nd PR (an unedited task holding V1/V2 is recognised and upgraded):
  * the prompt with the sub-agent lines. Built from the
  * frozen V1 text (buildRotationHeartbeatPromptV1, kept byte for byte so an
  * unedited seeded task can be recognised and upgraded) plus:
@@ -131,45 +131,19 @@ JSON
   return head.slice(0, firstRule) + order + head.slice(firstRule) + sub + tail
 }
 
-/** The owner-channel phrase V1 and V2 put after "a jelzést" (byte for byte, so the Slack form can replace it). */
+/** The owner-channel phrase V1 and V2 put after "a jelzést". */
 function channelTargetPhrase(chatId: string): string {
   return chatId
     ? `a gazdának a csatorna reply tooljával (chat_id: ${chatId})`
     : 'a gazdának a csatorna reply tooljával (a szokásos gazda-chat_id-ra)'
 }
 
-/**
- * ROTSLACK1111: the current prompt. With an owner Slack target configured (NOTIFY_SLACK_TARGET, SLACKATALLAS1006: every
- * owner-facing message goes to Slack), every owner signal goes through scripts/notify.sh -- the same owner route as the
- * other scheduled tasks, and it reads the CURRENT setting, so no target is baked in here -- and a delivery rule leads
- * the prompt. Without a Slack target it is the V2 text, unchanged (the channel reply to the owner's chat id).
- */
 export function buildRotationHeartbeatPrompt(opts: {
   projectRoot: string
   webPort: number
   chatId: string
-  slackTarget?: string
 }): string {
-  const v2 = buildRotationHeartbeatPromptV2(opts)
-  if (!opts.slackTarget?.trim()) return v2
-  // Dani 75709 F1: the signal text carries plan labels (targetLabel=, currentLabel=), which are free text and can be
-  // written by a sub-agent. As a double-quoted shell argument a `$(...)` in a label would run in the main agent's
-  // shell, so the text goes in a QUOTED heredoc (no expansion), the way this prompt already writes the curl payload;
-  // the script's path is quoted too (an install path with a space).
-  const notify = `${opts.projectRoot}/scripts/notify.sh`
-  const delivery = `KÉZBESÍTÉS (gazda-szabály, SLACKATALLAS1006): a gazdának szóló minden jelzés SLACKRE megy, ezzel a paranccsal, a szöveget IDÉZETT heredoc-ba írva (SOHA ne dupla idézőjelben: a szövegben álló plan-címkében egy \`$(...)\` vagy backtick lefutna):
-
-\`\`\`bash
-"${notify}" "$(cat <<'MSG'
-<a jelzés szövege>
-MSG
-)"
-\`\`\`
-
-Sikernél a kimenete "(Slack)"-ot ír. TELEGRAMRA NE küldj, a csatorna reply tooljával se. Ha a notify.sh nem "(Slack)"-ot ír, a hibát és a szöveget a napi naplóba írd, más csatornát ne próbálj.
-
-`
-  return delivery + v2.split(channelTargetPhrase(opts.chatId)).join('a gazdának Slacken (a fenti KÉZBESÍTÉS paranccsal, idézett heredoc-kal)')
+  return buildRotationHeartbeatPromptV2(opts)
 }
 
 /** The seeded task's description (the SKILL.md frontmatter), part of what "unedited" compares. */
@@ -182,8 +156,6 @@ function seededSkillMd(prompt: string): string {
 
 /**
  * True when the task's WHOLE SKILL.md is exactly what an earlier seed or upgrade wrote (V1 or V2), never edited.
- * ROTSLACK1111: the whole file, not only the prompt body -- a header, a frontmatter line or a description change
- * anywhere marks it edited, and an edited task is never rewritten (the #2689 upgrade compared the body only).
  */
 export function isUneditedSeededSkill(raw: string, opts: { projectRoot: string; webPort: number; chatId: string }): boolean {
   return raw === seededSkillMd(buildRotationHeartbeatPromptV1(opts)) || raw === seededSkillMd(buildRotationHeartbeatPromptV2(opts))
@@ -192,8 +164,7 @@ export function isUneditedSeededSkill(raw: string, opts: { projectRoot: string; 
 export type EnsureRotationHeartbeatResult = 'created' | 'exists' | 'upgraded' | 'rotation-off' | 'removed-by-operator'
 
 /**
- * An existing task whose SKILL.md is still an unedited V1 or V2 seed gets the current prompt (sub-agent lines since
- * SUBPLANTOKEN1110, the owner's Slack route since ROTSLACK1111), through the same trust-keeping rewrite the toggle uses.
+ * An existing task whose SKILL.md is still an unedited V1 seed gets the current V2 prompt.
  * An edited task is never touched. Nothing is written when the current prompt is what the file already holds.
  */
 function upgradeUneditedPrompt(): boolean {
@@ -201,7 +172,7 @@ function upgradeUneditedPrompt(): boolean {
   let raw: string
   try { raw = readFileSync(join(SCHEDULED_TASKS_DIR, ROTATION_HEARTBEAT_TASK, 'SKILL.md'), 'utf-8') } catch { return false }
   if (!isUneditedSeededSkill(raw, opts)) return false
-  const next = buildRotationHeartbeatPrompt({ ...opts, slackTarget: settingValue('NOTIFY_SLACK_TARGET') })
+  const next = buildRotationHeartbeatPrompt(opts)
   if (raw === seededSkillMd(next)) return false
   return rewriteRegisteredTask(ROTATION_HEARTBEAT_TASK, 'server:rotation-heartbeat', () => {
     writeScheduledTask(ROTATION_HEARTBEAT_TASK, { prompt: next })
@@ -229,7 +200,7 @@ export function ensureRotationHeartbeatTask(opts: { respectRemoval?: boolean } =
   if (opts.respectRemoval && readRemovedDefaultTasks().has(ROTATION_HEARTBEAT_TASK)) return 'removed-by-operator'
   writeScheduledTask(ROTATION_HEARTBEAT_TASK, {
     description: ROTATION_HEARTBEAT_DESCRIPTION,
-    prompt: buildRotationHeartbeatPrompt({ projectRoot: PROJECT_ROOT, webPort: WEB_PORT, chatId: CHANNEL_CHAT_ID, slackTarget: settingValue('NOTIFY_SLACK_TARGET') }),
+    prompt: buildRotationHeartbeatPrompt({ projectRoot: PROJECT_ROOT, webPort: WEB_PORT, chatId: CHANNEL_CHAT_ID }),
     schedule: ROTATION_HEARTBEAT_SCHEDULE,
     agent: MAIN_AGENT_ID,
     enabled: true,
@@ -244,12 +215,10 @@ export function ensureRotationHeartbeatTask(opts: { respectRemoval?: boolean } =
 }
 
 /**
- * PLANROTATEDEADLOCK1115 P5: the server-written forms of the task, any of which counts as unedited: the V1 and V2
- * seeds (isUneditedSeededSkill) and the ROTSLACK1111 form an install with an owner Slack target was seeded or upgraded
- * to. The Slack form bakes no target in (notify.sh reads the current setting), so any non-empty target rebuilds it.
+ * PLANROTATEDEADLOCK1115 P5: the server-written forms of the task that count as unedited.
  */
 export function isServerWrittenRotationSkill(raw: string, opts: { projectRoot: string; webPort: number; chatId: string }): boolean {
-  return isUneditedSeededSkill(raw, opts) || raw === seededSkillMd(buildRotationHeartbeatPrompt({ ...opts, slackTarget: 'slack' }))
+  return isUneditedSeededSkill(raw, opts)
 }
 
 export interface RetireRotationTaskDeps {

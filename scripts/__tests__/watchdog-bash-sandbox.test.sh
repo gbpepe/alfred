@@ -259,7 +259,7 @@ cp -R "$REPO_DIR/dist" "$FX2/dist"
 cp "$REPO_DIR/scripts/backup.sh" "$FX2/scripts/backup.sh"
 cp "$REPO_DIR/scripts/lib/archive-list-has.sh" "$FX2/scripts/lib/"
 echo '[]' > "$FX2/store/agent-package-hidden.json"
-if command -v sqlite3 >/dev/null 2>&1; then sqlite3 "$FX2/store/claudeclaw.db" 'CREATE TABLE t(x);'; else printf 'db' > "$FX2/store/claudeclaw.db"; fi
+if command -v sqlite3 >/dev/null 2>&1; then sqlite3 "$FX2/store/alfred.db" 'CREATE TABLE t(x);'; else printf 'db' > "$FX2/store/alfred.db"; fi
 printf 'x' > "$FH2/.claude/skills/demo/SKILL.md"; printf 'x' > "$FH2/.claude/scheduled-tasks/demo/SKILL.md"
 START_OUT="$(env -u BASH_SANDBOX_AGENTS HOME="$FH2" node --input-type=module -e '
   const m = await import(process.argv[1])
@@ -274,7 +274,7 @@ NODE_MODE="$(stat -c %a "$FX2/store/.dashboard-node" 2>/dev/null || stat -f %Lp 
   && pass "dashboard start: no store/bash-sandbox/ without the list (as before the node record)" \
   || fail "dashboard start: no store/bash-sandbox/ without the list (as before the node record)" "$START_OUT / $(ls -la "$FX2/store")"
 BK_OUT="$(cd "$FX2" && HOME="$FH2" BACKUP_DIR="$BK" bash scripts/backup.sh 2>&1)"; BK_RC=$?
-BK_ARCHIVE="$(ls -1 "$BK"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
+BK_ARCHIVE="$(ls -1 "$BK"/alfred-*.tar.gz 2>/dev/null | head -1)"
 [ "$BK_RC" -eq 0 ] && [ -n "$BK_ARCHIVE" ] && tar -tzf "$BK_ARCHIVE" | grep -qx "repo/store/.dashboard-node" \
   && pass "backup: exits 0 and the archive carries store/.dashboard-node" \
   || fail "backup: exits 0 and the archive carries store/.dashboard-node" "rc=$BK_RC / $(printf '%s' "$BK_OUT" | tail -5)"

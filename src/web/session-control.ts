@@ -47,7 +47,7 @@ export const SWITCH_TURN_QUIET_MS = 20_000
 // child process, no hard-guard phase): unlike /clear it throws nothing
 // away, so pending outbound work or an open question do not block it.
 // The gate's reasons are for logs ("turn-active (15s ago, need 20s)"); the
-// owner reads Telegram (owner feedback 2026-09-24: technical text carries no
+// owner reads the chat channel (owner feedback 2026-09-24: technical text carries no
 // information there).
 export function humanBusy(reason: string | undefined): string {
   const r = reason ?? ''

@@ -17,12 +17,12 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-skilltrap-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-skilltrap-test-'))
 
 vi.mock('../config.js', () => ({
   // agent-scaffold imports settings-store (MCPOROKLES923), which derives a path from
   // STORE_DIR at import time. A never-created dir: nothing here reads the store.
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',

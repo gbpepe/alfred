@@ -38,8 +38,8 @@ command only:
 
 ```
 CLAUDE_CODE_PLUGIN_DIRS=<install>/plugins/agent-state-observer
-MARVEEN_AGENT_ID=<name>
-MARVEEN_STATE_OBSERVER_DIR=<install>/store/mod-state
+ALFRED_AGENT_ID=<name>
+ALFRED_STATE_OBSERVER_DIR=<install>/store/mod-state
 ```
 
 The mod takes its name and output folder from these two variables and writes

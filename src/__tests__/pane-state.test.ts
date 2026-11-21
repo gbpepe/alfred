@@ -1562,7 +1562,7 @@ describe('parkedChannelInput (stuck channel-block gate + truncation guard)', () 
 })
 
 // ---------------------------------------------------------------------------
-// Contract tests: esc-to-interrupt live-region scoping (port from kovesdan/marveen)
+// Contract tests: esc-to-interrupt live-region scoping (port from kovesdan/alfred)
 //
 // Root cause: a watchdog report or log output that quotes "esc to interrupt"
 // anywhere in the scrollback permanently classified an otherwise-idle session
@@ -1670,7 +1670,7 @@ describe('parkedInputText', () => {
   // A long inter-agent message wrapped across two input-box lines by the TUI.
   const WRAPPED_PARKED = [
     '', SEP2,
-    '❯ [Uzenet @system-tol]: Uj csapattag erkezett: balazsmarveenja. Udv',
+    '❯ [Uzenet @system-tol]: Uj csapattag erkezett: balazsalfredja. Udv',
     '  neki ha legkozelebb beszeltek!',
     SEP2,
     '  ⏵⏵ bypass permissions on (shift+tab to cycle)',
@@ -1692,7 +1692,7 @@ describe('parkedInputText', () => {
 
   it('collapses terminal-wrapped lines into a single submittable line', () => {
     expect(parkedInputText(WRAPPED_PARKED)).toBe(
-      '[Uzenet @system-tol]: Uj csapattag erkezett: balazsmarveenja. Udv neki ha legkozelebb beszeltek!',
+      '[Uzenet @system-tol]: Uj csapattag erkezett: balazsalfredja. Udv neki ha legkozelebb beszeltek!',
     )
   })
 })
@@ -1868,7 +1868,7 @@ describe('detectsPermissionDialog', () => {
   // giveaway. An identical edit to a path outside the project but outside
   // ~/.claude/ produced NO dialog, so "outside the project" is not the trigger.
   const PERMISSION_DIALOG = [
-    ' ../../home/marveen/.claude/bond-teszt.txt',
+    ' ../../home/alfred/.claude/bond-teszt.txt',
     '╌'.repeat(100),
     ' 1 -proba',
     ' 1 +modositva',
@@ -1890,7 +1890,7 @@ describe('detectsPermissionDialog', () => {
     '',
     ' Do you want to proceed?',
     ' ❯ 1. Yes',
-    "   2. Yes, and don't ask again for rm commands in /home/marveen/marveen",
+    "   2. Yes, and don't ask again for rm commands in /home/alfred/alfred",
     '   3. No, and tell Claude what to do differently (esc)',
     '',
     ' Esc to cancel',
@@ -2148,7 +2148,7 @@ const WELCOME_STUCK = [
   '',
   ' ▐▛███▜▌   Claude Code v2.1.170',
   '▝▜█████▛▘  qwen3.6:27b-192k with high effort · API Usage Billing',
-  '  ▘▘ ▝▝    ~/ClaudeClaw/agents/qwen',
+  '  ▘▘ ▝▝    ~/Alfred/agents/qwen',
   '',
   '',
   SEP,
@@ -2458,7 +2458,7 @@ describe('parkedPasteSignature (stuck [Pasted text #N] recovery)', () => {
 // in that window reads 'idle' and injects a prompt into a working pane.
 //
 // The minute-form fixture below is a verbatim capture from a live fleet pane
-// (marveen-channels, 2026-09-06 17:31), not a retyped lookalike.
+// (alfred-channels, 2026-09-06 17:31), not a retyped lookalike.
 // ---------------------------------------------------------------------------
 describe('detectPaneState: minute- and hour-shaped turn durations', () => {
   const liveTurn = (statusLine: string) =>
@@ -2627,13 +2627,13 @@ describe('truncated idle footer (tmux width clipping)', () => {
     '',
     ' Do you want to proceed?',
     ' ❯ 1. Yes',
-    "   2. Yes, and don't ask again for rm commands in /home/marveen/marveen",
+    "   2. Yes, and don't ask again for rm commands in /home/alfred/alfred",
     '   3. No, and tell Claude what to do differently (esc)',
     '',
     ' Esc to cancel',
   ].join('\n')
   const EDIT_PERMISSION_DIALOG = [
-    ' ../../home/marveen/.claude/bond-teszt.txt',
+    ' ../../home/alfred/.claude/bond-teszt.txt',
     ' Do you want to make this edit to bond-teszt.txt?',
     ' ❯ 1. Yes',
     '   2. Yes, and allow Claude to edit its own settings for this session',

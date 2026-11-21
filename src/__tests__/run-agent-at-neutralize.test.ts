@@ -40,17 +40,17 @@ vi.mock('../web/fleet-freeze.js', () => ({ isFleetFrozen: () => false }))
 const RAW = `${AT}first then ${AT}second\n${AT}third\t${AT}fourth;${AT}fifth mail user${AT}example.org (${AT}paren)`
 const MAPPED = `${BS}${AT}first then ${BS}${AT}second\n${BS}${AT}third\t${BS}${AT}fourth;${BS}${AT}fifth mail user${AT}example.org (${AT}paren)`
 
-const savedBackend = process.env.MARVEEN_AGENT_BACKEND
+const savedBackend = process.env.ALFRED_AGENT_BACKEND
 
 beforeEach(() => {
   sdkPrompts.length = 0
   workerPrompts.length = 0
   workerAnswer = { text: 'worker-ok' }
-  delete process.env.MARVEEN_AGENT_BACKEND
+  delete process.env.ALFRED_AGENT_BACKEND
 })
 afterEach(() => {
-  if (savedBackend === undefined) delete process.env.MARVEEN_AGENT_BACKEND
-  else process.env.MARVEEN_AGENT_BACKEND = savedBackend
+  if (savedBackend === undefined) delete process.env.ALFRED_AGENT_BACKEND
+  else process.env.ALFRED_AGENT_BACKEND = savedBackend
 })
 
 describe('runAgent maps the at-sign once, before either path', () => {
@@ -66,8 +66,8 @@ describe('runAgent maps the at-sign once, before either path', () => {
     expect(sdkPrompts).toEqual([])
   })
 
-  it('SDK path (MARVEEN_AGENT_BACKEND=sdk): query receives the mapped prompt, line breaks kept', async () => {
-    process.env.MARVEEN_AGENT_BACKEND = 'sdk'
+  it('SDK path (ALFRED_AGENT_BACKEND=sdk): query receives the mapped prompt, line breaks kept', async () => {
+    process.env.ALFRED_AGENT_BACKEND = 'sdk'
     const { runAgent } = await import('../agent.js')
     expect((await runAgent(RAW)).text).toBe('sdk-ok')
     expect(workerPrompts).toEqual([])

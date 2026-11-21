@@ -2,7 +2,7 @@
 //
 // ISOLATED ON PURPOSE: nothing else in the verifier depends on how a
 // frontmatter is read. This module mirrors `frontmatterFindings` of the
-// reference scanner (marveen-io PR 371, head 4d9b9e99, package-scan.ts) line
+// reference scanner (alfred-io PR 371, head 4d9b9e99, package-scan.ts) line
 // for line, so every install-stage case of that head's shared text vector
 // passes. Its only tests are the vector-driven ones: a rule the vector does
 // not pin is not a rule here.

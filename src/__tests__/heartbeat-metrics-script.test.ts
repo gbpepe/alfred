@@ -98,7 +98,7 @@ rows = [(now_ms - 60_000, 'fired'), (now_ms - 120_000, 'fired'),
         (now_ms - 7_200_000, 'fired'), (int(time.time()) - 60, 'fired')]
 con.executemany('INSERT INTO task_runs VALUES (?, ?)', rows)
 con.commit()
-`, join(storeDir, 'claudeclaw.db')])
+`, join(storeDir, 'alfred.db')])
   if (mk.status !== 0) throw new Error('fixture db failed: ' + mk.stderr)
 
   server = createServer((req, res) => {

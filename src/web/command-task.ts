@@ -1,21 +1,21 @@
 import { spawn } from "node:child_process"
 import { join } from "node:path"
 import { readFileSync } from "node:fs"
-import { PROJECT_ROOT, STORE_DIR, TELEGRAM_BOT_TOKEN } from "../config.js"
+import { PROJECT_ROOT, STORE_DIR } from "../config.js"
 import { shQuote } from "./ssh-tmux.js"
 import { ownerAlertChatOverride, resolveOwnerChatId } from "../owner-chat.js"
 import { atomicWriteFileSync } from "./atomic-write.js"
 import { logger } from "../logger.js"
-import { sendTelegramMessage } from "./telegram.js"
+import { notifyChannel } from "../notify.js"
 import { appendTaskRun, markTaskRunCompleted } from "../db.js"
 import { trackDetachedGroup } from "./detached-groups.js"
 import { disableOnceTask, type ScheduledTask } from "./scheduled-tasks-io.js"
 import { rewriteRegisteredTask } from "./schedule-registry-rewrite.js"
 
 // command-type scheduled tasks run a raw shell command directly (no LLM
-// agent, no tmux session) and alert on Telegram after N consecutive
+// agent, no tmux session) and alert the owner after N consecutive
 // failures. This keeps infra heartbeats inside the one system that gets
-// backed up (the Marveen store) instead of a separate crontab.
+// backed up (the Alfred store) instead of a separate crontab.
 
 const HEALTH_PATH = join(STORE_DIR, "command-task-health.json")
 
@@ -221,16 +221,16 @@ function finish(
   }
 
   if (action === "none") return
-  const ownerChat = ownerAlertChatOverride('telegram') ?? resolveOwnerChatId()
-  if (!TELEGRAM_BOT_TOKEN || !ownerChat) {
-    logger.warn({ task: task.name }, "command task alert suppressed: missing token, or no owner chat (ALLOWED_CHAT_ID unset/placeholder and no paired channel)")
+  const ownerChat = ownerAlertChatOverride('discord') ?? resolveOwnerChatId()
+  if (!ownerChat) {
+    logger.warn({ task: task.name }, "command task alert suppressed: no owner chat (CHANNEL_CHAT_ID unset/placeholder and no paired channel)")
     return
   }
   const label = task.description || task.name
   const text = action === "alert"
     ? `\u{1F534} Hiba: ${label} nem v\u00e1laszol (${next.fails}. egym\u00e1s ut\u00e1ni hiba). R\u00e9szlet: ${detail}`
     : `\u{1F7E2} Helyre\u00e1llt: ${label} ism\u00e9t OK.`
-  sendTelegramMessage(TELEGRAM_BOT_TOKEN, ownerChat, text)
+  notifyChannel(text)
     .then(() => logger.info({ task: task.name, action }, "command task alert sent"))
     .catch((err) => logger.warn({ err, task: task.name }, "command task alert send failed"))
 }

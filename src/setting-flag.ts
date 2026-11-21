@@ -1,9 +1,8 @@
 // One reading of an on/off setting for every runtime reader. src/config.ts
-// reads a boolean flag (HEARTBEAT_AGENT_ENABLED, SUBAGENT_TELEGRAM_WAKE_ENABLED,
-// ...) as on for any of these values, and scripts/patch-telegram-plugin.py
-// (TRUTHY) does the same; the Settings page itself writes "1". A reader that
-// accepts only "1" sees a hand-written TELEGRAM_TOPICS_ENABLED=true as off
-// while the plugin patch is on: a half-switched install.
+// reads a boolean flag (e.g. HEARTBEAT_AGENT_ENABLED, WEB_PUBLIC_ENABLED)
+// as on for any of these values; the Settings page itself writes "1".
+// Accepting multiple truthy spellings avoids half-switched installs when a
+// setting is written manually (e.g. FLAG=true vs FLAG=1).
 
 import { getEffectiveSettingValue } from './settings-store.js'
 

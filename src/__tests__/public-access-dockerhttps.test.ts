@@ -123,7 +123,7 @@ describe('the public listener with no cookie reaches only the closed list', () =
     const out = { status: 0 }
     const res = { writeHead(s: number) { out.status = s; return res }, setHeader() {}, end() {} }
     const url = new URL(`http://127.0.0.1:3421${path}`)
-    const auth = await gateRequest(mkReq(headers, publicListener), res as unknown as http.ServerResponse, url, path, method, { dashboardToken: TOKEN, mainAgentId: 'marveen', publicListener })
+    const auth = await gateRequest(mkReq(headers, publicListener), res as unknown as http.ServerResponse, url, path, method, { dashboardToken: TOKEN, mainAgentId: 'alfred', publicListener })
     return { auth, status: out.status }
   }
 
@@ -164,7 +164,7 @@ describe('the setup session reaches only the closed list among gated paths', () 
     const out = { status: 0, body: '' }
     const res = { writeHead(s: number) { out.status = s; return res }, setHeader() {}, end(d?: string) { if (d) out.body += d } }
     const url = new URL(`http://127.0.0.1:3421${path}`)
-    const auth = await gateRequest(mkReq({ cookie: `${SETUP_COOKIE_NAME}=${value}` }, true), res as unknown as http.ServerResponse, url, path, method, { dashboardToken: TOKEN, mainAgentId: 'marveen', publicListener: true })
+    const auth = await gateRequest(mkReq({ cookie: `${SETUP_COOKIE_NAME}=${value}` }, true), res as unknown as http.ServerResponse, url, path, method, { dashboardToken: TOKEN, mainAgentId: 'alfred', publicListener: true })
     return { auth, status: out.status, body: out.body }
   }
 
@@ -224,16 +224,16 @@ describe('the setup session reaches only the closed list among gated paths', () 
 describe('WEB_PUBLIC_PORT comes from the install .env', () => {
   it('config.ts reads it from the .env file, and web.ts hands that value to publicListenerPort', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'webpublicport-'))
-    const saved = { dir: process.env.CLAUDECLAW_ENV_DIR, port: process.env.WEB_PUBLIC_PORT }
+    const saved = { dir: process.env.ALFRED_ENV_DIR, port: process.env.WEB_PUBLIC_PORT }
     try {
       writeFileSync(join(dir, '.env'), 'WEB_PUBLIC_PORT=3421\n')
-      process.env.CLAUDECLAW_ENV_DIR = dir
+      process.env.ALFRED_ENV_DIR = dir
       delete process.env.WEB_PUBLIC_PORT
       vi.resetModules()
       const cfg = await import('../config.js')
       expect(cfg.WEB_PUBLIC_PORT).toBe('3421')
     } finally {
-      if (saved.dir === undefined) delete process.env.CLAUDECLAW_ENV_DIR; else process.env.CLAUDECLAW_ENV_DIR = saved.dir
+      if (saved.dir === undefined) delete process.env.ALFRED_ENV_DIR; else process.env.ALFRED_ENV_DIR = saved.dir
       if (saved.port !== undefined) process.env.WEB_PUBLIC_PORT = saved.port
       vi.resetModules()
       rmSync(dir, { recursive: true, force: true })

@@ -234,7 +234,7 @@ check("proza egy ertelmezo-heredoc karakterlancaban",
 
 print()
 print("NEGATIV kontroll -- artalmatlan hetkoznapi parancsok:")
-for cmd in ("cd /home/istvan/marveen && ls -la",
+for cmd in ("cd /home/istvan/alfred && ls -la",
             "git commit -m 'fix'",
             "rmdir /tmp/ures",
             "curl -s http://localhost:3420/api/kanban",
@@ -587,7 +587,7 @@ check("egyetlen hook-fajl is", blocks_cwd(
       RM + " -f " + GROOT + "/scripts/hooks/destructive-gate.py", GROOT))
 check("a mentesek konyvtara", blocks_cwd(RM + " -rf " + GROOT + "/backups", GROOT))
 check("mentes-fajl a konyvtaron belul", blocks_cwd(
-      RM + " -f " + GROOT + "/backups/claudeclaw-x.tar.gz", GROOT))
+      RM + " -f " + GROOT + "/backups/alfred-x.tar.gz", GROOT))
 
 print()
 print("ONVEDELEM -- a mellettuk allo utak NEM lettek vedettek (a masik irany):")
@@ -627,8 +627,8 @@ with tempfile.TemporaryDirectory() as td:
     check("jelolo nelkul: eldobhato masolat", not gate._live_install(td))
     os.makedirs(os.path.join(td, "store"))
     check("ures store/ meg nem eles", not gate._live_install(td))
-    open(os.path.join(td, "store", "claudeclaw.db"), "w").close()
-    check("claudeclaw.db -> ELES", gate._live_install(td))
+    open(os.path.join(td, "store", "alfred.db"), "w").close()
+    check("alfred.db -> ELES", gate._live_install(td))
 with tempfile.TemporaryDirectory() as td:
     os.makedirs(os.path.join(td, "store"))
     open(os.path.join(td, "store", ".dashboard-token"), "w").close()
@@ -694,14 +694,14 @@ with tempfile.TemporaryDirectory() as td:
         gate.PROJECT_ROOT = td
         check("valodi jelolo nelkul a szintetikus gyokeren atmegy",
               not blocks_cwd(RM + " -rf " + td + "/build", td))
-        open(os.path.join(td, "store", "claudeclaw.db"), "w").close()
-        check("VALODI claudeclaw.db kiteve -> ugyanaz a parancs BLOKK",
+        open(os.path.join(td, "store", "alfred.db"), "w").close()
+        check("VALODI alfred.db kiteve -> ugyanaz a parancs BLOKK",
               blocks_cwd(RM + " -rf " + td + "/build", td))
     finally:
         gate.PROJECT_ROOT = _orig_root
 
 
-# ---- marveen #2482 (ISSUE2482GATE1103): a burkolok kapcsoloi es operandusai -------------------
+# ---- alfred #2482 (ISSUE2482GATE1103): a burkolok kapcsoloi es operandusai -------------------
 # Merve 2026-11-04-en a develop 0ae732db-n: az alabbi 18 burkolt torles a regi atlepesen
 # ATMENT (a kapu egy kapcsolo-erteket, a flock lock-fajljat vagy a chroot gyokeret vette
 # "parancsnak", vagy a burkolo parancssztringjet prozakent kiuritette). Mindnek blokkolnia kell.
@@ -853,7 +853,7 @@ print("POZITIV kontroll -- a core.hooksPath TENYLEGES erteke (a push ele):")
 # konyvtarban keresne a hookokat (Szotasz, PR #1957 review: nem minden hooksPath a kapuk
 # kikapcsolasa). A fixture-repok ezert a dispatcher jelolo sorat kapjak a .git/hooks/pre-push-ba:
 # ugyanazt a sort, amit a harom telepito ir (install-secret-gate-hook.sh PUSH_MARK).
-_MARK = "marveen-pre-push-dispatcher"
+_MARK = "alfred-pre-push-dispatcher"
 _td = tempfile.mkdtemp(prefix="dgate-hp-", dir=os.path.dirname(ROOT))
 try:
     def _git(args, cwd):

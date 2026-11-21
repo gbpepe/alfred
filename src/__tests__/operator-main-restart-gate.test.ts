@@ -28,7 +28,7 @@ vi.mock('../web/manual-restart-gate.js', async (orig) => ({
 }))
 vi.mock('../web/channel-monitor.js', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
-  hardRestartMarveenChannels: () => h.hard(),
+  hardRestartAlfredChannels: () => h.hard(),
 }))
 
 import { initDatabase } from '../db.js'
@@ -120,7 +120,7 @@ describe('operator page: a refused main restart shows the readable message', () 
       (_id: string, text: string, cls?: string) => { shown.push([text, cls]) },
       async () => reply, () => {}, () => 0,
     ) as (n: string, p: string, l: string) => Promise<void>
-    await fn('marveen', '/api/operator/agents/marveen/restart', 'Újraindítás')
+    await fn('alfred', '/api/operator/agents/alfred/restart', 'Újraindítás')
     return shown.at(-1)
   }
 
@@ -133,9 +133,9 @@ describe('operator page: a refused main restart shows the readable message', () 
       .toEqual([OPERATOR_MAIN_RESTART_BLOCKED, 'err'])
   })
   it('another failure keeps the old line', async () => {
-    expect(await run({ ok: false, status: 500, data: { error: 'boom' } })).toEqual(['Újraindítás sikertelen (marveen): boom', 'err'])
+    expect(await run({ ok: false, status: 500, data: { error: 'boom' } })).toEqual(['Újraindítás sikertelen (alfred): boom', 'err'])
   })
   it('success keeps the old line', async () => {
-    expect(await run({ ok: true, status: 200, data: { ok: true } })).toEqual(['Újraindítás: marveen kész.', 'ok'])
+    expect(await run({ ok: true, status: 200, data: { ok: true } })).toEqual(['Újraindítás: alfred kész.', 'ok'])
   })
 })

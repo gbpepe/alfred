@@ -19,7 +19,7 @@ What it does per run (the full contract is the script's docstring):
 - Every text passes the outgoing-copy gate (`scripts/hooks/sender_check.py`).
 - **Owner chat:** `scripts/lib/owner_chat.py` (the `.env` `ALLOWED_CHAT_ID`, else
   the single DM entry of the main channel's `access.json`), with
-  `MARVEEN_ALERT_CHAT_ID` as an explicit override. The bot token is read from the
+  `ALFRED_ALERT_CHAT_ID` as an explicit override. The bot token is read from the
   main channel dir's `.env`.
 
 Exit codes: `0` fine, `3` confirmed outage, `2` not measurable, `4` a send failed
@@ -27,7 +27,7 @@ or the send path (token, chat, helper, copy gate) is unusable, `1` internal or
 config error, or a state stamp after a successful send that could not be written
 (the notice went out; the next run may repeat it). That `1` overrides `4`, `3`
 and `2`. The unit treats `2` and `3` as success, so `1`, `4` and a timeout
-start `OnFailure=marveen-notify@%n.service` (`scripts/unit-fail-notify.sh`).
+start `OnFailure=alfred-notify@%n.service` (`scripts/unit-fail-notify.sh`).
 
 ## Configuration
 
@@ -45,7 +45,7 @@ fit is refused with exit 1.
 ## Activation
 
 The units are systemd **user** units. They carry three placeholders: replace
-`/path/to/marveen` with your install dir, `/home/USER` with your home, and
+`/path/to/alfred` with your install dir, `/home/USER` with your home, and
 `TZ=Europe/Budapest` with your own zone, before installing.
 
 ```bash

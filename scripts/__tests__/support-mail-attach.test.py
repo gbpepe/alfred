@@ -61,7 +61,7 @@ def make_project(td, level=2):
         json.dump({"version": 1, "categories": [{"key": "email_send", "level": level}]}, fh)
     with open(os.path.join(store, "outgoing-copy-gate-rules.json"), "w", encoding="utf-8") as fh:
         json.dump({"no_name_rule": True}, fh)
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute("""CREATE TABLE approvals (
         id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, category TEXT NOT NULL,
         action_description TEXT NOT NULL, action_payload TEXT,
@@ -84,7 +84,7 @@ def put(root, rel, data):
 
 
 def approve(root, anchor, aid="ap-1"):
-    con = sqlite3.connect(os.path.join(root, "store", "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(root, "store", "alfred.db"))
     con.execute("INSERT INTO approvals (id, agent_id, category, action_description, status, resolved_at,"
                 f" content_hash) VALUES (?, 'agent-a', 'email_send', 'x', 'approved', {NOW_S}, ?)", (aid, anchor))
     con.commit()
@@ -92,7 +92,7 @@ def approve(root, anchor, aid="ap-1"):
 
 
 def consumed(root, aid="ap-1"):
-    con = sqlite3.connect(os.path.join(root, "store", "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(root, "store", "alfred.db"))
     row = con.execute("SELECT consumed_at FROM approvals WHERE id=?", (aid,)).fetchone()
     con.close()
     return bool(row and row[0] is not None)

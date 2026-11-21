@@ -6,8 +6,8 @@
 // the agent's agent-config.json turns it on, and the launcher then exports
 // three variables into that agent's launch command:
 //   CLAUDE_CODE_PLUGIN_DIRS     loads the mod folder for this session only
-//   MARVEEN_AGENT_ID            the name the mod writes under
-//   MARVEEN_STATE_OBSERVER_DIR  the folder it writes into
+//   ALFRED_AGENT_ID            the name the mod writes under
+//   ALFRED_STATE_OBSERVER_DIR  the folder it writes into
 // Nothing reads the state file yet: alerting on it is a later, measured step.
 //
 // Version gate: Claude Code loads mods from 2.1.287 on. Below that, or when the
@@ -58,5 +58,5 @@ export function stateObserverLaunchEnv(
 ): string {
   if (!load) return ''
   const q = quote
-  return `export CLAUDE_CODE_PLUGIN_DIRS=${q(pluginDir)} MARVEEN_AGENT_ID=${q(agentName)} MARVEEN_STATE_OBSERVER_DIR=${q(stateDir)} && `
+  return `export CLAUDE_CODE_PLUGIN_DIRS=${q(pluginDir)} ALFRED_AGENT_ID=${q(agentName)} ALFRED_STATE_OBSERVER_DIR=${q(stateDir)} && `
 }

@@ -71,7 +71,7 @@ let issued = 0
 async function loadModule(opts: { saMode?: number; withOAuth?: boolean } = {}) {
   home = mkdtempSync(join(tmpdir(), 'gsa-flow-'))
   vi.stubEnv('HOME', home)
-  const saDir = join(home, '.config', 'marveen')
+  const saDir = join(home, '.config', 'alfred')
   mkdirSync(saDir, { recursive: true })
   const saPath = join(saDir, 'google-service-account.json')
   writeFileSync(saPath, JSON.stringify({ client_email: 'bot@x.iam.gserviceaccount.com', private_key: privateKey }))

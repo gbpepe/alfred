@@ -88,7 +88,7 @@ def run(card_id, author, port, with_msg=True, extra=()):
             f.write('Ertesites: irtam a ' + card_id + ' kartyara.')
         args += ['--msg-file', mf]
     env = dict(os.environ)
-    env['KARTYA_DB'] = DB_PATH; env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['KARTYA_DB'] = DB_PATH; env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_TOKEN'] = 'teszt-token'; env['KARTYA_API'] = f'http://127.0.0.1:{port}/api/messages'
     return subprocess.run(args + list(extra), capture_output=True, text=True, env=env, timeout=30)
 
@@ -102,7 +102,7 @@ def komment_kulso(card_id, author, port):
     with open(mf, 'w', encoding='utf-8') as f:
         f.write('Ertesites kulso szerzotol.')
     env = dict(os.environ)
-    env['KARTYA_DB'] = DB_PATH; env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['KARTYA_DB'] = DB_PATH; env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_TOKEN'] = 'teszt-token'; env['KARTYA_API'] = f'http://127.0.0.1:{port}/api/messages'
     return subprocess.run([sys.executable, SCRIPT, '--id', card_id, '--comment-file', cf,
                            '--author', author, '--msg-file', mf],
@@ -188,7 +188,7 @@ def main():
     with open(mf, 'w', encoding='utf-8') as f:
         f.write('   \n  ')
     env = dict(os.environ)
-    env['KARTYA_DB'] = DB_PATH; env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['KARTYA_DB'] = DB_PATH; env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_TOKEN'] = 'teszt-token'; env['KARTYA_API'] = f'http://127.0.0.1:{port}/api/messages'
     p = subprocess.run([sys.executable, SCRIPT, '--id', 'MASE922', '--comment-file', cf,
                         '--author', 'Geri', '--msg-file', mf],
@@ -226,7 +226,7 @@ def main():
     db = sqlite3.connect(DB_PATH)
     frm = db.execute('SELECT from_agent FROM agent_messages ORDER BY id LIMIT 1').fetchone()
     db.close()
-    check('6 a felado az --author kisbetusitve (boni), nem marveen',
+    check('6 a felado az --author kisbetusitve (boni), nem alfred',
           p.returncode == 0 and frm and frm[0] == 'boni', f'from={frm} | {p.stdout}{p.stderr}')
 
     # 7. A MEGTAGADAS SZOVEGE TANIT: a --msg-file all ELOL, a kulon szkript utana,

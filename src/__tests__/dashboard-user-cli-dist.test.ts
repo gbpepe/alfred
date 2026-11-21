@@ -31,7 +31,7 @@ describe('the break-glass CLI runs without a TypeScript runner', () => {
     const doc = read('docs/docker.md')
     const cli = read('src/dashboard-user-cli.ts')
     for (const cmd of ['totp:off', 'reset-password']) {
-      expect(doc).toContain(`docker compose exec marveen node dist/dashboard-user-cli.js ${cmd} <username>`)
+      expect(doc).toContain(`docker compose exec alfred node dist/dashboard-user-cli.js ${cmd} <username>`)
       expect(cli).toContain(`case '${cmd}':`)
     }
   })

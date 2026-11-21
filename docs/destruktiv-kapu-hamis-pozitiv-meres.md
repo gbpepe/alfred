@@ -194,7 +194,7 @@ Hamis pozitív ráta: **28,4% -> 4,9%** (31/109 -> 4/82), **valódi blokk elvesz
 
 **Az 1 újonnan blokkolt nem regresszió, hanem egy addig észrevétlen lyuk zárása.** A régi
 `.env`-minta szóközt követelt a fájlnév előtt, ezért a teljes útvonalas alakot ELENGEDTE:
-`grep -i "..." /home/istvan/marveen/.env` -- ez valódi konfigurációs-fájl-olvasás, a régi
+`grep -i "..." /home/istvan/alfred/.env` -- ez valódi konfigurációs-fájl-olvasás, a régi
 kapu átengedte, az új megfogja.
 
 **A 4 megmaradt hamis pozitív, és miért hagytam bent.** Mind a négy ugyanaz az alak:

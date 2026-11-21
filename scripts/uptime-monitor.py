@@ -73,7 +73,7 @@ CHANNEL: a direct Telegram Bot API sendMessage through scripts/lib/send-telegram
 of the alert resolver, scripts/lib/owner_chat.py resolve_owner_chat(<install>/.env): ALLOWED_CHAT_ID from the install's
 .env first, else the main channel dir's access.json, and only when it holds exactly one DM entry (several DM entries,
 group or channel ids, or the "0" placeholder give no chat, and the resolver's reason is named in the exit-4 preflight
-line, T22c, T22d). MARVEEN_ALERT_CHAT_ID is an explicit override in front of the resolver (T22e). The bot token is read
+line, T22c, T22d). ALFRED_ALERT_CHAT_ID is an explicit override in front of the resolver (T22e). The bot token is read
 at run time from TELEGRAM_BOT_TOKEN in that same main channel dir's .env (the resolver's own state-dir rule; an inherited
 TELEGRAM_STATE_DIR is not honoured, T22), or from the file TELEGRAM_ENV names, an explicit override as in
 scripts/unit-fail-notify.sh. It is never copied: it travels in the helper process's environment, not in this script's
@@ -97,7 +97,7 @@ TimeoutStartSec, start OnFailure.
 
 ENVIRONMENT (the test is hermetic with these): UPTIME_CONFIG, UPTIME_STATE, UPTIME_LOG, UPTIME_SENDER ("telegram" |
 "file:<path>" | "fail"), UPTIME_TIMEOUT (finite, positive; part of the I4 computation), UPTIME_MAX_BYTES; for the
-channel: TELEGRAM_ENV and MARVEEN_ALERT_CHAT_ID (explicit overrides, see CHANNEL), and TELEGRAM_API_BASE (the
+channel: TELEGRAM_ENV and ALFRED_ALERT_CHAT_ID (explicit overrides, see CHANNEL), and TELEGRAM_API_BASE (the
 send-telegram.sh test seam: a local Bot API stub).
 """
 import importlib.util
@@ -143,7 +143,7 @@ _MAIN_TG_DIR = (owner_chat._state_dir(INSTALL_ENV, "telegram") if owner_chat
 TELEGRAM_ENV = os.environ.get("TELEGRAM_ENV") or os.path.join(_MAIN_TG_DIR, ".env")
 # sender_check._copy_check(text) runs the outgoing-copy-gate audit and raises Refused
 SENDER_CHECK = os.path.join(ROOT, "scripts", "hooks", "sender_check.py")
-UA = "Mozilla/5.0 (marveen-uptime-monitor)"
+UA = "Mozilla/5.0 (alfred-uptime-monitor)"
 # upper bound of an answer's transferred and decompressed size (well above a typical page); the test lowers it with
 # UPTIME_MAX_BYTES
 try:
@@ -487,9 +487,9 @@ def gate_check(text):
 
 
 def resolve_chat():
-    """(chat_id, None), or ("", reason) when there is no owner chat to alert. MARVEEN_ALERT_CHAT_ID is an explicit
+    """(chat_id, None), or ("", reason) when there is no owner chat to alert. ALFRED_ALERT_CHAT_ID is an explicit
     override; otherwise scripts/lib/owner_chat.py decides (see CHANNEL in the docstring)."""
-    c = os.environ.get("MARVEEN_ALERT_CHAT_ID", "").strip()
+    c = os.environ.get("ALFRED_ALERT_CHAT_ID", "").strip()
     if c and c != "0":
         return c, None
     if owner_chat is None:

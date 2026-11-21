@@ -34,7 +34,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-LABEL="com.marveen.channel-outage-alarm"
+LABEL="com.alfred.channel-outage-alarm"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 ALARM="$PROJECT_DIR/scripts/channel-outage-alarm.sh"
 

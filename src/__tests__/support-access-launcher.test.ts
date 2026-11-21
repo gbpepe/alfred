@@ -135,29 +135,29 @@ describe("the routine's enable refusals, as sentences", () => {
   it('already_on (Bence 78560, Dani F1 on #2779): turn it off first, with the disable line, then run again; the code is not spent (Bence 78639)', () => {
     const out = say('already_on')
     expect(out).toContain('(already_on)')
-    expect(out).toContain(`~/.marveen/support/kit/${KIT_LAUNCHER_NAME} disable`)
+    expect(out).toContain(`~/.alfred/support/kit/${KIT_LAUNCHER_NAME} disable`)
     expect(out).toContain('futtasd újra ezt a sort')
     expect(out).toContain('nem fogy el')
     expect(out).not.toContain('új kódot')
     expect(out).not.toContain('Küldd el nekünk')
   })
 
-  it('names the one support address, hello@marveen.io, wherever it asks the customer to write (the owner, 78568)', () => {
-    expect(mail).toEqual(['SUPPORT_MAIL=hello@marveen.io'])
+  it('names the one support address, hello@alfred.io, wherever it asks the customer to write (the owner, 78568)', () => {
+    expect(mail).toEqual(['SUPPORT_MAIL=hello@alfred.io'])
     expect(LAUNCHER).not.toMatch(/aiamindennapokban/)
     const asks = LAUNCHER.split('\n').filter((l) => /[Íí]rj nekünk|[Kk]üldd el nekünk/.test(l))
     expect(asks.length).toBeGreaterThan(5)
     for (const l of asks) expect(l).toContain('$SUPPORT_MAIL')
     expect(say('rate_limited')).not.toContain('hello@')
-    expect(say('keys_file_layout')).toContain('(hello@marveen.io)')
-    expect(say('service_unavailable')).toContain('írj nekünk (hello@marveen.io), és küldd el ezt a kódot: service_unavailable.')
+    expect(say('keys_file_layout')).toContain('(hello@alfred.io)')
+    expect(say('service_unavailable')).toContain('írj nekünk (hello@alfred.io), és küldd el ezt a kódot: service_unavailable.')
   })
 
-  it('a release whose pins are not complete (no key, no source address, malformed) says: update Marveen (Geri 78991)', () => {
+  it('a release whose pins are not complete (no key, no source address, malformed) says: update Alfred (Geri 78991)', () => {
     for (const code of ['support_keys_unset', 'support_from_unset', 'support_pins_invalid']) {
       const out = say(code)
       expect(out, code).toContain('(' + code + ')')
-      expect(out, code).toContain('Ez a Marveen-kiadás még nem tartalmazza a távoli segítség beállításait (' + code + '). Frissítsd a Marveent.')
+      expect(out, code).toContain('Ez a Alfred-kiadás még nem tartalmazza a távoli segítség beállításait (' + code + '). Frissítsd a Alfredet.')
       expect(out, code).not.toContain('A bekapcsolás nem sikerült')
     }
   })
@@ -168,7 +168,7 @@ describe("the routine's enable refusals, as sentences", () => {
 })
 
 describe('a finished disable', () => {
-  it('says the machine stays on the marveen.io account until the Profile page removes it (Dani 78558)', () => {
+  it('says the machine stays on the alfred.io account until the Profile page removes it (Dani 78558)', () => {
     const tail = LAUNCHER.slice(LAUNCHER.indexOf('if [ "$MODE" = disable ]; then'))
     const done = tail.slice(0, tail.indexOf('  exit 0\n'))
     expect(done).toContain('A levétel kész ezen a gépen.')

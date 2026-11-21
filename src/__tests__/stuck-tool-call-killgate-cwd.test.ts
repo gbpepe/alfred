@@ -1,7 +1,7 @@
 // KILLGATECWD1022: the STUCKFREEZE819 kill-boundary gate (and the STUCKATTEMPTS1018 written-since-the-freeze gate after it)
 // read the main session's transcript from projectsDirFor(PROJECT_ROOT, ...). The session's transcript lives under its own
 // working directory, and that is not always PROJECT_ROOT:
-//   - channels.sh restarts the session in a mktemp dir (/tmp/marveen-channels-XXXXXX) when the first start fails with EPERM;
+//   - channels.sh restarts the session in a mktemp dir (/tmp/alfred-channels-XXXXXX) when the first start fails with EPERM;
 //   - an install can run the dashboard from a different directory (a release dir) than the one the session was started in.
 // In both cases, the gate reads either nothing (null) or the stale transcript the session wrote before the move, so it
 // can never abort a kill of a live session. The gate now also reads the session's real working directory (tmux pane_current_path).
@@ -28,10 +28,10 @@ const FALLBACK_LINE = 'no transcript under the main session working directory'
 let root: string
 /** file mtimes round-trip through a float: compare within 2 ms */
 const near = (a: number | null, b: number): void => { expect(a).not.toBeNull(); expect(Math.abs((a as number) - b)).toBeLessThan(2) }
-const INSTALL_DIR = '/opt/marveen'                                    // PROJECT_ROOT of the dashboard
-const EPERM_CWD = '/private/tmp/marveen-channels-Ab12Cd'              // the channels.sh EPERM fallback start dir (as tmux reports it)
-const RELEASE_ROOT = '/srv/marveen-releases/b3ab73f'                   // PROJECT_ROOT when the dashboard runs from a release dir
-const SESSION_CWD = '/srv/marveen'                                     // ... while the session keeps its own working directory
+const INSTALL_DIR = '/opt/alfred'                                    // PROJECT_ROOT of the dashboard
+const EPERM_CWD = '/private/tmp/alfred-channels-Ab12Cd'              // the channels.sh EPERM fallback start dir (as tmux reports it)
+const RELEASE_ROOT = '/srv/alfred-releases/b3ab73f'                   // PROJECT_ROOT when the dashboard runs from a release dir
+const SESSION_CWD = '/srv/alfred'                                     // ... while the session keeps its own working directory
 
 /** A transcript for `workingDir` under the config root, last written `ageMs` ago. Returns its mtime in ms. */
 function transcript(workingDir: string, ageMs: number, name = 's.jsonl'): number {
@@ -111,8 +111,8 @@ describe('KILLGATECWD1022: the kill gate reads the main session\'s real working 
   })
 
   it('the pane cwd does not widen the read to other directories (a sibling project is not read)', () => {
-    transcript('/srv/marveen-other', 1_000)
-    transcript('/srv/marveen/agents/worker', 1_000)
+    transcript('/srv/alfred-other', 1_000)
+    transcript('/srv/alfred/agents/worker', 1_000)
     expect(forSession(RELEASE_ROOT, SESSION_CWD, [root])).toBeNull()
   })
 
@@ -191,7 +191,7 @@ describe('KILLGATECWD1022: the kill gate reads the main session\'s real working 
     const readIdx = code.indexOf(read)
     const staleIdx = code.indexOf('verdictStaleByTranscript(transcriptMtime, Date.now())')
     const sinceIdx = code.indexOf('transcriptWrittenSinceStagnation(transcriptMtime, next.stagnantSince)')
-    const killIdx = code.indexOf('await resumeMarveenSession()')
+    const killIdx = code.indexOf('await resumeAlfredSession()')
     expect(staleIdx).toBeGreaterThan(readIdx)
     expect(sinceIdx).toBeGreaterThan(readIdx)
     expect(killIdx).toBeGreaterThan(staleIdx)

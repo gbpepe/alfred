@@ -4,7 +4,7 @@
 # WHY THIS FILE EXISTS, STATED HONESTLY: the guard added alongside this test is
 # DEFENCE IN DEPTH, not a live bug fix. Measured on 2026-09-22 before writing it:
 # no path puts a "0" into fleet-memory-gate's CHAT_ID today -- nothing in the repo
-# sets MARVEEN_ALERT_CHAT_ID (no unit, no plist, no installer line), the placeholder
+# sets ALFRED_ALERT_CHAT_ID (no unit, no plist, no installer line), the placeholder
 # lands in ALLOWED_CHAT_ID which this script never reads, and no shipped installer
 # version ever seeded access.json's allowFrom from CHAT_ID (107 historical versions,
 # 0 hits, positive control passed).
@@ -50,11 +50,11 @@ run_gate() {
   env PATH="$SANDBOX/bin:$PATH" \
       STUB_ARGS_FILE="$SANDBOX/args.txt" \
       MEMGATE_PROC_MEMINFO="$SANDBOX/meminfo" \
-      MARVEEN_STORE="$SANDBOX/store" \
+      ALFRED_STORE="$SANDBOX/store" \
       TELEGRAM_ENV="$SANDBOX/chan/.env" \
       TELEGRAM_ACCESS="$SANDBOX/chan/access.json" \
-      MARVEEN_ALERT_CHAT_ID="$chat" \
-      MARVEEN_MEM_GATE_OBSERVE=1 \
+      ALFRED_ALERT_CHAT_ID="$chat" \
+      ALFRED_MEM_GATE_OBSERVE=1 \
       bash "$ROOT/scripts/fleet-memory-gate.sh" check >/dev/null 2>"$SANDBOX/log.txt"
   cat "$SANDBOX/log.txt"
 }

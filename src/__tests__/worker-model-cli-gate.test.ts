@@ -6,7 +6,7 @@
  * 2.1.110, below the 2.1.280 minimum of claude-opus-5-5):
  *   - shipped default -> claude-opus-5[1m] (the #1609 guard falls back);
  *   - DEFAULT_AGENT_MODEL=claude-opus-5-5[1m] -> passed through unchanged;
- *   - MARVEEN_WORKER_MODEL=claude-opus-5-5[1m] -> never reached the guard.
+ *   - ALFRED_WORKER_MODEL=claude-opus-5-5[1m] -> never reached the guard.
  * Either way the worker session came up and every prompt got 400.
  *
  * resolveWorkerModel is the one place that decides the worker's model, and the
@@ -34,9 +34,9 @@ function inputs(over: Partial<WorkerModelInputs> = {}): WorkerModelInputs {
 }
 
 describe('resolveWorkerModel: the CLI gate sees the final model', () => {
-  it('MARVEEN_WORKER_MODEL on an old CLI: this run falls back, flagged with the requested model and its source', () => {
+  it('ALFRED_WORKER_MODEL on an old CLI: this run falls back, flagged with the requested model and its source', () => {
     const d = resolveWorkerModel(inputs({ override: 'claude-opus-5-5[1m]' }))
-    expect(d.source).toBe('env:MARVEEN_WORKER_MODEL')
+    expect(d.source).toBe('env:ALFRED_WORKER_MODEL')
     expect(d.model).toBe('claude-opus-5[1m]')
     expect(d.unlaunchable).toEqual({ requested: 'claude-opus-5-5[1m]', minCli: '2.1.280', installedCli: OLD_CLI, fallback: 'claude-opus-5[1m]' })
   })
@@ -71,8 +71,8 @@ describe('resolveWorkerModel: the CLI gate sees the final model', () => {
     expect(guard).not.toHaveBeenCalled()
   })
 
-  it('MARVEEN_WORKER_MODEL wins over a custom provider (the existing priority)', () => {
-    expect(resolveWorkerModel(inputs({ override: 'claude-opus-5', customProviderModel: 'gpt-oss-120b' })).source).toBe('env:MARVEEN_WORKER_MODEL')
+  it('ALFRED_WORKER_MODEL wins over a custom provider (the existing priority)', () => {
+    expect(resolveWorkerModel(inputs({ override: 'claude-opus-5', customProviderModel: 'gpt-oss-120b' })).source).toBe('env:ALFRED_WORKER_MODEL')
   })
 })
 
@@ -98,7 +98,7 @@ describe('WORKERMODEL1773 part 2: the owner decision (A)', () => {
     expect(resolveWorkerModel(i).model).toBe('claude-opus-5[1m]')
     expect(JSON.stringify({ ...i, launchableDefault: 0, launchableFallback: 0, installedCli: 0 })).toBe(before)
     const later = resolveWorkerModel({ ...i, installedCli: () => NEW_CLI })
-    expect(later).toEqual({ model: 'claude-opus-5-5[1m]', source: 'env:MARVEEN_WORKER_MODEL', unlaunchable: null })
+    expect(later).toEqual({ model: 'claude-opus-5-5[1m]', source: 'env:ALFRED_WORKER_MODEL', unlaunchable: null })
   })
 
   it('the notice is rate-limited per configured model and CLI version, one per day', () => {
@@ -121,7 +121,7 @@ describe('WORKERMODEL1773 part 2: the owner decision (A)', () => {
   it('the notice names the requested model, the source, the CLI, its minimum and the fallback, and says the setting was not changed', () => {
     const d = resolveWorkerModel(inputs({ override: 'claude-opus-5-5[1m]' }))
     const t = workerModelFallbackText(d)
-    for (const part of ['claude-opus-5-5[1m]', 'env:MARVEEN_WORKER_MODEL', '2.1.110', '2.1.280', 'claude-opus-5[1m]', 'nem írtuk át']) expect(t).toContain(part)
+    for (const part of ['claude-opus-5-5[1m]', 'env:ALFRED_WORKER_MODEL', '2.1.110', '2.1.280', 'claude-opus-5[1m]', 'nem írtuk át']) expect(t).toContain(part)
     expect(t).not.toMatch(/[\u2013\u2014]/)
     const none = workerModelFallbackText(resolveWorkerModel(inputs({ override: 'claude-opus-5-5[1m]', launchableFallback: () => 'claude-fable-5-1' })))
     expect(none).toContain('minden kérés hibát fog adni')

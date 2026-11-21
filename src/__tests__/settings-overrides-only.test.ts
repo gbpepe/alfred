@@ -395,14 +395,14 @@ describe('script parity with the store', () => {
 
 
   // OWNERAUTHGUESS1106: TELEGRAM_OWNER_USER_ID is read by two mirrors of the store (owner-identity.ts and the
-  // marveen-commands.py hook): each must see exactly the owner id the store answers (an override, never the .env
+  // alfred-commands.py hook): each must see exactly the owner id the store answers (an override, never the .env
   // line), and only a positive Telegram user id counts.
-  it('the two TELEGRAM_OWNER_USER_ID mirrors (owner-identity.ts / marveen-commands.py)', async () => {
+  it('the two TELEGRAM_OWNER_USER_ID mirrors (owner-identity.ts / alfred-commands.py)', async () => {
     const { readTelegramOwnerSetting, TELEGRAM_USER_ID_RX } = await import('../owner-identity.js')
     const K = 'TELEGRAM_OWNER_USER_ID'
     const states: Array<Record<string, string> | 'unreadable' | null> = [null, 'unreadable', { K: '5556667778' }, { K: '' }, { K: '0' }, { K: '-1001234' }, { K: ' 5556667778 ' }]
     const envs: Array<Record<string, string>> = [{}, { K: '1111111111' }]
-    const hook = join(ROOT, 'scripts', 'hooks', 'marveen-commands.py')
+    const hook = join(ROOT, 'scripts', 'hooks', 'alfred-commands.py')
     const py = [
       'import importlib.util, sys',
       'spec = importlib.util.spec_from_file_location("mc", sys.argv[1])',
@@ -418,7 +418,7 @@ describe('script parity with the store', () => {
         const root = install(o, e)
         const t = readTelegramOwnerSetting(join(root, 'store', 'config-overrides.json'))
         const ts = TELEGRAM_USER_ID_RX.test(t) ? t : ''
-        const got = execFileSync('python3', ['-c', py, hook], { encoding: 'utf-8', env: { ...process.env, MARVEEN_INSTALL_DIR: root } }).trim()
+        const got = execFileSync('python3', ['-c', py, hook], { encoding: 'utf-8', env: { ...process.env, ALFRED_INSTALL_DIR: root } }).trim()
         const tag = JSON.stringify([o, e])
         expect(ts, `ts ${tag}`).toBe(want)
         expect(got, `py ${tag}`).toBe(want)
@@ -510,7 +510,7 @@ describe('grep guard: script mentions of overrides-only keys', () => {
     'scripts/morning-briefing.sh', // reads through dist/settings-store.js
     'scripts/lib/owner-chat.sh', // OWNER_ALERT_CHAT_ID mirror, parity-tested above
     'scripts/lib/owner_chat.py', // OWNER_ALERT_CHAT_ID mirror, parity-tested above
-    'scripts/hooks/marveen-commands.py', // TELEGRAM_OWNER_USER_ID mirror, parity-tested above
+    'scripts/hooks/alfred-commands.py', // TELEGRAM_OWNER_USER_ID mirror, parity-tested above
     'scripts/patch-discord-plugin.py', // DISCORD_PLUGIN_EXT / DISCORD_OWNER_USER_ID mirror, parity-tested above
     'scripts/bash-sandbox-sync.mjs', // BASH_SANDBOX_AGENTS through dist/web/bash-sandbox.js (WDSANDBOXMARKER1119)
   ])

@@ -18,8 +18,8 @@ import { selectReapablePollers, type ProcRow } from '../web/channel-poller-reap.
 const LIVE: ProcRow[] = [
   { pid: 1, ppid: 0, command: '/sbin/init' },
   { pid: 855, ppid: 1, command: 'tmux -CC new-session -d -s lean-chief-channels' },
-  { pid: 94830, ppid: 395, command: '/usr/bin/node /home/istvan/marveen/dist/index.js' },
-  { pid: 640921, ppid: 94830, command: '/bin/bash /home/istvan/marveen/scripts/channels.sh' },
+  { pid: 94830, ppid: 395, command: '/usr/bin/node /home/istvan/alfred/dist/index.js' },
+  { pid: 640921, ppid: 94830, command: '/bin/bash /home/istvan/alfred/scripts/channels.sh' },
   { pid: 641057, ppid: 855, command: '/home/istvan/.local/bin/claude --dangerously-skip-permissions --model claude-opus-5[1m] --channels plugin:telegram@claude-plugins-official' },
   { pid: 641186, ppid: 641057, command: 'bun run --cwd /home/istvan/.claude/plugins/cache/claude-plugins-official/telegram/0.0.7 --shell=bun --silent start' },
   { pid: 641196, ppid: 641186, command: '/home/istvan/.bun/bin/bun server.ts' },

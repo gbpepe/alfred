@@ -306,8 +306,8 @@ describe('on the real routes', () => {
   // Dani 65912 (1) and (2): revoking a key (for a paired Bridge also its SSH line) is the one route where bridgeOwner
   // was the only gate.
   it('R3b: revoking a key: the key alone and an operator key with the cookie revoke nothing; key + cookie revokes, and the audit names the owner', async () => {
-    const prevSsh = process.env.MARVEEN_SSH_DIR
-    process.env.MARVEEN_SSH_DIR = mkdtempSync(join(tmpdir(), 'owner-action-ssh-'))
+    const prevSsh = process.env.ALFRED_SSH_DIR
+    process.env.ALFRED_SSH_DIR = mkdtempSync(join(tmpdir(), 'owner-action-ssh-'))
     try {
       const key = keyOf()
       const target = createDeviceKey('Paired', { installId: 'install-r3b' })
@@ -322,8 +322,8 @@ describe('on the real routes', () => {
       spy.mockRestore()
       expect(getRecentConfigChanges(5).find((c) => c.key === 'security.bridge_revoke')?.actor).toBe('bridge:owner')
     } finally {
-      if (prevSsh === undefined) delete process.env.MARVEEN_SSH_DIR
-      else process.env.MARVEEN_SSH_DIR = prevSsh
+      if (prevSsh === undefined) delete process.env.ALFRED_SSH_DIR
+      else process.env.ALFRED_SSH_DIR = prevSsh
     }
   })
 
@@ -331,13 +331,13 @@ describe('on the real routes', () => {
   // login exists, so it cannot lock the owner out of the Bridge. The paired key's SSH line is a real authorized_keys
   // line here, so "nothing revoked" is measured on both halves.
   it('R3c: revoking a paired key with the bare shared token is refused (key and SSH line stay); listing stays token-only', async () => {
-    const prevSsh = process.env.MARVEEN_SSH_DIR
+    const prevSsh = process.env.ALFRED_SSH_DIR
     const sshDir = mkdtempSync(join(tmpdir(), 'owner-action-ssh-'))
-    process.env.MARVEEN_SSH_DIR = sshDir
+    process.env.ALFRED_SSH_DIR = sshDir
     try {
       const target = createDeviceKey('Paired-bare', { installId: 'install-r3c-bare' })
       const authKeys = join(sshDir, 'authorized_keys')
-      const before = 'ssh-ed25519 AAAAkeep other@host\nrestrict ssh-ed25519 AAAAdrop marveen-remote:install-r3c-bare\n'
+      const before = 'ssh-ed25519 AAAAkeep other@host\nrestrict ssh-ed25519 AAAAdrop alfred-remote:install-r3c-bare\n'
       writeFileSync(authKeys, before, { mode: 0o600 })
       const bare = { authorization: `Bearer ${TOKEN}` }
       expect(refusedByOwnerGate(await hit(tryHandleAuth, 'DELETE', `/api/auth/device-keys/${target.id}`, bare))).toBe(true)
@@ -349,8 +349,8 @@ describe('on the real routes', () => {
       // Control: the list stays readable with the token (Samu 69185, 3.).
       expect((await hit(tryHandleAuth, 'GET', '/api/auth/device-keys', bare)).status).toBe(200)
     } finally {
-      if (prevSsh === undefined) delete process.env.MARVEEN_SSH_DIR
-      else process.env.MARVEEN_SSH_DIR = prevSsh
+      if (prevSsh === undefined) delete process.env.ALFRED_SSH_DIR
+      else process.env.ALFRED_SSH_DIR = prevSsh
     }
   })
 
@@ -358,9 +358,9 @@ describe('on the real routes', () => {
   // that also keeps the token sends both). The audit actor is the auth kind (the security.bridge_revoke line); R3b pins
   // the device lane.
   it('R3d: revoking a paired key on the session lane or token + owner cookie: revoked, SSH line removed, actor is the auth kind', async () => {
-    const prevSsh = process.env.MARVEEN_SSH_DIR
+    const prevSsh = process.env.ALFRED_SSH_DIR
     const sshDir = mkdtempSync(join(tmpdir(), 'owner-action-ssh-'))
-    process.env.MARVEEN_SSH_DIR = sshDir
+    process.env.ALFRED_SSH_DIR = sshDir
     try {
       const lanes: Array<[string, Record<string, string>]> = [
         ['token', { authorization: `Bearer ${TOKEN}`, cookie: cookieHeader() }],
@@ -370,7 +370,7 @@ describe('on the real routes', () => {
         const installId = `install-r3d-${kind}`
         const target = createDeviceKey(`Paired-${kind}`, { installId })
         const authKeys = join(sshDir, 'authorized_keys')
-        writeFileSync(authKeys, `ssh-ed25519 AAAAkeep other@host\nrestrict ssh-ed25519 AAAAdrop marveen-remote:${installId}\n`, { mode: 0o600 })
+        writeFileSync(authKeys, `ssh-ed25519 AAAAkeep other@host\nrestrict ssh-ed25519 AAAAdrop alfred-remote:${installId}\n`, { mode: 0o600 })
         const r = await hit(tryHandleAuth, 'DELETE', `/api/auth/device-keys/${target.id}`, headers)
         expect(r.status).toBe(200)
         expect(getDeviceKey(target.id)).toBeNull()
@@ -379,8 +379,8 @@ describe('on the real routes', () => {
         expect(row?.actor).toBe(kind)
       }
     } finally {
-      if (prevSsh === undefined) delete process.env.MARVEEN_SSH_DIR
-      else process.env.MARVEEN_SSH_DIR = prevSsh
+      if (prevSsh === undefined) delete process.env.ALFRED_SSH_DIR
+      else process.env.ALFRED_SSH_DIR = prevSsh
     }
   })
 

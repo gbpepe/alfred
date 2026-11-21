@@ -16,8 +16,8 @@ import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 
 const REPO = join(__dirname, '..', '..')
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-agent-package-carriers-'))
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-agent-package-carriers-'))
+process.env.ALFRED_ENV_DIR = tmpRoot
 vi.mock('../config.js', async (importOriginal) => ({
   ...(await importOriginal<object>()), PROJECT_ROOT: tmpRoot, STORE_DIR: join(tmpRoot, 'store'), MAIN_AGENT_ID: 'agent-a',
 }))

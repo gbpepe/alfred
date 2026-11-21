@@ -24,7 +24,7 @@ vi.mock('../web/agent-config.js', async (orig) => {
 
 const { chatIdFromAccessConfig, channelDeliveryName, resolveSchedulerAlertToken, resolveTaskChannelTarget } = await import('../web/schedule-runner.js')
 
-// Regression guard for 2026-07-27 (Zara report, Marveen diagnosis): the
+// Regression guard for 2026-07-27 (Zara report, Alfred diagnosis): the
 // scheduled-task prompt prefix carried a "chat_id: 0" sentinel from a
 // pre-plugin channel implementation. The official Telegram plugin rejects it
 // (assertAllowedChat: "0" is never allowlisted), so every non-heartbeat
@@ -95,7 +95,7 @@ describe('channelDeliveryName (provider -> Hungarian channel noun)', () => {
 })
 
 // Regression guard for the 2026-07-08 fix: the scheduler-alert bot token is
-// looked up in marveen/.env FIRST and the main agent's channel .env SECOND, for
+// looked up in alfred/.env FIRST and the main agent's channel .env SECOND, for
 // every provider that has a bot token. The provider-aware rewrite once dropped
 // the second location for Telegram and every alert went silent on hosts whose
 // token lives in the plugin env. The reader is stubbed so the test pins the
@@ -114,7 +114,7 @@ describe('resolveSchedulerAlertToken (lookup order via injected reader)', () => 
     return { read, calls }
   }
 
-  it('telegram: marveen/.env wins and the channel .env is not consulted', () => {
+  it('telegram: alfred/.env wins and the channel .env is not consulted', () => {
     const { read, calls } = stub({ [PROJECT_ENV]: '111:project', [channelEnv('telegram')]: '222:plugin' })
     expect(resolveSchedulerAlertToken('telegram', read)).toBe('111:project')
     expect(calls).toEqual([['telegram', PROJECT_ENV]])
@@ -126,7 +126,7 @@ describe('resolveSchedulerAlertToken (lookup order via injected reader)', () => 
     expect(calls).toEqual([['telegram', PROJECT_ENV], ['telegram', channelEnv('telegram')]])
   })
 
-  it('an EMPTY value in marveen/.env falls through, like the old `if (token)` did', () => {
+  it('an EMPTY value in alfred/.env falls through, like the old `if (token)` did', () => {
     const { read } = stub({ [PROJECT_ENV]: '', [channelEnv('telegram')]: '222:plugin' })
     expect(resolveSchedulerAlertToken('telegram', read)).toBe('222:plugin')
   })

@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 // Create a temp dir that acts as the project root for the test.
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-roster-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-roster-test-'))
 
 vi.mock('../config.js', () => ({
   // agent-scaffold imports settings-store (MCPOROKLES923), which derives a path from
   // STORE_DIR at import time. A never-created dir: nothing here reads the store.
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   APP_TZ: 'Europe/Budapest',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',

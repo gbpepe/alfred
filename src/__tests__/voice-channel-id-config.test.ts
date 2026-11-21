@@ -4,7 +4,7 @@
 // reserved-name list -- must follow the CONFIGURED value, and the old default
 // must lose all of it once another id is configured.
 //
-// env.ts pins its .env directory at import time (CLAUDECLAW_ENV_DIR is its test
+// env.ts pins its .env directory at import time (ALFRED_ENV_DIR is its test
 // seam), so each case re-imports the modules after pointing the seam at a
 // temporary .env.
 import { describe, it, expect, afterAll, vi } from 'vitest'
@@ -14,12 +14,12 @@ import { tmpdir } from 'node:os'
 import { Readable } from 'node:stream'
 import { resolveVoiceChannelId, DEFAULT_VOICE_CHANNEL_ID } from '../config.js'
 
-const savedDir = process.env.CLAUDECLAW_ENV_DIR
+const savedDir = process.env.ALFRED_ENV_DIR
 
 async function loadWithEnvFile(content: string) {
   const dir = mkdtempSync(join(tmpdir(), 'voice-id-env-'))
   writeFileSync(join(dir, '.env'), content)
-  process.env.CLAUDECLAW_ENV_DIR = dir
+  process.env.ALFRED_ENV_DIR = dir
   vi.resetModules()
   const { logger } = await import('../logger.js')
   const warn = vi.spyOn(logger, 'warn')
@@ -37,7 +37,7 @@ async function postAs(
   from: string,
   auth?: { kind: string },
 ) {
-  const req = Readable.from([Buffer.from(JSON.stringify({ from, to: 'marveen', content: 'a dictated line' }))]) as any
+  const req = Readable.from([Buffer.from(JSON.stringify({ from, to: 'alfred', content: 'a dictated line' }))]) as any
   let status = 0
   let body = ''
   const res = { writeHead(s: number) { status = s }, end(b?: string) { body = b ?? '' } } as any
@@ -49,14 +49,14 @@ async function postAs(
 }
 
 afterAll(() => {
-  if (savedDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = savedDir
+  if (savedDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = savedDir
   vi.restoreAllMocks()
   vi.resetModules()
 })
 
 const TAKEN = {
-  mainAgentId: 'marveen',
+  mainAgentId: 'alfred',
   ownerName: 'Owner Person',
   systemSenderIds: 'cortex, @billing.',
   isSubAgent: (id: string) => id === 'atlas',
@@ -80,7 +80,7 @@ describe('resolveVoiceChannelId', () => {
   })
 
   it('rejects an id another sender uses: the message layer, a SYSTEM_SENDER_IDS entry, the main agent, a sub-agent', () => {
-    for (const taken of ['system', 'heartbeat', 'telegram-coordinator', 'channel-coordinator', 'cortex', 'billing', 'marveen', 'atlas']) {
+    for (const taken of ['system', 'heartbeat', 'telegram-coordinator', 'channel-coordinator', 'cortex', 'billing', 'alfred', 'atlas']) {
       expect(resolveVoiceChannelId(taken, TAKEN), taken).toEqual({ id: DEFAULT_VOICE_CHANNEL_ID, invalid: taken })
     }
   })
@@ -123,8 +123,8 @@ describe('VOICE_CHANNEL_ID set in .env to another valid id', () => {
     expect(m.delivery.rankedSenders()).not.toContain(DEFAULT_VOICE_CHANNEL_ID)
 
     // Framed as channel-inbound: the configured id, not the default.
-    expect(m.wrap.classifyAgentMessage('voice-relay', 'marveen')!.category).toBe('channel-inbound')
-    expect(m.wrap.classifyAgentMessage(DEFAULT_VOICE_CHANNEL_ID, 'marveen')!.category).not.toBe('channel-inbound')
+    expect(m.wrap.classifyAgentMessage('voice-relay', 'alfred')!.category).toBe('channel-inbound')
+    expect(m.wrap.classifyAgentMessage(DEFAULT_VOICE_CHANNEL_ID, 'alfred')!.category).not.toBe('channel-inbound')
 
     // Write guard: the configured id needs a device key ...
     const voice = await postAs(m.messages.tryHandleMessages, 'voice-relay', { kind: 'token' })
@@ -147,7 +147,7 @@ describe('VOICE_CHANNEL_ID set in .env to an invalid value', () => {
     expect(m.config.VOICE_CHANNEL_ID_INVALID).toBe('Voice_Relay')
     expect(m.ingest.VOICE_CHANNEL_AGENT_ID).toBe(DEFAULT_VOICE_CHANNEL_ID)
     expect(m.config.RESERVED_AGENT_IDS).toContain(DEFAULT_VOICE_CHANNEL_ID)
-    expect(m.wrap.classifyAgentMessage(DEFAULT_VOICE_CHANNEL_ID, 'marveen')!.category).toBe('channel-inbound')
+    expect(m.wrap.classifyAgentMessage(DEFAULT_VOICE_CHANNEL_ID, 'alfred')!.category).toBe('channel-inbound')
     const warned = m.warn.mock.calls.find(c => String(c[1] ?? '').includes('VOICE_CHANNEL_ID'))
     expect(warned).toBeDefined()
     expect(warned![0]).toMatchObject({ rejected: 'Voice_Relay', using: DEFAULT_VOICE_CHANNEL_ID })

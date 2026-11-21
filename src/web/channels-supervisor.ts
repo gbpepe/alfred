@@ -75,7 +75,7 @@ export function launchdReloadVerdict(pidBefore: number | null, pidAfter: number 
   return 'none'
 }
 
-/** The window a supervisor must fall in to belong to a reload begun at `reloadAt` (ms): the time since, rounded up, plus a second of slack. */
+/** The window a supervisor must fall in to belong to a reload begun at `reloadAt` (ms): the time since, rounded up, plus a second of margin. */
 export function reloadWindowSec(reloadAt: number, now: number): number {
   return Math.ceil((now - reloadAt) / 1000) + 1
 }
@@ -86,7 +86,7 @@ export function reloadWindowSec(reloadAt: number, now: number): number {
 // longer than this means the supervisor is stuck before it created the session. Then the owner
 // is told; a second supervisor is still not started (that was the original bug). The limit is
 // the recreate path's own cold-start grace (MAIN_SESSION_CREATE_GRACE_MS in channel-monitor.ts,
-// Marveen 42304): a supervisor gets exactly as long as a recreate the dashboard started itself.
+// Alfred 42304): a supervisor gets exactly as long as a recreate the dashboard started itself.
 export const SUPERVISOR_STUCK_MS = 360_000
 // The monitor calls the recreate path once a minute while the session is absent. A longer gap
 // means the earlier wait ended (the session came back), so a new wait starts from zero.

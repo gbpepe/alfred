@@ -2,7 +2,7 @@
 """PreToolUse gate on the MAIN agent's outbound email: Hungarian copy QA.
 
 Why this exists (Szabi, 2026-08-10 12:57): a licence-delivery email went out to a
-client with every accent stripped ("Szia Balint, itt van a Marveen licenckulcsod
+client with every accent stripped ("Szia Balint, itt van a Alfred licenckulcsod
 es a telepito"). It was the second accent incident that day -- the first was a
 client-facing spreadsheet the same morning. Szabi asked for a gate that inspects
 outgoing copy BEFORE the send and rejects it if something is wrong.
@@ -57,7 +57,7 @@ import sys
 #   - graph-mail futtatasa `send` alparanccsal;
 #   - curl/wget, amelynek IDEZETLEN URL-tokenje az api.resend.com-ra mutat
 #     (a -d payloadban idezett elofordulas nem szamit -- az tartalom).
-# MASODIK KOR (Marveen adverzarialis merese, msg 14282): az elso valtozat a
+# MASODIK KOR (Alfred adverzarialis merese, msg 14282): az elso valtozat a
 # quoted stringeket VAKON vagta ki, ezert ket hamis negativot nyitott -- az
 # IDEZOJELES URL a curl sajat argumentum-helyen (a curl SZOKASOS irasmodja!)
 # es a burkolo hejj `-c` string-argumentuma atment. A gyoker: az idezojel a
@@ -68,7 +68,7 @@ import sys
 # belsejeben emlitett domain tovabbra is csak tartalom (az URL-minta a token
 # ELEJERE horgonyzott). A wrapper hejj (`sh -c "..."`) string-argumentuma
 # rekurzivan elemzodik.
-# A heredoc-kivagas SORREND-FUGGETLEN (Marveen 3. kore, msg 14286): a
+# A heredoc-kivagas SORREND-FUGGETLEN (Alfred 3. kore, msg 14286): a
 # hatarolo utani SOR-MARADEK (pl. atiranyitas: <<EOF > fajl) a parancs
 # resze es MEGMARAD -- csak a torzs esik ki. Enelkul (a) forditott
 # sorrendnel a torzs parancsnak latszott (FP), (b) a bevezeto sor
@@ -118,7 +118,7 @@ _PYTHON = re.compile(r"^python(3(\.\d+t?)?)?$", re.I)
 # A ket kapu (ez + scripts/email-send-gate.mjs) SZANDEKOSAN azonos
 # felismeres-szemantikat visel, es ezt kozos eset-lista orzi
 # (send-invocation-cases.json + konformancia-teszt): a divergencia
-# teszt-hibakent jelenjen meg, ne incidenskent (Marveen, msg 14289).
+# teszt-hibakent jelenjen meg, ne incidenskent (Alfred, msg 14289).
 _NODEISH = re.compile(r"^(node|tsx|ts-node|deno|bun|npx)$", re.I)
 _GRAPHMAIL = re.compile(r"^graph-mail(\.ts|\.js)?$", re.I)
 _WRAPPER_SHELL = re.compile(r"^(sh|bash|zsh|dash)$", re.I)
@@ -126,7 +126,7 @@ _CURLISH = re.compile(r"^(curl|wget|http)$", re.I)
 # Interpreter kod-string argumentum (python -c / node -e): az interpreternek
 # atadott kod MUVELET, nem tartalom -- a kod-szintu kuldes-hivasokra szurunk.
 #
-# KIMONDOTT HATAR (Marveen, msg 14298): tetszoleges interpreter-kod statikus
+# KIMONDOTT HATAR (Alfred, msg 14298): tetszoleges interpreter-kod statikus
 # elemzese eldonthetetlen -- ez a kapu a VELETLEN kuldest fogja meg, nem egy
 # elszant kikerulot. A lenti exec-heurisztika a NAIV alakokat fedi (a kod
 # process-inditast ES kuldo-programnevet egyutt tartalmaz); ennel tobbet nem
@@ -177,7 +177,7 @@ def _graph_sends(text: str) -> bool:
     return bool(_GRAPH_SEND.search(t) and _GRAPH_EVIDENCE.search(t))
 
 
-# MAILGATEHTTPAPI1027: an HTTP mail API reached from a script (Marveen 50920: a Gmail REST send from
+# MAILGATEHTTPAPI1027: an HTTP mail API reached from a script (Alfred 50920: a Gmail REST send from
 # urllib went past the approval gate, because only SMTP, nodemailer and Graph were known). Each provider
 # needs its own evidence AND a send shape in the same text, so a Gmail read (messages list, profile) or a
 # text that only names the provider is no send. The evidence is a literal API host or a client call or
@@ -583,7 +583,7 @@ _WRAPPERS = {
     "timeout": ("sk", ("signal", "kill-after"), 1),
     # setsid: for future use and symmetry. NOT measured local traffic: the hits the
     # first count found all sat inside quoted remote (ssh) command strings or heredoc
-    # bodies, and that pattern was not quote-aware (Marveen's correction, 2026-09-24).
+    # bodies, and that pattern was not quote-aware (Alfred's correction, 2026-09-24).
     "setsid": ("", (), 0),
     # ENVOPTHEAD1104 (Bence 69481): launchers whose value options were read as the program, so the command behind
     # them was never judged (measured on develop: all four were no send in front of a real sender).
@@ -1531,7 +1531,7 @@ def wrapper_depth_hit(cmd: str) -> bool:
     """True when some segment is still a wrapper at the depth bound, so it was
     counted as a send without the real command being seen (HEADDEPTH924). The
     gate uses it to say WHY it blocks: "I could not audit the letter" is the
-    wrong reason for `nohup x9 git status` (Marveen, #1522 review)."""
+    wrong reason for `nohup x9 git status` (Alfred, #1522 review)."""
     # Only when the depth bound is the WHOLE reason: if a visible segment is a
     # send on its own (`sendmail x; sudo x9 true`), that send is the reason,
     # and the ordinary wording must stay (Samu, #1523 review).
@@ -1838,7 +1838,7 @@ def _node_script_operand(prog, rest):
 
 
 def _nonliteral_value(val: str) -> bool:
-    """COPYSUBST1116 (Marveen 4114): a recipient value the gate cannot read as text -- a command or process substitution
+    """COPYSUBST1116 (Alfred 4114): a recipient value the gate cannot read as text -- a command or process substitution
     (also the flattened $__SUBST__ word), a variable, an ANSI-C $'..' string, a backtick -- may be any address."""
     return "$" in val or "`" in val
 
@@ -2565,7 +2565,7 @@ def draft_isolation_hint(cmd: str, cwd, read_script=None) -> bool:
 #       --cc / --bcc, an argparse prefix of one, curl's --mail-rcpt), or the -I / -J / -i / --replace string is in
 #       the word right after one (or glued to one with `=`). A shell -c program in the template is judged with the replace
 #       string and the positional parameters as that address; a -c program that IS the input cannot be told. A helper
-#       script that xargs runs is judged by the script-run rule as before, not here (Marveen's real-traffic control).
+#       script that xargs runs is judged by the script-run rule as before, not here (Alfred's real-traffic control).
 # A shell `-c` string and an eval line are searched for the same shapes one level deeper (up to _SHELL_C_DEPTH).
 # Not in the class, so not refused here: a data argument or the stdin of a program whose script is a file (the send
 # forms the other rules judge, e.g. `python3 send.py --to x < body.txt`), a pipe from another producer into a
@@ -4088,7 +4088,7 @@ ACCENTLESS = {
     "kulcsszef": "kulcsszéf", "olcso": "olcsó",
 }
 
-# GATEHOMOGLIF816 (2026-08-16, Marveen merese): 33 cirill homoglifa ult a
+# GATEHOMOGLIF816 (2026-08-16, Alfred merese): 33 cirill homoglifa ult a
 # memoria-sorokban es kartya-cimekben -- olvasva lathatatlan, de a grep/FTS
 # nema nulla-talalatot ad, ami hianyzo emleknek latszik, nem serult adatnak.
 # A szabaly a VEGYES SZORA vonatkozik (egy szon belul latin ES nem-latin betu),
@@ -4304,7 +4304,7 @@ def load_bad_name():
         # or an uncompilable pattern. All of these mean someone TRIED to
         # configure the rule and failed -- that must stay loud AND closed.
         state = RULES_INVALID
-    # ONE logging tail for EVERY loud state (Marveen review on #1156: the
+    # ONE logging tail for EVERY loud state (Alfred review on #1156: the
     # first cut logged only the exception branches, so empty/schema-invalid
     # left no log line while missing did -- same event class, inconsistent
     # ledger).
@@ -4473,7 +4473,7 @@ _TECH_COMMON = r"""
       | [\w.+-]+@[\w-]+\.[\w.]+     # email
       | `[^`]*`                     # kod-span
       | \b\w+(?:_\w+)+\b            # snake_case azonosito
-      | \b\w+\.[A-Za-z]{2,10}(?:-[a-záéíóöőúüű]{1,4})?\b   # fajlnev / domain, magyar toldalekkal (video.mp4, marveen.io, Mail.app-ot)
+      | \b\w+\.[A-Za-z]{2,10}(?:-[a-záéíóöőúüű]{1,4})?\b   # fajlnev / domain, magyar toldalekkal (video.mp4, alfred.io, Mail.app-ot)
       | \b[\w-]*/[\w/-]+            # utvonal / slug
 """
 # CSAK a token-/ekezet-vizsgalat vaghatja ki ezeket: mindharom ag kepes egy
@@ -4562,7 +4562,7 @@ def is_hungarian(text: str) -> bool:
     return sum(1 for m in HU_MARKERS if m in low) >= 3
 
 
-# GATETG816 (2026-08-16, Marveen merese): az is_hungarian() funkcionalis szavakra
+# GATETG816 (2026-08-16, Alfred merese): az is_hungarian() funkcionalis szavakra
 # szur, ezert a TOMOR, tenykozol, felsorolasos magyar uzenet (pont a fo agens
 # Telegram-stilusa) nem eri el a 3 markert, es az ekezet-vizsgalat el sem indul --
 # a mai napindito elso bekezdese ekezetlenul atment. A nyelv-detektor ezert nem
@@ -4678,7 +4678,7 @@ MDV2_ESCAPE = re.compile(r"\\([^\w\s])")
 #
 # Covered here, each only when the method is a SEND (POST/PUT/PATCH or an
 # implicit POST from a data flag; GET/HEAD reads pass untouched):
-#   - the community agent API (api.marveen.io): feed posts, comments, mention
+#   - the community agent API (api.alfred.io): feed posts, comments, mention
 #     replies. Written from a vault-held base URL in practice ($B/feed/...), so
 #     the path shape counts even when the host is an unresolved variable;
 #   - Discord REST: .../channels/<id>/messages[/<id>];
@@ -4693,8 +4693,8 @@ MDV2_ESCAPE = re.compile(r"\\([^\w\s])")
 # costs more than a retry with a readable body. An INTERNAL error still passes
 # loudly, like every channel arm.
 _HTTP_CHANNEL_TARGETS = (
-    ("marveen.io", re.compile(
-        r"^((https?://)?([^/\s]*\.)?api\.marveen\.io|\$\{?\w+\}?)(/[^\s]*)?"
+    ("alfred.io", re.compile(
+        r"^((https?://)?([^/\s]*\.)?api\.alfred\.io|\$\{?\w+\}?)(/[^\s]*)?"
         r"/(feed/posts(/[^/\s]+/comments)?|mentions/[^/\s]+/reply)/?(\?\S*)?$", re.I)),
     ("Discord API", re.compile(
         r"^(https?://)?([^/\s]*\.)?discord(app)?\.com/api(/v\d+)?/channels/[^/\s]+/messages(/[^/\s]+)?/?(\?\S*)?$",
@@ -4801,7 +4801,7 @@ def collect_channel_body(tool_input: dict, unescape_mdv2: bool) -> str:
     a literal the author wrote, not gate noise."""
     fields = ("text", "caption", "message")
     got = [str(tool_input[f]) for f in fields if tool_input.get(f)]
-    # c67f5f34: the Telegram reply tool's one-tap answer buttons (a Marveen patch
+    # c67f5f34: the Telegram reply tool's one-tap answer buttons (a Alfred patch
     # of the plugin, scripts/patch-telegram-plugin.py) are outgoing text too: the
     # tapped label is what the recipient sees and sends back. A label this gate
     # did not read would be the silent zero above, so every label joins the body;
@@ -4898,7 +4898,7 @@ def channel_gate(tool_input: dict, label: str, unescape_mdv2: bool) -> None:
 
 def audit(text: str):
     """Return a list of human-readable problems."""
-    # COPYGATEENT914 (Marveen merese, 2026-09-14, egy VALODI vevo-levelen): a
+    # COPYGATEENT914 (Alfred merese, 2026-09-14, egy VALODI vevo-levelen): a
     # tag-kiszedes onmagaban megkerulheto HTML-ENTITASSAL. A `&mdash;` (es a
     # szamos `&#8212;` / hex `&#x2014;` alak) atment a kapun, a cimzettnel
     # viszont gondolatjelkent renderel -- vagyis a kapu zoldet mondott arra,
@@ -4951,7 +4951,7 @@ def audit(text: str):
             "Ird at: kettospont, zarojel, vagy uj mondat. Idosav es datumtartomany (10:00 – 12:00, 10–12) tartomany, nem gondolatjel: az maradhat."
         )
     # 4. ellenorzes (GATEHOMOGLIF816): vegyes irasrendszeru szo. SZANDEKOSAN
-    # NEM magyar-kapuzott (elteres Marveen specjetol, ervvel): az FP-vedelem
+    # NEM magyar-kapuzott (elteres Alfred specjetol, ervvel): az FP-vedelem
     # maga a VEGYES-szo szabaly -- egy legitim idegen idezet szavai TISZTA
     # nem-latin betusek, sosem vegyesek. A magyar-kapu itt semmit nem vedene,
     # viszont lyukat utne: egy 2-markeres, hibatlanul ekezetes magyar szoveg
@@ -5071,7 +5071,7 @@ _AUDITED_MAIL_KINDS = ("send_email", "connector_send", "draft")
 # four such characters in the lead agent's own messages, caught only by a
 # manual scan.
 #
-# FAILURE DIRECTION IS THE OPPOSITE OF THE EMAIL BRANCH (Marveen, msg 28870):
+# FAILURE DIRECTION IS THE OPPOSITE OF THE EMAIL BRANCH (Alfred, msg 28870):
 #   - homoglyph FOUND           -> BLOCK (exit 2), naming the word and the char;
 #   - body NOT INTERPRETABLE     -> PASS, with a loud named systemMessage and a
 #     (unreadable path, $-path,     gate-log line. On this channel a false block

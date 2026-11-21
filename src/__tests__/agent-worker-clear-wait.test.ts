@@ -154,7 +154,7 @@ import { runViaWorker } from '../web/agent-worker.js'
 // The test suite runs from a git worktree, which workerStartAllowed() treats
 // as a second instance and would disable the worker path on. Opt in -- the
 // gate targets accidental live-worker takeover, not this fully mocked run.
-process.env.MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES = '1'
+process.env.ALFRED_ALLOW_SECOND_INSTANCE_SERVICES = '1'
 
 afterEach(() => {
   for (const p of [tui.state.acceptedOutPath, tui.state.acceptedDonePath]) {

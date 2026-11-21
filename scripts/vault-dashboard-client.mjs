@@ -49,10 +49,10 @@ export function installSetting(root, key, def) {
 }
 
 // The agent name this process claims (sent as X-Agent-Id; self-asserted, never authentication):
-// MARVEEN_AGENT_ID or MARVEEN_AGENT_NAME when the launcher exported one, else the <name> of the last
+// ALFRED_AGENT_ID or ALFRED_AGENT_NAME when the launcher exported one, else the <name> of the last
 // /agents/<name>/ component of the working directory (an agent's MCP servers start in its folder).
 export function claimedAgentName(cwd = process.cwd()) {
-  const fromEnv = (process.env.MARVEEN_AGENT_ID || process.env.MARVEEN_AGENT_NAME || '').trim()
+  const fromEnv = (process.env.ALFRED_AGENT_ID || process.env.ALFRED_AGENT_NAME || '').trim()
   if (fromEnv) return fromEnv
   const parts = cwd.split('/')
   for (let i = parts.length - 2; i >= 0; i--) {

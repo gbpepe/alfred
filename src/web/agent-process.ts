@@ -41,10 +41,8 @@ import { scheduleRecoveryBrief, cancelRecoveryBrief } from './restart-recovery-b
 import { requeueAbandonedAndNotify } from './requeue-notice.js'
 import { beginRestart, endRestart } from './restart-lock.js'
 import { cancelRestartWake, scheduleRestartWake, type RestartWakeRequest } from './restart-wake.js'
-import { agentDir, listAgentNames, readAgentModel, resolveAgentModelDetailed, readAgentClaudeConfigDir, readAgentClaudePlan, readAgentChannelProvider, agentConfigCarriesSenderRoleGate, readAgentAuthMode, readAgentDisplayName, readAgentRemoteConfig, readAgentRemoteHost, readAgentRunAsUser, readAgentMemoryIsolation, readAgentCodeMode, readAgentCodeModeLaunched, writeAgentCodeModeLaunched, readAgentStateObserver, readAgentWorksourceChannel, readAgentCustomProvider, readAgentExtraChannels, readAgentGromzo, readAgentSenderRoleGatePolicy, readFileOr, readJsonObjectForWrite } from './agent-config.js'
-import { buildExtraChannelLaunch, enableExtraPlugins, gromzoTokenFile, mxdAgentSockUsable } from './agent-extra-channels.js'
-import { filterMainGromzoIds, mainGromzoPrimaryReady, MAIN_GROMZO_PLUGIN_ID } from './main-gromzo-launch.js'
-import { ensureGromzoMarketplace } from './gromzo-marketplace.js'
+import { agentDir, listAgentNames, readAgentModel, resolveAgentModelDetailed, readAgentClaudeConfigDir, readAgentClaudePlan, readAgentChannelProvider, agentConfigCarriesSenderRoleGate, readAgentAuthMode, readAgentDisplayName, readAgentRemoteConfig, readAgentRemoteHost, readAgentRunAsUser, readAgentMemoryIsolation, readAgentCodeMode, readAgentCodeModeLaunched, writeAgentCodeModeLaunched, readAgentStateObserver, readAgentWorksourceChannel, readAgentCustomProvider, readAgentExtraChannels, readAgentSenderRoleGatePolicy, readFileOr, readJsonObjectForWrite } from './agent-config.js'
+import { buildExtraChannelLaunch, enableExtraPlugins } from './agent-extra-channels.js'
 import { probeExtraPluginsInTree, combineLiveness } from './extra-channel-liveness.js'
 import { loadCustomProvider, type CustomProviderDef } from './custom-providers.js'
 import { decideOwnOauthToken, ownOauthTokenExport, ownOauthLaunchVerdict, resolveOauthTokenFileSetting } from './agent-oauth-token-file.js'
@@ -79,7 +77,6 @@ import {
   type AgentRunState,
   type TmuxInvocation,
 } from './ssh-tmux.js'
-import { parseTelegramToken } from './telegram.js'
 import { getProvider, getProviderType, channelStateDir, providerCapabilities, readChannelToken, type ChannelProviderType } from '../channel-provider.js'
 import { CODE_MODE_SWITCH_REASON, CONTINUE_OPT_OUT_REASON, decideContinueFlag, readContinueOptOut, verifyContinueLaunch } from './channel-continue-policy.js'
 import { buildChannelStateFence } from './channel-state-fence.js'
@@ -87,7 +84,7 @@ import { measureClaudeCliVersion } from './claude-cli-version.js'
 import { decideStateObserver, stateObserverLaunchEnv } from './state-observer.js'
 import { launchableInstallDefault } from './default-model-guard.js'
 import { getClaudePidForSession, probeChannelPluginLiveness } from '../channel-coordinator/liveness.js'
-import { CHANNEL_PROVIDER, MAIN_AGENT_ID, STORE_DIR, PROJECT_ROOT, SUBAGENT_INBOX_TEE, FLEET_PYTHON_VENV } from '../config.js'
+import { CHANNEL_PROVIDER, MAIN_AGENT_ID, STORE_DIR, PROJECT_ROOT, FLEET_PYTHON_VENV } from '../config.js'
 import { fleetVenvBin } from '../fleet-venv.js'
 
 // FLEETVENV923: the `<venv>/bin:` prefix for a launch PATH, or '' when the venv
@@ -115,7 +112,7 @@ import { schedulePluginUnlockAfterRespawn } from './channel-plugin-unlock.js'
 import { recordInjectedPrompt, forgetInjectedPrompt } from './injected-prompt-registry.js'
 import { getSecret } from './vault.js'
 import { resolveOpenRouterModel } from './openrouter-models.js'
-import { reapChannelOrphans, reapDetachedChannelClaudes, reapGromzoOrphans } from './channel-poller-reap.js'
+import { reapChannelOrphans, reapDetachedChannelClaudes } from './channel-poller-reap.js'
 import { MAIN_CHANNELS_SESSION } from './main-agent.js'
 import { notifyChannel, alertIsRedirected } from '../notify.js'
 
@@ -156,12 +153,11 @@ export { CHANNEL_PLUGIN_IDS }
 // `explicitProvider` MUST be the agent's EXPLICIT per-agent channelProvider
 // (readAgentChannelProvider), or null when unset -- NOT the resolved provider.
 // resolveAgentProvider() defaults an agent with no channelProvider to the global
-// CHANNEL_PROVIDER (telegram), and a legacy-token fallback then marks it
-// hasChannel -- so EVERY channel-less sub-agent (boni/deeper/iris/zara/samu) is
-// launched with --channels plugin:telegram and would keep the dup poller. Keying
-// on the EXPLICIT provider means a channel-less agent (null) disables all three;
-// only an agent that genuinely declares its channel (e.g. slacker=slack) keeps
-// its own plugin.
+// CHANNEL_PROVIDER (discord), and a legacy-token fallback would otherwise mark it
+// hasChannel -- so EVERY channel-less sub-agent would be launched with
+// --channels plugin:discord and keep a dup poller. Keying on the EXPLICIT
+// provider means a channel-less agent (null) disables all channel plugins; only
+// an agent that genuinely declares its channel keeps its own plugin.
 export function scopeChannelPlugins(
   explicitProvider: string | null,
   existing?: Record<string, boolean>,
@@ -183,57 +179,13 @@ export function scopeChannelPlugins(
 // loaded it, yet enabledPlugins:false made Claude Code refuse to register it (no
 // MCP entry, no bun poller, no bot.pid -> dead bot after any respawn). Gating on
 // the own token keeps the dup-poller intent: a channel-less agent (no own token,
-// only the legacy/global-token fallback that still marks hasChannel) returns null,
-// so scopeChannelPlugins(null) disables all three and it never fights the main
-// agent over the shared getUpdates slot.
+// only a shared fallback) returns null, so scopeChannelPlugins(null) disables
+// channel plugins and avoids contention over the shared token slot.
 export function ownChannelProviderForScope(
   hasOwnToken: boolean,
   resolvedProvider: string | null,
 ): string | null {
   return hasOwnToken && resolvedProvider ? resolvedProvider : null
-}
-
-/**
- * Teams name-sync write: set TEAMS_BOT_DISPLAY_NAME in the agent's teams .env
- * to `displayName`, only on drift. Returns whether it wrote.
- *
- * ENVTMPMODE925: the teams .env holds the bot's app secret, so a file this call
- * CREATES is 0600. writeFileSync's `mode` applies only on creation, so an
- * existing .env keeps whatever mode the operator gave it (the write is in
- * place, no rename). Without it a missing .env came up at the umask default.
- */
-export function syncTeamsDisplayName(envPath: string, displayName: string | null | undefined): boolean {
-  if (!displayName) return false
-  // One line only (ENVTEAMSNAME1028): the name comes from agent-config.json, and a
-  // line break in it would add a line of its own to this .env.
-  if (!isSingleLineEnvValue(displayName)) {
-    logger.warn({ envPath }, 'teams name sync: display name is not a single line, not written')
-    return false
-  }
-  const raw = existsSync(envPath) ? readFileSync(envPath, 'utf-8') : ''
-  const current = raw.match(/^TEAMS_BOT_DISPLAY_NAME=(.*)$/m)?.[1]?.trim()
-  if (current === displayName) return false
-  const line = `TEAMS_BOT_DISPLAY_NAME=${displayName}`
-  const next = current !== undefined
-    ? raw.replace(/^TEAMS_BOT_DISPLAY_NAME=.*$/m, () => line) // a function: "$&" or "$`" in the name stays literal
-    : (raw === '' || raw.endsWith('\n') ? raw + line + '\n' : raw + '\n' + line + '\n')
-  writeFileSync(envPath, next, { mode: 0o600 })
-  return true
-}
-
-// Wrap the telegram plugin's bun stdio server in a tee that persists each
-// inbound channel notification to <stateDir>/inbox-pending.jsonl, which the
-// channel-inbox-drain UserPromptSubmit hook then pulls into the next turn.
-// Sub-agents load the plugin as a plain MCP server, so Claude Code drops its
-// channel notifications; this tee is what makes SUBAGENT_TELEGRAM_WAKE_ENABLED
-// have an inbox to wake on.
-export function buildTelegramMcpServerConfig(bunBin: string, pluginDir: string, stateDir: string) {
-  const wrapper = join(PROJECT_ROOT, 'scripts', 'channel-inbound-tee.mjs')
-  return {
-    command: 'node',
-    args: [wrapper, bunBin, 'run', '--cwd', pluginDir, '--shell=bun', '--silent', 'start'],
-    env: { TELEGRAM_STATE_DIR: stateDir },
-  }
 }
 
 // The fleet's shared long-lived OAuth token (from `claude setup-token`), stored
@@ -291,7 +243,7 @@ export const LAUNCH_SECRET_FILE_MODE = 0o600
  * <br />
  * en: Removes an agent's launch secrets from disk (on stop).
  *
- * MIERT DONTES, ES NEM MULASZTAS (Marveen kikotese a #1478 review-jan): a takaritas hianya azt
+ * MIERT DONTES, ES NEM MULASZTAS (Alfred kikotese a #1478 review-jan): a takaritas hianya azt
  * jelentette volna, hogy egy vaultban ROTALT kulcs REGI erteke a lemezen marad a kovetkezo
  * inditasig, egy leallitott agens titka pedig hataridotlenul. Egy rotacio utan tovabb elo regi
  * kulcs pont az a nyom, amit egy incidensnel keresni fogunk.
@@ -361,13 +313,12 @@ export function hasFleetOauthToken(): boolean {
 //     cannot contend for anything: 6 configured / 2 running must not read as
 //     a 6-way collision.
 //   - It counted across providers. Plugin installs are keyed per plugin id
-//     (telegram/slack/teams/... are separate slots in installed_plugins.json),
-//     so a running Teams agent never collides with running Telegram agents.
+//     in installed_plugins.json, so agents using distinct slots do not collide.
 //   - On macOS the collision does not manifest (verified empirically
-//     2026-07-10 on the origin host: three concurrent telegram pollers --
+//     2026-07-10 on the origin host: three concurrent channel pollers --
 //     main + two sub-agents, distinct own tokens, a live `bun server.ts`
 //     each, all on the shared ~/.claude while the installed_plugins.json
-//     telegram slot pointed at a THIRD agent's projectPath). Channel agents
+//     channel slot pointed at a THIRD agent's projectPath). Channel agents
 //     always launch fresh with an explicit --channels plugin:<id> flag, which
 //     loads the plugin regardless of the project-scoped install slot; and
 //     macOS auth lives in the Keychain, so the Linux credentials-refresh
@@ -496,10 +447,9 @@ function maybeAlertSharedConfigCollision(name: string): void {
 // Claude Code records a plugin's PROJECT-scoped install in a single shared file
 // -- ~/.claude/plugins/installed_plugins.json -- keyed by ONE projectPath per
 // plugin id. Every sub-agent ran out of the SAME ~/.claude, so each agent launch
-// (claude --channels plugin:telegram@...) rewrote that single slot to its OWN
+// (claude --channels plugin:...) rewrote that single slot to its OWN
 // project, evicting whichever agent registered before it. Net effect: only ONE
-// agent's channel plugin could be registered (one bun getUpdates poller / one
-// bot.pid) fleet-wide; every other agent saw "No MCP servers configured", spawned
+// agent's channel plugin could be registered (one bun poller / one bot.pid) fleet-wide; every other agent saw "No MCP servers configured", spawned
 // no poller, and went deaf. Sequentialising restarts did NOT help (the slot is
 // shared state, not a startup race); the only structural fix is to stop the
 // agents sharing one plugin-install file.
@@ -564,7 +514,7 @@ export function ensureIsolatedChannelConfigDir(
 // never retry, and Claude Code prefers an on-disk .credentials.json over an
 // otherwise-valid CLAUDE_CODE_OAUTH_TOKEN env var (claude-credentials-guard.ts),
 // so a stale file wins even with a live token sitting right next to it
-// (confirmed root cause of the 2026-07-23 marveen-channels silent outage,
+// (confirmed root cause of the 2026-07-23 alfred-channels silent outage,
 // PLAN.md GAP 1). The isolated sub-agents, which authenticate from the
 // long-lived fleet setup-token via an isolated CLAUDE_CONFIG_DIR carrying no
 // .credentials.json at all, never hit this. This gives the main agent the SAME
@@ -656,51 +606,31 @@ export function mainAgentConfigDirIfSeparate(): string | null {
   return existsSync(dir) ? dir : null
 }
 
-// CHANNEL_PLUGINS_EXTRA -- the co-listen plugins channels.sh appends to
-// --channels so ONE main session can serve several providers at once (e.g.
-// Telegram primary + Discord). Same .env key channels.sh parses, read here so
-// the isolated-config provisioner and the launcher cannot disagree.
+// CHANNEL_PLUGINS_EXTRA -- co-listen plugins channels.sh appends to
+// --channels so ONE main session can serve extra plugins alongside the primary.
+// Same .env key channels.sh parses, read here so the isolated-config provisioner
+// and the launcher cannot disagree.
 //
 // 2026-08-16 (Discord co-listen, ~2h silent outage): the provisioner rewrites
 // the isolated settings.json on EVERY channels.sh start and forced
 // scopeChannelPlugins(PRIMARY) -- which sets every OTHER channel plugin to
 // false. Claude Code then refuses to load the co-listen plugin no matter what
-// --channels says, so the Discord bot came up deaf: messages to it reached
+// --channels says, so the co-listen bot came up deaf: messages to it reached
 // nothing and the owner got no reply. Two manual fixes (hand-edited registry,
 // then `claude plugin install`) both looked correct and were both erased
 // seconds later by the next restart. Keeping the extras enabled here is the
 // only place that survives, because this function is what does the erasing.
-//
-// GROMZOMAINAGENT1106: through the same gromzo filter as every main launcher (main-gromzo-launch.ts), so the
-// isolated main config does not enable a gromzo plugin the launch left out (no agent.sock, or a bad slug):
-// enabled there, it would still start as an MCP server, without MXD_AGENT, and exit.
 export function readExtraChannelPluginIds(): string[] {
   try {
-    const env = readEnvFile(['CHANNEL_PLUGINS_EXTRA', 'MAIN_AGENT_ID', 'CHANNEL_PROVIDER'])
-    return mainIsolatedExtraPluginIds(env['CHANNEL_PROVIDER'] || CHANNEL_PROVIDER, env['MAIN_AGENT_ID'] ?? '', env['CHANNEL_PLUGINS_EXTRA'] ?? '')
+    const env = readEnvFile(['CHANNEL_PLUGINS_EXTRA'])
+    return mainIsolatedExtraPluginIds(env['CHANNEL_PLUGINS_EXTRA'] ?? '')
   } catch {
     return []
   }
 }
 
-/** GROMZOEXTRASREADY1109 (Samu 73946): the ids the isolated MAIN config enables beside its primary, pure for the tests.
- *  Every id passes filterMainGromzoIds (the gromzo id only with a usable agent.sock and a valid slug), as before. On a
- *  CHANNEL_PROVIDER=gromzo install the gromzo id ALSO needs the main agent primary-ready (mainGromzoPrimaryReady, the
- *  same rule as channels.sh and the respawn builder): measured on the QA VPS 11-09, while the install was gromzo
- *  PENDING this config still enabled the plugin, the pending claude started it without MXD_AGENT (CONNECTION_CLOSED),
- *  and the next, ready session came up without its Gromzo channel until the dashboard's soft /mcp reconnect ~9 min
- *  later, racing channels.sh's 600 s never-started guard. On every other provider gromzo is an extra, as before. */
-export function mainIsolatedExtraPluginIds(
-  provider: string,
-  mainAgentId: string,
-  rawExtras: string,
-  opts: { sockPath?: string; primaryReady?: (id: string) => boolean } = {},
-): string[] {
-  const raw = rawExtras.split(/\s+/).map(s => s.trim()).filter(Boolean)
-  const ids = opts.sockPath === undefined ? filterMainGromzoIds(mainAgentId, raw) : filterMainGromzoIds(mainAgentId, raw, opts.sockPath)
-  if (provider !== 'gromzo') return ids
-  const ready = opts.primaryReady ?? ((id: string) => mainGromzoPrimaryReady(id))
-  return ids.filter((id) => id !== MAIN_GROMZO_PLUGIN_ID || ready(mainAgentId))
+export function mainIsolatedExtraPluginIds(rawExtras: string): string[] {
+  return rawExtras.split(/\s+/).map(s => s.trim()).filter(Boolean)
 }
 
 /**
@@ -948,7 +878,7 @@ function writeJsonAtomic(path: string, value: unknown, opts: { groupShared?: boo
 // MCPWRITEGATE1104 D4: which servers of an isolated .claude.json the dashboard copied from the shared config. Kept in
 // a file of its own next to .claude.json (Claude Code owns and rewrites .claude.json; an extra key there is not ours to
 // rely on). A missing or unreadable file is an empty set: nothing is then provably inherited.
-export const INHERITED_MCP_FILE = '.marveen-mcp-inherited.json'
+export const INHERITED_MCP_FILE = '.alfred-mcp-inherited.json'
 // Seeded into every agent before the provenance file existed, with a "/" root: removable without a record.
 const LEGACY_INHERITED_MCP_NAMES = new Set(['Filesystem'])
 
@@ -1396,7 +1326,7 @@ function provisionIsolatedConfigDir(
     // overwrite. The agent's own registry is the one Claude Code maintains; a
     // plain copy of the shared file threw away every entry the shared file
     // lacked. Measured 2026-11-07: the shared registry was `{"plugins":{}}`, so
-    // each channels.sh start wiped the telegram entry, Claude Code re-installed
+    // each channels.sh start wiped the channel entry, Claude Code re-installed
     // the plugin DURING startup (installedAt == session start, every time), and
     // a plugin installed that late is never spawned for the session: no bun
     // child, no bot.pid, the watchdog's "plugin disappeared" grace, and a
@@ -1840,18 +1770,17 @@ export function stampFableOverageConsentSharedRoots(): void {
   const candidates = [
     mainDir ? join(mainDir, '.claude.json') : null,
     join(homedir(), '.claude.json'),
-    join(process.env.MARVEEN_WORKER_DIR || join(homedir(), '.marveen-worker'), '.claude-config', '.claude.json'),
-    join(process.env.MARVEEN_WORKER_DIR_FAST || join(homedir(), '.marveen-worker-fast'), '.claude-config', '.claude.json'),
+    join(process.env.ALFRED_WORKER_DIR || join(homedir(), '.alfred-worker'), '.claude-config', '.claude.json'),
+    join(process.env.ALFRED_WORKER_DIR_FAST || join(homedir(), '.alfred-worker-fast'), '.claude-config', '.claude.json'),
   ]
   for (const p of candidates) {
     if (p && existsSync(p)) stampFableOverageConsent(p)
   }
 }
 
-/** The provider a sub-agent's own agent-config value resolves to: one of the five sub-agent providers, else the
- *  install's provider (an unknown or unaccepted value, 'gromzo' included, falls back). Pure, so it is unit-tested. */
+/** The provider a sub-agent's own agent-config value resolves to ('discord'), else the install's provider. */
 export function pickAgentProvider(perAgent: string | null, installProvider: ChannelProviderType): ChannelProviderType {
-  if (perAgent === 'slack' || perAgent === 'telegram' || perAgent === 'discord' || perAgent === 'googlechat' || perAgent === 'teams') return perAgent
+  if (perAgent === 'discord') return perAgent
   return installProvider
 }
 
@@ -1896,7 +1825,7 @@ export function shSingleQuote(value: string): string {
  * amit a hivo a `launchSecretRef`-fel allit elo. Egy jovobeli ag, ami megint az erteket akarna
  * beirni, eloszor a PARAMETER TIPUSAT kellene visszaallitsa -- az pedig latszik a review-ban.
  */
-export type ProviderKind = 'claude' | 'deepseek' | 'minimax' | 'openrouter' | 'ollama' | 'custom'
+export type ProviderKind = 'claude' | 'deepseek' | 'vertex-eu' | 'minimax' | 'openrouter' | 'ollama' | 'custom'
 
 export function resolveProviderEnv(
   model: string,
@@ -2072,7 +2001,7 @@ export function tmuxInvocationFor(tmuxArgs: string[], target: string | null | Tm
   const { host, runAsUser } = resolveTarget(target, tmuxArgs)
   // Ensure the private ControlMaster socket dir exists before ANY remote ssh
   // call (idempotent, ~free). Without this a watcher-first remote call after a
-  // marveen restart would lose connection multiplexing and re-handshake each tick.
+  // alfred restart would lose connection multiplexing and re-handshake each tick.
   if (host) ensureControlDir()
   return buildTmuxInvocation(host, tmuxBin(), tmuxArgs, 'tmux', runAsUser ?? null)
 }
@@ -2137,7 +2066,7 @@ export function prefetchPaneCaptures(sessions: string[]): void {
     if (eligible.length < 2) return
 
     const nonce = randomBytes(16).toString('hex')
-    const markers = eligible.map((_, i) => `__marveen_capture_${nonce}_${i}__`)
+    const markers = eligible.map((_, i) => `__alfred_capture_${nonce}_${i}__`)
     const args: string[] = []
     eligible.forEach((session, i) => {
       if (i > 0) args.push(';')
@@ -2164,7 +2093,7 @@ export function prefetchPaneCaptures(sessions: string[]): void {
     }
 
     // Reject collisions before trusting any frame or failed-session position.
-    const matches = [...out.matchAll(new RegExp(`(?<=^|\\n)__marveen_capture_${nonce}_[0-9]+__\\n`, 'g'))]
+    const matches = [...out.matchAll(new RegExp(`(?<=^|\\n)__alfred_capture_${nonce}_[0-9]+__\\n`, 'g'))]
     if (!out.startsWith(markers[0] + '\n') || matches.length > eligible.length ||
         matches.some((match, i) => match[0] !== markers[i] + '\n') ||
         out.split(nonce).length - 1 !== matches.length) return
@@ -2319,11 +2248,7 @@ export function getAgentRunningSince(name: string, session: string = agentSessio
 }
 
 
-/** GROMZONOPROVIDER1108 (Dani 73584, 73593): decided on the RESOLVED provider, never on what the agent wrote. A
- *  sub-agent never takes a provider whose capabilities say sub-agents get none (subAgentDefault === 'none': gromzo,
- *  the MAIN agent's Gromzo channel, which a sub-agent must never carry or speak through). An own value the resolver
- *  does not accept ('gromzo', 'whatsapp', any string the agent wrote into its own config) falls back to the install's
- *  provider and lands here as that provider, so it cannot open the door. Pure, so it is unit-tested. */
+/** Decided on the RESOLVED provider, never on what the agent wrote. Pure, so it is unit-tested. */
 export function subAgentMayUseProvider(resolved: ChannelProviderType): boolean {
   return providerCapabilities(resolved).subAgentDefault !== 'none'
 }
@@ -2334,9 +2259,7 @@ export function agentHasChannel(name: string): boolean {
   const dir = agentDir(name)
   const agentChannelDir = channelStateDir(agentProvider, dir)
   const token = readChannelToken(agentProvider, join(agentChannelDir, '.env'))
-  if (token) return true
-  if (agentProvider === 'telegram') return !!parseTelegramToken(name)
-  return false
+  return !!token
 }
 
 // Remote agent launch (ssh). Starts a DETACHED tmux session on the laptop so
@@ -2634,62 +2557,25 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
   const agentProvider = resolveAgentProvider(name)
   const provider = getProvider(agentProvider)
   const agentChannelDir = channelStateDir(agentProvider, dir)
-  // GROMZONOPROVIDER1108 (Dani 73593): the launch path has its own guard, the same one agentHasChannel asks first, so a
-  // sub-agent never launches with a provider sub-agents may not use (gromzo), whatever a token reader would return.
   const providerAllowed = subAgentMayUseProvider(agentProvider)
   const token = providerAllowed ? readChannelToken(agentProvider, join(agentChannelDir, '.env')) : null
-  // Backward compat: try legacy Telegram token if provider-aware lookup misses
-  let hasChannel = !!token
-  if (!token && agentProvider === 'telegram') {
-    const legacyToken = parseTelegramToken(name)
-    hasChannel = !!legacyToken
-    // Channel-less agents (inter-agent only, no direct Telegram/Slack) are allowed to start
-  }
+  // Channel-less agents (inter-agent only, no direct Discord channel) are allowed to start
+  const hasChannel = !!token
 
   // AGENTEXTRACH1006: co-listen providers next to the primary one. Only an
   // extra whose OWN state dir holds a token takes part; a configured but
   // tokenless one is skipped loudly rather than loading a plugin that could
   // fall back to another bot's token.
-  // GROMZOAGENTS1028: the Gromzo channel rides the same launch fields (plugin
-  // id, --channels arg, env exports), never `providers`: it has no token or
-  // state dir for the reaper, the state fence or the token probes to act on.
-  const extraLaunch = buildExtraChannelLaunch(readAgentExtraChannels(name), agentProvider, dir, undefined,
-    readAgentGromzo(name)
-      ? { slug: name, sockUsable: mxdAgentSockUsable(), tokenFile: gromzoTokenFile(name) }
-      : undefined)
-  // GROMZOGATECONF1030 (c): the agent's own agent-config.json is no gate source any more (the agent can write it).
+  const extraLaunch = buildExtraChannelLaunch(readAgentExtraChannels(name), agentProvider, dir)
+  // Role-gate store enforcement: the agent's own agent-config.json is no gate source (the agent can write it).
   if (agentConfigCarriesSenderRoleGate(name)) {
     logger.warn({ name }, 'senderRoleGate in agent-config.json is ignored: the gate is read from store/agent-sender-role-gates.json only')
   }
   if (extraLaunch.skipped.length > 0) {
     logger.warn({ name, skipped: extraLaunch.skipped }, 'extraChannels: provider configured but no token in its state dir -- not loaded')
   }
-  // GROMZOMXDINSTALL1102 Q5: the staged gromzo-local marketplace registered in the shared
-  // ~/.claude/plugins BEFORE this agent's isolated config is seeded from it (gromzo-marketplace.ts).
-  if (extraLaunch.gromzo === 'on') {
-    const reg = ensureGromzoMarketplace({
-      pluginsDir: join(homedir(), '.claude', 'plugins'),
-      pluginRoot: join(homedir(), 'marveen-local-plugins', 'gromzo'),
-      projectRoot: PROJECT_ROOT,
-    })
-    if (reg === 'registered') logger.info({ name }, 'gromzo: the gromzo-local marketplace registered')
-    else if (reg !== 'present') logger.warn({ name, reg }, 'gromzo: the gromzo-local marketplace is not registered')
-  }
-  if (extraLaunch.gromzo === 'skipped-no-socket' || extraLaunch.gromzo === 'skipped-bad-name') {
-    logger.warn({ name, gromzo: extraLaunch.gromzo }, 'gromzo: configured but not loaded (no usable mxd agent.sock, or a name mxd refuses)')
-  }
-  const hasExtraChannels = extraLaunch.providers.length > 0 || extraLaunch.gromzo === 'on'
+  const hasExtraChannels = extraLaunch.providers.length > 0
   const hasAnyChannel = hasChannel || hasExtraChannels
-
-  // Teams name-sync (companion to make-teams-manifest.sh): keep
-  // TEAMS_BOT_DISPLAY_NAME in the agent's teams .env equal to the agent's
-  // displayName, so the generated Teams manifest names the bot after the agent
-  // (not the generic fallback). Idempotent; writes only on drift, non-fatal.
-  if (agentProvider === 'teams' && hasChannel) {
-    try {
-      syncTeamsDisplayName(join(agentChannelDir, '.env'), readAgentDisplayName(name))
-    } catch { /* best-effort name-sync; never block launch */ }
-  }
 
   const session = agentSessionName(name)
 
@@ -2715,7 +2601,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     }
 
     // Also reap DETACHED channel claudes (the parent-process leak): a prior
-    // --continue session that survived kill-session keeps a poller 409-racing
+    // --continue session that survived kill-session keeps a poller contending for
     // this agent's bot token, which the health monitor reads as "down" and
     // restarts -- a self-feeding thrash loop (zara, 2026-06-03). We just killed
     // this agent's tmux session above, so its leftover claude is now detached;
@@ -2724,13 +2610,6 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
       reapDetachedChannelClaudes({ tmuxPath: tmuxBin() })
     } catch (err) {
       logger.warn({ err, name }, 'pre-launch detached-claude reap failed (continuing)')
-    }
-    // MXDAGENTSOCKID1106 (b): the gromzo plugins of the claudes killed above (and of this agent's old session)
-    // outlive them; a leftover keeps this agent's agent.sock binding and pops its messages.
-    try {
-      reapGromzoOrphans({ tmuxPath: tmuxBin() })
-    } catch (err) {
-      logger.warn({ err, name }, 'pre-launch gromzo-orphan reap failed (continuing)')
     }
 
     // Custom provider check runs FIRST and BEFORE resolveOpenRouterModel, so
@@ -2845,67 +2724,22 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     writeAgentSettingsFromProfile(name, profile)
     rewriteAgentClaudeMdOnStart(name, profile)
     // A sub-agent must load ONLY its own channel plugin. The user-scope
-    // enabledPlugins would otherwise make EVERY sub-agent spawn a telegram
-    // (and slack/discord) poller that falls back to the main agent's bot
-    // token and fights it over the same getUpdates slot (409 Conflict /
-    // orphan-poller churn / recurring MCP disconnects). Scope the agent's
-    // settings.json so exactly its configured provider stays enabled and the
-    // other channel plugins are forced off; a channel-less agent disables all
-    // three. Applies to channel-HAVING sub-agents too (e.g. a slack agent must
-    // not also run a telegram poller). Re-applied on EVERY spawn because
+    // enabledPlugins would otherwise make EVERY sub-agent spawn a channel
+    // poller that falls back to the main agent's bot token and contends with
+    // it (orphan-poller churn / recurring MCP disconnects). Scope the agent's
+    // settings.json so exactly its configured provider stays enabled and other
+    // channel plugins are forced off; a channel-less agent disables all channel
+    // plugins. Re-applied on EVERY spawn because
     // writeAgentSettingsFromProfile() above regenerates settings.json from the
     // profile template -- so this survives respawns, unlike a one-off manual
     // per-agent override (which a respawn silently wiped). The main agent runs
-    // via channels.sh, not this path, so it remains the sole telegram poller.
+    // via channels.sh, not this path, so it remains the sole main poller.
     //
-    // CATASTROPHE GUARD: never scope the MAIN agent's plugins here. marveen is
+    // CATASTROPHE GUARD: never scope the MAIN agent's plugins here. alfred is
     // not in agents/ (so listAgentNames never spawns it through this path) and
     // its channel comes up via channels.sh -- but if a future caller ever passed
     // MAIN_AGENT_ID in, scopeChannelPlugins(null) would DISABLE the owner's
-    // telegram channel (Szabi's primary line). Refuse outright.
-    //
-    // Telegram agents use a per-agent .mcp.json to spawn their own bun process
-    // instead of the shared --channels flag path. The --channels path goes
-    // through the plugin's .in_use/<pid> lock: if one process already holds the
-    // lock, every other agent that starts with --channels gets "already in use"
-    // and ends up with No MCP servers configured -- no bun, no bot.pid, deaf to
-    // inbound Telegram. The mcp.json path bypasses the lock: Claude Code spawns a
-    // fresh bun stdio server per agent, each with its own TELEGRAM_STATE_DIR. The
-    // stdio tee wrapper restores inbound delivery by persisting notifications to a
-    // local inbox that the UserPromptSubmit drain hook pulls into context.
-    //
-    // OPT-IN / DEFAULT OFF (SUBAGENT_INBOX_TEE). This mcp.json+tee swap is a
-    // delivery-path change: it writes inbound message content to a local inbox
-    // file for the drain hook to pull. With the flag off, telegram sub-agents
-    // keep the upstream `--channels` path unchanged and nothing is written to
-    // disk. Only opt in together with the channel-inbox-drain hook + (optionally)
-    // SUBAGENT_TELEGRAM_WAKE_ENABLED.
-    let useMcpJsonForChannel = false
-    if (SUBAGENT_INBOX_TEE && hasChannel && agentProvider === 'telegram' && name !== MAIN_AGENT_ID) {
-      try {
-        const pluginCacheDir = join(homedir(), '.claude', 'plugins', 'cache', 'claude-plugins-official', 'telegram')
-        const versions = existsSync(pluginCacheDir)
-          ? readdirSync(pluginCacheDir).filter(v => /^\d+\.\d+\.\d+$/.test(v)).sort().reverse()
-          : []
-        const pluginVersion = versions[0] ?? '0.0.6'
-        const pluginDir = join(pluginCacheDir, pluginVersion)
-        const bunBin = join(homedir(), '.bun', 'bin', 'bun')
-        // The agent working-dir .mcp.json (NOT .claude/mcp.json) is what Claude Code
-        // loads as project-scope MCP config. An empty .mcp.json already present would
-        // override .claude/mcp.json, so write to the same file Claude Code reads.
-        const mcpJsonPath = join(agentDir(name), '.mcp.json')
-        const mcpConfig = {
-          mcpServers: {
-            'plugin:telegram:telegram': buildTelegramMcpServerConfig(bunBin, pluginDir, agentChannelDir),
-          },
-        }
-        writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2))
-        useMcpJsonForChannel = true
-        logger.info({ name, pluginVersion, pluginDir }, 'Wrote per-agent mcp.json for telegram plugin')
-      } catch (err) {
-        logger.warn({ err, name }, 'Could not write mcp.json for telegram agent; falling back to --channels flag')
-      }
-    }
+    // primary channel. Refuse outright.
 
     // ---- worksource channel (opt-in per agent, default OFF) ----
     //
@@ -2921,7 +2755,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     // loop. The two channel kinds stay orthogonal; an agent may have either,
     // both, or neither.
     //
-    // Merged into the SAME .mcp.json the telegram tee writes above, never
+    // Merged into the SAME .mcp.json if one already exists, never
     // overwriting it: an agent can legitimately have both a chat channel and a
     // work queue, and clobbering the file would silence the bot.
     //
@@ -3021,14 +2855,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
       const settingsPath = join(agentDir(name), '.claude', 'settings.json')
       try {
         const s = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>
-        // When mcp.json is used for the telegram plugin, force enabledPlugins.telegram
-        // to false so Claude Code does not ALSO load the plugin via the marketplace
-        // enabledPlugins path -- that would spawn a second bun process and produce
-        // 409 Conflict / poller races. When --channels is still used (non-telegram
-        // providers or mcp.json write failure), keep the original token-gated logic.
-        const scopeProvider = useMcpJsonForChannel
-          ? null
-          : ownChannelProviderForScope(!!token, agentProvider)
+        const scopeProvider = ownChannelProviderForScope(!!token, agentProvider)
         s.enabledPlugins = scopeChannelPlugins(
           scopeProvider,
           s.enabledPlugins as Record<string, boolean> | undefined,
@@ -3314,7 +3141,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
       stampCustomApiKeyApproval(target, stampKey)
     }
     const claudeConfigEnv = claudeConfigDir ? `export CLAUDE_CONFIG_DIR="${claudeConfigDir}" && ` : ''
-    // VOICETOKENLEAK1101 PR-A0: scripts/marveen-api.sh reads the agent's OWN token when it has one (AGENT_TOKENS).
+    // VOICETOKENLEAK1101 PR-A0: scripts/alfred-api.sh reads the agent's OWN token when it has one (AGENT_TOKENS).
     const helperTokenEnvPiece = helperTokenEnv(name, shSingleQuote)
     const agentEgressEnv = agentVendorHostsEnv(name, shSingleQuote)
     // `--continue` requires an existing session; on a brand-new agent the
@@ -3339,9 +3166,9 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     // CC 2.1.193 REGRESSION: a `--continue` resume did NOT re-initialise the
     // `--channels` plugin MCP server -- the agent came up deaf on its channel.
     // So channel-having agents were ALWAYS launched fresh. MEASURED ABSENT on
-    // Claude Code 2.1.280 (CONTRESUME922, 2026-09-23: real Telegram message
+    // Claude Code 2.1.280 (CONTRESUME922, 2026-09-23: real channel message
     // from a resumed session, context kept). The narrowing lives in
-    // channel-continue-policy.ts and is CONDITIONAL: telegram provider, the
+    // channel-continue-policy.ts and is CONDITIONAL: channel provider, the
     // fleet-token auth path, no ephemeral launch-secret in the launch (a
     // resume of such a command starts without its key), measured CLI >= the
     // floor; and after a resumed launch the plugin is VERIFIED (bun poller +
@@ -3355,7 +3182,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     const continueDecision = decideContinueFlag({
       hasPriorSession, fresh: !!opts.fresh, hasChannel, isMainAgent: name === MAIN_AGENT_ID,
       provider: agentProvider, usesLaunchSecret, fleetTokenLaunch: oauthTokenEnv !== '',
-      useMcpJsonForChannel, installedCli, extraProviders: extraLaunch.providers,
+      useMcpJsonForChannel: false, installedCli, extraProviders: extraLaunch.providers,
       continueOptOut: readContinueOptOut(readFileOr(join(dir, 'agent-config.json'), '{}')),
       codeModeSwitched,
     })
@@ -3367,9 +3194,9 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
       logger.info({ name, reason: continueDecision.reason }, 'agent resume decision')
     }
     const continueFlag = continueDecision.useContinue ? '--continue ' : ''
-    const stateEnvVar = agentProvider === 'slack' ? 'SLACK_STATE_DIR' : agentProvider === 'discord' ? 'DISCORD_STATE_DIR' : agentProvider === 'googlechat' ? 'GOOGLECHAT_STATE_DIR' : agentProvider === 'teams' ? 'TEAMS_STATE_DIR' : 'TELEGRAM_STATE_DIR'
+    const stateEnvVar = 'DISCORD_STATE_DIR'
     // CHANSTATEUNSET930: the channel STATE DIRS are stripped too, not only the
-    // bot tokens. The tmux server carries the main agent's TELEGRAM_STATE_DIR in
+    // bot tokens. The tmux server carries the main agent's DISCORD_STATE_DIR in
     // its own env (channels.sh exports it before `tmux start-server`), so every
     // new pane inherited it -- including channel-less agents, whose claude and
     // every MCP server under it then looked, to channel-poller-reap's env scan,
@@ -3378,7 +3205,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     // channel-less agent, whose tools then reported 'failed to connect' until
     // the agent was restarted. A channel agent
     // re-exports its OWN dir right after this, via channelSetup below.
-    const unsetTokens = 'unset TELEGRAM_BOT_TOKEN SLACK_BOT_TOKEN SLACK_APP_TOKEN DISCORD_BOT_TOKEN TELEGRAM_STATE_DIR SLACK_STATE_DIR DISCORD_STATE_DIR GOOGLECHAT_STATE_DIR TEAMS_STATE_DIR'
+    const unsetTokens = 'unset DISCORD_BOT_TOKEN DISCORD_STATE_DIR'
     // CODEMODEFLAG1119: every launch sets the Code Mode variable explicitly, 1 or 0, so neither an inherited value nor
     // a settings.json env block decides it.
     const codeModeEnv = codeModeLaunchEnv(codeModeOn)
@@ -3397,39 +3224,28 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     // (BYOSUBUNSET1018, inherited-auth-unset.ts).
     // A plan token is an own token like oauthTokenFile: the inherited OAuth token AND API key are unset before its export.
     const byoUnsetEnv = inheritedAuthUnset({ needsFleetOauth, isOwnTeam, configuredConfigDir, ownTokenFile: ownTokenFile !== null || planToken !== null, keyMode })
-    // Slack plugin is third-party; its "not on approved allowlist" check is
-    // bypassed via `allowedChannelPlugins` in /Library/Application Support/ClaudeCode/managed-settings.json.
-    const auditLogEnv = agentProvider === 'slack' ? ` && export SLACK_AUDIT_LOG="${agentChannelDir}/audit.jsonl"` : ''
     const channelSetup = (hasChannel
-      ? `export ${stateEnvVar}="${agentChannelDir}"${auditLogEnv} && `
+      ? `export ${stateEnvVar}="${agentChannelDir}" && `
       : '') + extraLaunch.envExports
-    // SLACKDMVESZT1006: every provider this launch does NOT use points at the
-    // agent's own (token-less) state dir, so a plugin loaded for any other
-    // reason can never fall back to the main agent's token. The extras export
-    // their own real dir (envExports above), so they are excluded from the fence.
+    // Every provider this launch does NOT use points at the agent's own
+    // (token-less) state dir, so a plugin loaded for any other reason can
+    // never fall back to the main agent's token. The extras export their own
+    // real dir (envExports above), so they are excluded from the fence.
     const stateFence = buildChannelStateFence([...(hasChannel ? [agentProvider] : []), ...extraLaunch.providers], dir)
-    // When the per-agent mcp.json+tee path is active (SUBAGENT_INBOX_TEE), the
-    // plugin is already loaded as a plain MCP server, so ALSO passing --channels
-    // would register the plugin a SECOND way -- a duplicate poller racing the tee
-    // process over the same getUpdates slot. Suppress --channels in that case and
-    // rely solely on mcp.json (enabledPlugins is already forced false above for
-    // the same reason). Every other agent (non-telegram, main, or flag off) keeps
-    // the --channels launch path unchanged.
     // AGENTEXTRACH1006: the extras ride the SAME --channels list (a plugin that
-    // is loaded but not listed delivers nothing). With the telegram mcp.json
-    // path the primary is absent from the list and only the extras remain.
-    const primaryChannel = hasChannel && !useMcpJsonForChannel ? `plugin:${provider.pluginId}` : ''
+    // is loaded but not listed delivers nothing).
+    const primaryChannel = hasChannel ? `plugin:${provider.pluginId}` : ''
     const channelList = (primaryChannel + extraLaunch.channelArgs).trim()
     const channelFlag = channelList ? `--channels ${channelList}` : ''
-    // Channel-plugin MCP-registration guard (2026-06-23): the telegram/slack/etc.
-    // channel plugin registers as a stdio MCP server loaded via --channels. Claude
+    // Channel-plugin MCP-registration guard (2026-06-23): the channel plugin
+    // registers as a stdio MCP server loaded via --channels. Claude
     // Code connects stdio MCP servers in batches of MCP_SERVER_CONNECTION_BATCH_SIZE
     // (default 3); when an agent ALSO runs a slow local .mcp.json stdio server
     // (e.g. google-workspace/workspace-mcp, which spends seconds on OAuth + Google
     // API init) plus many claude.ai connectors, the channel plugin gets starved
     // out of the startup batch / hits MCP_TIMEOUT and never registers -- no /mcp
-    // entry, no bun poller, dead bot (observed: balazsmarveenja with workspace-mcp
-    // had NO telegram; removing workspace-mcp restored it). Raise the stdio batch
+    // entry, no bun poller, dead bot (observed: agents with workspace-mcp lost
+    // channel registration; removing workspace-mcp restored it). Raise the stdio batch
     // size and per-server timeout, and force non-blocking startup, so a slow local
     // MCP can never crowd the channel plugin out of registration. Only set for
     // channel-having agents (channel-less agents have no plugin to protect).
@@ -3508,7 +3324,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     logger.info({ name, session, channelDir: agentChannelDir, runAsUser: startTarget.runAsUser ?? null }, 'Agent tmux session started')
     // APRO920 (c)(2): the --model value actually passed, with the config-chain
     // element that supplied it (agent-config.json / model-choices / default) --
-    // D001 measured 227 claude-sonnet-4-6 token_usage rows under agent='marveen'
+    // D001 measured 227 claude-sonnet-4-6 token_usage rows under agent='alfred'
     // with no task_title, spread across 21 sessions, which looked like a CLI
     // fallback-model pattern rather than a configured source; this line lets a
     // later audit tell the two apart without re-deriving the resolution by hand.
@@ -3554,8 +3370,8 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
     // Claude Code 2.1.183+ launching `--channels` in a TRUSTED project directory
     // throws EPERM before any dialog -- the plugin never loads, no bun poller,
     // the sub-bot is deaf. The MAIN channels session has this fallback in
-    // channels.sh; sub-agents did NOT, so after a reboot/restart hephaestus and
-    // hermes came up with their telegram plugin silently absent. Watch the pane and, on EPERM,
+    // channels.sh; sub-agents did NOT, so after a reboot/restart agents
+    // could come up with their channel plugin silently absent. Watch the pane and, on EPERM,
     // relaunch ONCE from a /tmp dir (untrusted -> a trust dialog fires instead of
     // EPERM) with the agent CLAUDE.md symlinked so personality survives; the
     // channel state dir + CLAUDE_CONFIG_DIR are absolute so the bot still
@@ -3573,7 +3389,7 @@ export async function startAgentProcess(name: string, opts: StartOpts = {}): Pro
           epermRestarted = true
           try { runTmux(null, ['kill-session', '-t', exactTmuxTarget(session)], { timeout: 5000 }) } catch { /* already gone */ }
           try {
-            const fallbackCwd = mkdtempSync(join(tmpdir(), `marveen-agent-${name}-`))
+            const fallbackCwd = mkdtempSync(join(tmpdir(), `alfred-agent-${name}-`))
             // MIOAGENTINSTALL1114 (plan 4.4, Samu 77251 B): a package agent's shell is EXPANDED into a real file
             // (its imports would not load from /tmp, M24); any other agent gets the link as before. 'refused': the
             // package files are missing or the shell is broken; no context-less start, the owner gets a notice.
@@ -3706,12 +3522,6 @@ export async function stopAgentProcess(name: string): Promise<{ ok: boolean; err
         }
       } catch (err) {
         logger.warn({ err, name }, 'post-stop channel-poller reap failed')
-      }
-      // MXDAGENTSOCKID1106 (b): a gromzo plugin the kill-session left behind.
-      try {
-        reapGromzoOrphans({ tmuxPath: tmuxBin() })
-      } catch (err) {
-        logger.warn({ err, name }, 'post-stop gromzo-orphan reap failed')
       }
     }
     logger.info({ name, session, host }, 'Agent tmux session stopped')
@@ -3855,7 +3665,7 @@ export async function dismissResumeSummaryModalIfPresent(session: string, host: 
 // the send path never runs for the case it was written for (measured twice on
 // 2026-08-31 -- see the detector's note in pane-state.ts). Four injectors share
 // that shape: message-router, schedule-runner, inbox-nudge-watcher and
-// telegram-inbox-wake. They call this on their refusal branch instead of each
+// sub-agent wake hooks. They call this on their refusal branch instead of each
 // re-implementing the probe, so the fifth injector added later has one obvious
 // thing to call rather than three lines to remember.
 //
@@ -3951,8 +3761,8 @@ async function answerFeedbackOptOutAfterDigit(session: string, host: string | nu
   }
 }
 
-// Slack past the card's input-ignore window, for the tmux keystroke and the render.
-const FEEDBACK_CARD_WAIT_SLACK_MS = 100
+// Buffer past the card's input-ignore window, for the tmux keystroke and the render.
+const FEEDBACK_CARD_WAIT_MARGIN_MS = 100
 
 export async function dismissFeedbackDraftModalIfPresent(session: string, host: string | null = null): Promise<void> {
   try {
@@ -3971,7 +3781,7 @@ export async function dismissFeedbackDraftModalIfPresent(session: string, host: 
     let plan = planFor(pane)
     if (plan.act === 'wait') {
       // One more capture once the card is old enough, instead of a digit now.
-      await delay(plan.ms + FEEDBACK_CARD_WAIT_SLACK_MS)
+      await delay(plan.ms + FEEDBACK_CARD_WAIT_MARGIN_MS)
       pane = captureTmux(host, ['capture-pane', '-t', exactTmuxTarget(session), '-p'])
       plan = planFor(pane)
       if (plan.act === 'wait') return
@@ -4251,7 +4061,7 @@ const IDENTITY_LANE_MAX_ATTEMPTS = 5
 // Schedule the identity setup for a freshly (re)spawned session: once it has
 // had time to render, dismiss any first-run/resume modals, then send `/rename`.
 // Shared by startAgentProcess and the channel-monitor recovery respawns
-// (resumeMarveenSession / respawnMarveenSessionFresh), which previously left the
+// (resumeAlfredSession / respawnAlfredSessionFresh), which previously left the
 // main session without its identity after auto-recovery. Fire-and-forget; all
 // errors are swallowed/logged so a missed setup never tears down the caller.
 //
@@ -4260,7 +4070,7 @@ const IDENTITY_LANE_MAX_ATTEMPTS = 5
 // it typed `/rename <name>` with a bare `runTmux(['send-keys', ...])` on a
 // fire-and-forget timer, outside the lane. Measured 2026-09-10 09:40:01: an
 // update.sh restart fired identity setup while the scheduler was chunk-pasting
-// a task prompt into the SAME pane, and `/rename Marveen_is` spliced into the
+// a task prompt into the SAME pane, and `/rename Alfred_is` spliced into the
 // MIDDLE of that prompt -- between two words of a python expression on line 100
 // of the task's SKILL.md. The prompt file on disk was clean, so the splice
 // happened in transit. Reading agent saw an unprovenanced self-rename command
@@ -5371,7 +5181,7 @@ const PARKED_CLEAR_RECHECK_EVERY = 8
 // (health probes read 000) and drive the watchdog into a dashboard restart loop.
 // Retry the SAME stuck text at most once per this window, per session.
 const UNWEDGE_COOLDOWN_MS = 30_000
-// Escalate to the operator (NOTIFY only -- a Telegram message, never a
+// Escalate to the operator (NOTIFY only -- a channel message, never a
 // keystroke) once per stuck episode after this many consecutive confirmed-stuck
 // detections (~one per UNWEDGE_COOLDOWN_MS). The main agent escalates sooner
 // because its box is NEVER auto-cleared (the parked line may be a real reply),
@@ -5394,7 +5204,7 @@ export const PARKED_RESCUE_DIR = join(STORE_DIR, 'parked-input')
 
 // The rescued text is whatever the owner had typed. It is not a secret by
 // design, but it is private by accident, and the rest of store/ already treats
-// per-install state that way: .dashboard-token, claudeclaw.db and
+// per-install state that way: .dashboard-token, alfred.db and
 // .claude-oauth-token are all 0600 (measured). Matching that is not about
 // today's threat model -- we run as one OS user and we know it -- it is that a
 // file sitting at 0644 next to three at 0600 later reads as a deliberate

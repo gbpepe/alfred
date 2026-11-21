@@ -1,6 +1,6 @@
 ---
 name: channel-plugin-duplicate-socket
-description: When a new channel plugin (slack-channel, telegram, etc.) is installed in the Marveen fleet, the user-level ~/.claude/settings.json enabledPlugins loads the plugin server for every agent, and if it opens a Socket Mode connection (Slack), SEVERAL agents open a connection on the same workspace at once. Use it when an agent uses a Socket Mode channel plugin and inbound events "half disappear".
+description: When a new channel plugin (slack-channel, telegram, etc.) is installed in the Alfred fleet, the user-level ~/.claude/settings.json enabledPlugins loads the plugin server for every agent, and if it opens a Socket Mode connection (Slack), SEVERAL agents open a connection on the same workspace at once. Use it when an agent uses a Socket Mode channel plugin and inbound events "half disappear".
 ---
 # Channel plugin duplicate Socket Mode connection
 

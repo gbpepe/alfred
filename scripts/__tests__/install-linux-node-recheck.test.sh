@@ -99,7 +99,7 @@ assert_contains "names the installed major" "$OUT" "18."
 assert_not_contains "never reached the end" "$OUT" "REACHED-END"
 
 echo "7. English text"
-OUT="$(MARVEEN_LANG=en /bin/bash -c ". '$REPO/install-lang.sh'; _t linux.node_too_old; _t linux.node_distro_too_old; _t linux.node_fix_lead; _t linux.node_fix_rpm")"
+OUT="$(ALFRED_LANG=en /bin/bash -c ". '$REPO/install-lang.sh'; _t linux.node_too_old; _t linux.node_distro_too_old; _t linux.node_fix_lead; _t linux.node_fix_rpm")"
 assert_not_contains "every key resolves (no raw key)" "$OUT" "linux.node_"
 
 echo ""

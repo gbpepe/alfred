@@ -112,12 +112,12 @@ STATE_PATH = os.path.join(STORE_DIR, "usage-alert-state.json")
 STATUSLINE_PATH = os.path.join(STORE_DIR, ".claude-rate-limits.json")
 ENV_PATH = os.path.join(REPO_ROOT, ".env")
 
-# Display timezone for reset stamps: MARVEEN_TZ when set, else the install zone
+# Display timezone for reset stamps: ALFRED_TZ when set, else the install zone
 # (SCHEDULER_TZ, config-overrides.json over .env, the same rule as APP_TZ in
 # src/config.ts), else the host zone. ISSUE1895 / #1895: it used to default to
 # Europe/Budapest whatever the install's zone was.
 def _install_zone():
-    explicit = (os.environ.get("MARVEEN_TZ") or "").strip()
+    explicit = (os.environ.get("ALFRED_TZ") or "").strip()
     if explicit:
         return explicit
     value = ""

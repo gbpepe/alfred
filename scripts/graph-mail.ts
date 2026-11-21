@@ -11,8 +11,8 @@
 // <repo>/store/mail-attachments); anything outside it is refused. Putting a
 // file there is the deliberate act that authorises sending it.
 //
-// Credentials come from the gitignored marveen-mail-ugyfelkod file (override
-// with MARVEEN_MAIL_CREDS). Send is intentionally CLI-explicit; the sub-agent
+// Credentials come from the gitignored alfred-mail-ugyfelkod file (override
+// with ALFRED_MAIL_CREDS). Send is intentionally CLI-explicit; the sub-agent
 // email-send-gate hook still applies to any programmatic use elsewhere.
 //
 // `send` runs scripts/hooks/sender_check.py on the exact letter it delivers

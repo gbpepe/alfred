@@ -10,7 +10,7 @@ a `https://seeme.hu/gateway`-re, es SEMMI nem allitja meg gepileg: a kredenciali
 ismeri az `external_message` fogalmat. UGYANEZ A HIANY ALL FENN AZ `sms-send.py`
 TESTVERENEL IS (sms-gate.app), es ott korabban nem lett kimondva -- itt potoljuk.
 A kapu erteke tehat NEM az, hogy a rossz ut lehetetlen, hanem hogy VAN helyes ut, es
-ha valaki azt hasznalja, a jovahagyas es a naplo garantalt. (marveen am#19092, kartya
+ha valaki azt hasznalja, a jovahagyas es a naplo garantalt. (alfred am#19092, kartya
 `adbabf7f`, 1. kikotes.)
 
 MIERT KuLoN FAJL, ES NEM AZ `sms-send.py` BoVITESE: az `sms-send.py` az sms-gate.app
@@ -100,7 +100,7 @@ DASH_BASE = os.environ.get("SEEME_DASH_BASE") or "http://localhost:3420"
 CONSUMER = "seeme-send.py"
 DEFAULT_BASE = "https://seeme.hu/gateway"
 # Elovigyazatossagbol, NEM mert protekcio -- lasd a fejlecet.
-USER_AGENT = "kaszap-jobs-seeme-gateway/1.0 (+marveen)"
+USER_AGENT = "kaszap-jobs-seeme-gateway/1.0 (+alfred)"
 
 # A SeeMe a magyar mobilszamot NEMZETKoZI ALAKBAN, '+' NELKuL varja: 36301234567.
 # Ez SZANDEKOSAN MAS mintat hasznal, mint az sms-send.py E.164 (+...) ellenorzese --

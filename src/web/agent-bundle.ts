@@ -72,7 +72,7 @@ const PORTABLE_ENTRIES = [
 
 // Channel secret files, relative to agents/<name>/. Only copied when the
 // operator explicitly opts into a secrets-bearing export. The provider subdir
-// (telegram/slack/discord) is discovered at pack time.
+// (discord) is discovered at pack time.
 const CHANNEL_STATE_ROOT = join('.claude', 'channels')
 const CHANNEL_SECRET_FILES = ['.env', 'access.json', 'invites.json'] as const
 const CHANNEL_SECRET_DIRS = ['approved'] as const
@@ -172,7 +172,7 @@ export function exportAgentBundle(
   opts: { includeSecrets?: boolean; exportedBy?: string; exportedAt?: string } = {},
 ): BundleManifest {
   const includeSecrets = opts.includeSecrets === true
-  const stage = makeTempDir('marveen-agent-export-')
+  const stage = makeTempDir('alfred-agent-export-')
   try {
     const stageAgentDir = join(stage, 'agent')
     stageAgentForExport(name, stageAgentDir, includeSecrets)
@@ -201,7 +201,7 @@ export function exportAgentBundle(
 export function readBundleManifest(extractedRoot: string): BundleManifest {
   const manifestPath = join(extractedRoot, 'manifest.json')
   if (!existsSync(manifestPath)) {
-    throw new Error('Invalid bundle: manifest.json missing (not a Marveen agent bundle?)')
+    throw new Error('Invalid bundle: manifest.json missing (not a Alfred agent bundle?)')
   }
   let parsed: unknown
   try { parsed = JSON.parse(readFileSync(manifestPath, 'utf-8')) } catch {
@@ -213,7 +213,7 @@ export function readBundleManifest(extractedRoot: string): BundleManifest {
   if (schemaVersion > BUNDLE_SCHEMA_VERSION) {
     throw new Error(
       `Bundle schema version ${schemaVersion} is newer than this install supports ` +
-      `(max ${BUNDLE_SCHEMA_VERSION}). Update Marveen on this machine first.`,
+      `(max ${BUNDLE_SCHEMA_VERSION}). Update Alfred on this machine first.`,
     )
   }
   const agentName = typeof m.agentName === 'string' ? m.agentName : ''
@@ -261,7 +261,7 @@ export function importAgentBundle(
   opts: { overrideName?: string; overwrite?: boolean; resolveDest?: (name: string) => string } = {},
 ): ImportResult {
   const resolveDest = opts.resolveDest ?? agentDir
-  const work = makeTempDir('marveen-agent-import-')
+  const work = makeTempDir('alfred-agent-import-')
   try {
     const bundlePath = join(work, 'bundle.tar.gz')
     writeFileSync(bundlePath, bundle)
@@ -317,7 +317,7 @@ function dropPackageRecord(stagedAgentDir: string): void {
 // goes into a Content-Disposition header).
 export function bundleFilename(name: string): string {
   const safe = basename(name).replace(/[^A-Za-z0-9_-]/g, '') || 'agent'
-  return `marveen-agent-${safe}.tar.gz`
+  return `alfred-agent-${safe}.tar.gz`
 }
 
 // ===========================================================================
@@ -353,7 +353,7 @@ export function exportAllAgentsBundle(
   opts: { includeSecrets?: boolean; exportedBy?: string; exportedAt?: string } = {},
 ): FleetBundleManifest {
   const includeSecrets = opts.includeSecrets === true
-  const stage = makeTempDir('marveen-fleet-export-')
+  const stage = makeTempDir('alfred-fleet-export-')
   try {
     const agentsRoot = join(stage, 'agents')
     mkdirSync(agentsRoot, { recursive: true })
@@ -392,7 +392,7 @@ export function exportAllAgentsBundle(
 export function readFleetManifest(extractedRoot: string): FleetBundleManifest {
   const manifestPath = join(extractedRoot, 'manifest.json')
   if (!existsSync(manifestPath)) {
-    throw new Error('Invalid bundle: manifest.json missing (not a Marveen bundle?)')
+    throw new Error('Invalid bundle: manifest.json missing (not a Alfred bundle?)')
   }
   let parsed: unknown
   try { parsed = JSON.parse(readFileSync(manifestPath, 'utf-8')) } catch {
@@ -404,7 +404,7 @@ export function readFleetManifest(extractedRoot: string): FleetBundleManifest {
   if (schemaVersion > BUNDLE_SCHEMA_VERSION) {
     throw new Error(
       `Bundle schema version ${schemaVersion} is newer than this install supports ` +
-      `(max ${BUNDLE_SCHEMA_VERSION}). Update Marveen on this machine first.`,
+      `(max ${BUNDLE_SCHEMA_VERSION}). Update Alfred on this machine first.`,
     )
   }
   if (m.kind !== 'fleet') throw new Error('Invalid bundle: not a fleet bundle')
@@ -424,7 +424,7 @@ export function readFleetManifest(extractedRoot: string): FleetBundleManifest {
 // endpoint accept either format. Throws on a non-extractable / manifest-less
 // archive (same operator-facing wording as the full importers).
 export function peekBundleKind(bundle: Buffer): 'agent' | 'fleet' {
-  const work = makeTempDir('marveen-bundle-peek-')
+  const work = makeTempDir('alfred-bundle-peek-')
   try {
     const bundlePath = join(work, 'bundle.tar.gz')
     writeFileSync(bundlePath, bundle)
@@ -435,7 +435,7 @@ export function peekBundleKind(bundle: Buffer): 'agent' | 'fleet' {
     }
     const manifestPath = join(work, 'manifest.json')
     if (!existsSync(manifestPath)) {
-      throw new Error('Invalid bundle: manifest.json missing (not a Marveen bundle?)')
+      throw new Error('Invalid bundle: manifest.json missing (not a Alfred bundle?)')
     }
     let parsed: unknown
     try { parsed = JSON.parse(readFileSync(manifestPath, 'utf-8')) } catch {
@@ -465,7 +465,7 @@ export function importAllAgentsBundle(
   opts: { overwrite?: boolean; resolveDest?: (name: string) => string } = {},
 ): FleetImportResult {
   const resolveDest = opts.resolveDest ?? agentDir
-  const work = makeTempDir('marveen-fleet-import-')
+  const work = makeTempDir('alfred-fleet-import-')
   try {
     const bundlePath = join(work, 'bundle.tar.gz')
     writeFileSync(bundlePath, bundle)
@@ -511,5 +511,5 @@ export function importAllAgentsBundle(
 }
 
 export function fleetBundleFilename(): string {
-  return 'marveen-fleet.tar.gz'
+  return 'alfred-fleet.tar.gz'
 }

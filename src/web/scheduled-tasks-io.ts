@@ -112,7 +112,7 @@ export interface ScheduledTask {
   command?: string
   // type='command' only: command timeout in ms (default 10000).
   timeoutMs?: number
-  // type='command' only: consecutive failures before a Telegram alert (default 2).
+  // type='command' only: consecutive failures before a channel alert (default 2).
   failThreshold?: number
   // Optional pre-check script (filename relative to the task dir, or absolute path).
   // Runs via `bash` BEFORE invoking the LLM. Protocol:
@@ -163,36 +163,20 @@ export interface ScheduledTask {
   // failing at exactly that (2026-10-03: a number typed before reading the
   // block, then twice the POST written out as text and never run).
   sendDigestDirect?: boolean
-  // Explicit Telegram delivery target for this task's result (WRONGRECIP819).
+  // Explicit delivery target for this task's result (WRONGRECIP819).
   // Unset means "resolve it automatically" -- safe only when the agent's own
   // channel access.json has exactly one DM contact; with 2+ contacts the
-  // runner will no longer guess (see resolveTaskChannelTarget in
-  // schedule-runner.ts; the name lost its Telegram-only spelling when Slack
-  // was added). A real chat_id string pins the exact recipient,
+  // runner will no longer guess. A real chat_id string pins the exact recipient,
   // overriding any allowlist-order heuristic. The literal string "none" means
-  // this task has NO direct Telegram recipient at all (e.g. its result goes
-  // out as an inter-agent message, or it is a self-only reminder) -- the
-  // runner omits the Telegram delivery instruction entirely, no warning.
-  telegramChatId?: string
-  // SLACKFOCSATORNA1007C: the provider this task's result is delivered on,
-  // when it is NOT the agent's own bound provider (e.g. the main agent is
-  // bound to Telegram, but the owner reads this task's result in the Slack
-  // DM). The chat id still comes from telegramChatId (the key keeps its
-  // historical name); without one, the agent's binding for THIS provider is
-  // resolved. An unknown value is ignored, as if unset.
+  // this task has NO direct channel recipient at all -- the runner omits the
+  // channel delivery instruction entirely, no warning.
+  channelChatId?: string
   channelProvider?: ChannelProviderType
   // Run once (card 7d2b49b4): after the first SUCCESSFUL run the runner switches the task off itself
-  // (enabled:false + onceDisabledAt). The fleet wrote one-offs as a dated cron ("0 5 22 9 *"), which fires
-  // again every year and had to be switched off by hand. "Successful" is isOnceRunSuccess for a prompt task
-  // and exit 0 for a command task: a damaged or lost run leaves the task on, so it stays visible.
+  // (enabled:false + onceDisabledAt).
   once?: boolean
   // When the runner switched a once task off (ISO time); absent until then.
   onceDisabledAt?: string
-  // A named topic of the main chat (`/topic new <name>`, store/telegram-topics.json)
-  // the result goes into. Used only while TELEGRAM_TOPICS_ENABLED is on, for the
-  // main agent's tasks delivered on Telegram; otherwise ignored (see
-  // resolveTaskTopicThreadId in schedule-runner.ts).
-  telegramTopic?: string
   // Scheduled-task registry: sha256 over the exact bytes this read
   // parsed (SKILL.md + task-config.json), the preCheck script (see
   // preCheckHashTarget) and every other file under the task dir
@@ -216,7 +200,7 @@ export interface ScheduledTask {
   dirName?: string
 }
 
-const CHANNEL_PROVIDER_VALUES: readonly ChannelProviderType[] = ['telegram', 'slack', 'discord', 'googlechat', 'teams']
+const CHANNEL_PROVIDER_VALUES: readonly ChannelProviderType[] = ['discord']
 
 /** A ChannelProviderType, or undefined for anything else (absent, mistyped, wrong case). */
 export function parseChannelProvider(raw: unknown): ChannelProviderType | undefined {
@@ -348,7 +332,7 @@ export function taskDirExtraParts(taskDir: string): TaskDirPart[] {
 // files hashes exactly as before the dir parts were added.
 export function computeScheduledTaskHash(parts: { skill: Buffer | null; config: Buffer | null; preCheck?: Buffer | null; preCheckRel?: string | null; dirParts?: TaskDirPart[] }): string {
   const h = createHash('sha256')
-  h.update('marveen-scheduled-task-v1\n')
+  h.update('alfred-scheduled-task-v1\n')
   const add = (label: string, buf: Buffer | null | undefined) => {
     if (buf == null) { h.update(`${label}\0absent\n`); return }
     h.update(`${label}\0${buf.length}\n`)
@@ -432,7 +416,7 @@ export function readScheduledTask(taskName: string): ScheduledTask | null {
   const skillContent = skillBuf != null ? skillBuf.toString('utf-8') : ''
   const { name, description, body } = parseSkillMdFrontmatter(skillContent)
 
-  let config: { schedule?: string; agent?: string; enabled?: boolean; createdAt?: number; type?: string; skipIfBusy?: boolean; requiresDesktop?: boolean; essential?: boolean; forceSend?: boolean; targetSession?: string; description?: string; command?: string; timeoutMs?: number; failThreshold?: number; preCheck?: string; preCheckTimeoutSeconds?: unknown; catchUpMaxAgeMinutes?: unknown; stuckAfterMinutes?: unknown; requires?: { mcp_servers?: unknown }; injectMetrics?: unknown; sendDigestDirect?: unknown; telegramChatId?: string; channelProvider?: unknown; once?: unknown; onceDisabledAt?: unknown; telegramTopic?: unknown } = {}
+  let config: { schedule?: string; agent?: string; enabled?: boolean; createdAt?: number; type?: string; skipIfBusy?: boolean; requiresDesktop?: boolean; essential?: boolean; forceSend?: boolean; targetSession?: string; description?: string; command?: string; timeoutMs?: number; failThreshold?: number; preCheck?: string; preCheckTimeoutSeconds?: unknown; catchUpMaxAgeMinutes?: unknown; stuckAfterMinutes?: unknown; requires?: { mcp_servers?: unknown }; injectMetrics?: unknown; sendDigestDirect?: unknown; channelChatId?: string; channelProvider?: unknown; once?: unknown; onceDisabledAt?: unknown } = {}
   try {
     config = JSON.parse(configBuf != null ? configBuf.toString('utf-8') : '{}')
   } catch { /* use defaults */ }
@@ -468,11 +452,10 @@ export function readScheduledTask(taskName: string): ScheduledTask | null {
     requires: parseRequires(config.requires),
     injectMetrics: config.injectMetrics === true,
     sendDigestDirect: config.sendDigestDirect === true,
-    telegramChatId: typeof config.telegramChatId === 'string' && config.telegramChatId.trim() ? config.telegramChatId.trim() : undefined,
+    channelChatId: typeof config.channelChatId === 'string' && config.channelChatId.trim() ? config.channelChatId.trim() : undefined,
     channelProvider: parseChannelProvider(config.channelProvider),
     once: readOnceFlag(taskName, config.once),
     onceDisabledAt: typeof config.onceDisabledAt === 'string' ? config.onceDisabledAt : undefined,
-    telegramTopic: typeof config.telegramTopic === 'string' && config.telegramTopic.trim() ? config.telegramTopic.trim() : undefined,
     contentHash,
     preCheckSha256,
     dirFiles,
@@ -526,7 +509,7 @@ export interface ScheduledTaskWritten {
 
 export function writeScheduledTask(
   taskName: string,
-  data: { description?: string; prompt?: string; schedule?: string; agent?: string; enabled?: boolean; type?: string; skipIfBusy?: boolean; forceSend?: boolean; targetSession?: string; command?: string; timeoutMs?: number; failThreshold?: number; preCheck?: string; preCheckTimeoutSeconds?: number; catchUpMaxAgeMinutes?: number; stuckAfterMinutes?: number; injectMetrics?: boolean; sendDigestDirect?: boolean; telegramChatId?: string; channelProvider?: ChannelProviderType | null; once?: boolean },
+  data: { description?: string; prompt?: string; schedule?: string; agent?: string; enabled?: boolean; type?: string; skipIfBusy?: boolean; forceSend?: boolean; targetSession?: string; command?: string; timeoutMs?: number; failThreshold?: number; preCheck?: string; preCheckTimeoutSeconds?: number; catchUpMaxAgeMinutes?: number; stuckAfterMinutes?: number; injectMetrics?: boolean; sendDigestDirect?: boolean; channelChatId?: string; channelProvider?: ChannelProviderType | null; once?: boolean },
 ): ScheduledTaskWritten {
   const dir = join(SCHEDULED_TASKS_DIR, taskName)
   mkdirSync(dir, { recursive: true })
@@ -565,7 +548,7 @@ export function writeScheduledTask(
   if (data.stuckAfterMinutes !== undefined) config.stuckAfterMinutes = data.stuckAfterMinutes
   if (data.injectMetrics !== undefined) config.injectMetrics = data.injectMetrics
   if (data.sendDigestDirect !== undefined) config.sendDigestDirect = data.sendDigestDirect
-  if (data.telegramChatId !== undefined) config.telegramChatId = data.telegramChatId
+  if (data.channelChatId !== undefined) config.channelChatId = data.channelChatId
   // null clears the override (back to the agent's own provider); an unknown
   // value is never written, so the reader's "ignored as unset" is not the only guard.
   if (data.channelProvider === null) delete config.channelProvider

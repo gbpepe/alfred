@@ -60,7 +60,7 @@ Minden átirat egy helyi faster-whisper futás, tehát sok ügynökre bekapcsolv
 
 ### Hangmodellek
 
-A TTS Piper ONNX modelleket használ. A modellek helye: `~/.local/share/marveen-voice/voices/`.
+A TTS Piper ONNX modelleket használ. A modellek helye: `~/.local/share/alfred-voice/voices/`.
 
 Alapból elérhető magyar hangok:
 - `hu_HU-imre-medium` -- férfi hang (default)

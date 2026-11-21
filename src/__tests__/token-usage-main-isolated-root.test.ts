@@ -15,8 +15,8 @@ import { join } from 'node:path'
 const FIXTURE = mkdtempSync(join(tmpdir(), 'token-usage-main-root-'))
 const HOME = join(FIXTURE, 'home')
 const SHARED_PROJECTS = join(HOME, '.claude', 'projects')
-const PROJECT_ROOT = '/Users/x/marveen'
-const ENCODED = '-Users-x-marveen'
+const PROJECT_ROOT = '/Users/x/alfred'
+const ENCODED = '-Users-x-alfred'
 const SHARED_MAIN_DIR = join(SHARED_PROJECTS, ENCODED)
 
 const ISOLATED_CONFIG = join(FIXTURE, 'channels-config')
@@ -35,7 +35,7 @@ vi.mock('node:os', async () => {
 
 vi.mock('../config.js', async () => {
   const actual = await vi.importActual<typeof import('../config.js')>('../config.js')
-  return { ...actual, MAIN_AGENT_ID: 'marveen', PROJECT_ROOT }
+  return { ...actual, MAIN_AGENT_ID: 'alfred', PROJECT_ROOT }
 })
 
 vi.mock('../logger.js', () => ({
@@ -66,7 +66,7 @@ describe('discoverAgentSources and the main agent isolated config dir', () => {
   it('finds the live isolated dir as well as the shared one, both booked to the main agent', async () => {
     const { discoverAgentSources } = await import('../web/token-usage.js')
     const dirs = discoverAgentSources()
-      .filter((s) => s.agent === 'marveen')
+      .filter((s) => s.agent === 'alfred')
       .map((s) => s.projectDir)
       .sort()
 
@@ -78,7 +78,7 @@ describe('discoverAgentSources and the main agent isolated config dir', () => {
     roots = [join(HOME, '.claude'), SYMLINKED_CONFIG]
     vi.resetModules()
     const { discoverAgentSources } = await import('../web/token-usage.js')
-    const dirs = discoverAgentSources().filter((s) => s.agent === 'marveen')
+    const dirs = discoverAgentSources().filter((s) => s.agent === 'alfred')
 
     expect(dirs).toHaveLength(1)
     expect(dirs[0].projectDir).toBe(SHARED_MAIN_DIR)

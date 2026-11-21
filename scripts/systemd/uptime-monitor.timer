@@ -1,5 +1,5 @@
 [Unit]
-Description=Run the Marveen uptime monitor every 5 minutes
+Description=Run the Alfred uptime monitor every 5 minutes
 
 [Timer]
 OnCalendar=*:0/5

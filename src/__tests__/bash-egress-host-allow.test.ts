@@ -13,7 +13,7 @@ const { BASH_EGRESS_DENY, LEGACY_BASH_EGRESS_DENY, ensureBashEgressDeny, bashEgr
 const { MAIN_AGENT_ID } = await import('../config.js')
 
 function withDir(fn: (dir: string) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), 'marveen-hostallow-'))
+  const dir = mkdtempSync(join(tmpdir(), 'alfred-hostallow-'))
   try { fn(dir) } finally { rmSync(dir, { recursive: true, force: true }) }
 }
 const deny = (dir: string): string[] => JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf-8')).permissions.deny

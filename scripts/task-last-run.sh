@@ -2,7 +2,7 @@
 # Utemezett feladatok futasanak lekerdezese HELYES ido-kezelessel.
 #
 # Miert letezik ez a szkript: a task_runs.ts oszlop MILLISZEKUNDUM epoch, a
-# store/claudeclaw.db tobbi timestampje viszont MASODPERC. Ha valaki kezzel ir
+# store/alfred.db tobbi timestampje viszont MASODPERC. Ha valaki kezzel ir
 # ido-szurot (strftime('%s','2026-08-19 08:00')*1000), az SQLite a stringet
 # UTC-nek veszi -> CEST alatt ket oraval a jovobe csuszik az ablak, es a
 # lekerdezes URES halmazt ad. Az ures halmaz pontosan ugy nez ki, mint "a task
@@ -26,7 +26,7 @@
 # az "utoljara mikor futott".
 
 set -euo pipefail
-DB="$(cd "$(dirname "$0")/.." && pwd)/store/claudeclaw.db"
+DB="$(cd "$(dirname "$0")/.." && pwd)/store/alfred.db"
 NAME="${1:-}"
 HOURS="${2:-}"
 # The window goes into the SQL as a number: a whole number or nothing.

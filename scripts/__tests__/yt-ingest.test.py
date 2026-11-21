@@ -269,7 +269,7 @@ class DefaultOutput(unittest.TestCase):
 class FakeRun(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        self.store = os.path.join(os.path.expanduser('~'), 'marveen', 'store')
+        self.store = os.path.join(os.path.expanduser('~'), 'alfred', 'store')
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -336,7 +336,7 @@ class FakeRun(unittest.TestCase):
         # Negative control for 7: the probe path really exists on the host,
         # so "absent" above is the sandbox's doing, not a wrong path.
         if not os.path.isdir(self.store):
-            self.skipTest('no ~/marveen/store on this host')
+            self.skipTest('no ~/alfred/store on this host')
         self.assertTrue(os.path.exists(self.store))
 
     def test_failure_after_video_still_cleans_temp(self):

@@ -1,5 +1,5 @@
 /**
- * MARVEENGAPS1020 (c): WebSearch results reach every agent framed as untrusted
+ * ALFREDGAPS1020 (c): WebSearch results reach every agent framed as untrusted
  * content. The main agent gets it from the repo-shipped project settings
  * (browser-content-notice.test.ts pins that); sub-agents from the scaffold, on
  * spawn and by the startup migration. These tests assert the FINAL settings

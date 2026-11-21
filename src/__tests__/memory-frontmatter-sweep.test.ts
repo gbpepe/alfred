@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 // KAPUEGYUT918 PR2: the at-rest sweep reads every fleet memory file with the
 // shared parser and REPORTS (never repairs). What these tests pin: a symlinked
-// agent projects dir is counted once; the message to Marveen goes out only
+// agent projects dir is counted once; the message to Alfred goes out only
 // when the broken set changes (new or repaired), not every day; seeing no file
 // at all is an instrument error (exit 2), not a clean fleet; a failed message
 // is exit 3 and does not advance the state, so the next run retries.
@@ -29,7 +29,7 @@ function notifier(ok: boolean) {
 beforeEach(() => {
   S = mkdtempSync(join(tmpdir(), 'memfm-sweep-'))
   HOME = join(S, 'home')
-  MEM = join(HOME, '.claude', 'projects', '-Users-x-ClaudeClaw', 'memory')
+  MEM = join(HOME, '.claude', 'projects', '-Users-x-Alfred', 'memory')
   mkdirSync(MEM, { recursive: true })
   REPO = join(S, 'repo')
   // An agent whose .claude-config/projects is a symlink to the shared projects dir.
@@ -56,11 +56,11 @@ describe('memory-frontmatter-sweep', () => {
     expect(sent()).toBe('')
   })
 
-  it('a new broken file: exit 1 and ONE message to Marveen (from heartbeat) naming it', () => {
+  it('a new broken file: exit 1 and ONE message to Alfred (from heartbeat) naming it', () => {
     writeFileSync(join(MEM, 'feedback_b.md'), BROKEN)
     const r = sweep()
     expect(r.code).toBe(1)
-    expect(sent()).toContain('heartbeat -> marveen')
+    expect(sent()).toContain('heartbeat -> alfred')
     expect(sent()).toContain('UJ: ')
     expect(sent()).toContain('feedback_b.md')
   })

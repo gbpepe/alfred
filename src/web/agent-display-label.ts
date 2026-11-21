@@ -1,9 +1,9 @@
 // DASHNAME1109: the name a person SEES for an agent id, in text the dashboard shows (the overview's activity feed).
 //
 // The main agent's routing id (MAIN_AGENT_ID) and its display name (BOT_NAME) differ on a renamed install. Measured
-// on the Bridge path: the headless installer runs with the default name, so MAIN_AGENT_ID becomes "marveen"; the
+// on the Bridge path: the headless installer runs with the default name, so MAIN_AGENT_ID becomes "alfred"; the
 // dashboard wizard then renames the agent ("Patex") in BOT_NAME/BRAND_NAME and, on purpose, leaves the routing id.
-// Text built from the raw id then showed "marveen" in the middle of a dashboard that says "Patex" everywhere else.
+// Text built from the raw id then showed "alfred" in the middle of a dashboard that says "Patex" everywhere else.
 //
 // The rule: the main agent's id -> its current display name (read fresh, the wizard writes .env at run time); a known
 // sub-agent -> its display name (agent-config.json displayName, else the title-cased name); anything else (system,

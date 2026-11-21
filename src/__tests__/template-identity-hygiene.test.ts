@@ -28,7 +28,7 @@ const KNOWN_PLACEHOLDERS = ['PROJECT_ROOT', 'INSTALL_DIR', 'MAIN_AGENT_ID', 'BOT
 
 // An absolute macOS/Linux home path embeds a real username. The trailing
 // slash is optional so a bare literal like "/Users/bob" at end of value is
-// still caught. A `<...>` segment (e.g. /Users/<user>/marveen) is a doc
+// still caught. A `<...>` segment (e.g. /Users/<user>/alfred) is a doc
 // placeholder, not a real path, so it is allowed. Callers run the line through
 // stripUrls() first, so a link like https://host/home/x is not mistaken for a
 // home path.
@@ -144,11 +144,11 @@ describe('shipped templates carry no hardcoded identity', () => {
 
   // web/app.js is the dashboard bundle, shipped verbatim to every install. It
   // must carry no deployment-specific operator identity: the owner display name
-  // flows from the backend (OWNER_NAME -> /api/marveen -> window._marveen.ownerName,
+  // flows from the backend (OWNER_NAME -> /api/alfred -> window._alfred.ownerName,
   // read via chatOwnerName()), never a hardcoded "Szabolcs"/"Szabi" literal, so a
   // renamed install labels its real owner. This is the exact regression #369
   // fixed -- the chat sidebar used to pin/label the owner thread off a
-  // `const CHAT_OWNER_AGENT = 'Szabolcs'` literal. The Marveen product brand and
+  // `const CHAT_OWNER_AGENT = 'Szabolcs'` literal. The Alfred product brand and
   // agent role-names are NOT identity and stay allowed (none match these regexes).
   it('web/app.js carries no absolute home path, personal email, or default owner-name literal', () => {
     const violations: string[] = []
@@ -163,7 +163,7 @@ describe('shipped templates carry no hardcoded identity', () => {
           violations.push(`web/app.js:${i + 1} personal email: ${line.trim().slice(0, 100)}`)
         }
         if (FOREIGN_DEFAULT_OWNER_RX.test(line)) {
-          violations.push(`web/app.js:${i + 1} default owner name literal (read it from window._marveen.ownerName via chatOwnerName()): ${line.trim().slice(0, 100)}`)
+          violations.push(`web/app.js:${i + 1} default owner name literal (read it from window._alfred.ownerName via chatOwnerName()): ${line.trim().slice(0, 100)}`)
         }
       })
     }
@@ -226,7 +226,7 @@ describe('the home-path predicate looks at the whole line, not just URL-free lin
   })
 
   it('does not flag a documentation placeholder', () => {
-    expect(flags('/Users/<user>/marveen')).toBe(false)
+    expect(flags('/Users/<user>/alfred')).toBe(false)
   })
 
   it('does not flag a home-looking path that is inside a URL', () => {

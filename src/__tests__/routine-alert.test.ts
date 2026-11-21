@@ -150,7 +150,7 @@ describe('sendRoutineAlert channel gate (NOTIFY_ROUTINE_ALERTS)', () => {
   })
 })
 
-describe('sendOwnerActionAlert (Szotasz/marveen#2353 review): never gated by NOTIFY_ROUTINE_ALERTS', () => {
+describe('sendOwnerActionAlert (gbpepe/alfred#2353 review): never gated by NOTIFY_ROUTINE_ALERTS', () => {
   beforeEach(() => {
     h.routineAlerts = true
     h.notify.length = 0
@@ -208,7 +208,7 @@ describe('sendOwnerActionAlert (Szotasz/marveen#2353 review): never gated by NOT
   })
 })
 
-// Szotasz's review on Szotasz/marveen#2353: NOTIFY_ROUTINE_ALERTS=off silenced
+// Szotasz's review on gbpepe/alfred#2353: NOTIFY_ROUTINE_ALERTS=off silenced
 // four/five calls that actually ask for the OWNER's action (a permission
 // prompt, a stuck supervisor nobody can safely double-start, a restart that
 // did not take, a dead channel intake) rather than reporting a recovery the

@@ -119,7 +119,7 @@ describe('resolveClaudePlans', () => {
     // deleteSecret on plan delete/switch then made it a destructive primitive
     // reachable by a typo. Only this plan's own derived id is valid now.
     it('rejects a tokenSecretId that is not this plan\'s own derived id, even if charset-valid', () => {
-      const raw = JSON.stringify([tokenPlan({ id: 'good', tokenSecretId: 'MARVEEN-CONNECTORS-PAT' })])
+      const raw = JSON.stringify([tokenPlan({ id: 'good', tokenSecretId: 'ALFRED-CONNECTORS-PAT' })])
       expect(resolveClaudePlans(raw, HOME)).toEqual([])
     })
 

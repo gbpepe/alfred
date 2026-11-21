@@ -1,4 +1,4 @@
-// ENVRELAXGATE1104 (Samu 67818, Marveen 67806): the two workers (marveen-worker, marveen-worker-fast) carried ONE
+// ENVRELAXGATE1104 (Samu 67818, Alfred 67806): the two workers (alfred-worker, alfred-worker-fast) carried ONE
 // PreToolUse hook, the fleet-freeze gate. They now also get the db-write-gate (the sub-agents' generator) and the
 // outgoing-copy gate on Bash and the email tools (as the main agent's tracked settings carry it), written on every
 // worker boot. Then a harness, NOT live: with the worker's identity (project dir = its own home outside the install,
@@ -60,7 +60,7 @@ describe('withWorkerGates: what the worker\'s settings carry', () => {
 })
 
 describe('the harness: a worker\'s identity through the db-write-gate (decision function only, nothing is written)', () => {
-  const workerHome = join(homedir(), '.marveen-worker')
+  const workerHome = join(homedir(), '.alfred-worker')
   const workerCfg = join(workerHome, '.claude-config')
   const asWorker = (tool: string, input: Record<string, unknown>) =>
     gateDecision(tool, input, { cwd: workerHome, root: INSTALL_ROOT, subAgent: isSubAgentCaller(workerHome, INSTALL_ROOT, workerCfg), projectDir: workerHome, configDir: workerCfg })
@@ -117,8 +117,8 @@ describe('the harness: the hard email-send-gate on a worker (real run, disposabl
       const add = spawnSync(process.execPath, [join(dir, 'recipient-ledger.mjs'), 'add', KNOWN, '--source', 'owner', '--note', 'worker-gates test'], { encoding: 'utf-8', timeout: 15000 })
       expect(add.status).toBe(0)
       const run = (payload: unknown) => spawnSync(process.execPath, [join(dir, 'email-send-gate.mjs')], {
-        input: JSON.stringify({ ...(payload as object), cwd: join(homedir(), '.marveen-worker') }), encoding: 'utf-8', timeout: 15000,
-        env: { ...process.env, CLAUDE_PROJECT_DIR: join(homedir(), '.marveen-worker') },
+        input: JSON.stringify({ ...(payload as object), cwd: join(homedir(), '.alfred-worker') }), encoding: 'utf-8', timeout: 15000,
+        env: { ...process.env, CLAUDE_PROJECT_DIR: join(homedir(), '.alfred-worker') },
       })
       expect(denied(run({ tool_name: 'mcp__server-gmail-autoauth-mcp__send_email', tool_input: { to: [KNOWN], subject: 's', body: 'b' } }).stdout)).toBe(true)
       expect(denied(run({ tool_name: 'Bash', tool_input: { command: `sendmail ${KNOWN}` } }).stdout)).toBe(true)

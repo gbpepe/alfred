@@ -1,13 +1,13 @@
 """Shared helpers for the deterministic conversation-continuity ledger.
 
-The ledger (store/claudeclaw.db -> conversation_log) is a rolling TRANSCRIPT of
+The ledger (store/alfred.db -> conversation_log) is a rolling TRANSCRIPT of
 every channel turn -- inbound user messages AND outbound replies -- per
 agent_id + chat_id. On a respawn (a fresh --channels session with no memory of
 the live conversation) the SessionStart hook injects the last ~20 turns of
 context PLUS the open question, so the fresh session continues where the
 connection dropped -- with ZERO agent discretion.
 
-Generic across all three channel agents (marveen / dia / erno-ba): agent_id is
+Generic across all three channel agents (alfred / dia / erno-ba): agent_id is
 derived from the running session's cwd so each session only ever sees its OWN
 chat. Pure stdlib (sqlite3) -- no node startup, no jq.
 """
@@ -76,7 +76,7 @@ def db_path():
     # a tmp install (<tmp>/scripts linked to the repo's; abspath keeps <tmp>).
     here = os.path.dirname(os.path.abspath(__file__))
     install = os.path.dirname(os.path.dirname(here))
-    return os.path.join(install, "store", "claudeclaw.db")
+    return os.path.join(install, "store", "alfred.db")
 
 
 def _install_dir():
@@ -113,7 +113,7 @@ def main_agent_id():
                     return line.split("=", 1)[1].strip()
     except Exception:
         pass
-    return "marveen"
+    return "alfred"
 
 
 def owner_name():
@@ -153,14 +153,14 @@ def agent_id_from_payload(payload):
     (CLAUDE_CONFIG_DIR), which never changes within a session -- that is the
     identity anchor. Resolution order:
       1. transcript_path  (immutable per session)
-      2. MARVEEN_AGENT_ID (explicit launcher override)
+      2. ALFRED_AGENT_ID (explicit launcher override)
       3. cwd              (last resort, for callers that have nothing else)
     """
     payload = payload or {}
     agent = _agent_id_from_config_path(payload.get("transcript_path"))
     if agent:
         return agent
-    env_id = os.environ.get("MARVEEN_AGENT_ID", "").strip()
+    env_id = os.environ.get("ALFRED_AGENT_ID", "").strip()
     if env_id:
         return env_id
     return agent_id_from_cwd(payload.get("cwd"))
@@ -192,7 +192,7 @@ def _agent_id_from_config_path(path):
     #    by the session's STARTING cwd, flattened: /a/b -> "-a-b". Every fleet
     #    agent's tmux session runs this way (measured 2026-08-28: the live
     #    samu session's transcript sits under
-    #    ~/.claude/projects/-Users-marvin-ClaudeClaw-agents-samu/), so the
+    #    ~/.claude/projects/-Users-marvin-Alfred-agents-samu/), so the
     #    agent id is IN the path -- mapping the whole family to the main agent
     #    would be the original bug mirrored. Parse the segment instead.
     for install in installs:
@@ -211,8 +211,8 @@ def _agent_id_from_config_path(path):
 def _agent_id_from_project_segment(path, install):
     """Read the agent id out of a flattened projects/<segment>/ component.
 
-      .../projects/-Users-...-ClaudeClaw-agents-<id>[-...]/x.jsonl -> <id>
-      .../projects/-Users-...-ClaudeClaw[-...]/x.jsonl             -> MAIN
+      .../projects/-Users-...-Alfred-agents-<id>[-...]/x.jsonl -> <id>
+      .../projects/-Users-...-Alfred[-...]/x.jsonl             -> MAIN
       no /projects/ component, or a foreign segment                -> None
 
     Agent ids may in principle contain hyphens, which the flattening makes
@@ -267,9 +267,9 @@ def agent_id_from_cwd(cwd):
         # already answered, because it finds no outbound under the real id.
         return main_agent_id()
     # Outside the install tree: never invent an agent id from the directory name.
-    # The launcher can name the session explicitly via MARVEEN_AGENT_ID; failing
+    # The launcher can name the session explicitly via ALFRED_AGENT_ID; failing
     # that, attribute to the main agent rather than a bogus basename.
-    env_id = os.environ.get("MARVEEN_AGENT_ID", "").strip()
+    env_id = os.environ.get("ALFRED_AGENT_ID", "").strip()
     if env_id:
         return env_id
     return main_agent_id()

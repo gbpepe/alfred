@@ -98,7 +98,7 @@ vi.mock('../web/schedule-registry.js', () => ({
 vi.mock('../web/scheduled-tasks-io.js', () => ({
   listScheduledTasks: () => mockListScheduledTasks(),
   readScheduledTask: (n: string) => (mockListScheduledTasks() as Array<{ name: string }>).find(t => t.name === n) ?? null,
-  SCHEDULED_TASKS_DIR: '/tmp/marveen-retry-missing-no-tasks-dir',
+  SCHEDULED_TASKS_DIR: '/tmp/alfred-retry-missing-no-tasks-dir',
   // SCHEDPROMPTREF917: attemptFireTask reads these on every fire (size-guard
   // + inline/snapshot threshold). Real values -- the fixtures' short prompts
   // must stay well under them so the size-guard/snapshot path never trips.

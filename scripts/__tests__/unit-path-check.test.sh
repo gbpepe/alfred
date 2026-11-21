@@ -52,68 +52,68 @@ unit(){
 }
 
 run(){ # run <lib> <home> <os> [sid]
-  HOME="$2" PATH="$TOOLPATH" INSTALL_DIR="$INSTALL_DIR" /bin/bash -c ". \"$1\"; unit_path_check \"$3\" \"${4:-marveen}\"" 2>&1
+  HOME="$2" PATH="$TOOLPATH" INSTALL_DIR="$INSTALL_DIR" /bin/bash -c ". \"$1\"; unit_path_check \"$3\" \"${4:-alfred}\"" 2>&1
 }
 
 FIXED="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 echo "--- macOS, custom prefix: main units learn it at run time, a helper does not ---"
 H1="$FIX/h1"
-plist "$H1" com.marveen.channels "$KEG:$H1/.local/bin:/opt/homebrew/bin:$H1/.bun/bin:/usr/local/bin:/usr/bin:/bin"
-plist "$H1" com.marveen.dashboard "$KEG:$H1/.local/bin:/opt/homebrew/bin:$H1/.bun/bin:/usr/local/bin:/usr/bin:/bin"
-plist "$H1" com.marveen.channel-coordinator "$FIXED"
-plist "$H1" com.marveen.telegram-progress-watchdog "$FIXED"
+plist "$H1" com.alfred.channels "$KEG:$H1/.local/bin:/opt/homebrew/bin:$H1/.bun/bin:/usr/local/bin:/usr/bin:/bin"
+plist "$H1" com.alfred.dashboard "$KEG:$H1/.local/bin:/opt/homebrew/bin:$H1/.bun/bin:/usr/local/bin:/usr/bin:/bin"
+plist "$H1" com.alfred.channel-coordinator "$FIXED"
+plist "$H1" com.alfred.telegram-progress-watchdog "$FIXED"
 out="$(run "$LIB" "$H1" Darwin)"; rc=$?
 [ $rc -eq 0 ] && [ "$(echo "$out" | grep -c '^warn|')" -eq 3 ] \
   && pass "exit 0, one warn line per tool (3)" || fail "expected 3 warn lines (rc=$rc): $out"
-echo "$out" | grep -q "^warn|tmux: $PFX/bin (where $PFX/bin/tmux is) is not on the PATH of com.marveen.channel-coordinator, com.marveen.telegram-progress-watchdog, so these jobs may not find it. Fix: bash scripts/install-channel-coordinator.sh; bash scripts/install-telegram-progress-hook.sh$" \
+echo "$out" | grep -q "^warn|tmux: $PFX/bin (where $PFX/bin/tmux is) is not on the PATH of com.alfred.channel-coordinator, com.alfred.telegram-progress-watchdog, so these jobs may not find it. Fix: bash scripts/install-channel-coordinator.sh; bash scripts/install-telegram-progress-hook.sh$" \
   && pass "tmux line: missing dir, the two helpers, their install scripts" || fail "tmux line not as expected: $out"
 echo "$out" | grep -q "^warn|claude: $PFX/bin " && pass "claude line names $PFX/bin" || fail "claude line missing: $out"
-echo "$out" | grep -q "^warn|node: $KEG (where $KEG/node is) is not on the PATH of com.marveen.channel-coordinator, com.marveen.telegram-progress-watchdog," \
+echo "$out" | grep -q "^warn|node: $KEG (where $KEG/node is) is not on the PATH of com.alfred.channel-coordinator, com.alfred.telegram-progress-watchdog," \
   && pass "node line names the keg dir and only the helpers" || fail "node line not as expected: $out"
-echo "$out" | grep -q 'com.marveen.channels\|com.marveen.dashboard' \
+echo "$out" | grep -q 'com.alfred.channels\|com.alfred.dashboard' \
   && fail "channels/dashboard flagged although #2578 adds the prefix bin at run time: $out" \
   || pass "channels and dashboard not flagged (prefix bin learned from their keg entry)"
 
 echo "--- macOS: a main unit with NO keg entry does not learn the prefix: flagged, fix is the installer ---"
 H2="$FIX/h2"
-plist "$H2" com.marveen.channels "$H2/.local/bin:/opt/homebrew/bin:$H2/.bun/bin:/usr/local/bin:/usr/bin:/bin"
+plist "$H2" com.alfred.channels "$H2/.local/bin:/opt/homebrew/bin:$H2/.bun/bin:/usr/local/bin:/usr/bin:/bin"
 out="$(run "$LIB" "$H2" Darwin)"
-echo "$out" | grep -q "^warn|tmux: $PFX/bin .* PATH of com.marveen.channels, .* Fix: ./install.sh$" \
+echo "$out" | grep -q "^warn|tmux: $PFX/bin .* PATH of com.alfred.channels, .* Fix: ./install.sh$" \
   && pass "channels without keg entry flagged, fix ./install.sh" || fail "expected channels flagged: $out"
 
 echo "--- macOS: everything on PATH (default prefix layout): one ok line, no warn ---"
 H3="$FIX/h3"
-plist "$H3" com.marveen.channels "$KEG:$PFX/bin:$FIXED"
-plist "$H3" com.marveen.channel-keepalive-probe "$KEG:$PFX/bin/:$FIXED"
+plist "$H3" com.alfred.channels "$KEG:$PFX/bin:$FIXED"
+plist "$H3" com.alfred.channel-keepalive-probe "$KEG:$PFX/bin/:$FIXED"
 out="$(run "$LIB" "$H3" Darwin)"; rc=$?
 [ $rc -eq 0 ] && [ "$out" = "ok|tmux, claude and node are on the PATH of every installed unit" ] \
   && pass "ok line only (a trailing slash on a PATH dir counts as the same dir)" || fail "expected only the ok line (rc=$rc): $out"
 
-echo "--- macOS: a SERVICE_ID other than marveen; the fixed-label outage alarm still read; plist without PATH skipped ---"
+echo "--- macOS: a SERVICE_ID other than alfred; the fixed-label outage alarm still read; plist without PATH skipped ---"
 H4="$FIX/h4"
 plist "$H4" com.acme.stuck-modal-guard "$FIXED"
-plist "$H4" com.marveen.channel-outage-alarm "$FIXED"
-plist "$H4" com.marveen.channels "$FIXED"            # another install's unit: not ours
+plist "$H4" com.alfred.channel-outage-alarm "$FIXED"
+plist "$H4" com.alfred.channels "$FIXED"            # another install's unit: not ours
 mkdir -p "$H4/Library/LaunchAgents"; printf '<plist><dict><key>Label</key><string>com.acme.app</string></dict></plist>\n' > "$H4/Library/LaunchAgents/com.acme.app.plist"
 out="$(run "$LIB" "$H4" Darwin acme)"
-echo "$out" | grep -q "^warn|tmux: .* PATH of com.acme.stuck-modal-guard, com.marveen.channel-outage-alarm, .* Fix: bash scripts/install-stuck-modal-guard.sh; bash scripts/install-channel-outage-alarm.sh$" \
+echo "$out" | grep -q "^warn|tmux: .* PATH of com.acme.stuck-modal-guard, com.alfred.channel-outage-alarm, .* Fix: bash scripts/install-stuck-modal-guard.sh; bash scripts/install-channel-outage-alarm.sh$" \
   && pass "com.acme.* and the fixed outage-alarm label read, fixes named" || fail "acme case not as expected: $out"
-echo "$out" | grep -q 'com.acme.app\|com.marveen.channels' \
+echo "$out" | grep -q 'com.acme.app\|com.alfred.channels' \
   && fail "a PATH-less plist or another install's unit was flagged: $out" || pass "PATH-less plist and foreign unit not flagged"
 
 echo "--- Linux: systemd Environment=PATH (plain and quoted), the main unit learns the keg prefix ---"
 H5="$FIX/h5"
-unit "$H5" marveen-channels "Environment=PATH=$KEG:$H5/.local/bin:/usr/local/bin:/usr/bin:/bin"
-unit "$H5" marveen-keepalive "Environment=\"PATH=$H5/.local/bin:/usr/local/bin:/usr/bin:/bin\""
-unit "$H5" marveen-slack-progress-watchdog "Environment=PATH=$KEG:$PFX/bin:/usr/bin:/bin"
+unit "$H5" alfred-channels "Environment=PATH=$KEG:$H5/.local/bin:/usr/local/bin:/usr/bin:/bin"
+unit "$H5" alfred-keepalive "Environment=\"PATH=$H5/.local/bin:/usr/local/bin:/usr/bin:/bin\""
+unit "$H5" alfred-slack-progress-watchdog "Environment=PATH=$KEG:$PFX/bin:/usr/bin:/bin"
 out="$(run "$LIB" "$H5" Linux)"
-echo "$out" | grep -q "^warn|tmux: $PFX/bin .* PATH of marveen-keepalive, so these jobs may not find it. Fix: ./install.sh$" \
+echo "$out" | grep -q "^warn|tmux: $PFX/bin .* PATH of alfred-keepalive, so these jobs may not find it. Fix: ./install.sh$" \
   && pass "keepalive unit flagged (quoted form read), channels and the watchdog not" || fail "linux tmux line not as expected: $out"
-echo "$out" | grep -q "^warn|node: $KEG .* PATH of marveen-keepalive," \
+echo "$out" | grep -q "^warn|node: $KEG .* PATH of alfred-keepalive," \
   && pass "node flagged on keepalive only" || fail "linux node line not as expected: $out"
 H6="$FIX/h6"
-unit "$H6" marveen-telegram-progress-watchdog "Environment=PATH=/usr/bin:/bin"
+unit "$H6" alfred-telegram-progress-watchdog "Environment=PATH=/usr/bin:/bin"
 out="$(run "$LIB" "$H6" Linux)"
 echo "$out" | grep -q "Fix: bash scripts/install-telegram-progress-hook.sh$" \
   && pass "linux progress watchdog fix names its install script" || fail "linux watchdog fix not as expected: $out"
@@ -121,7 +121,7 @@ echo "$out" | grep -q "Fix: bash scripts/install-telegram-progress-hook.sh$" \
 echo "--- no unit, no tool: skip / nothing flagged ---"
 out="$(run "$LIB" "$FIX/empty" Darwin)"
 [ "$out" = "skip|no installed unit found to compare" ] && pass "no unit: skip" || fail "no unit must skip: $out"
-out="$(HOME="$H1" PATH="/usr/bin:/bin" /bin/bash -c ". \"$LIB\"; unit_path_check Darwin marveen" 2>&1)"
+out="$(HOME="$H1" PATH="/usr/bin:/bin" /bin/bash -c ". \"$LIB\"; unit_path_check Darwin alfred" 2>&1)"
 echo "$out" | grep -q '^warn|' && fail "a tool command -v cannot find was flagged: $out" \
   || pass "tools not found on the doctor's PATH: no warn"
 
@@ -140,7 +140,7 @@ SNIP="$FIX/doctor-block.sh"
   echo "$block"
   echo 'echo "FAIL=$FAIL"'
 } > "$SNIP"
-out="$(HOME="$H1" PATH="$TOOLPATH" INSTALL_DIR="$INSTALL_DIR" SERVICE_ID_DOC=marveen /bin/bash "$SNIP" 2>&1)"
+out="$(HOME="$H1" PATH="$TOOLPATH" INSTALL_DIR="$INSTALL_DIR" SERVICE_ID_DOC=alfred /bin/bash "$SNIP" 2>&1)"
 [ "$(echo "$out" | grep -c '^WARN tmux: \|^WARN claude: \|^WARN node: ')" -eq 3 ] && echo "$out" | grep -q '^FAIL=0$' \
   && ! echo "$out" | grep -q FAILCALL \
   && pass "doctor block prints the 3 warnings through warn() and leaves FAIL=0" || fail "doctor block run not as expected: $out"

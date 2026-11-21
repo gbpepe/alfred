@@ -95,7 +95,7 @@ def move(card_id, extra=()):
         f.write(f'Kartya {card_id}: dispatch- es lanc-teszt.')
     env = dict(os.environ)
     env['KARTYA_DB'] = DB_PATH
-    env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['ALFRED_ROOT'] = SANDBOX_ROOT
     # Halott port: ha valami megis uzenetet kuldene, ne az eles API-ra menjen.
     env['KARTYA_API'] = 'http://127.0.0.1:9/api/messages'
     return subprocess.run(

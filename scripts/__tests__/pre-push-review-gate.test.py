@@ -33,8 +33,8 @@ SCRIPTS = os.path.dirname(HERE)
 CLEAN_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 CLEAN_ENV.update({"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
                   "GIT_COMMITTER_EMAIL": "t@t"})
-for _k in ("REVIEW_GATE_SKIP", "REVIEW_GATE_SKIP_REASON", "MARVEEN_API_BASE", "MARVEEN_WEB_PORT",
-           "WEB_PORT", "MARVEEN_TOKEN_FILE", "REVIEW_GATE_INSTALL_ROOT", "REVIEW_GATE_REVIEWER", "REVIEW_GATE_TRACE_WORD"):
+for _k in ("REVIEW_GATE_SKIP", "REVIEW_GATE_SKIP_REASON", "ALFRED_API_BASE", "ALFRED_WEB_PORT",
+           "WEB_PORT", "ALFRED_TOKEN_FILE", "REVIEW_GATE_INSTALL_ROOT", "REVIEW_GATE_REVIEWER", "REVIEW_GATE_TRACE_WORD"):
     CLEAN_ENV.pop(_k, None)
 # The gate applies to agent sessions only (the owner's decision, 2026-10-11). The suite itself may run inside one,
 # so the agent markers are removed here and the agent case is put back explicitly in setUp.
@@ -139,7 +139,7 @@ class ReviewGate(unittest.TestCase):
         sh("git", "fetch", "-q", "fork", cwd=self.repo)
         sh("bash", os.path.join(self.repo, "scripts", "install-review-gate-hook.sh"), cwd=self.repo)
         # self.env is an AGENT push (CLAUDECODE set); self.hand_env is a hand push (no marker).
-        self.hand_env = dict(CLEAN_ENV, MARVEEN_API_BASE="http://127.0.0.1:%d" % self.stub.port,
+        self.hand_env = dict(CLEAN_ENV, ALFRED_API_BASE="http://127.0.0.1:%d" % self.stub.port,
                              REVIEW_GATE_REVIEWER="reviewer1", REVIEW_GATE_TRACE_WORD="CUSTOM-GREEN")
         self.env = dict(self.hand_env, CLAUDECODE="1")
         sh("git", "checkout", "-q", "-b", "feature", cwd=self.repo)
@@ -242,7 +242,7 @@ class ReviewGate(unittest.TestCase):
 
     def test_dashboard_unreachable_blocks(self):
         self.commit("a")
-        env = dict(self.env, MARVEEN_API_BASE="http://127.0.0.1:1")
+        env = dict(self.env, ALFRED_API_BASE="http://127.0.0.1:1")
         p = self.push("fork", "feature", env=env)
         self.assertNotEqual(p.returncode, 0)
         self.assertIn("cannot read reviewer1's messages", p.stderr)

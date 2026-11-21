@@ -27,7 +27,7 @@ describe('the security teardown of support access (terv-v7 3.9)', () => {
   let sshDir: string
   const deps = () => ({ supportDir, sshDir, pins: { keys: TEST_ONLY_KEYS, fromCidrs: TEST_ONLY_FROM } })
   const line = () =>
-    buildSupportLine({ key: TEST_ONLY_KEYS[0], grantId: GRANT, consentVersion: 1, dispatchPath: '/home/x/.marveen/support/kit/support-dispatch.sh', fromCidrs: TEST_ONLY_FROM, sshd: { major: 9, minor: 6 } })
+    buildSupportLine({ key: TEST_ONLY_KEYS[0], grantId: GRANT, consentVersion: 1, dispatchPath: '/home/x/.alfred/support/kit/support-dispatch.sh', fromCidrs: TEST_ONLY_FROM, sshd: { major: 9, minor: 6 } })
 
   beforeAll(() => {
     process.env.NODE_ENV = 'test'
@@ -37,7 +37,7 @@ describe('the security teardown of support access (terv-v7 3.9)', () => {
     getDb().exec('DELETE FROM support_consents')
     notifyOwner.mockClear()
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-teardown-')))
-    supportDir = join(root, 'home', '.marveen', 'support')
+    supportDir = join(root, 'home', '.alfred', 'support')
     sshDir = join(root, 'home', '.ssh')
     mkdirSync(sshDir, { recursive: true, mode: 0o700 })
     writeFileSync(join(sshDir, 'authorized_keys'), OWN_LINE + '\n', { mode: 0o600 })

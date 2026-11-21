@@ -8,18 +8,18 @@ import { tmpdir } from 'node:os'
 // which in a production checkout recreated the real secrets file with default
 // 0644 permissions (2026-07-27 incident). env.ts resolves its own PROJECT_ROOT
 // (it cannot import config.js -- circular), so the redirect is the
-// CLAUDECLAW_ENV_DIR hook read at module import; set it BEFORE the dynamic
+// ALFRED_ENV_DIR hook read at module import; set it BEFORE the dynamic
 // import below. vitest isolates module registries per test file, so the hook
 // cannot leak into other suites.
 const SANDBOX = mkdtempSync(join(tmpdir(), 'env-test-'))
 const testEnvPath = join(SANDBOX, '.env')
 
 beforeAll(() => {
-  process.env.CLAUDECLAW_ENV_DIR = SANDBOX
+  process.env.ALFRED_ENV_DIR = SANDBOX
 })
 
 afterAll(() => {
-  delete process.env.CLAUDECLAW_ENV_DIR
+  delete process.env.ALFRED_ENV_DIR
   rmSync(SANDBOX, { recursive: true, force: true })
 })
 

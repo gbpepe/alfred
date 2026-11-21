@@ -13,8 +13,8 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, readdirSyn
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-fleet-base-rules-section-'))
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-fleet-base-rules-section-'))
+process.env.ALFRED_ENV_DIR = tmpRoot
 
 const tokens = { on: '1' }
 vi.mock('../config.js', async (importOriginal) => {

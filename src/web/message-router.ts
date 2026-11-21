@@ -45,7 +45,6 @@ import { setLastInboundModality } from './voice-modality.js'
 import { classifyAgentMessage, wrapAgentMessageForDelivery } from './agent-message-wrap.js'
 import { shouldNotifySenderOfFailure } from './requeue-notice.js'
 import { composeBatchInjection, batchInjectCapFor } from './batch-inject.js'
-import { maybeWakeSubAgentsForTelegram } from './telegram-inbox-wake.js'
 import { isStopMessage, isUrgentDelivery, selectTickWindow } from './message-router-window.js'
 import { busyRowAction, type BusyMemo } from './router-busy-skip.js'
 import { deliveryHoldFor, type DeliveryHold } from './delivery-hold.js'
@@ -1497,13 +1496,6 @@ export async function runMessageRouterTick(): Promise<void> {
         routerLoggedMisses.delete(msg.id)
       }
     }
-
-    // Independently of the inter-agent queue above: wake idle sub-agents whose
-    // Telegram inbox (inbox-pending.jsonl) has stuck inbound messages the drain
-    // hook cannot pull without a turn. No-op unless SUBAGENT_TELEGRAM_WAKE_ENABLED
-    // (default off); when enabled it is cheap statSync-gated so an empty fleet
-    // costs one stat per agent and no tmux I/O.
-    void maybeWakeSubAgentsForTelegram(now)
 }
 
 // ---- multi-envelope batch mates (B1F38C8C) ---------------------------------
@@ -1631,7 +1623,7 @@ async function callVoiceSTT(fileId: string, agentId: string): Promise<string | n
 
     // Resolve the agent's channel state_dir using the canonical helper so
     // sub-agents (whose .env lives under AGENTS_BASE_DIR) are found correctly.
-    const resolvedDir = resolveAgentChannelStateDir(agentId, 'telegram')
+    const resolvedDir = resolveAgentChannelStateDir(agentId, 'discord')
     if (!existsSync(join(resolvedDir, '.env'))) return null
 
     const { transcribeVoiceFile } = await import('./routes/voice.js')

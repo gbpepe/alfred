@@ -1,0 +1,19 @@
+# NOTE: replace /path/to/alfred (install dir) and /home/USER (home) with your values.
+# Templated app-crash notifier. Instantiated by an `OnFailure=` line on a unit,
+# e.g. a drop-in on alfred-dashboard.service / alfred-channels.service:
+#   [Unit]
+#   OnFailure=alfred-notify@%n.service
+# %i carries the failed unit's name. Reports an APP/service crash -- distinct
+# from a host/WSL-VM restart (host-restart-watchdog.sh). See
+# scripts/systemd/README-host-stability.md.
+[Unit]
+Description=Alfred app-crash notifier for %i
+
+[Service]
+Type=oneshot
+ExecStart=/path/to/alfred/scripts/unit-fail-notify.sh %i
+Environment=PATH=/home/USER/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/USER
+Environment=TZ=Europe/Budapest
+StandardOutput=journal
+StandardError=journal

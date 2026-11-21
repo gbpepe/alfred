@@ -25,9 +25,9 @@ mkdirSync(join(tmpRoot, 'store'), { recursive: true })
 vi.mock('../config.js', () => ({
   PROJECT_ROOT: tmpRoot,
   STORE_DIR: join(tmpRoot, 'store'),
-  MAIN_AGENT_ID: 'marveen',
-  BOT_NAME: 'Marveen',
-  BRAND_NAME: 'Marveen',
+  MAIN_AGENT_ID: 'alfred',
+  BOT_NAME: 'Alfred',
+  BRAND_NAME: 'Alfred',
   OWNER_NAME: 'Test',
   CHANNEL_PROVIDER: 'telegram',
 }))

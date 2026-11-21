@@ -1,6 +1,6 @@
 /**
  * MACROOTFROMCLONE1106: install-macos.sh runs no clone code as root, and leaves the sudo password out of clone
- * code's reach. The clone (~/marveen) is the user's: anything running as that user (an agent) can rewrite it, so a
+ * code's reach. The clone (~/alfred) is the user's: anything running as that user (an agent) can rewrite it, so a
  * root step that ran a clone file, or clone code that ran while the password was still in the installer's memory,
  * would hand the agent root on the next install.
  *
@@ -38,7 +38,7 @@ const CODE: Array<{ i: number; l: string }> = (() => {
 })()
 
 /** The line of the reset that ends the root part (the sudo login dropped, the password unset). */
-const RESET = LINES.findIndex((l) => l === 'unset __MARVEEN_SUDO_PW')
+const RESET = LINES.findIndex((l) => l === 'unset __ALFRED_SUDO_PW')
 
 function heredoc(open: string, close: string): string {
   const start = MAC.indexOf(open)

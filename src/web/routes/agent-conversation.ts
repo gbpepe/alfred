@@ -10,15 +10,15 @@ import type { RouteContext } from './types.js'
 
 // Read-only, human-readable conversation view for an agent. The dashboard
 // terminal only mirrors the live tmux pane (no history, and it does not show
-// the full Telegram traffic cleanly). The complete conversation lives in the
+// the full channel traffic cleanly). The complete conversation lives in the
 // Claude Code transcript (.jsonl): every inbound channel message, every
 // outbound reply, and every action. We parse the newest session transcript
 // into a chat-style timeline so an operator can actually review what happened
-// -- and, for customer-hosted Marveens, support them. Read-only.
+// -- and, for customer-hosted Alfreds, support them. Read-only.
 
 interface Entry {
   ts: string | null
-  // in  = inbound channel (e.g. Telegram) message from the user
+  // in  = inbound channel (e.g. Discord) message from the user
   // out = outbound message the agent sent back (reply/react/edit)
   // note = the agent's own narration text for that turn
   // action = a tool the agent ran (Bash, search, draft, ...)
@@ -121,13 +121,13 @@ function buildTimeline(file: string): Entry[] {
         } else if (bt === 'tool_use') {
           const name = typeof block['name'] === 'string' ? (block['name'] as string) : ''
           const input = (block['input'] as Record<string, unknown>) ?? {}
-          if (name.endsWith('telegram__reply') || name.endsWith('__reply')) {
+          if (name.endsWith('__reply')) {
             const txt = typeof input['text'] === 'string' ? (input['text'] as string) : ''
             if (txt) entries.push({ ts, kind: 'out', text: clip(txt), label: 'válasz' })
-          } else if (name.endsWith('telegram__react') || name.endsWith('__react')) {
+          } else if (name.endsWith('__react')) {
             const emoji = typeof input['emoji'] === 'string' ? (input['emoji'] as string) : '?'
             entries.push({ ts, kind: 'out', text: emoji, label: 'reakció' })
-          } else if (name.endsWith('telegram__edit_message') || name.endsWith('__edit_message')) {
+          } else if (name.endsWith('__edit_message')) {
             const txt = typeof input['text'] === 'string' ? (input['text'] as string) : ''
             entries.push({ ts, kind: 'out', text: clip(txt), label: 'szerkesztés' })
           } else {

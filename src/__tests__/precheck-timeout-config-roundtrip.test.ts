@@ -17,7 +17,7 @@ import { join } from 'node:path'
 const tmpHome = mkdtempSync(join(tmpdir(), 'precheck-timeout-home-'))
 const realHome = process.env.HOME
 process.env.HOME = tmpHome
-process.env.MAIN_AGENT_ID = process.env.MAIN_AGENT_ID || 'marveen'
+process.env.MAIN_AGENT_ID = process.env.MAIN_AGENT_ID || 'alfred'
 
 let io: typeof import('../web/scheduled-tasks-io.js')
 let runner: typeof import('../web/schedule-runner.js')

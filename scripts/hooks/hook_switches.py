@@ -1,4 +1,4 @@
-"""Shared runtime switches for Marveen's own Python hooks (HOOKDRIFT926).
+"""Shared runtime switches for Alfred's own Python hooks (HOOKDRIFT926).
 
 Not a hook itself: a small library a hook script calls as its first step.
 
@@ -6,7 +6,7 @@ Two switches, both read from the hook process environment (which Claude Code
 inherits from the session that launched it, or from the "env" block of
 settings.json):
 
-  MARVEEN_DISABLED_HOOKS=tool-log-capture
+  ALFRED_DISABLED_HOOKS=tool-log-capture
       Comma/space separated hook NAMES (the script file stem, the "hook" field
       of .claude/hooks.metadata.json). A listed hook exits 0 before reading
       its input. Locked names (DEFAULT_NON_DISABLEABLE below, plus the
@@ -17,7 +17,7 @@ settings.json):
       but its lock list cannot be read, EVERY hook counts as locked (fail
       safe): none is disableable, and oversize input fails closed.
 
-  MARVEEN_HOOK_INPUT_MAX_BYTES=<int>
+  ALFRED_HOOK_INPUT_MAX_BYTES=<int>
       Upper bound on the stdin payload a hook will read (default 8 MiB).
       Over the cap the direction depends on what the hook is:
         - a locked hook (gate / audit ledger) fails CLOSED: exit 2
@@ -34,8 +34,8 @@ import json
 import os
 import sys
 
-DISABLE_ENV = "MARVEEN_DISABLED_HOOKS"
-MAX_BYTES_ENV = "MARVEEN_HOOK_INPUT_MAX_BYTES"
+DISABLE_ENV = "ALFRED_DISABLED_HOOKS"
+MAX_BYTES_ENV = "ALFRED_HOOK_INPUT_MAX_BYTES"
 DEFAULT_MAX_INPUT_BYTES = 8 * 1024 * 1024
 
 # Hooks that no env var may disable, and whose oversize input fails closed.

@@ -31,7 +31,7 @@ import {
   hasFleetOauthToken, mainAgentSharedConfigDir,
 } from '../agent-process.js'
 import { waitPlanTokenOutcome } from '../plan-token-launch.js'
-import { hardRestartMarveenChannels, restartMainForRotationContinue } from '../channel-monitor.js'
+import { hardRestartAlfredChannels, restartMainForRotationContinue } from '../channel-monitor.js'
 import { rotationReadiness } from '../claude-rotation-heartbeat.js'
 import { mainRotationContinueVerdict, type ContinueRestartResult } from '../main-rotation-continue.js'
 import type { RouteContext } from './types.js'
@@ -151,7 +151,7 @@ export function commitNewPlan(rawBody: Record<string, unknown>): { status: numbe
   if (hasAmbiguousTokenField(rawBody)) {
     return { status: 400, payload: { error: 'Invalid plan: token cannot be combined with configDir or tokenSecretId' } }
   }
-  // K1 (ROTSLACK1111, Dani 75718): a label goes into the heartbeat's line-by-line output; a line break or a control
+  // K1 (Dani 75718): a label goes into the heartbeat's line-by-line output; a line break or a control
   // character is refused here (the value is never echoed). A label already on disk is not dropped by the reader:
   // the heartbeat flattens it when it prints (heartbeat-line.ts).
   if (typeof rawBody.label === 'string' && breaksLine(rawBody.label)) {
@@ -269,7 +269,7 @@ export async function rotatePlan(input: { agentId: string; targetPlanId: string;
       }
       mode = restarted.mode
     } else {
-      const result = hardRestartMarveenChannels()
+      const result = hardRestartAlfredChannels()
       if (!result.ok) {
         return { status: 500, payload: { error: result.error || 'Main agent restart failed' } }
       }
@@ -284,7 +284,7 @@ export async function rotatePlan(input: { agentId: string; targetPlanId: string;
     // fleet), and the usual caller -- the main agent's own heartbeat turn --
     // is being restarted by this very request. runFleetLeg never throws; it
     // records its outcome in the state side-car (fleet), and the next
-    // heartbeat tick prints that once for the Telegram report.
+    // heartbeat tick prints that once for the channel report.
     // Imported lazily: the wiring pulls in the agent registry/launcher
     // helpers, which installs with the opt-in off never need to load here.
     const fleetOn = isFleetRotationEnabled()

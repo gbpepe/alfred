@@ -88,7 +88,7 @@ def make_store(root, level):
     with open(os.path.join(store, "autonomy-config.json"), "w", encoding="utf-8") as fh:
         json.dump({"version": 1, "categories": [
             {"key": "email_send", "label": "Email", "level": level, "locked": False}]}, fh)
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute("""
       CREATE TABLE approvals (
         id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, category TEXT NOT NULL,
@@ -120,7 +120,7 @@ def run_gate(store, payload, gate=GATE):
 
 
 def approve(store, anchor):
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute(
         "INSERT INTO approvals (id, agent_id, category, action_description, status,"
         " requested_at, resolved_at, resolved_by, content_hash, consumed_at)"

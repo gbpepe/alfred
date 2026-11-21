@@ -30,7 +30,7 @@ function deps(i: GateInputs, after: number | null = 12_000) {
   const d: SessionControlDeps = {
     gather: () => ({ cfg: { ...DEFAULT_GATE_CONFIG }, inputs: i }),
     softClear,
-    session: () => 'marveen-channels',
+    session: () => 'alfred-channels',
     contextTokens: () => after,
   }
   return { d, softClear }
@@ -61,7 +61,7 @@ describe('/context clear (CMD920 test 10)', () => {
     const { d, softClear } = deps(inputs())
     const r = await contextClear(NOW, d)
     expect(r.cleared).toBe(true)
-    expect(softClear).toHaveBeenCalledWith('marveen', 'marveen-channels', NOW, 180_000)
+    expect(softClear).toHaveBeenCalledWith('alfred', 'alfred-channels', NOW, 180_000)
     expect(r.text).toMatch(/előtte: 180k · utána: 12k/)
   })
 
@@ -118,7 +118,7 @@ describe('/context clear (CMD920 test 10)', () => {
   it('readLastTurnActivityMs skips the blocked-prompt bookkeeping lines (the shape measured on the test transcript)', () => {
     const cfgDir = mkdtempSync(join(tmpdir(), 'turn-'))
     try {
-      const dir = projectsDirFor('/opt/marveen', cfgDir)
+      const dir = projectsDirFor('/opt/alfred', cfgDir)
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, 's.jsonl'), [
         JSON.stringify({ type: 'assistant', timestamp: '2026-09-22T13:30:26.598Z', message: { model: 'claude-sonnet-5' } }),
@@ -128,14 +128,14 @@ describe('/context clear (CMD920 test 10)', () => {
         JSON.stringify({ type: 'last-prompt' }),
         '',
       ].join('\n'))
-      expect(readLastTurnActivityMs('/opt/marveen', cfgDir)).toBe(Date.parse('2026-09-22T13:30:26.598Z'))
+      expect(readLastTurnActivityMs('/opt/alfred', cfgDir)).toBe(Date.parse('2026-09-22T13:30:26.598Z'))
     } finally { rmSync(cfgDir, { recursive: true, force: true }) }
   })
 
   it('a fresh session with only bookkeeping lines reads as "never had a turn" (0); an oversized file stays unknown (null)', () => {
     const cfgDir = mkdtempSync(join(tmpdir(), 'turn-'))
     try {
-      const dir = projectsDirFor('/opt/marveen', cfgDir)
+      const dir = projectsDirFor('/opt/alfred', cfgDir)
       mkdirSync(dir, { recursive: true })
       const book = [
         JSON.stringify({ type: 'system', subtype: 'local_command', timestamp: '2026-09-23T13:19:39.000Z', content: '<command-name>/rename</command-name>' }),
@@ -143,17 +143,17 @@ describe('/context clear (CMD920 test 10)', () => {
         JSON.stringify({ type: 'system', subtype: 'informational', timestamp: '2026-09-23T13:19:44.500Z', content: 'UserPromptSubmit operation blocked by hook' }),
       ]
       writeFileSync(join(dir, 's.jsonl'), book.join('\n') + '\n')
-      expect(readLastTurnActivityMs('/opt/marveen', cfgDir)).toBe(0)
+      expect(readLastTurnActivityMs('/opt/alfred', cfgDir)).toBe(0)
       const filler = JSON.stringify({ type: 'system', subtype: 'informational', content: 'x'.repeat(1000) })
       writeFileSync(join(dir, 's.jsonl'), Array.from({ length: 600 }, () => filler).join('\n') + '\n')
-      expect(readLastTurnActivityMs('/opt/marveen', cfgDir)).toBeNull()
+      expect(readLastTurnActivityMs('/opt/alfred', cfgDir)).toBeNull()
     } finally { rmSync(cfgDir, { recursive: true, force: true }) }
   })
 
   it('readLastTurnActivityMs skips our own /model lines (local command, no model turn; measured 2026-09-23)', () => {
     const cfgDir = mkdtempSync(join(tmpdir(), 'turn-'))
     try {
-      const dir = projectsDirFor('/opt/marveen', cfgDir)
+      const dir = projectsDirFor('/opt/alfred', cfgDir)
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, 's.jsonl'), [
         JSON.stringify({ type: 'assistant', timestamp: '2026-09-23T13:01:00.000Z', message: { model: 'claude-sonnet-5' } }),
@@ -162,10 +162,10 @@ describe('/context clear (CMD920 test 10)', () => {
         JSON.stringify({ type: 'user', timestamp: '2026-09-23T13:07:00.317Z', message: { role: 'user', content: '<local-command-stdout>Set model to \u001b[1mclaude-sonnet-5\u001b[22m</local-command-stdout>' } }),
         '',
       ].join('\n'))
-      expect(readLastTurnActivityMs('/opt/marveen', cfgDir)).toBe(Date.parse('2026-09-23T13:01:00.000Z'))
+      expect(readLastTurnActivityMs('/opt/alfred', cfgDir)).toBe(Date.parse('2026-09-23T13:01:00.000Z'))
       // a real owner prompt after it counts again
       writeFileSync(join(dir, 's.jsonl'), JSON.stringify({ type: 'user', timestamp: '2026-09-23T13:08:00.000Z', message: { role: 'user', content: 'szia' } }) + '\n', { flag: 'a' })
-      expect(readLastTurnActivityMs('/opt/marveen', cfgDir)).toBe(Date.parse('2026-09-23T13:08:00.000Z'))
+      expect(readLastTurnActivityMs('/opt/alfred', cfgDir)).toBe(Date.parse('2026-09-23T13:08:00.000Z'))
     } finally { rmSync(cfgDir, { recursive: true, force: true }) }
   })
 

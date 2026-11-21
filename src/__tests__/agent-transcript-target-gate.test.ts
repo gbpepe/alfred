@@ -94,10 +94,10 @@ describe('transcript route: target gate (whose log may be read)', () => {
       ['hungarian everyone', '["mindenki"]'],
       ['english everyone', '["all"]'],
       ['boolean true', 'true'],
-      ['object instead of array', '{"marveen-is": true}'],
+      ['object instead of array', '{"alfred-is": true}'],
       ['string instead of array', '"mindenki"'],
       ['empty list', '[]'],
-      ['truncated json', '["marveen-is"'],
+      ['truncated json', '["alfred-is"'],
       ['not json at all', 'mindenki'],
       ['empty file', ''],
     ]

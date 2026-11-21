@@ -37,7 +37,7 @@ import urllib.error
 
 # api.telegram.org publishes an AAAA record that is not routable from every host, and
 # Python's urllib has no happy-eyeballs fallback: each fresh connection stalls on the
-# IPv6 attempt before dropping to IPv4. MEASURED 2026-07-27 on the Marveen box: getFile
+# IPv6 attempt before dropping to IPv4. MEASURED 2026-07-27 on the Alfred box: getFile
 # took 25.1s with IPv6 allowed vs 0.0s IPv4-only, and a full transcribe ran 2m43s of
 # which only 5.5s was CPU. That silently blew the dashboard's 60s STT timeout, so
 # /api/voice/directive returned transcript=null and voice messages reached the agent
@@ -53,8 +53,8 @@ _orig_getaddrinfo = socket.getaddrinfo
 
 
 def _whisper_model_name():
-    """faster-whisper model size (MARVEEN_WHISPER_MODEL, default 'small')."""
-    return (os.environ.get("MARVEEN_WHISPER_MODEL") or "small").strip()
+    """faster-whisper model size (ALFRED_WHISPER_MODEL, default 'small')."""
+    return (os.environ.get("ALFRED_WHISPER_MODEL") or "small").strip()
 
 def _getaddrinfo_ipv4_first(host, port, family=0, *args, **kwargs):
     results = _orig_getaddrinfo(host, port, family, *args, **kwargs)
@@ -69,13 +69,13 @@ socket.getaddrinfo = _getaddrinfo_ipv4_first
 socket.setdefaulttimeout(60)
 
 
-# Piper runs from the marveen-voice venv. Resolve robustly across install layouts:
+# Piper runs from the alfred-voice venv. Resolve robustly across install layouts:
 # 1) explicit override env, 2) the real user-data venv (actual install location),
 # 3) legacy path relative to this file (PREFIX-style). First existing wins.
 def _resolve_venv_py():
     candidates = [
-        os.environ.get("MARVEEN_VOICE_VENV_PY"),
-        os.path.join(os.path.expanduser("~/.local/share/marveen-voice/venv"), "bin", "python"),
+        os.environ.get("ALFRED_VOICE_VENV_PY"),
+        os.path.join(os.path.expanduser("~/.local/share/alfred-voice/venv"), "bin", "python"),
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv", "bin", "python"),
     ]
     for c in candidates:
@@ -102,7 +102,7 @@ def _whisper(path, words=False):
     from faster_whisper import WhisperModel
     # Model size is configurable: 'medium' is noticeably better than 'small' on
     # Hungarian accents/diacritics, at a cost in latency and memory. Default
-    # stays 'small'; set MARVEEN_WHISPER_MODEL=medium to trade speed for accuracy.
+    # stays 'small'; set ALFRED_WHISPER_MODEL=medium to trade speed for accuracy.
     m = WhisperModel(_whisper_model_name(), device="cpu", compute_type="int8")
     segs, _ = m.transcribe(path, language="hu", beam_size=5, condition_on_previous_text=False,
                            word_timestamps=words)
@@ -217,22 +217,22 @@ def _post_voice(token, chat_id, ogg):
 
 
 def _is_install_dir(d):
-    """A marveen install is recognised by the ledger helper it ships."""
+    """A alfred install is recognised by the ledger helper it ships."""
     return bool(d) and os.path.isfile(os.path.join(d, "scripts", "hooks", "ledger_lib.py"))
 
 
 def _install_dir(state_dir=None):
-    """Root of the marveen install this voice call belongs to, or None.
+    """Root of the alfred install this voice call belongs to, or None.
 
-    Live calls run the INSTALLED toolkit copy (~/.local/share/marveen-voice/
+    Live calls run the INSTALLED toolkit copy (~/.local/share/alfred-voice/
     _vtools.py), which sits outside the install tree, so a path relative to this
     file is only right when running from the source tree. Resolution order:
-    1) MARVEEN_INSTALL_DIR (the dashboard passes it), 2) this file's own tree
+    1) ALFRED_INSTALL_DIR (the dashboard passes it), 2) this file's own tree
     (<install>/scripts/voice/_vtools.py), 3) the channel state_dir, which is
     <install>/agents/<name>/.claude/channels/<provider> for a sub-agent and
     <install>/.claude/channels/<provider> for the main agent."""
     candidates = [
-        os.environ.get("MARVEEN_INSTALL_DIR"),
+        os.environ.get("ALFRED_INSTALL_DIR"),
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     ]
     if state_dir:

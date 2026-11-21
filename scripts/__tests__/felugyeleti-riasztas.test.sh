@@ -16,7 +16,7 @@
 #  BUG 2 -- az OnFailure-ertesito keptelen volt kuldeni. A unitok beegetett
 #    `Environment=TELEGRAM_ENV=$HOME/...` sora elnyomta a script SAJAT, helyes
 #    feloldasat (a migralt telepitesen az a konyvtar mar ures), a
-#    MARVEEN_ALERT_CHAT_ID-t pedig SEMMI nem allitotta be.
+#    ALFRED_ALERT_CHAT_ID-t pedig SEMMI nem allitotta be.
 #
 # A KETTO EGYUTT a rossz: az elso leveszi a Restart=-ot, a masodik elnemitja azt az
 # ertesitest, ami szolt volna rola. Kivulrol semmi nem latszik.
@@ -71,7 +71,7 @@ STUB
 # `env -u`-val: a szandekos felulbiralast a hivo adja hozza, minden mast kizarunk.
 run_notify() {  # run_notify <install-dir> [env assignments...]
   local d="$1"; shift
-  ( cd "$d" && env -u TELEGRAM_STATE_DIR -u TELEGRAM_ENV -u TELEGRAM_ACCESS -u MARVEEN_ALERT_CHAT_ID \
+  ( cd "$d" && env -u TELEGRAM_STATE_DIR -u TELEGRAM_ENV -u TELEGRAM_ACCESS -u ALFRED_ALERT_CHAT_ID \
       PATH="$d/bin:$PATH" HOME="$d/home" STUB_ARGS_FILE="$d/curl-args.txt" \
       "$@" bash "$d/scripts/unit-fail-notify.sh" teszt.service ) 2>&1
 }
@@ -89,12 +89,12 @@ out="$(run_notify "$B")"
 check "2 a '0' placeholder NEM szamit chatnek (nem megy ki semmi)" \
   "$(grep -q 'no Telegram sent' <<<"$out" && echo 0 || echo 1)" "$(printf '%s' "$out" | tail -1)"
 check "2 a hianyt NEVESITI a naplo" \
-  "$(grep -q 'MARVEEN_ALERT_CHAT_ID' <<<"$out" && echo 0 || echo 1)"
+  "$(grep -q 'ALFRED_ALERT_CHAT_ID' <<<"$out" && echo 0 || echo 1)"
 
 # A KIMONDOTT felulbiralas TOVABBRA IS nyer -- ezt nem vettuk el.
 C="$SANDBOX/c"; mk_install "$C" '{"dmPolicy":"allowlist","allowFrom":["111222333"]}'; mk_curl_stub "$C"
-out="$(run_notify "$C" MARVEEN_ALERT_CHAT_ID=999888777)"
-check "3 a MARVEEN_ALERT_CHAT_ID felulbiralas ervenyes" \
+out="$(run_notify "$C" ALFRED_ALERT_CHAT_ID=999888777)"
+check "3 a ALFRED_ALERT_CHAT_ID felulbiralas ervenyes" \
   "$(grep -q '999888777' "$C/curl-args.txt" 2>/dev/null && echo 0 || echo 1)"
 
 # Ha NINCS access.json es nincs override: nema marad, de NEVESITVE.

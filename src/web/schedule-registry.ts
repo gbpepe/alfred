@@ -25,7 +25,7 @@
 // (src/web/schedule-registry-cli.ts); see docs/scheduled-tasks.md
 // ("Forrás-oldali védelem").
 //
-// Scope, stated honestly: the registry lives in store/claudeclaw.db, which a
+// Scope, stated honestly: the registry lives in store/alfred.db, which a
 // same-user process could also write. The guard stops FILE-ONLY plants (a
 // Write/Edit/cp into the tasks dir, a symlinked config path, a tampered seed);
 // planting a task now also takes a deliberate DB write or CLI call. The hash

@@ -26,7 +26,7 @@ export type DeliverySendOutcome = 'sent' | 'aborted-busy' | 'skipped-locked' | (
 export interface DeliverOptions {
   /** Wait before the FIRST readiness check. Past the identity-setup /rename and
    *  the plugin-unlock keystrokes (start -> /rename max 20.0 s, n=102): a few
-   *  seconds of slack past that maximum. */
+   *  seconds of leeway past that maximum. */
   firstMs: number
   /** Gaps between the following checks; the last one repeats until the deadline. */
   stepsMs: readonly number[]

@@ -328,7 +328,7 @@ describe('gate script entrypoint (spawned, no network)', () => {
   })
 
   it('deny message names the way out with the configured bot name', () => {
-    expect(buildThreadDenyMsg('Marveen', 'proba')).toContain('Marveen')
-    expect(buildThreadDenyMsg('Marveen', 'proba')).toContain('proba')
+    expect(buildThreadDenyMsg('Alfred', 'proba')).toContain('Alfred')
+    expect(buildThreadDenyMsg('Alfred', 'proba')).toContain('proba')
   })
 })

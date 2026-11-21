@@ -36,8 +36,8 @@ const commandAtCardIndent = (pane: string) => noReason(pane).replace(/\n {3}│ 
 function outgoing(pane: string): string[] {
   const ask = permissionPromptSummary(pane)
   return [
-    formatStuckSessionAlert('worker', 'marveen', 'agent-worker', 11 * 60 * 1000, 1, 'unknown', true, ask) ?? '',
-    formatUrgentHoldNotice({ id: 7, from_agent: 'marveen', to_agent: 'worker' }, 'agent-worker', { kind: 'permission-prompt', ask }, 'worker'),
+    formatStuckSessionAlert('worker', 'alfred', 'agent-worker', 11 * 60 * 1000, 1, 'unknown', true, ask) ?? '',
+    formatUrgentHoldNotice({ id: 7, from_agent: 'alfred', to_agent: 'worker' }, 'agent-worker', { kind: 'permission-prompt', ask }, 'worker'),
     formatPermissionPromptMainAlert('worker', 'agent-worker', permissionPromptAsk(pane), 15 * 60 * 1000),
   ]
 }

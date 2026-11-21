@@ -1,4 +1,4 @@
-// GROMZOGATECONF1030 (c) (the owner's GO, Samu 59516, Dani 59506): a sub-agent's sender-role gate lives in ONE file
+// Role-gate store hardening (Samu 59516, Dani 59506): a sub-agent's sender-role gate lives in ONE file
 // under store/, which only the dashboard writes, and the launcher and the gate read ONLY from there. Before, the
 // policy sat in the agent's own agents/<name>/agent-config.json, which the agent itself can write: a deceived agent
 // could widen its own gate, live at its next restart. The store file is on the install-file gate's protected list

@@ -28,7 +28,7 @@ const projectRoot = join(__dirname, '..')
 // visible on STDERR (the lines this script writes itself) and in the exit code; to debug the vault module, run it from a REPL or the
 // dashboard process, not through this script.
 process.env.LOG_LEVEL = 'silent'
-process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION = '1'
+process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION = '1'
 
 const wanted = []
 for (const arg of process.argv.slice(2)) {

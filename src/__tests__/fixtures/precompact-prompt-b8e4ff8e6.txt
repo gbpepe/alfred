@@ -1,6 +1,6 @@
 A kontextus hamarosan tömörítődik. Két dolgot csinálj:
 
-A Marveen /api/* Bearer tokenes. A token a projekt gyökerében: cat ~/ClaudeClaw/store/.dashboard-token
+A Alfred /api/* Bearer tokenes. A token a projekt gyökerében: cat ~/Alfred/store/.dashboard-token
 
 ## 1. Memória mentés
 Nézd át az eddigi beszélgetést és mentsd el a fontos dolgokat.
@@ -9,12 +9,12 @@ FONTOS: Az agent_id-t a CLAUDE.md-ből derítsd ki (a fájl elején szerepel a n
 
 Használd a curl parancsokat:
 - Fontos döntések, preferenciák, tanulságok (category=warm):
-  curl -s -X POST http://localhost:3420/api/memories -H 'Content-Type: application/json' -H "Authorization: Bearer $(cat ~/ClaudeClaw/store/.dashboard-token)" -d '{"agent_id":"SAJAT_NEVED","content":"...","category":"warm","keywords":"..."}'
+  curl -s -X POST http://localhost:3420/api/memories -H 'Content-Type: application/json' -H "Authorization: Bearer $(cat ~/Alfred/store/.dashboard-token)" -d '{"agent_id":"SAJAT_NEVED","content":"...","category":"warm","keywords":"..."}'
 - Aktív feladatok, pending -> category=hot
 - Hosszútávú tanulság -> category=cold
 - Más agent-nek is -> category=shared
 - Napi napló bejegyzés:
-  curl -s -X POST http://localhost:3420/api/daily-log -H 'Content-Type: application/json' -H "Authorization: Bearer $(cat ~/ClaudeClaw/store/.dashboard-token)" -d '{"agent_id":"SAJAT_NEVED","content":"..."}'
+  curl -s -X POST http://localhost:3420/api/daily-log -H 'Content-Type: application/json' -H "Authorization: Bearer $(cat ~/Alfred/store/.dashboard-token)" -d '{"agent_id":"SAJAT_NEVED","content":"..."}'
 
 CSAK a tényleg fontos, nem nyilvánvaló dolgokat mentsd. Ne mentsd ami a kódból kiderül.
 
@@ -45,6 +45,6 @@ SKILLEOF
 
 Ha volt korábban hasonló skill, PATCH-eld (csak a megváltozott részt cseréld sed-del vagy a SKILL.md átírásával), ne írd újra az egészet.
 
-Ha generáltál vagy patch-eltél skill-t, futtasd az index frissítőt: bash ~/ClaudeClaw/scripts/skill-index.sh
+Ha generáltál vagy patch-eltél skill-t, futtasd az index frissítőt: bash ~/Alfred/scripts/skill-index.sh
 
 Ha nem volt skill-méltó munka, ne csinálj semmit -- ez a rész opcionális.

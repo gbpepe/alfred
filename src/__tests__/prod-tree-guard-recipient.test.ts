@@ -15,7 +15,7 @@ import { sanitizeAgentIdent } from '../prompt-safety.js'
 
 // WHO the post-checkout alert is sent AS and TO.
 //
-// The recipient and the stock 'marveen' fallback are develop's (#1569, pinned by
+// The recipient and the stock 'alfred' fallback are develop's (#1569, pinned by
 // #1633). What this file adds is the SENDER: the guard sends under its own name
 // where SYSTEM_SENDER_IDS registers it, and under the install's main agent id
 // where it does not. The recipient is never derived from the sender.
@@ -128,7 +128,7 @@ async function switchTo(
   execFileSync('git', ['-C', repo, 'branch', branch])
   const { stderr } = await execFileAsync('git', ['-C', repo, 'checkout', '-q', branch], {
     timeout: 20000,
-    env: { ...process.env, MARVEEN_DASHBOARD_ORIGIN: origin, ...extraEnv },
+    env: { ...process.env, ALFRED_DASHBOARD_ORIGIN: origin, ...extraEnv },
   })
   if (waitForPost) {
     for (let i = 0; i < 100 && captured.length === 0; i++) await new Promise((r) => setTimeout(r, 20))
@@ -162,7 +162,7 @@ describe('prod-tree-guard post-checkout alert: the recipient comes from the inst
     // the file measured the recipient in both directions and the sender in
     // neither.
     const repo = makeRepo('MAIN_AGENT_ID=env-fajlbol\n')
-    const { bodies, rejected } = await switchTo(repo, 'feature-ordinary', { MARVEEN_GUARD_ALERT_TO: 'valtozobol' })
+    const { bodies, rejected } = await switchTo(repo, 'feature-ordinary', { ALFRED_GUARD_ALERT_TO: 'valtozobol' })
     expect(rejected).toEqual([])
     expect(bodies.length).toBe(1)
     const p = JSON.parse(bodies[0])
@@ -172,8 +172,8 @@ describe('prod-tree-guard post-checkout alert: the recipient comes from the inst
 
   it('the SENDER is the install\'s own id too -- a hardcoded one is refused by the dashboard', async () => {
     // Measured 2026-09-25 (Sam): fixing the recipient while leaving
-    // `"from":"marveen"` in place moves the failure instead of removing it --
-    // the real dashboard answers 403 "unknown agent 'marveen'". And because
+    // `"from":"alfred"` in place moves the failure instead of removing it --
+    // the real dashboard answers 403 "unknown agent 'alfred'". And because
     // the installer rewrites this hook unconditionally, the first update after
     // a merge would have restored the broken sender.
     const repo = makeRepo('MAIN_AGENT_ID=sajat-agens\n')
@@ -236,7 +236,7 @@ describe('prod-tree-guard post-checkout alert: the SENDER is read from SYSTEM_SE
 
   it('THE GUARD IS NEVER THE RECIPIENT OF ITS OWN ALERT', async () => {
     // The trap this change had to avoid. The recipient line used to read
-    // `${MARVEEN_GUARD_ALERT_TO:-$ALERT_FROM}`, which was harmless while the
+    // `${ALFRED_GUARD_ALERT_TO:-$ALERT_FROM}`, which was harmless while the
     // sender could only be the main agent -- the two were the same value. Once
     // the sender can be the guard, that same line addresses the alert to the
     // guard itself: a mailbox with no reader, and the hook reports success.
@@ -252,7 +252,7 @@ describe('prod-tree-guard post-checkout alert: the SENDER is read from SYSTEM_SE
 
   it('a registered sender with no MAIN_AGENT_ID still goes out, to the stock recipient the develop logic falls back to', async () => {
     // The recipient half is develop's (#1569, pinned by #1633): no MAIN_AGENT_ID
-    // means the stock 'marveen'. This case pins that the SENDER feature does not
+    // means the stock 'alfred'. This case pins that the SENDER feature does not
     // disturb it -- the guard sends under its own name, and the recipient is
     // still resolved from MAIN_AGENT_ID and never from the sender.
     const repo = makeRepo('SYSTEM_SENDER_IDS=prod-tree-guard\n')
@@ -261,7 +261,7 @@ describe('prod-tree-guard post-checkout alert: the SENDER is read from SYSTEM_SE
     expect(bodies.length).toBe(1)
     const p = JSON.parse(bodies[0])
     expect(p.from).toBe('prod-tree-guard')
-    expect(p.to).toBe('marveen')
+    expect(p.to).toBe('alfred')
   })
 
   // THE HOOK AND THE SERVER MUST READ THE LIST THE SAME WAY (Sam, 2026-09-30). The
@@ -327,7 +327,7 @@ describe('prod-tree-guard post-checkout alert: the SENDER is read from SYSTEM_SE
     // proves the refusal above is about a MISSING recipient, not about the
     // guard sender being rejected somewhere in the hook.
     const repo = makeRepo('SYSTEM_SENDER_IDS=prod-tree-guard\n')
-    const { bodies, rejected } = await switchTo(repo, 'feature-ordinary', { MARVEEN_GUARD_ALERT_TO: 'valtozobol' })
+    const { bodies, rejected } = await switchTo(repo, 'feature-ordinary', { ALFRED_GUARD_ALERT_TO: 'valtozobol' })
     expect(rejected).toEqual([])
     expect(bodies.length).toBe(1)
     const p = JSON.parse(bodies[0])

@@ -43,7 +43,7 @@ describe('Notes page: assignee picker', () => {
     const { loaded, values } = await loadAssignees(async () => ({ ok: true, json: async () => [{ name: 'Cody' }, { name: 'boss' }, { name: 'ada' }, { name: 'cody' }] }))
     expect(loaded).toBe(true)
     expect(values).toEqual(['mindenki', 'gazda', 'boss', 'ada', 'cody'])
-    expect(values).not.toContain('marveen')
+    expect(values).not.toContain('alfred')
   })
 
   it('a failed agent list keeps the form usable but is not remembered as loaded, so the next visit retries', async () => {
@@ -65,12 +65,12 @@ describe('Notes page: who the writes name', () => {
 })
 
 describe('Notes page opened first: the writes still name the owner', () => {
-  // window._marveen is filled by the Kanban, Agents and Messages pages only. With
+  // window._alfred is filled by the Kanban, Agents and Messages pages only. With
   // the notes page as the first page of a fresh load it is unset, so the writes
-  // must resolve /api/marveen themselves before building their bodies.
+  // must resolve /api/alfred themselves before building their bodies.
   const helpers =
     slice('function kanbanMoveActor()', '\n') + '\n' +
-    slice('async function ensureMarveenLoaded()', '\nasync function loadMessagesPage(') + '\n' +
+    slice('async function ensureAlfredLoaded()', '\nasync function loadMessagesPage(') + '\n' +
     'let notesPageWired = false\n' +
     slice('function wireNotesPage()', '\nasync function loadIdeasPage(')
 
@@ -88,7 +88,7 @@ describe('Notes page opened first: the writes still name the owner', () => {
       window: win,
       document: { getElementById: (id: string) => els[id] || null },
       ['fe' + 'tch']: async (url: string, opts?: { body?: string }) => {
-        if (url === '/api/marveen') return { ok: true, json: async () => ({ agentId: 'boss', ownerName: 'Owner Name' }) }
+        if (url === '/api/alfred') return { ok: true, json: async () => ({ agentId: 'boss', ownerName: 'Owner Name' }) }
         writes.push({ url, body: JSON.parse(opts?.body || '{}') })
         return { ok: true, json: async () => ({ ok: true }) }
       },
@@ -103,7 +103,7 @@ describe('Notes page opened first: the writes still name the owner', () => {
 
   it('the first add carries created_by although no other page loaded the config', async () => {
     const { listeners, els, writes, win } = setup()
-    expect(win._marveen).toBeUndefined()
+    expect(win._alfred).toBeUndefined()
     els.notesContent.value = 'call the plumber'
     await listeners.notesForm({ preventDefault() {} })
     expect(writes).toHaveLength(1)
@@ -122,7 +122,7 @@ describe('Notes page opened first: the writes still name the owner', () => {
 
   it('loadNotesPage resolves the config before it draws anything', () => {
     const body = slice('async function loadNotesPage() {', '\n}\n')
-    expect(body.indexOf('await ensureMarveenLoaded()')).toBeGreaterThan(-1)
-    expect(body.indexOf('await ensureMarveenLoaded()')).toBeLessThan(body.indexOf('loadNotesAssignees()'))
+    expect(body.indexOf('await ensureAlfredLoaded()')).toBeGreaterThan(-1)
+    expect(body.indexOf('await ensureAlfredLoaded()')).toBeLessThan(body.indexOf('loadNotesAssignees()'))
   })
 })

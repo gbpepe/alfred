@@ -133,11 +133,11 @@ describe('wrapScheduledTaskByReference', () => {
   it('carries body-file/body-sha256/body-chars as attributes, not as content', () => {
     const out = wrapScheduledTaskByReference(
       'scheduled-task:kanban-audit',
-      '/opt/marveen/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md',
+      '/opt/alfred/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md',
       'deadbeef'.repeat(8),
       48745,
     )
-    expect(out).toMatch(/^<scheduled-task source="scheduled-task:kanban-audit" body-file="\/opt\/marveen\/store\/scheduled-runs\/20260917-080000-kanban-audit-a3f9\.md" body-sha256="(?:deadbeef){8}" body-chars="48745">/)
+    expect(out).toMatch(/^<scheduled-task source="scheduled-task:kanban-audit" body-file="\/opt\/alfred\/store\/scheduled-runs\/20260917-080000-kanban-audit-a3f9\.md" body-sha256="(?:deadbeef){8}" body-chars="48745">/)
     expect(out.endsWith('</scheduled-task>')).toBe(true)
     // The task's actual content is NOT in the block -- only the pointer + instruction.
     expect(out).not.toMatch(/kanban-audit SKILL/)
@@ -152,7 +152,7 @@ describe('wrapScheduledTaskByReference', () => {
   it('produces a short, size-independent prompt (test 3: <1200 chars for a 48745-char body)', () => {
     const out = wrapScheduledTaskByReference(
       'scheduled-task:kanban-audit',
-      '/opt/marveen/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md',
+      '/opt/alfred/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md',
       'a'.repeat(64),
       48745,
     )

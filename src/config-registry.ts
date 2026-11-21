@@ -133,13 +133,13 @@ export function parseStoreWatchExclude(raw: string | undefined): Set<string> {
 }
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/
-// A Discord id, exactly as the Discord overlay's parseChannelPolicy accepts it (marveen-ext.ts SNOWFLAKE_ID).
+// A Discord id, exactly as the Discord overlay's parseChannelPolicy accepts it (alfred-ext.ts SNOWFLAKE_ID).
 const DISCORD_SNOWFLAKE_RE = /^[0-9]{15,20}$/
 // DISCORD_CHANNEL_POLICY's on/off keys per channel, as the overlay's parseChannelPolicy reads them.
 const DISCORD_CHANNEL_POLICY_FLAGS = ['history', 'autoThread']
 
-// True for an absolute http(s) URL, e.g. "https://marveen.example.com" or "http://localhost:3420/prefix". A value with
-// no scheme ("marveen", "localhost:3420"), another scheme or any whitespace is not one: such a value, glued in front
+// True for an absolute http(s) URL, e.g. "https://alfred.example.com" or "http://localhost:3420/prefix". A value with
+// no scheme ("alfred", "localhost:3420"), another scheme or any whitespace is not one: such a value, glued in front
 // of "/api/...", gives a relative path or a split word instead of an address. Exported for resolveDashboardOrigin
 // (agent-scaffold.ts), so the check on save and the check on use are the same one.
 export function isAbsoluteHttpUrl(v: string): boolean {
@@ -156,7 +156,7 @@ export function isAbsoluteHttpUrl(v: string): boolean {
 function validAbsoluteHttpUrlOrEmpty(v: string): string | null {
   return v.trim() === '' || isAbsoluteHttpUrl(v)
     ? null
-    : 'Üres érték vagy teljes http(s) URL szükséges, sémával együtt (pl. https://marveen.example.com vagy http://localhost:3420).'
+    : 'Üres érték vagy teljes http(s) URL szükséges, sémával együtt (pl. https://alfred.example.com vagy http://localhost:3420).'
 }
 
 // A '' (use the default) or a number in [0, 1], e.g. a cosine-similarity threshold.
@@ -266,9 +266,9 @@ function validFusionWeight(v: string): string | null {
 }
 
 // The Claude models an agent / worker setting may pick. Shared by DEFAULT_AGENT_MODEL and
-// MARVEEN_WORKER_MODEL_FAST so the two pickers can never drift apart (WORKERMODELFAST1109).
+// ALFRED_WORKER_MODEL_FAST so the two pickers can never drift apart (WORKERMODELFAST1109).
 export const AGENT_MODEL_CHOICES: readonly string[] = [
-  // Opus 5.5: ONLY the 1M variant is offered (owner decision 2026-09-23, Marveen 28541).
+  // Opus 5.5: ONLY the 1M variant is offered (owner decision 2026-09-23, Alfred 28541).
   'claude-opus-5-5[1m]',
   'claude-opus-5',
   'claude-opus-5[1m]',
@@ -515,7 +515,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     key: 'DASHBOARD_PUBLIC_URL',
     type: 'string',
     default: '',
-    description: 'A dashboard nyilvánosan elérhető URL-je (pl. https://marveen.example.com). Üres = nincs CORS whitelist bővítés.',
+    description: 'A dashboard nyilvánosan elérhető URL-je (pl. https://alfred.example.com). Üres = nincs CORS whitelist bővítés.',
     module: 'system',
     secret: false,
     requiresRestart: true,
@@ -731,16 +731,6 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     requiresRestart: true,
   },
   {
-    key: 'TELEGRAM_PROGRESS_MODE',
-    type: 'string',
-    default: 'indicator',
-    valueSet: ['silent', 'indicator', 'verbose'],
-    description: 'Mennyit lásson a tulajdonos Telegramon a munkából. silent = semmi; indicator = egy eltűnő "gondolkodom" üzenet élő token-számlálóval, ami a kör végén törlődik; verbose = ugyanez, plusz a gondolatmenet megmaradó üzenetekben. Ez a flotta alapértelmezése -- egy ügynök felülírhatja a store/progress-config.json-ban.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-  },
-  {
     key: 'DASHBOARD_LANG',
     type: 'string',
     default: 'hu',
@@ -904,11 +894,10 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     loosens: (oldValue: string, newValue: string) => oldValue.trim() !== 'audit' && newValue.trim() === 'audit',
   },
   {
-    // SKILLAPPROVALOFF1101 (owner, Slack 2026-11-01 22:35): switchable, OFF by default. The scan, the hash binding and
+    // SKILLAPPROVALOFF1101: switchable, OFF by default. The scan, the hash binding and
     // an audit line run in both positions; only the hold for the owner's approval is what the switch turns on.
-    // SKILLQUARANTINEDEF1109 (owner, Slack 2026-11-18, "Vevőknél is KI"; overrides Rec0CGYNBMRL0 = A of 2026-11-16):
-    // the default is OFF again, on customer installs too, so the skill factory is not slowed down. The scan, the hash
-    // binding, the audit line and the hold of a strong-shape finding run with the switch off as well.
+    // SKILLQUARANTINEDEF1109: the default is OFF again, on customer installs too, so the skill factory is not slowed down.
+    // The scan, the hash binding, the audit line and the hold of a strong-shape finding run with the switch off as well.
     key: 'SKILL_QUARANTINE',
     type: 'boolean',
     default: '0',
@@ -1061,52 +1050,8 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     secret: false,
     requiresRestart: true,
   },
-  {
-    key: 'NOTIFY_SLACK_TARGET',
-    type: 'string',
-    default: '',
-    description: 'A tulajdonosnak szóló értesítések (heartbeat-összefoglaló, biztonsági és egyéb gazda-értesítések) Slack-célja: "dm" (a gazda DM-je), egy csatorna neve a store/slack-channels.json térképből, vagy egy C/G/D-vel kezdődő Slack-azonosító. Üresen (alapértelmezés) nincs Slack-küldés. A küldés a fő ágens Slack-bot tokenjével megy. Egy D-vel kezdődő azonosítóra a jóváhagyás-kérések is közvetlenül ide mennek; minden változásáról a RÉGI cél értesítést kap.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    // APPROVALSLACK1030 (Samu 66026): the owner's approval requests go here, so ANY change needs the owner's session.
-    loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
-  },
-  {
-    key: 'NOTIFY_SLACK_ALERT_TARGET',
-    type: 'string',
-    default: '',
-    description: 'Az üzemeltetési riasztások (watchdog, újraindítás, beragadt munkamenet, context-guard) Slack-célja, ugyanabban az alakban, mint a NOTIFY_SLACK_TARGET. Üresen a NOTIFY_SLACK_TARGET-et használja.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    // Where every alert goes FIRST (slack-notify.mjs): any change re-routes them, like NOTIFY_SLACK_TARGET (Dani's #2500
-    // review). So it is overrides-only, and a .env line never counts.
-    loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
-  },
-  {
-    key: 'NOTIFY_TELEGRAM',
-    type: 'boolean',
-    default: '1',
-    description: 'Menjen-e az értesítés Telegramra is. Bekapcsolva (alapértelmezés) a Telegram-küldés változatlan, a Slack mellé kerül. Kikapcsolva, ha van Slack-cél, csak Slackre megy; ha a Slack-küldés elbukik, a Telegram tartalékként mégis kimegy, hogy semmi ne vesszen el.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-  },
-  {
-    key: 'NOTIFY_TELEGRAM_FALLBACK',
-    type: 'boolean',
-    default: '1',
-    description: 'Mehet-e Telegram TARTALÉKKÉNT, ha a Slack-értesítés nem megy ki (nincs Slack-cél, a Slack-modul nem töltődik be, vagy a küldés hibát ad). Bekapcsolva (alapértelmezés) semmi nem vész el: a Telegram átveszi. Kikapcsolva a Telegram SOHA nem kap értesítést tartalékként: a Slack-hiba hangos naplósor (a notify.sh nem nullával lép ki), és az ütemezett feladatok tartalék-utasítása is a notify.sh-t nevezi meg. A NOTIFY_TELEGRAM a "menjen-e MELLÉ" kérdés, ez a "menjen-e HELYETTE".',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-  },
   // Boot-time const in src/config.ts, like the opt-in switches further down this
   // module -- so a saved value takes effect only after the dashboard restarts.
-  // It sits HERE, next to the notify switches, because its default is ON: the
-  // comment above that lower block says its entries default to '0', which would
-  // not be true of this one.
   {
     key: 'NOTIFY_ROUTINE_ALERTS',
     type: 'boolean',
@@ -1115,60 +1060,6 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     module: 'channels',
     secret: false,
     requiresRestart: true,
-  },
-  {
-    key: 'SLACK_OWNER_USER_ID',
-    type: 'string',
-    default: '',
-    description: 'A gazda Slack user-azonosítója (U...), a "dm" cél ehhez nyit DM-et. Üresen a fő ágens Slack access.json-jából veszi, ha ott pontosan egy engedélyezett felhasználó áll. Ha a Slack-reakciós jóváhagyás be van kapcsolva, ennek a felhasználónak a ✅/❌ reakciója dönt; minden változásáról a RÉGI azonosító DM-et kap.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    // APPROVALSLACK1030 (2), Samu 65935: this id names whose Slack reaction approves, so ANY change of it needs the
-    // owner's session; with the shared token an agent could make itself the approver.
-    loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
-  },
-  {
-    // OWNERAUTHGUESS1106 (Samu 71849): the owner of the Telegram chat commands. With several paired DMs and the
-    // installer's ALLOWED_CHAT_ID=0 nobody is guessed any more: the commands stop until this is set. Not the memory key
-    // (ALLOWED_CHAT_ID), not OWNER_ALERT_CHAT_ID (a delivery target).
-    key: 'TELEGRAM_OWNER_USER_ID',
-    type: 'string',
-    default: '',
-    description: 'A gazda Telegram-felhasználói azonosítója (pozitív szám, a saját chated száma): ő futtathatja a chat-parancsokat (/status, /model ...). Üresen a régi szabály marad: egy pozitív ALLOWED_CHAT_ID, vagy ha az nincs, a fő bot egyetlen párosított DM-je. Ha több DM van párosítva (pl. gazda és családtag) és az ALLOWED_CHAT_ID nincs kitöltve, a rendszer nem találgat: a chat-parancsok addig nem futnak, amíg ezt be nem állítod. Csak azt dönti el, ki a gazda a parancsoknál: hova menjenek a riasztások, azt az OWNER_ALERT_CHAT_ID mondja meg, az emlékek pedig változatlanok.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    // a positive Telegram user id or empty; refused otherwise, never stored and ignored later
-    validate: (v: string) => (v.trim() === '' || /^[1-9][0-9]{0,19}$/.test(v.trim())
-      ? null
-      : 'Pozitív Telegram-felhasználói azonosító kell (a saját chated száma, pl. 1268077055); csoport (negatív szám) nem lehet. / A positive Telegram user id is required (your own chat number, e.g. 1268077055); a group (a negative number) is not allowed.'),
-    // whose chat commands run: ANY change needs the owner's session, as SLACK_OWNER_USER_ID
-    loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
-  },
-  {
-    key: 'APPROVAL_SLACK_REACTIONS',
-    type: 'string',
-    default: 'off',
-    description: 'Slack-reakciós jóváhagyás (APPROVALSLACK1030): bekapcsolva (on) a jóváhagyás-kérés a gazda Slack-DM-jébe EGY üzenetként megy, és a gazda ✅ (jóváhagy) vagy ❌ (elutasít) reakcióját a szerver maga ellenőrzi. Csak kifejezett SLACK_OWNER_USER_ID mellett, és csak olyan kérésre, amelynek tartalmát a szerver ellenőrizni tudja (levélnél a teljes boríték, a horgonnyal egyezően); minden más kérésnél a döntés a dashboardon marad. Alapból KI.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    validate: (v: string) => (['on', 'off'].includes(v.trim().toLowerCase()) ? null : 'on vagy off'),
-    // Switching it ON opens one more way to approve: that needs the owner's session.
-    loosens: (oldValue: string, newValue: string) => oldValue.trim().toLowerCase() !== 'on' && newValue.trim().toLowerCase() === 'on',
-  },
-  {
-    key: 'APPROVAL_SLACK_REPLIES',
-    type: 'string',
-    default: 'off',
-    description: 'Slack-válaszos jóváhagyás (APPROVALSLACK1030 B): bekapcsolva (on) a jóváhagyás-kérés a gazda Slack-DM-jébe EGY üzenetként megy, és a gazda beírt "mehet" (jóváhagy) vagy "nem" (elutasít) válaszát a szerver maga olvassa el: a kérés szálában, vagy közvetlenül a kérés után, ha közben senki más nem írt. Csak kifejezett SLACK_OWNER_USER_ID mellett. Leírás-alapú kérésnél a gazda a kérő ügynök leírását hagyja jóvá (vállalt kockázat). Az állandó kategóriák, a data_delete és a boríték nélküli levél a dashboardon marad. Alapból KI; a bekapcsolás a gazda döntése.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    validate: (v: string) => (['on', 'off'].includes(v.trim().toLowerCase()) ? null : 'on vagy off'),
-    // Switching it ON opens one more way to approve: that needs the owner's session (Samu 67693: the owner's own step).
-    loosens: (oldValue: string, newValue: string) => oldValue.trim().toLowerCase() !== 'on' && newValue.trim().toLowerCase() === 'on',
   },
   {
     // AGENTCREATEPR2-1119: a new way to create an agent (a request the owner approves in a channel), so off by default
@@ -1184,61 +1075,24 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     loosens: (oldValue: string, newValue: string) => oldValue.trim().toLowerCase() !== 'on' && newValue.trim().toLowerCase() === 'on',
   },
   {
-    // TEAMSAPPROVECARD1118 (Samu D3): one more way to approve, so off by default and switching it on needs the owner.
-    key: 'APPROVAL_TEAMS_CARDS',
-    type: 'string',
-    default: 'off',
-    description: 'Teams-kártyás jóváhagyás (TEAMSAPPROVECARD1118): bekapcsolva (on) a levélküldés (email_send) jóváhagyás-kérése kártyaként megy a gazda Teams 1:1 chatjébe a bottal, Jóváhagyom / Elutasítom gombbal. A kártyát a szerver állítja össze a tárolt borítékból (címzett, másolat, a levél szövege), és a kattintást a szerver maga ellenőrzi (Microsoft által aláírt csatorna-token, a bot tenantja, a gazda azonosítója, az elküldött kártya, egyszeri kód); az ügynök nincs az úton. Csak kifejezett TEAMS_OWNER_AAD_OBJECT_ID mellett, és csak olyan levélre, amelynek borítéka a horgonnyal egyezik; minden más kérés a dashboardon dől el. A Teams-plugin 0.3.2 utáni változata kell hozzá. Alapból KI.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    validate: (v: string) => (['on', 'off'].includes(v.trim().toLowerCase()) ? null : 'on vagy off'),
-    loosens: (oldValue: string, newValue: string) => oldValue.trim().toLowerCase() !== 'on' && newValue.trim().toLowerCase() === 'on',
-  },
-  {
-    // TEAMSAPPROVECARD1118 (Samu D2): whose click approves. The plugin allowlist's single entry is an alert target only,
-    // never the approver, so this is explicit, and ANY change needs the owner's session (as SLACK_OWNER_USER_ID).
-    key: 'TEAMS_OWNER_AAD_OBJECT_ID',
-    type: 'string',
-    default: '',
-    description: 'A gazda Microsoft Entra objektum-azonosítója (GUID, pl. 6f1c2d3e-0000-4000-8000-000000000001). Ha a Teams-kártyás jóváhagyás be van kapcsolva, csak az ő kattintása dönt. Üresen a kártyás jóváhagyás nem működik (a döntés a dashboardon marad). A Teams-plugin párosítási listája (allowlist.json) ehhez nem elég: ott a riasztások címzettje áll, nem a jóváhagyóé.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
-    validate: (v: string) => (v.trim() === '' || /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v.trim())
-      ? null
-      : 'Entra objektum-azonosító (GUID) kell, pl. 6f1c2d3e-0000-4000-8000-000000000001. / An Entra object id (GUID) is required.'),
-    loosens: (oldValue: string, newValue: string) => oldValue.trim().toLowerCase() !== newValue.trim().toLowerCase(),
-  },
-  {
     key: 'SCHEDULED_DELIVERY_CHANNEL',
     type: 'string',
     default: '',
-    description: 'Hova menjen a fő ágens ütemezett feladatainak eredménye, "<csatorna>:<chat id>" alakban (csatorna: telegram, slack, discord, googlechat, teams), pl. "slack:D0123456789". Üresen (alapértelmezés) a fő ágens saját csatornája marad. Az al-ágensek feladataira nem hat, és az a feladat, amelyik saját chatet vagy "none"-t ad meg, megtartja. Ha a cél nem Telegram, és ott a küldés nem megy, a gazda Telegram-chatje (ALLOWED_CHAT_ID) a tartalék. Hibás érték esetén nincs felülírás, csak naplóbejegyzés.',
+    description: 'Hova menjen a fő ágens ütemezett feladatainak eredménye, "discord:<csatorna-ID>" alakban, pl. "discord:1234567890123456789". Üresen (alapértelmezés) a fő ágens saját Discord-csatornája marad. Az al-ágensek feladataira nem hat, és az a feladat, amelyik saját chatet vagy "none"-t ad meg, megtartja. Hibás érték esetén nincs felülírás, csak naplóbejegyzés.',
     module: 'channels',
     secret: false,
     requiresRestart: false,
-    // Where the main agent's scheduled results go: any change re-routes them, so it is overrides-only and a .env line
-    // never counts (ENVRELAXGATE1104 follow-up, Samu 68119).
     loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
   },
   {
-    // ISSUE2556X (marveen#2556): with two paired DMs and the installer's ALLOWED_CHAT_ID=0 the alert resolver refuses
-    // to guess, and every system alert was lost. This names the chat outright. Delivery only: it never makes anyone
-    // the owner (the command gate and the ledger keep ALLOWED_CHAT_ID / the sole DM entry), and the memory key stays
-    // ALLOWED_CHAT_ID.
     key: OWNER_ALERT_CHAT_KEY,
     type: 'string',
     default: '',
-    description: 'Hova menjenek a rendszer-riasztások és a gazdának szóló értesítések (kvóta, lemez, beragadt munkamenet, biztonsági esemény, ütemezett feladat hibája, napi napló), a beállított csatornán (CHANNEL_PROVIDER) belül a gazda SZEMÉLYES chatjének azonosítójával: Telegramon a saját chated pozitív száma, Slacken a DM (D...) vagy a felhasználód (U...) azonosítója, Discordon a DM-csatornád azonosítója (ott az alakból nem látszik, hogy DM-e). Csoport vagy csatorna nem lehet, mert ott a riasztásokat és a jóváhagyások szövegét mindenki látná. Üresen (alapértelmezés) a mostani szabály marad: az ALLOWED_CHAT_ID, vagy ha az nincs beállítva, az egyetlen párosított DM. Akkor kell, ha a fő bothoz több ember is párosítva van, és az ALLOWED_CHAT_ID nincs kitöltve: ilyenkor a rendszer nem találgat, és e nélkül a riasztás elveszik. Csak a kézbesítést állítja: senkit nem tesz gazdává, a parancsok és az emlékek változatlanok.',
+    description: 'Hova menjenek a rendszer-riasztások és a gazdának szóló értesítések (kvóta, lemez, beragadt munkamenet, biztonsági esemény, ütemezett feladat hibája, napi napló), a Discord csatornán belül a gazda SZEMÉLYES DM-csatornájának azonosítójával (hópehely-ID; az alakból nem látszik, hogy DM-e). Csoport vagy szerver-csatorna nem lehet, mert ott a riasztásokat és a jóváhagyások szövegét mindenki látná. Üresen (alapértelmezés) a DISCORD_CHANNEL_ID marad, vagy ha az nincs beállítva, az egyetlen párosított DM. Akkor kell, ha a fő bothoz több ember is párosítva van: ilyenkor a rendszer nem találgat, és e nélkül a riasztás elveszik. Csak a kézbesítést állítja: senkit nem tesz gazdává, a parancsok és az emlékek változatlanok.',
     module: 'channels',
     secret: false,
     requiresRestart: false,
-    // the provider's own shape, read from the install .env as config.ts reads CHANNEL_PROVIDER (this module may not
-    // import config.ts); a wrong shape is refused here, never stored and silently ignored later
     validate: (v: string) => alertChatFormatError(alertChatProviderOf(readEnvFile(['CHANNEL_PROVIDER'])['CHANNEL_PROVIDER']), v),
-    // Where the owner's alerts go: any change re-routes them (a security alert included), so it is overrides-only and
-    // a .env line never counts, as SCHEDULED_DELIVERY_CHANNEL (Samu 71763).
     loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
   },
   {
@@ -1252,28 +1106,6 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
       ? null
       : 'Érvénytelen könyvtár: csak betű, szám és a _ . / ~ - karakterek, ".." nélkül, a ~ csak az elején (~/...).'),
     description: 'A fő channels-agent explicit CLAUDE_CONFIG_DIR-je (pl. ~/.claude-bot). Akkor kell, ha a botnak SAJÁT Claude-loginja van, külön a flottáétól: a MAIN_AGENT_ISOLATED_CONFIG erre nem alkalmas, mert az a fleet setup-tokenből hitelesít, tehát a flotta identitását adja a botnak (és token nélkül no-op). Üresen hagyva a fő agent a közös ~/.claude-ot használja (alapértelmezés). Ha a megadott könyvtár nem létezik, a beállítás no-op és figyelmeztetést logol. Elsőbbséget élvez a MAIN_AGENT_ISOLATED_CONFIG-gal szemben. A módosítás a channels session újraindításakor lép életbe.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: true,
-  },
-  // The opt-in switches below are boot-time consts in src/config.ts
-  // (cfg(): config-overrides.json > .env), so a value saved here takes effect
-  // only after the dashboard restarts. Default '0' matches config.ts, where an
-  // unset key resolves to false.
-  {
-    key: 'SUBAGENT_INBOX_TEE',
-    type: 'boolean',
-    default: '0',
-    description: 'Telegramos sub-agentek bejövő üzeneteinek lemezre tükrözése (inbound-tee). Bekapcsolva a sub-agent a csatorna-plugint egy saját mcp.json-on keresztül, a scripts/channel-inbound-tee.mjs burkolóval tölti be (--channels helyett), és minden bejövő üzenet a <state>/inbox-pending.jsonl fájlba is kerül, ahonnan a channel-inbox-drain hook a következő körbe húzza be. Ez a bejövő üzenetek tartalmát lemezre írja. A fő agentre és a nem Telegramos agentekre nem vonatkozik. Alapértelmezés: kikapcsolva (változatlan --channels út). A SUBAGENT_TELEGRAM_WAKE_ENABLED csak ezzel együtt csinál bármit. A módosítás a dashboard újraindítása után, és agentenként a sub-agent következő indításakor lép életbe.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: true,
-  },
-  {
-    key: 'SUBAGENT_TELEGRAM_WAKE_ENABLED',
-    type: 'boolean',
-    default: '0',
-    description: 'A message-router felébreszti azt a tétlen Telegramos sub-agentet, akinek a <state>/inbox-pending.jsonl fájljában beragadt bejövő üzenet van, hogy a drain hook behúzza őket. Csak SUBAGENT_INBOX_TEE=1 mellett van hatása: anélkül nem keletkezik inbox-fájl, és a figyelő no-op. Alapértelmezés: kikapcsolva. A módosítás a dashboard újraindításakor lép életbe.',
     module: 'channels',
     secret: false,
     requiresRestart: true,
@@ -1297,61 +1129,19 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     requiresRestart: true,
   },
   {
-    key: 'TELEGRAM_TOPICS_ENABLED',
-    type: 'boolean',
-    default: '0',
-    description: 'Telegram-témák: ha a bot privát chatjében témák vannak, a válasz abba a témába megy, ahonnan az üzenet jött, és a gépelés-jelzés is ott látszik. Bekapcsolva a csatorna-indítás egy kiegészítést tesz a Telegram plugin forrására (scripts/patch-telegram-plugin.py), ami a bejövő üzenet téma-azonosítóját átadja az ügynöknek, és a reply toolt témába küldésre is képessé teszi; kikapcsolva a kiegészítést leveszi, és a plugin pontosan a mai. A privát chatben a témákat a BotFather-ben kell bekapcsolni. A riasztások, a jóváhagyás-kérések és a többi rendszerüzenet ettől függetlenül téma nélkül megy ki. Alapértelmezés: kikapcsolva. A módosítás a csatorna következő indításakor lép életbe.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: true,
-  },
-  {
-    key: 'TELEGRAM_REPLY_BUTTONS',
-    type: 'boolean',
-    default: '1',
-    description: 'Válasz-gombok a Telegramon: bekapcsolva az ügynök egy kérdés alá egy koppintással választható gombokat tehet (a reply tool buttons mezője). Kikapcsolva egy ügynök sem küld gombot: a nem üres buttons listát a csatorna eldobja, az üzenet gombok nélkül megy ki, és az ügynök a válaszban figyelmeztetést kap, hogy a választást sima szövegben kérje. Az üres lista ekkor is leveszi a korábban fent ragadt billentyűzetet. A kapcsolót a csatorna-indítás a Telegram plugin forrására teszi (scripts/patch-telegram-plugin.py). Alapértelmezés: bekapcsolva. A módosítás a csatorna következő indításakor lép életbe; a már futó ügynökök a saját újraindításukig a régi viselkedéssel futnak.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: true,
-  },
-  {
-    // TELEGRAM_REPLY_BUTTONS_MAX_AGE_HOURS (owner request, 2026-11-08): a tap on a button of an old question
-    // delivers nothing. Baked into the plugin source by scripts/patch-telegram-plugin.py at the channel start.
-    key: 'TELEGRAM_REPLY_BUTTONS_MAX_AGE_HOURS',
-    type: 'int',
-    default: 0,
-    min: 0,
-    max: 8760,
-    description: 'Válasz-gombok lejárata órában. Ha be van állítva (például 24), egy ennél régebbi kérdés gombjára koppintás nem jut el az ügynökhöz: a felugró üzenet azt kéri, hogy a választ írd be, és a kérdés gombjai helyére egyetlen „⏱ Lejárt, írd be a választ” gomb kerül. A kor a kérdés elküldési idejétől számít, így a plugin újraindítása után is érvényes. 0 = a gombok nem járnak le (a mai működés). A beállítást a csatorna-indítás a Telegram plugin forrására teszi (scripts/patch-telegram-plugin.py). Alapértelmezés: 0. A módosítás a csatorna következő indításakor lép életbe.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: true,
-  },
-  {
-    // TELEGRAM_REACTIONS_ENABLED (owner request, 2026-11-09): the owner's emoji reactions reach the agent. Baked into
-    // the plugin source by scripts/patch-telegram-plugin.py at the channel start (the tgreact1119 patch).
-    key: 'TELEGRAM_REACTIONS_ENABLED',
-    type: 'boolean',
-    default: '0',
-    description: 'Telegram-reakciók továbbítása: bekapcsolva ha a párosított tulajdonos a privát chatben egy üzenetre emoji-reakciót tesz, az ügynök megkapja „(reaction 👍)” alakban, a reagált üzenet azonosítójával, és ha az ügynök küldte a plugin indulása óta, egy rövid kivonatával. Csak a hozzáadott reakció megy tovább, a levétel nem. Minden reakció egy újabb kör az ügynöknek, ezért alapból ki van kapcsolva. A kapcsolót a csatorna-indítás a Telegram plugin forrására teszi (scripts/patch-telegram-plugin.py). Alapértelmezés: kikapcsolva. A módosítás a csatorna következő indításakor lép életbe.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: true,
-  },
-  {
-    // DCEXT1111: Marveen's version of the Discord plugin (vendor/discord-plugin) over the official one. Off puts the
+    // DCEXT1111: Alfred's version of the Discord plugin (vendor/discord-plugin) over the official one. Off puts the
     // official file back, and with it the official permission relay that asks EVERY paired DM: a loosening.
     key: 'DISCORD_PLUGIN_EXT',
     type: 'boolean',
     default: '1',
-    description: 'A Marveen Discord-kiegészítései (vendor/discord-plugin): válasz-gombok, eszköz-jóváhagyás csak a gazdától (DISCORD_OWNER_USER_ID), a párosított DM-ek újraindítás után is elérhetők, hangüzenet-jelölés, kiesett üzenetek pótlása (DISCORD_BACKFILL), szál nyitása és lapozás a régebbi üzenetek között. Bekapcsolva a csatorna-indítás a Discord plugin forrását a Marveen-változatra cseréli, de csak akkor, ha a telepített plugin pontosan az ismert verzió; egy plugin-frissítés után a hivatalos plugin fut, és a napló egy sorban jelzi. Kikapcsolva a csatorna következő indításakor a hivatalos plugin áll vissza változatlanul. Alapértelmezés: bekapcsolva. A kikapcsoláshoz a gazda kell.',
+    description: 'A Alfred Discord-kiegészítései (vendor/discord-plugin): válasz-gombok, eszköz-jóváhagyás csak a gazdától (DISCORD_OWNER_USER_ID), a párosított DM-ek újraindítás után is elérhetők, hangüzenet-jelölés, kiesett üzenetek pótlása (DISCORD_BACKFILL), szál nyitása és lapozás a régebbi üzenetek között. Bekapcsolva a csatorna-indítás a Discord plugin forrását a Alfred-változatra cseréli, de csak akkor, ha a telepített plugin pontosan az ismert verzió; egy plugin-frissítés után a hivatalos plugin fut, és a napló egy sorban jelzi. Kikapcsolva a csatorna következő indításakor a hivatalos plugin áll vissza változatlanul. Alapértelmezés: bekapcsolva. A kikapcsoláshoz a gazda kell.',
     module: 'channels',
     secret: false,
     requiresRestart: true,
     loosens: (oldValue: string, newValue: string) => ['1', 'true', 'yes', 'on'].includes(oldValue.trim().toLowerCase()) && !['1', 'true', 'yes', 'on'].includes(newValue.trim().toLowerCase()),
   },
   {
-    // DCEXT1111: the twin of TELEGRAM_OWNER_USER_ID for the Discord permission relay. Never the first of several DMs.
+    // DCEXT1111: the owner user ID for the Discord permission relay and slash commands. Never the first of several DMs.
     key: 'DISCORD_OWNER_USER_ID',
     type: 'string',
     default: '',
@@ -1362,7 +1152,6 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     validate: (v: string) => (v.trim() === '' || /^[1-9][0-9]{16,19}$/.test(v.trim())
       ? null
       : 'Discord-felhasználói azonosító kell (17-20 jegyű szám). / A Discord user id is required (a 17-20 digit number).'),
-    // who approves a tool from Discord: ANY change needs the owner's session, as TELEGRAM_OWNER_USER_ID
     loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
   },
   {
@@ -1394,13 +1183,9 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
         return 'Érvénytelen JSON. / Invalid JSON.'
       }
       if (!o || typeof o !== 'object' || Array.isArray(o)) return 'JSON-objektum kell. / A JSON object is required.'
-      // The plugin drops anything that is not a Discord id, and the channel then falls back to the old rule:
-      // say so on save instead (a role NAME is the usual mistake).
       for (const [ch, v] of Object.entries(o as Record<string, unknown>)) {
         if (!DISCORD_SNOWFLAKE_RE.test(ch)) return `Nem Discord csatorna-ID: ${JSON.stringify(ch)}. / Not a Discord channel id: ${JSON.stringify(ch)}.`
         if (!v || typeof v !== 'object' || Array.isArray(v)) return `${ch}: JSON-objektum kell. / ${ch}: a JSON object is required.`
-        // The overlay honours only a literal true and ignores unknown keys: a typo ("histroy") or "true" would
-        // be saved and silently do nothing.
         for (const [k, flag] of Object.entries(v as Record<string, unknown>)) {
           if (k === 'allowRoles') continue
           if (!DISCORD_CHANNEL_POLICY_FLAGS.includes(k)) {
@@ -1420,15 +1205,6 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
       return null
     },
     loosens: (oldValue: string, newValue: string) => oldValue.trim() !== newValue.trim(),
-  },
-  {
-    key: 'TELEGRAM_INBOUND_REPLAY_ENABLED',
-    type: 'boolean',
-    default: '0',
-    description: 'Elveszett Telegram-üzenetek pótlása: ha egy csatornás al-ügynök újraindul, a Telegram plugin már a Claude Code kézfogása előtt átveheti az üzenetet, és ilyenkor a Claude Code némán eldobja. A dashboard percenként összeveti az ügynök inbound-evidence naplóját (az utolsó 15 perc) az átirataival, és amit a session sosem kapott meg, azt egyszer, a channel-coordinator keretezésével kézbesíti. Ha az átirat nem olvasható, nem küld semmit. Korlát: a naplót az ügynök saját OS-felhasználója írja, így egy ugyanazzal a felhasználóval futó ügynök vagy szkript is írhat bele, és amit beír, az csatornaüzenetként jut el az ügynökhöz. Az írókapu (db-write-gate) az al-ügynökök eszközhívásaiban a felismert parancsformákat tiltja erre a naplóra, de ez csak szöveg-fék, nem OS-határ: például egy korábban megírt szkriptfájl vagy egy értelmezőben futás közben összerakott útvonal átmegy rajta. Ezért alapból kikapcsolva; akkor kapcsold be, ha az ugyanazzal az OS-felhasználóval futó ügynökökben megbízol. A módosítás a következő percben életbe lép.',
-    module: 'channels',
-    secret: false,
-    requiresRestart: false,
   },
   {
     key: 'PERMISSION_ALERT_MARKS',
@@ -1482,7 +1258,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
     valueSet: [...AGENT_MODEL_CHOICES],
   },
   {
-    key: 'MARVEEN_WORKER_MODEL_FAST',
+    key: 'ALFRED_WORKER_MODEL_FAST',
     type: 'string',
     default: '',
     description: 'A GYORS háttér-worker session modellje. Üresen ugyanaz a lánc dönt, mint a lassú workernél, tehát a beállítás nélkül semmi nem változik. A gyors session rövid, társalgási feladatokat kap, azokra elég egy kisebb modell. A CLI-indíthatósági őr erre is lefut. A módosítás a szolgáltatás újraindításakor lép életbe.',

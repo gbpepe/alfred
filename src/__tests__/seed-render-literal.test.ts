@@ -23,7 +23,7 @@ const NASTY = ['A & B', 'a/b/c', 'back\\slash', 'pipe|name', 'amp&&slash/\\', 'd
 describe('render_seed_template substitutes literally', () => {
   for (const name of NASTY) {
     it(`OWNER_NAME and BOT_NAME ${JSON.stringify(name)} come out byte for byte`, () => {
-      const out = render('Owner: {{OWNER_NAME}}; bot: {{BOT_NAME}}; dir {{INSTALL_DIR}}\n', { OWNER_NAME: name, BOT_NAME: name, MAIN_AGENT_ID: 'marveen', INSTALL_DIR: '/opt/m' })
+      const out = render('Owner: {{OWNER_NAME}}; bot: {{BOT_NAME}}; dir {{INSTALL_DIR}}\n', { OWNER_NAME: name, BOT_NAME: name, MAIN_AGENT_ID: 'alfred', INSTALL_DIR: '/opt/m' })
       expect(out).toBe(`Owner: ${name}; bot: ${name}; dir /opt/m\n`)
     })
   }
@@ -52,7 +52,7 @@ describe('the refresh with such a name (a templated task)', () => {
     const task = join(install, `seed-${SCHED}`, 'demo-task', 'SKILL.md')
     mkdirSync(join(install, `seed-${SCHED}`, 'demo-task'), { recursive: true })
     mkdirSync(join(home, '.claude', SCHED, 'demo-task'), { recursive: true })
-    writeFileSync(join(install, '.env'), `MAIN_AGENT_ID=marveen\nBOT_NAME=Marveen\nOWNER_NAME=${owner}\nWEB_PORT=3420\n`)
+    writeFileSync(join(install, '.env'), `MAIN_AGENT_ID=alfred\nBOT_NAME=Alfred\nOWNER_NAME=${owner}\nWEB_PORT=3420\n`)
     const g = (...a: string[]) => execFileSync('git', ['-C', install, ...a], { stdio: 'pipe' })
     g('init', '-q'); g('config', 'user.email', 't@example.invalid'); g('config', 'user.name', 't')
     writeFileSync(task, 'v1 for {{OWNER_NAME}}\n'); g('add', '-A'); g('commit', '-qm', 'v1')
@@ -118,10 +118,10 @@ describe('the seeding loops render literally (installers, update.sh new-task loo
         writeFileSync(join(install, srcRel, 'demo', 'SKILL.md'), 'for {{OWNER_NAME}} by {{BOT_NAME}} ({{MAIN_AGENT_ID}}) at {{INSTALL_DIR}}:{{WEB_PORT}}\n')
         const script = ['set -u', 'ok() { :; }; warn() { :; }; GREEN=""; NC=""', `INSTALL_DIR=${JSON.stringify(install)}`,
           `${dirVar}=${JSON.stringify(join(install, srcRel))}`, `SCHED_TARGET_DIR=${JSON.stringify(target)}`, 'SCHED_TOMBSTONE="$SCHED_TARGET_DIR/.removed-defaults"',
-          'RESEED_FLEET=0; SCHED_NEW=0; SCHED_SKIP=0; SCHED_FORCED=0', `MAIN_AGENT_ID=marveen; BOT_NAME='B&B/1'; OWNER_NAME=${JSON.stringify(NAME).replace(/\$/g, '\\$')}; WEB_PORT=3421`,
+          'RESEED_FLEET=0; SCHED_NEW=0; SCHED_SKIP=0; SCHED_FORCED=0', `MAIN_AGENT_ID=alfred; BOT_NAME='B&B/1'; OWNER_NAME=${JSON.stringify(NAME).replace(/\$/g, '\\$')}; WEB_PORT=3421`,
           `. ${JSON.stringify(LIB)}`, sliceTplLoop(read(file), dirVar)].join('\n')
         execFileSync('bash', ['-c', script], { encoding: 'utf-8' })
-        expect(readFileSync(join(target, 'demo', 'SKILL.md'), 'utf-8')).toBe(`for ${NAME} by B&B/1 (marveen) at ${install}:3421\n`)
+        expect(readFileSync(join(target, 'demo', 'SKILL.md'), 'utf-8')).toBe(`for ${NAME} by B&B/1 (alfred) at ${install}:3421\n`)
       } finally { rmSync(base, { recursive: true, force: true }) }
     })
   }

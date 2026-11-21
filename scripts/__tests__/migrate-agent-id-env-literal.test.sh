@@ -36,7 +36,7 @@ run_case() {
     bash "$dir/scripts/migrate-main-agent-id.sh" <<< "n" 2>&1)"
   RC=$?
 }
-slug_of() { printf '%s\n' "$OUT" | sed -n 's/^Migrating main agent id: marveen → \([^ ]*\) .*/\1/p'; }
+slug_of() { printf '%s\n' "$OUT" | sed -n 's/^Migrating main agent id: alfred → \([^ ]*\) .*/\1/p'; }
 
 echo "migrate-main-agent-id.sh -- .env is read as data, never sourced"
 
@@ -91,9 +91,9 @@ mkdir -p "$TMP/subagent/agents/atlas"
 run_case subagent 'BOT_NAME=Atlas'
 refused subagent && printf '%s\n' "$OUT" | grep -q 'already a sub-agent' \
   && pass "a BOT_NAME whose id is a sub-agent's is refused" || fail "subagent: rc=$RC $OUT"
-mkdir -p "$TMP/defaultsub/agents/marveen"
-run_case defaultsub 'BOT_NAME=Marveen'
-printf '%s\n' "$OUT" | grep -q 'Nothing to migrate' && pass 'the default id is not refused by an agents/marveen dir' || fail "defaultsub: $OUT"
+mkdir -p "$TMP/defaultsub/agents/alfred"
+run_case defaultsub 'BOT_NAME=Alfred'
+printf '%s\n' "$OUT" | grep -q 'Nothing to migrate' && pass 'the default id is not refused by an agents/alfred dir' || fail "defaultsub: $OUT"
 
 # --- VOICECHANNELID1022: the CONFIGURED voice channel id is the reserved one --------
 run_case voice-custom "$(printf 'VOICE_CHANNEL_ID=voice-relay\nBOT_NAME="Voice Relay"')"
@@ -142,10 +142,10 @@ voice_is lane-off none 'OWNER_NAME=hanna' \
   && pass "when even 'hanna' names another sender, no voice id is reserved (the lane is off)" || fail 'lane-off'
 
 # The voice id is resolved again against the NEW main agent id: a migration that
-# would move it (here VOICE_CHANNEL_ID=marveen, invalid while marveen is the main
+# would move it (here VOICE_CHANNEL_ID=alfred, invalid while alfred is the main
 # agent, valid once the main agent is atlas) is refused before anything changes.
-run_case voice-moves "$(printf 'VOICE_CHANNEL_ID=marveen\nBOT_NAME=Atlas')"
-refused voice-moves && printf '%s\n' "$OUT" | grep -q 'voice channel id would change from "hanna" to "marveen"' \
+run_case voice-moves "$(printf 'VOICE_CHANNEL_ID=alfred\nBOT_NAME=Atlas')"
+refused voice-moves && printf '%s\n' "$OUT" | grep -q 'voice channel id would change from "hanna" to "alfred"' \
   && pass 'a migration that would re-point the voice id is refused' || fail "voice-moves: rc=$RC $OUT"
 run_case voice-stays "$(printf 'VOICE_CHANNEL_ID=voice-relay\nBOT_NAME=Atlas')"
 [ "$(slug_of)" = "atlas" ] && pass 'NEGATIVE CONTROL: a voice id the migration does not move lets it through' || fail "voice-stays: rc=$RC $OUT"

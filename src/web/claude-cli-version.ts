@@ -13,12 +13,12 @@ export interface ClaudeCliVersionResult {
   measuredAt: number
   /** Why `version` is null; null when measured. */
   error: string | null
-  /** 'probe' for a real `claude --version`, 'env' for the MARVEEN_CLAUDE_CLI_VERSION override. */
+  /** 'probe' for a real `claude --version`, 'env' for the ALFRED_CLAUDE_CLI_VERSION override. */
   source: 'probe' | 'env'
 }
 
 /** Operator/test override: when set, no binary is probed. Empty string means "unmeasured". */
-export const CLI_VERSION_OVERRIDE_ENV = 'MARVEEN_CLAUDE_CLI_VERSION'
+export const CLI_VERSION_OVERRIDE_ENV = 'ALFRED_CLAUDE_CLI_VERSION'
 const CACHE_TTL_MS = 10 * 60 * 1000
 const PROBE_TIMEOUT_MS = 10_000
 

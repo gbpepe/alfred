@@ -40,7 +40,7 @@ except BaseException as _check_exc:  # noqa: BLE001 -- deliberate fail-closed ne
     sys.exit(3)
 
 # A gazda masolati cime: a kimeno support-levelek alapertelmezett CC-je.
-# CONFIG-VEZERELT, URES ALAPERTELMEZESSEL -- a Marveen termekkent szallitodik, tehat
+# CONFIG-VEZERELT, URES ALAPERTELMEZESSEL -- a Alfred termekkent szallitodik, tehat
 # a repoban NEM allhat egyetlen telepites gazdajanak a cime sem. Aki nem allitja be,
 # annal a viselkedes bajt-azonos a korabbival (nincs CC). A mi telepitesunkon a
 # SUPPORT_OWNER_CC a .env-ben all, ami nem verziokovetett.
@@ -177,7 +177,7 @@ def main():
     ap.add_argument("--to", required=True)
     ap.add_argument("--subject", required=True)
     ap.add_argument("--body", default=None)
-    # A GAZDA-CC MOSTANTOL ALAPERTELMEZES, NEM EMLEKEZET (Marveen, mert eset 2026-09-14).
+    # A GAZDA-CC MOSTANTOL ALAPERTELMEZES, NEM EMLEKEZET (Alfred, mert eset 2026-09-14).
     # A CLAUDE.md kimondja, hogy MINDEN kimeno levelnek CC-znie kell a gazdat, kivetel nelkul.
     # Ez a szabaly eddig CSAK PROZABAN letezett: a `--cc` opcionalis volt, default None.
     # Merve: a mai negy Comline-levelbol HAROM CC nelkul ment ki (INBOX.Sent fejlecek), ezert a

@@ -126,23 +126,23 @@ describe('channels.sh start block: no token -> no primary channel, the marker, o
     expect(r.stderr.match(/no telegram channel configured \(no TELEGRAM_BOT_TOKEN in its \.env\)/g)?.length).toBe(1)
   })
   it('without a token but with a co-listen extra: only the extra', () => {
-    const r = run('slack', 'slack-channel@marveen-marketplace', 'discord@claude-plugins-official')
+    const r = run('slack', 'slack-channel@alfred-marketplace', 'discord@claude-plugins-official')
     expect(r.stdout).toContain('ARG=--channels plugin:discord@claude-plugins-official\n')
   })
   it('with a token: the launch as before (the primary first, then the extras), the marker removed', () => {
     writeFileSync(marker(), 'telegram\n')
     writeEnv(install, 'telegram', 'TELEGRAM_BOT_TOKEN=1:a\n')
-    const r = run('telegram', 'telegram@claude-plugins-official', 'slack-channel@marveen-marketplace')
-    expect(r.stdout).toBe('UNCONF=0\nPLUGIN=telegram@claude-plugins-official\nARG=--channels plugin:telegram@claude-plugins-official plugin:slack-channel@marveen-marketplace\n')
+    const r = run('telegram', 'telegram@claude-plugins-official', 'slack-channel@alfred-marketplace')
+    expect(r.stdout).toBe('UNCONF=0\nPLUGIN=telegram@claude-plugins-official\nARG=--channels plugin:telegram@claude-plugins-official plugin:slack-channel@alfred-marketplace\n')
     expect(r.stderr).toBe('')
     expect(existsSync(marker())).toBe(false)
   })
   it('teams with its app id is configured (the Teams path of EE2392D3 keeps its channel)', () => {
     writeEnv(install, 'teams', 'TEAMS_BOT_APP_ID=1f0c\nTEAMS_BOT_APP_PASSWORD=x\nTEAMS_BOT_TENANT_ID=t\n')
-    expect(run('teams', 'teams@marveen-marketplace').stdout).toContain('ARG=--channels plugin:teams@marveen-marketplace\n')
+    expect(run('teams', 'teams@alfred-marketplace').stdout).toContain('ARG=--channels plugin:teams@alfred-marketplace\n')
   })
   it('a provider the rule does not cover keeps its launch, without a token file', () => {
-    expect(run('whatsapp', 'whatsapp@marveen-marketplace').stdout).toContain('ARG=--channels plugin:whatsapp@marveen-marketplace\n')
+    expect(run('whatsapp', 'whatsapp@alfred-marketplace').stdout).toContain('ARG=--channels plugin:whatsapp@alfred-marketplace\n')
   })
   it('a half-updated tree (no helper) launches as before', () => {
     rmSync(join(install, 'scripts', 'main-channel-configured.sh'))
@@ -167,7 +167,7 @@ describe('channels.sh watchdog: unconfigured spends no never-started budget, and
   const loop = (configuredAt: number) => bash([
     `main_channel_unconfigured() { [ "$NOW" -lt ${configuredAt} ]; }`,
     'respawn_log() { echo "LOG $*"; }',
-    'CHANNEL_PROVIDER=telegram CHANNEL_UNCONFIGURED=1 CHANNEL_UNCONF_LAST_POLL=0 SESSION=marveen-channels',
+    'CHANNEL_PROVIDER=telegram CHANNEL_UNCONFIGURED=1 CHANNEL_UNCONF_LAST_POLL=0 SESSION=alfred-channels',
     'PLUGIN_NEVER_STARTED_DEADLINE=600 EXIT_REASON=session-gone POLLS=0',
     'for NOW in $(seq 5 5 5000); do',
     BRANCH,
@@ -271,8 +271,8 @@ describe('stuck-modal-guard.sh respawn: no primary for an unconfigured channel, 
       .toBe('ARG=--channels plugin:telegram@claude-plugins-official PRIMARY=telegram@claude-plugins-official\n')
   })
   it('an explicit STUCK_MODAL_PLUGIN override keeps its launch', () => {
-    expect(run('plugin:slack-channel@marveen-marketplace', '').stdout)
-      .toBe('ARG=--channels plugin:slack-channel@marveen-marketplace PRIMARY=slack-channel@marveen-marketplace\n')
+    expect(run('plugin:slack-channel@alfred-marketplace', '').stdout)
+      .toBe('ARG=--channels plugin:slack-channel@alfred-marketplace PRIMARY=slack-channel@alfred-marketplace\n')
   })
   it('the settings file enables the same primary the --channels list carries', () => {
     expect(SMG).toContain('SETTINGS_FLAG="$(main_extra_settings_flag "$INSTALL_DIR" "$_primary_id" $_extra)"')
@@ -308,7 +308,7 @@ describe('the TS respawn builder and the monitor', () => {
     config: {} as never,
     model: '',
     continueSession: false,
-    mainAgentId: 'marveen',
+    mainAgentId: 'alfred',
     pluginId: 'telegram@claude-plugins-official',
   }
   it('unconfigured: no --channels at all', () => {
@@ -320,9 +320,9 @@ describe('the TS respawn builder and the monitor', () => {
     expect(cmd).not.toContain('plugin:telegram@')
   })
   it('configured or absent: the respawn as before', () => {
-    const before = buildMainSessionRespawnCmd({ ...base, extraPluginIds: ['slack-channel@marveen-marketplace'] })
-    expect(before).toContain('--channels plugin:telegram@claude-plugins-official plugin:slack-channel@marveen-marketplace')
-    expect(buildMainSessionRespawnCmd({ ...base, channelConfigured: true, extraPluginIds: ['slack-channel@marveen-marketplace'] })).toBe(before)
+    const before = buildMainSessionRespawnCmd({ ...base, extraPluginIds: ['slack-channel@alfred-marketplace'] })
+    expect(before).toContain('--channels plugin:telegram@claude-plugins-official plugin:slack-channel@alfred-marketplace')
+    expect(buildMainSessionRespawnCmd({ ...base, channelConfigured: true, extraPluginIds: ['slack-channel@alfred-marketplace'] })).toBe(before)
   })
   it('every production respawn passes the rule, and its settings file drops the primary with it', () => {
     const cm = read('src/web/channel-monitor.ts')
@@ -332,9 +332,9 @@ describe('the TS respawn builder and the monitor', () => {
   })
   it('the monitor skips the main liveness action on the marker, before the probe and the down ladder', () => {
     const cm = read('src/web/channel-monitor.ts')
-    const skip = cm.indexOf('if (t.isMarveen && mainSessionRunsUnconfigured(t.provider)) {')
+    const skip = cm.indexOf('if (t.isAlfred && mainSessionRunsUnconfigured(t.provider)) {')
     const probe = cm.indexOf('const liveness = await probeChannelPluginLivenessAsync(')
-    const ladder = cm.indexOf('if (shouldEscalateMarveenDown()) await handleMarveenDown()')
+    const ladder = cm.indexOf('if (shouldEscalateAlfredDown()) await handleAlfredDown()')
     expect(skip).toBeGreaterThan(0)
     expect(probe).toBeGreaterThan(skip)
     expect(ladder).toBeGreaterThan(probe)
@@ -392,11 +392,11 @@ describe('the dashboard says it', () => {
     expect(huBanner).toContain('{provider}')
     expect(huBanner + (en.match(/'main_channel\.unconfigured\.banner': '([^']*)'/)?.[1] ?? '')).not.toMatch(/[\u2013\u2014]/)
   })
-  it('/api/marveen carries the field; the banner is drawn from it and points to the main agent Channel tab', () => {
-    expect(read('src/web/routes/marveen.ts')).toContain('mainChannelUnconfigured: mainChannelUnconfigured(CHANNEL_PROVIDER) ? CHANNEL_PROVIDER : null,')
+  it('/api/alfred carries the field; the banner is drawn from it and points to the main agent Channel tab', () => {
+    expect(read('src/web/routes/alfred.ts')).toContain('mainChannelUnconfigured: mainChannelUnconfigured(CHANNEL_PROVIDER) ? CHANNEL_PROVIDER : null,')
     expect(html).toContain('id="mainChannelUnconfBanner"')
     expect(app).toContain("await openAgentDetail(mainAgentId())\n    switchAgentTab('channel')")
-    expect(app.match(/updateMainChannelUnconfBanner\((data|window\._marveen)\)/g)?.length).toBe(2)
+    expect(app.match(/updateMainChannelUnconfBanner\((data|window\._alfred)\)/g)?.length).toBe(2)
   })
   it('the banner render, run: shown with the provider label for an unconfigured main channel, hidden otherwise', () => {
     const src = app.slice(app.indexOf('const MAIN_CHANNEL_PROVIDER_LABELS = '), app.indexOf('async function refreshMainChannelUnconfBanner'))
@@ -417,22 +417,22 @@ describe('the dashboard says it', () => {
     update(null)
     expect(els.mainChannelUnconfBanner.hidden).toBe(true)
   })
-  it('the banner button, run: fetches /api/marveen BEFORE opening the main detail (an empty window._marveen opened nothing)', async () => {
+  it('the banner button, run: fetches /api/alfred BEFORE opening the main detail (an empty window._alfred opened nothing)', async () => {
     const src = app.slice(app.indexOf('function wireMainChannelUnconfBanner() {'), app.indexOf('// === Update-conflict guard (UPDATECONFLICT1105) ==='))
     const calls: string[] = []
     let handler: (() => Promise<void>) | null = null
-    const win: { _marveen?: unknown } = {}
+    const win: { _alfred?: unknown } = {}
     const document = { getElementById: () => ({ addEventListener: (_e: string, h: () => Promise<void>) => { handler = h } }) }
     const deps = {
-      refreshMainChannelUnconfBanner: async () => { calls.push(`refresh(empty=${win._marveen === undefined})`); win._marveen = { name: 'Marveen' } },
-      openAgentDetail: async (n: string) => { calls.push(`open(${n}, loaded=${win._marveen !== undefined})`) },
+      refreshMainChannelUnconfBanner: async () => { calls.push(`refresh(empty=${win._alfred === undefined})`); win._alfred = { name: 'Alfred' } },
+      openAgentDetail: async (n: string) => { calls.push(`open(${n}, loaded=${win._alfred !== undefined})`) },
       switchAgentTab: (t: string) => { calls.push(`tab(${t})`) },
-      mainAgentId: () => 'marveen',
+      mainAgentId: () => 'alfred',
     }
     const wire = new Function('document', 'window', ...Object.keys(deps), `${src}\nreturn wireMainChannelUnconfBanner`)(document, win, ...Object.values(deps)) as () => void
     wire()
     await handler!()
-    expect(calls).toEqual(['refresh(empty=true)', 'open(marveen, loaded=true)', 'tab(channel)'])
+    expect(calls).toEqual(['refresh(empty=true)', 'open(alfred, loaded=true)', 'tab(channel)'])
   })
   it('the main agent detail no longer says "connected" without a token', () => {
     expect(app).toContain("m.mainChannelUnconfigured\n    ? `<span class=\"tg-status\"><span class=\"tg-dot\"></span>${t('agents.channel.not_configured')}</span>`")

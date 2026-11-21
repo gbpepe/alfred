@@ -2,21 +2,21 @@
 # HOSTINGERDOCKER1107: what the Linux installer writes before its services start, done in the container on every
 # start, each step only when its target is missing (idempotent). The configuration the installer asks for (the owner,
 # the names, the Claude token, the channel token, the pairing) is left to the dashboard's first-run wizard.
-# Inputs (compose environment): MARVEEN_CHANNEL (telegram|discord|slack), MARVEEN_AGENT_ID, MARVEEN_LANG, TZ, WEB_PORT.
+# Inputs (compose environment): ALFRED_CHANNEL (telegram|discord|slack), ALFRED_AGENT_ID, ALFRED_LANG, TZ, WEB_PORT.
 set -u
-INSTALL_DIR="${MARVEEN_INSTALL_DIR:-/opt/marveen}"
+INSTALL_DIR="${ALFRED_INSTALL_DIR:-/opt/alfred}"
 cd "$INSTALL_DIR" || exit 1
 umask 077
 say() { printf 'first-boot: %s\n' "$*"; }
 
-CHANNEL="${MARVEEN_CHANNEL:-telegram}"
-case "$CHANNEL" in telegram|discord|slack) ;; *) say "MARVEEN_CHANNEL must be telegram, discord or slack (got: $CHANNEL)"; exit 2 ;; esac
-AGENT_ID="${MARVEEN_AGENT_ID:-marveen}"
-printf '%s' "$AGENT_ID" | grep -Eqx '[a-z][a-z0-9-]{1,30}' || { say "MARVEEN_AGENT_ID must be a lower-case slug (got: $AGENT_ID)"; exit 2; }
+CHANNEL="${ALFRED_CHANNEL:-telegram}"
+case "$CHANNEL" in telegram|discord|slack) ;; *) say "ALFRED_CHANNEL must be telegram, discord or slack (got: $CHANNEL)"; exit 2 ;; esac
+AGENT_ID="${ALFRED_AGENT_ID:-alfred}"
+printf '%s' "$AGENT_ID" | grep -Eqx '[a-z][a-z0-9-]{1,30}' || { say "ALFRED_AGENT_ID must be a lower-case slug (got: $AGENT_ID)"; exit 2; }
 WEB_PORT="${WEB_PORT:-3420}"
 # Until the wizard's identity step: a name the wizard's rename replaces everywhere (ONB: it renames only a set name).
 OWNER_NAME=Owner
-BOT_NAME=Marveen
+BOT_NAME=Alfred
 
 set_env_key() { # key value: replace the line or append it (the .env is ours, 0600)
   if grep -q "^$1=" .env 2>/dev/null; then
@@ -32,7 +32,7 @@ open(p, "w").write("\n".join(f"{k}={v}" if l.startswith(k + "=") else l for l in
 mkdir -p store agents workspace
 if [ ! -f .env ]; then
   {
-    printf '%s\n' "# Written by the Marveen container on its first start. The dashboard's wizard fills in the rest."
+    printf '%s\n' "# Written by the Alfred container on its first start. The dashboard's wizard fills in the rest."
     printf 'CHANNEL_PROVIDER=%s\n' "$CHANNEL"
     printf 'OWNER_NAME=%s\nBOT_NAME=%s\nBRAND_NAME=%s\n' "$OWNER_NAME" "$BOT_NAME" "$BOT_NAME"
     printf 'MAIN_AGENT_ID=%s\nSERVICE_ID=%s\n' "$AGENT_ID" "$AGENT_ID"
@@ -45,21 +45,21 @@ if [ ! -f .env ]; then
 fi
 # The container's own keys, on every start (an older .env gets them too).
 set_env_key WEB_HOST 0.0.0.0
-set_env_key MARVEEN_DEPLOYMENT docker
+set_env_key ALFRED_DEPLOYMENT docker
 set_env_key CLAUDE_NATIVE_AUTOUPDATE 0
 # The optional services of docker-compose.yml: the Ollama of the compose network, and the TLS proxy's public address
 # (the CSRF allowlist and the browser links need it; the proxy sends X-Forwarded-Proto=https, so the cookie is Secure).
-[ -n "${MARVEEN_OLLAMA_URL:-}" ] && set_env_key OLLAMA_URL "$MARVEEN_OLLAMA_URL"
-if [ -n "${MARVEEN_DOMAIN:-}" ]; then
-  printf '%s' "$MARVEEN_DOMAIN" | grep -Eqx '[A-Za-z0-9.-]{1,253}' || { say "MARVEEN_DOMAIN is not a host name: $MARVEEN_DOMAIN"; exit 2; }
-  set_env_key DASHBOARD_PUBLIC_URL "https://$MARVEEN_DOMAIN"
+[ -n "${ALFRED_OLLAMA_URL:-}" ] && set_env_key OLLAMA_URL "$ALFRED_OLLAMA_URL"
+if [ -n "${ALFRED_DOMAIN:-}" ]; then
+  printf '%s' "$ALFRED_DOMAIN" | grep -Eqx '[A-Za-z0-9.-]{1,253}' || { say "ALFRED_DOMAIN is not a host name: $ALFRED_DOMAIN"; exit 2; }
+  set_env_key DASHBOARD_PUBLIC_URL "https://$ALFRED_DOMAIN"
   # DOCKERHTTPS1119: the public listener Caddy proxies to (cookies only, the one-time setup code; src/web/public-access.ts).
   # The compose file does not publish it to the host.
   set_env_key WEB_PUBLIC_PORT 3421
 fi
 chmod 0600 .env
 
-[ -f .lang ] || printf '%s\n' "${MARVEEN_LANG:-en}" > .lang
+[ -f .lang ] || printf '%s\n' "${ALFRED_LANG:-en}" > .lang
 # DOCKERUX1118: the dashboard's default language is the install's (DASHBOARD_LANG defaults to hu, so an en install's
 # wizard came up in Hungarian, Geri 33317). From .lang, so an existing volume gets it too; only when .env has no such
 # line. A choice made later on the Settings page lives in store/config-overrides.json and wins over this line anyway.
@@ -164,7 +164,7 @@ done
 # the old tree's sources before the swap). In a subshell: a failure is a WARN, the start goes on, the snapshot stays for
 # the next start.
 if [ -d .seed-prev ]; then
-  ( MAIN_AGENT_ID="$AGENT_ID"; . "${MARVEEN_DOCKER_DIR:-/opt/marveen-docker}/seed-refresh-docker.sh" && docker_seed_refresh ) \
+  ( MAIN_AGENT_ID="$AGENT_ID"; . "${ALFRED_DOCKER_DIR:-/opt/alfred-docker}/seed-refresh-docker.sh" && docker_seed_refresh ) \
     || say "WARN: the seed refresh did not finish; it is tried again at the next start"
 fi
 
@@ -173,7 +173,7 @@ bash scripts/sync-hooks.sh >/dev/null 2>&1 || say "WARN: scripts/sync-hooks.sh f
 
 # The channel plugin of the chosen provider ONLY (an installed channel plugin's server would start in every session).
 case "$(env_val CHANNEL_PROVIDER)" in
-  slack) PLUGIN=slack-channel@marveen-marketplace; MARKET=Szotasz/marveen-marketplace ;;
+  slack) PLUGIN=slack-channel@alfred-marketplace; MARKET=gbpepe/alfred-marketplace ;;
   discord) PLUGIN=discord@claude-plugins-official; MARKET=anthropics/claude-plugins-official ;;
   *) PLUGIN=telegram@claude-plugins-official; MARKET=anthropics/claude-plugins-official ;;
 esac

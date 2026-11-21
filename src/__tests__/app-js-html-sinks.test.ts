@@ -78,7 +78,7 @@ const langSrc: Record<string, string> = Object.fromEntries(
   ['en', 'hu'].map(l => [l, readFileSync(join(__dirname, '..', '..', 'web', 'lang', `${l}.js`), 'utf8')]),
 )
 
-function loadHelpers(win: Record<string, unknown> = makeWindow({ brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' })) {
+function loadHelpers(win: Record<string, unknown> = makeWindow({ brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' })) {
   return new Function('document', 'window', 't', `${helperSrc}\nreturn { ${HELPERS.join(', ')} }`)(fakeDocument, win, win.t) as {
     escapeHtml: (s: unknown) => string
     esc: (s: unknown) => string
@@ -328,7 +328,7 @@ describe('connector stale banner', () => {
   it('the banner shows the cache error text exactly once escaped', () => {
     expect(m).not.toBeNull()
     for (const lang of ['en', 'hu']) {
-      const win = makeWindow({ brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' })
+      const win = makeWindow({ brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' })
       win._lang = lang
       const h = loadHelpers(win)
       const err = `Can't reach "a" & <b>x</b>`
@@ -346,7 +346,7 @@ describe('label pills fall back to slate, never an empty colour', () => {
     ['renderArchivedCard', /\.map\(l => (`[^`]*`)\)/],
     ['showArchivedDetail', /\.map\(l => (`[^`]*`)\)/],
   ]
-  const win = makeWindow({ brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' })
+  const win = makeWindow({ brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' })
   it.each(sites)('%s', (fn, re) => {
     const m = re.exec(extractFn(fn))
     expect(m).not.toBeNull()
@@ -458,7 +458,7 @@ describe('textContent sinks get the raw text, not escaped twice', () => {
     return { els, doc }
   }
   function makeWin(templates: Record<string, string>) {
-    const win = makeWindow({ brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' })
+    const win = makeWindow({ brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' })
     Object.assign((win._i18n as Record<string, Record<string, string>>).en, templates)
     return win
   }
@@ -949,7 +949,7 @@ describe('sink-level completeness of web/app.js', () => {
     ["el.innerHTML = `<b>${tr('k.a', x.fb)}</b>`", 'review', 'text'],
     ["el.innerHTML = `<b>${t('k.a', { ...x })}</b>`", 'review', 'text'],
     ["el.innerHTML = `<b>${escapeHtml(x.a).replace('a', x.b)}</b>`", 'review', 'text'],
-    ["el.innerHTML = `<b>${t('agents.marveen_boss')}</b>`", 'review', 'text'],
+    ["el.innerHTML = `<b>${t('agents.alfred_boss')}</b>`", 'review', 'text'],
     ["el.innerHTML = `<b>${t('agents.confirm.hard_restart')}</b>`", 'review', 'text'],
     ["el.innerHTML = `<b>${xs.map(String).join('')}</b>`", 'review', 'text'],
     ["el.innerHTML = `<b>${[].concat(x.more).join('')}</b>`", 'review', 'text'],

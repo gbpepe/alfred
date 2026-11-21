@@ -49,16 +49,16 @@
 # Exit codes of --check: 0 = ok, 1 = stalled, 2 = unknown (queue unreadable).
 #
 # Env:
-#   MAIN_AGENT_ID                     - whose inbox to watch (default: .env, then marveen)
+#   MAIN_AGENT_ID                     - whose inbox to watch (default: .env, then alfred)
 #   MAIN_INBOX_STALL_SECONDS          - stall threshold (default 1800)
-#   MAIN_INBOX_OBSERVER_DB            - queue database (default <install>/store/claudeclaw.db)
+#   MAIN_INBOX_OBSERVER_DB            - queue database (default <install>/store/alfred.db)
 #   MAIN_INBOX_OBSERVER_ALERT_DRYRUN  - if 1, print "ALERT_DRYRUN: <msg>" instead of sending
 
 set -u
 
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STORE_DIR="$INSTALL_DIR/store"
-DB_DEFAULT="$STORE_DIR/claudeclaw.db"
+DB_DEFAULT="$STORE_DIR/alfred.db"
 LIVENESS_STAMP="$STORE_DIR/.main-inbox-observer"
 ALERT_STAMP="$STORE_DIR/.main-inbox-observer-alerted"
 LOG_TAG="main-inbox-observer"
@@ -84,7 +84,7 @@ resolve_main_agent_id() {
   if [ -z "$id" ] && [ -f "$INSTALL_DIR/.env" ]; then
     id="$(grep -E '^MAIN_AGENT_ID=' "$INSTALL_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r "')"
   fi
-  [ -n "$id" ] || id="marveen"
+  [ -n "$id" ] || id="alfred"
   case "$id" in
     *[!A-Za-z0-9._-]*) echo "" ;;
     *) echo "$id" ;;

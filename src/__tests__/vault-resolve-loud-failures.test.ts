@@ -55,7 +55,7 @@ beforeAll(() => {
 const noisy = process.env.LOG_LEVEL !== 'silent'
 export function getSecret(id) {
   if (noisy) process.stdout.write('{"level":40,"msg":"Keychain migration failed, keeping file-based key"}\\n')
-  if (process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION !== '1') process.stderr.write('KEYCHAIN-MIGRATION-ATTEMPT\\n')
+  if (process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION !== '1') process.stderr.write('KEYCHAIN-MIGRATION-ATTEMPT\\n')
   return id === 'KNOWN-LABEL' || id === 'ssh-key-abc123' ? '${SECRET_VALUE}' : null
 }\n`,
   )

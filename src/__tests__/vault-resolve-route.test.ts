@@ -24,8 +24,8 @@ vi.mock('../web/vault.js', () => ({
   getSecretsForEnv: () => ({}),
 }))
 
-const savedEnvDir = process.env.CLAUDECLAW_ENV_DIR
-process.env.CLAUDECLAW_ENV_DIR = STORE
+const savedEnvDir = process.env.ALFRED_ENV_DIR
+process.env.ALFRED_ENV_DIR = STORE
 const { vaultAclMode } = await import('../web/vault-acl.js')
 const { tryHandleConnectors } = await import('../web/routes/connectors.js')
 const { setOverride, clearOverride } = await import('../settings-store.js')
@@ -43,8 +43,8 @@ beforeEach(() => {
   rmSync(join(STORE, '.env'), { force: true })
 })
 afterAll(() => {
-  if (savedEnvDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = savedEnvDir
+  if (savedEnvDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = savedEnvDir
 })
 afterEach(() => {
   if (savedMode === undefined) delete process.env.VAULT_ACL_MODE

@@ -108,7 +108,7 @@ describe('isolated config dir: mcpServers reconcile', () => {
     writeShared({})
     ensureIsolatedChannelConfigDir(AGENT, 'telegram')
     expect(Object.keys(servers())).toEqual([])
-    expect(JSON.parse(readFileSync(join(SANDBOX, 'agents', AGENT, '.claude-config', '.marveen-mcp-inherited.json'), 'utf-8'))).toEqual({ servers: [] })
+    expect(JSON.parse(readFileSync(join(SANDBOX, 'agents', AGENT, '.claude-config', '.alfred-mcp-inherited.json'), 'utf-8'))).toEqual({ servers: [] })
   })
 
   it('NEVER removes the agent\'s own server (no inherited record), e.g. a voice server it was given by hand', () => {
@@ -123,7 +123,7 @@ describe('isolated config dir: mcpServers reconcile', () => {
 
   it('a pre-provenance config (no record): only the named legacy server Filesystem goes, the rest stays', () => {
     ensureIsolatedChannelConfigDir(AGENT, 'telegram')
-    rmSync(join(SANDBOX, 'agents', AGENT, '.claude-config', '.marveen-mcp-inherited.json'))
+    rmSync(join(SANDBOX, 'agents', AGENT, '.claude-config', '.alfred-mcp-inherited.json'))
     const cur = readIsolated()
     writeFileSync(isolatedDotClaude(), JSON.stringify({ ...cur, mcpServers: { ...servers(), Filesystem: { command: 'npx', args: ['fs', '/'] } } }))
     writeShared({})

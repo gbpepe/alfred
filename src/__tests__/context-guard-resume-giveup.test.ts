@@ -16,7 +16,7 @@ afterAll(() => { rmSync(SANDBOX, { recursive: true, force: true }) })
 
 vi.mock('../config.js', async (orig) => {
   const actual = await orig<typeof import('../config.js')>()
-  return { ...actual, MAIN_AGENT_ID: 'marveen', PROJECT_ROOT: SANDBOX, STORE_DIR: join(SANDBOX, 'store') }
+  return { ...actual, MAIN_AGENT_ID: 'alfred', PROJECT_ROOT: SANDBOX, STORE_DIR: join(SANDBOX, 'store') }
 })
 vi.mock('../logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
@@ -24,9 +24,9 @@ vi.mock('../logger.js', () => ({
 vi.mock('../db.js', () => ({ createAgentMessage: vi.fn() }))
 vi.mock('../notify.js', () => ({ notifyChannel: vi.fn(async () => {}) }))
 vi.mock('../web/channel-monitor.js', () => ({
-  hardRestartMarveenChannels: vi.fn(() => ({ ok: true })),
+  hardRestartAlfredChannels: vi.fn(() => ({ ok: true })),
   lastMainRespawnAt: () => null,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 0,
+  ALFRED_POST_RESPAWN_GRACE_MS: 0,
 }))
 vi.mock('../web/stuck-tool-call-watcher.js', () => ({ shouldDeferForRecentRespawn: () => false }))
 vi.mock('../web/agent-process.js', () => ({
@@ -39,7 +39,7 @@ vi.mock('../web/agent-process.js', () => ({
   sendPromptToSession: vi.fn(),
   isSessionReadyForPrompt: async () => false,
 }))
-vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'marveen-channels' }))
+vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'alfred-channels' }))
 
 const { reportResumeGiveUp, resumeGiveUpNotice } = await import('../web/context-guard-runner.js')
 const { decideGuard, DEFAULT_CONTEXT_GUARD, RESUME_GIVE_UP_REASON, READY_TIMEOUT_MS } = await import('../context-guard.js')
@@ -116,7 +116,7 @@ describe('resume give-up', () => {
     expect(createAgentMessage).toHaveBeenCalledTimes(1)
     const [from, to, text] = vi.mocked(createAgentMessage).mock.calls[0]
     expect(from).toBe('samu')
-    expect(to).toBe('marveen')
+    expect(to).toBe('alfred')
     expect(text).toContain('"samu"')
     expect(text).toContain('NEM ment ki')
     expect(text).toContain('HANDOFF.md')
@@ -124,9 +124,9 @@ describe('resume give-up', () => {
   })
 
   it('a main-agent give-up goes to the operator channel, not to its own inbox', async () => {
-    await reportResumeGiveUp('marveen')
+    await reportResumeGiveUp('alfred')
     expect(notifyChannel).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(notifyChannel).mock.calls[0][0]).toContain('"marveen"')
+    expect(vi.mocked(notifyChannel).mock.calls[0][0]).toContain('"alfred"')
     expect(createAgentMessage).not.toHaveBeenCalled()
   })
 

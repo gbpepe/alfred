@@ -1,35 +1,35 @@
-# Marveen with Docker Compose (HOSTINGERDOCKER1107). See docs/docker.md.
+# Alfred with Docker Compose (HOSTINGERDOCKER1107). See docs/docker.md.
 #
-#   docker compose up -d                  Marveen + Ollama (semantic memory search)
-#   docker compose --profile tls up -d    + Caddy with automatic HTTPS, for MARVEEN_DOMAIN
-#   docker compose logs marveen           the first-run link to the dashboard
+#   docker compose up -d                  Alfred + Ollama (semantic memory search)
+#   docker compose --profile tls up -d    + Caddy with automatic HTTPS, for ALFRED_DOMAIN
+#   docker compose logs alfred           the first-run link to the dashboard
 #
-# The dashboard is published on this server's 127.0.0.1 only: reach it with the Marveen Bridge or an SSH tunnel, or
+# The dashboard is published on this server's 127.0.0.1 only: reach it with the Alfred Bridge or an SSH tunnel, or
 # with your own domain through the tls profile. Never publish port 3420 on a public address: plain http carries the
 # login cookie and the access token unencrypted.
 
-name: marveen
+name: alfred
 
 services:
-  marveen:
+  alfred:
     # DOCKERUX1118: no build: here. With one, a pull that fails (an unpublished tag, no access) made compose build the
     # image on the server silently (measured, Geri 33317; ~5 GB build cache). Now a missing image is an error that says
     # so. To build from source, see "Build the image yourself" in docs/docker.md.
-    image: ghcr.io/szotasz/marveen:${MARVEEN_VERSION:-latest}
+    image: ghcr.io/gbpepe/alfred:${ALFRED_VERSION:-latest}
     restart: unless-stopped
     environment:
-      MARVEEN_CHANNEL: ${MARVEEN_CHANNEL:-telegram}
-      MARVEEN_AGENT_ID: ${MARVEEN_AGENT_ID:-marveen}
-      MARVEEN_LANG: ${MARVEEN_LANG:-en}
-      MARVEEN_OLLAMA_URL: ${MARVEEN_OLLAMA_URL:-http://ollama:11434}
-      MARVEEN_DOMAIN: ${MARVEEN_DOMAIN:-}
+      ALFRED_CHANNEL: ${ALFRED_CHANNEL:-telegram}
+      ALFRED_AGENT_ID: ${ALFRED_AGENT_ID:-alfred}
+      ALFRED_LANG: ${ALFRED_LANG:-en}
+      ALFRED_OLLAMA_URL: ${ALFRED_OLLAMA_URL:-http://ollama:11434}
+      ALFRED_DOMAIN: ${ALFRED_DOMAIN:-}
       TZ: ${TZ:-UTC}
       WEB_PORT: "3420"
     ports:
       - "127.0.0.1:3420:3420"
     volumes:
-      - marveen-install:/opt/marveen
-      - marveen-home:/home/marveen
+      - alfred-install:/opt/alfred
+      - alfred-home:/home/alfred
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -51,7 +51,7 @@ services:
     entrypoint: ["/bin/sh", "-c", "for i in $$(seq 1 30); do ollama pull nomic-embed-text && exit 0; sleep 5; done; exit 1"]
     restart: "no"
 
-  # DOCKERHTTPS1119: the TLS proxy, only with the tls profile (COMPOSE_PROFILES=tls) and MARVEEN_DOMAIN. It forwards to
+  # DOCKERHTTPS1119: the TLS proxy, only with the tls profile (COMPOSE_PROFILES=tls) and ALFRED_DOMAIN. It forwards to
   # the dashboard's public listener (3421, compose network only, cookies only), never to 3420. Its config is
   # written from the environment at start, not mounted: the Hostinger button loads docker/hostinger-compose.yml alone,
   # where no ./docker/Caddyfile exists. Its log drops the whole query string (Geri's live run: an upstream error
@@ -61,9 +61,9 @@ services:
     image: ${CADDY_IMAGE:-caddy:2}
     restart: unless-stopped
     depends_on:
-      - marveen
+      - alfred
     environment:
-      MARVEEN_DOMAIN: ${MARVEEN_DOMAIN:-}
+      ALFRED_DOMAIN: ${ALFRED_DOMAIN:-}
     ports:
       - "80:80"
       - "443:443"
@@ -73,15 +73,15 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        case "$$MARVEEN_DOMAIN" in
-          ""|*[!A-Za-z0-9.-]*) echo "caddy: MARVEEN_DOMAIN must be this server's public host name (now: '$$MARVEEN_DOMAIN')" >&2; exit 1 ;;
+        case "$$ALFRED_DOMAIN" in
+          ""|*[!A-Za-z0-9.-]*) echo "caddy: ALFRED_DOMAIN must be this server's public host name (now: '$$ALFRED_DOMAIN')" >&2; exit 1 ;;
         esac
-        printf '{\n\tlog {\n\t\tformat filter {\n\t\t\twrap console\n\t\t\tfields {\n\t\t\t\trequest>uri regexp "[?].*" ""\n\t\t\t}\n\t\t}\n\t}\n}\n%s {\n\theader Strict-Transport-Security "max-age=31536000"\n\theader Referrer-Policy "no-referrer"\n\treverse_proxy marveen:3421\n}\n' "$$MARVEEN_DOMAIN" > /config/Caddyfile
+        printf '{\n\tlog {\n\t\tformat filter {\n\t\t\twrap console\n\t\t\tfields {\n\t\t\t\trequest>uri regexp "[?].*" ""\n\t\t\t}\n\t\t}\n\t}\n}\n%s {\n\theader Strict-Transport-Security "max-age=31536000"\n\theader Referrer-Policy "no-referrer"\n\treverse_proxy alfred:3421\n}\n' "$$ALFRED_DOMAIN" > /config/Caddyfile
         exec caddy run --config /config/Caddyfile --adapter caddyfile
 
 volumes:
-  marveen-install:
-  marveen-home:
+  alfred-install:
+  alfred-home:
   ollama-models:
   caddy-data:
   caddy-config:

@@ -3,13 +3,11 @@
  * enabled through a launch-time --settings file, never through a settings layer
  * the sub-agents also read, and never by writing the TRACKED project
  * settings.json (INSTALLDIRTYTREE1103: that write left every install dirty).
- * Twin of scripts/main-extra-plugins-settings.sh (same file, same content);
- * see its header for the measurement (SLACKDMVESZT1006).
+ * Twin of scripts/main-extra-plugins-settings.sh (same file, same content).
  *
  * The same file carries the main agent's sender-role gate when
- * store/main-agent-config.json sets `senderRoleGate` (MIOAPPTEAMSRV1025): the
- * main session serves its owner and a team chat (gromzo, MXD_SCOPE=both) in
- * one session, and a launch flag is the one place only the main session reads.
+ * store/main-agent-config.json sets `senderRoleGate`, when the main session
+ * serves both its owner and additional channel roles in one session.
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

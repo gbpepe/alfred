@@ -11,15 +11,15 @@ import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-memfactchange-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-memfactchange-test-'))
 // readEnvFile (src/env.ts) takes its folder from this at import time.
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+process.env.ALFRED_ENV_DIR = tmpRoot
 
 vi.mock('../config.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../config.js')>()
   return {
     ...real,
-    STORE_DIR: '/nonexistent/claudeclaw-test-store',
+    STORE_DIR: '/nonexistent/alfred-test-store',
     PROJECT_ROOT: tmpRoot,
     OWNER_NAME: 'TestOwner',
     MAIN_AGENT_ID: 'agent-a',
@@ -123,7 +123,7 @@ describe('memory-fact-change section: an agent off the helper gets the raw route
   it('no helper verb, the retract route and the supersedes field instead', () => {
     setLang(null)
     const body = buildMemoryFactChangeBody('agent-b', false)
-    expect(body).not.toMatch(/marveen-api\.sh/)
+    expect(body).not.toMatch(/alfred-api\.sh/)
     expect(body).toMatch(/`POST \/api\/memories\/<id>\/retract`, törzs: `\{"agent_id":"agent-b"\}`/)
     expect(body).toMatch(/`"supersedes": \[<régi-id>\]`/)
     expect(body).toMatch(/&strict=1/)
@@ -155,7 +155,7 @@ describe('memory-fact-change section: the English twin', () => {
     expect(en).toMatch(/Do not save a memory about a rule that already stands word for word/)
     expect(en).toMatch(/A retraction has no way back/)
     expect(en).toMatch(/when in doubt, the dated OUTDATED note is the safe choice/)
-    expect(enRaw).not.toMatch(/marveen-api\.sh/)
+    expect(enRaw).not.toMatch(/alfred-api\.sh/)
     expect(enRaw).toMatch(/`POST \/api\/memories\/<id>\/retract` with `\{"agent_id":"agent-b"\}`/)
     expect(en).not.toMatch(/[–—]/)
     expect(enRaw).not.toContain(String.fromCharCode(64))

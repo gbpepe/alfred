@@ -145,7 +145,7 @@ describe('HOOKISOAGENTS1105: the agents\' envelope hook runs isolated, the retir
     const hooks: Record<string, unknown> = {
       UserPromptSubmit: [
         { hooks: [{ type: 'command', command: '/bin/echo first' }] },
-        { hooks: [{ type: 'command', command: live('/Users/x/ClaudeClaw'), timeout: 45 }] },
+        { hooks: [{ type: 'command', command: live('/Users/x/Alfred'), timeout: 45 }] },
         { hooks: [{ type: 'command', command: 'python3 "$CLAUDE_PROJECT_DIR/scripts/hooks/claude-usage.py"' }, keep] },
       ],
       Stop: [{ hooks: [{ type: 'command', command: live('/opt/other root') }] }], // a root with a space: not a shipped form

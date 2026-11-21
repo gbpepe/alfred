@@ -22,12 +22,12 @@ vi.mock('../web/claude-plans.js', () => ({
 }))
 vi.mock('../config.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../config.js')>()),
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
 }))
 vi.mock('../web/vault.js', () => ({ getSecret: (id: string) => `token-for-${id}` }))
 vi.mock('../web/claude-plans-state.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../web/claude-plans-state.js')>()),
-  readClaudePlansState: () => ({ activePlanByAgent: { marveen: 'a' }, plans: {} }),
+  readClaudePlansState: () => ({ activePlanByAgent: { alfred: 'a' }, plans: {} }),
   writeClaudePlansState: () => {},
 }))
 

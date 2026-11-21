@@ -28,8 +28,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readLastConversationTsFromProjectDir } from '../web/active-model.js'
 
-const WORKING_DIR = '/Users/x/marveen'
-const ENCODED = '-Users-x-marveen'
+const WORKING_DIR = '/Users/x/alfred'
+const ENCODED = '-Users-x-alfred'
 
 function fixtureWith(lines: string[], mtimeEpochSec?: number): string {
   const root = mkdtempSync(join(tmpdir(), 'gate-never-clears-'))

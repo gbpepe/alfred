@@ -1,5 +1,5 @@
 // WORKERMODELFAST1109: the fast worker session may run its own model
-// (MARVEEN_WORKER_MODEL_FAST); unset, both sessions walk the same chain as before.
+// (ALFRED_WORKER_MODEL_FAST); unset, both sessions walk the same chain as before.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -20,16 +20,16 @@ function inputs(over: Partial<WorkerModelInputs> = {}): WorkerModelInputs {
   }
 }
 
-describe('MARVEEN_WORKER_MODEL_FAST (WORKERMODELFAST1109)', () => {
+describe('ALFRED_WORKER_MODEL_FAST (WORKERMODELFAST1109)', () => {
   it('the fast override reports its own source and still goes through the CLI gate', () => {
-    const d = resolveWorkerModel(inputs({ override: 'claude-opus-5-5[1m]', overrideSource: 'env:MARVEEN_WORKER_MODEL_FAST' }))
-    expect(d.source).toBe('env:MARVEEN_WORKER_MODEL_FAST')
+    const d = resolveWorkerModel(inputs({ override: 'claude-opus-5-5[1m]', overrideSource: 'env:ALFRED_WORKER_MODEL_FAST' }))
+    expect(d.source).toBe('env:ALFRED_WORKER_MODEL_FAST')
     expect(d.model).toBe('claude-opus-5[1m]')
     expect(d.unlaunchable?.requested).toBe('claude-opus-5-5[1m]')
   })
 
   it('without overrideSource an override keeps the old label (no behaviour change)', () => {
-    expect(resolveWorkerModel(inputs({ override: 'claude-sonnet-5' })).source).toBe('env:MARVEEN_WORKER_MODEL')
+    expect(resolveWorkerModel(inputs({ override: 'claude-sonnet-5' })).source).toBe('env:ALFRED_WORKER_MODEL')
     expect(resolveWorkerModel(inputs()).source).toBe('default')
   })
 
@@ -39,7 +39,7 @@ describe('MARVEEN_WORKER_MODEL_FAST (WORKERMODELFAST1109)', () => {
   })
 
   it('the dashboard setting offers "" plus exactly the DEFAULT_AGENT_MODEL choices', () => {
-    const fast = SETTINGS_REGISTRY.find((d) => d.key === 'MARVEEN_WORKER_MODEL_FAST')!
+    const fast = SETTINGS_REGISTRY.find((d) => d.key === 'ALFRED_WORKER_MODEL_FAST')!
     const def = SETTINGS_REGISTRY.find((d) => d.key === 'DEFAULT_AGENT_MODEL')!
     expect(fast.default).toBe('')
     expect(fast.valueSet).toEqual(['', ...AGENT_MODEL_CHOICES])

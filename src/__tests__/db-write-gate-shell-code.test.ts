@@ -30,34 +30,34 @@ const ALLOW = { deny: false }
 
 describe('#2974: a file-level database write as shell code is denied, as the same write at the top level', () => {
   it.each([
-    ['rm, bash -c', "bash -c 'rm store/claudeclaw.db'"],
-    ['a redirect, sh -c in double quotes', 'sh -c "echo x > store/claudeclaw.db"'],
-    ['cp to the absolute path, behind timeout', "timeout 5 bash -c 'cp /tmp/x.db @R@/store/claudeclaw.db'"],
-    ['the -wal file', "bash -c 'rm -f store/claudeclaw.db-wal'"],
-    ['mv, bash -lc', "bash -lc 'mv /tmp/x.db store/claudeclaw.db'"],
-    ['eval', "eval 'rm store/claudeclaw.db'"],
-    ['a -c inside a -c', `bash -c "sh -c 'rm store/claudeclaw.db'"`],
-    ['a shell reading a heredoc', "sh <<'EOF'\nrm store/claudeclaw.db\nEOF"],
-    ['a shell reading a here-string', "bash <<< 'rm store/claudeclaw.db'"],
+    ['rm, bash -c', "bash -c 'rm store/alfred.db'"],
+    ['a redirect, sh -c in double quotes', 'sh -c "echo x > store/alfred.db"'],
+    ['cp to the absolute path, behind timeout', "timeout 5 bash -c 'cp /tmp/x.db @R@/store/alfred.db'"],
+    ['the -wal file', "bash -c 'rm -f store/alfred.db-wal'"],
+    ['mv, bash -lc', "bash -lc 'mv /tmp/x.db store/alfred.db'"],
+    ['eval', "eval 'rm store/alfred.db'"],
+    ['a -c inside a -c', `bash -c "sh -c 'rm store/alfred.db'"`],
+    ['a shell reading a heredoc', "sh <<'EOF'\nrm store/alfred.db\nEOF"],
+    ['a shell reading a here-string', "bash <<< 'rm store/alfred.db'"],
   ])('%s: denied for the main agent and a sub-agent', (_, cmd) => {
     expect(main(cmd)).toEqual(DB)
     expect(sub(cmd)).toEqual(DB)
   })
   it('the top-level forms stay denied (the reference rows)', () => {
-    expect(main('rm store/claudeclaw.db')).toEqual(DB)
-    expect(sub('echo x > store/claudeclaw.db')).toEqual(DB)
+    expect(main('rm store/alfred.db')).toEqual(DB)
+    expect(sub('echo x > store/alfred.db')).toEqual(DB)
   })
   it('a read of the database as shell code still passes', () => {
-    expect(main("bash -c 'ls -l store/claudeclaw.db'")).toEqual(ALLOW)
-    expect(sub(`bash -c "sqlite3 -readonly store/claudeclaw.db 'SELECT 1'"`)).toEqual(ALLOW)
+    expect(main("bash -c 'ls -l store/alfred.db'")).toEqual(ALLOW)
+    expect(sub(`bash -c "sqlite3 -readonly store/alfred.db 'SELECT 1'"`)).toEqual(ALLOW)
   })
   it('shell code that names no protected path passes', () => {
     expect(main("bash -c 'rm /tmp/x.db && echo done'")).toEqual(ALLOW)
   })
   it('a heredoc that is a script file\'s stdin is data, not shell code: passes; with -s the shell reads it as code: denied', () => {
-    expect(main("bash /tmp/x.sh <<'E'\nrm store/claudeclaw.db\nE")).toEqual(ALLOW)
-    expect(main("bash -s <<'E'\nrm store/claudeclaw.db\nE")).toEqual(DB)
-    expect(main("bash -s arg1 <<'E'\nrm store/claudeclaw.db\nE")).toEqual(DB)
+    expect(main("bash /tmp/x.sh <<'E'\nrm store/alfred.db\nE")).toEqual(ALLOW)
+    expect(main("bash -s <<'E'\nrm store/alfred.db\nE")).toEqual(DB)
+    expect(main("bash -s arg1 <<'E'\nrm store/alfred.db\nE")).toEqual(DB)
   })
   it('shell code nested deeper than the reading goes is denied (fail closed)', () => {
     let cmd = 'echo ok'

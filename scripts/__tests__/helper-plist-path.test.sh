@@ -47,7 +47,7 @@ stub_tmux() { mkdir -p "$1"; printf '#!/bin/sh\nexit 0\n' > "$1/tmux"; chmod +x 
 run_installer() {
   printf 'SERVICE_ID=hpt\n' > "$TMP/.env"
   rm -rf "$2/Library/LaunchAgents"
-  HOME="$2" PATH="$3" MARVEEN_ENV_FILE="$TMP/.env" /bin/bash "$REPO/scripts/$1" >"$TMP/out" 2>&1 || { echo "RC-HIBA $(cat "$TMP/out")"; return; }
+  HOME="$2" PATH="$3" ALFRED_ENV_FILE="$TMP/.env" /bin/bash "$REPO/scripts/$1" >"$TMP/out" 2>&1 || { echo "RC-HIBA $(cat "$TMP/out")"; return; }
   p="$(find "$2/Library/LaunchAgents" -name '*.plist' 2>/dev/null | head -1)"
   [ -n "$p" ] || { echo "NINCS-PLIST"; return; }
   cp "$p" "$TMP/last.plist"

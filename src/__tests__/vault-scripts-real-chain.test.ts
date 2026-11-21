@@ -134,28 +134,28 @@ describe('the real chain, macOS-like (platform darwin, `security` always fails):
   })
 
   it('half-fix 2: only the switch -> no Keychain call, but the one-time info line reaches stdout unless the logger is silent (both are needed)', async () => {
-    const r = await run([driver()], { MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION: '1' })
+    const r = await run([driver()], { ALFRED_VAULT_NO_KEYCHAIN_MIGRATION: '1' })
     expect(secCalls()).toEqual([])
     const lines = r.stdout.split('\n').filter(Boolean)
     expect(lines).toContain(VALUE)
     expect(lines.length).toBeGreaterThan(1)                                                         // the notice is on stdout
-    expect(lines.filter(l => l.includes('MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION')).length).toBe(1)   // once per process
+    expect(lines.filter(l => l.includes('ALFRED_VAULT_NO_KEYCHAIN_MIGRATION')).length).toBe(1)   // once per process
   })
 
   it('the switch notice is a WARN: it stays visible at LOG_LEVEL=warn (a mistaken switch must not be silent), and the scripts\' silent level still hides it', async () => {
-    const warn = await run([driver()], { MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION: '1', LOG_LEVEL: 'warn' })
-    expect(warn.stdout).toContain('MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION')
-    const silent = await run([driver()], { MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION: '1', LOG_LEVEL: 'silent' })
+    const warn = await run([driver()], { ALFRED_VAULT_NO_KEYCHAIN_MIGRATION: '1', LOG_LEVEL: 'warn' })
+    expect(warn.stdout).toContain('ALFRED_VAULT_NO_KEYCHAIN_MIGRATION')
+    const silent = await run([driver()], { ALFRED_VAULT_NO_KEYCHAIN_MIGRATION: '1', LOG_LEVEL: 'silent' })
     expect(silent.stdout).toBe(`${VALUE}\n`)
   })
 
   it('the switch notice is logged ONCE per process, however many secrets are read', async () => {
     const p = join(ROOT, 'many-driver.mjs')
     writeFileSync(p, `const { getSecret } = await import(${JSON.stringify(join(ROOT, 'dist', 'web', 'vault.js'))})\nfor (let i = 0; i < 4; i++) process.stdout.write(getSecret('KNOWN') + '\\n')\n`)
-    const r = await run([p], { MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION: '1' })
+    const r = await run([p], { ALFRED_VAULT_NO_KEYCHAIN_MIGRATION: '1' })
     const lines = r.stdout.split('\n').filter(Boolean)
     expect(lines.filter(l => l === VALUE)).toHaveLength(4)
-    expect(lines.filter(l => l.includes('MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION'))).toHaveLength(1)
+    expect(lines.filter(l => l.includes('ALFRED_VAULT_NO_KEYCHAIN_MIGRATION'))).toHaveLength(1)
     expect(secCalls()).toEqual([])
   })
 

@@ -29,8 +29,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # bot, and another install would silently be told to expect an identity that is
 # not theirs. The failure would then look like a broken gate rather than a
 # missing setting. Resolution order:
-#   1. MARVEEN_BOT_EMAIL in the environment
-#   2. MARVEEN_BOT_EMAIL= in the install's .env
+#   1. ALFRED_BOT_EMAIL in the environment
+#   2. ALFRED_BOT_EMAIL= in the install's .env
 #   3. nothing -> SKIP quietly (one line, exit 0), below: sync-hooks.sh runs every
 #      install-*-hook.sh on each update, so an install that never opted in to this gate
 #      must not get an error block and a non-zero exit every time. A value that IS set
@@ -41,7 +41,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # is exactly what `git -c user.email=` overrides, so a gate that read its expected
 # value from there would compare the config with itself and ALWAYS pass. The
 # expected identity has to come from outside the thing being checked.
-BOT_EMAIL="${MARVEEN_BOT_EMAIL:-}"
+BOT_EMAIL="${ALFRED_BOT_EMAIL:-}"
 if [ -z "$BOT_EMAIL" ] && [ -f "$ROOT/.env" ]; then
   # Same shapes the product's readEnvFile accepts: the key is what precedes the
   # first `=`, trimmed, so a leading `export ` does NOT match -- measured against
@@ -58,11 +58,11 @@ if [ -z "$BOT_EMAIL" ] && [ -f "$ROOT/.env" ]; then
   # r off a real address. And `[[:space:]]` covers CR here but that is locale-dependent,
   # so it is not relied on alone.
   CR="$(printf '\r')"
-  BOT_EMAIL="$(sed -n 's/^[[:space:]]*MARVEEN_BOT_EMAIL[[:space:]]*=[[:space:]]*//p' "$ROOT/.env" | tail -1 | sed "s/${CR}*\$//" | sed 's/[[:space:]]*$//; s/^"//; s/"$//; s/^'"'"'//; s/'"'"'$//')"
+  BOT_EMAIL="$(sed -n 's/^[[:space:]]*ALFRED_BOT_EMAIL[[:space:]]*=[[:space:]]*//p' "$ROOT/.env" | tail -1 | sed "s/${CR}*\$//" | sed 's/[[:space:]]*$//; s/^"//; s/"$//; s/^'"'"'//; s/'"'"'$//')"
 fi
 if [ -z "$BOT_EMAIL" ]; then
   # Not configured means not opted in: say so in one line and leave the hooks as they are.
-  echo "install-commit-identity-hook: skipped (MARVEEN_BOT_EMAIL not set; set it in .env to enable the gate)"
+  echo "install-commit-identity-hook: skipped (ALFRED_BOT_EMAIL not set; set it in .env to enable the gate)"
   exit 0
 fi
 
@@ -105,7 +105,7 @@ case "$GIT_COMMON_DIR" in /*) ;; *) GIT_COMMON_DIR="$ROOT/$GIT_COMMON_DIR" ;; es
 HOOK_DIR="$(cd "$GIT_COMMON_DIR" && pwd)/hooks"
 DISPATCH="$HOOK_DIR/pre-commit"
 GUARD="$HOOK_DIR/pre-commit.d/15-commit-identity"
-MARK="marveen-pre-commit-dispatcher"
+MARK="alfred-pre-commit-dispatcher"
 mkdir -p "$HOOK_DIR/pre-commit.d"
 
 # 1. The sub-hook. 15- so it runs after the prod-tree guard (05) and the secret
@@ -113,15 +113,15 @@ mkdir -p "$HOOK_DIR/pre-commit.d"
 #    blocks should speak first.
 cat > "$GUARD" <<HOOKEOF
 #!/usr/bin/env bash
-# marveen-commit-identity-gate (COMMITID927): refuse a commit whose AUTHOR or
+# alfred-commit-identity-gate (COMMITID927): refuse a commit whose AUTHOR or
 # COMMITTER is not this install's bot identity. Managed by
 # scripts/install-commit-identity-hook.sh -- edit there, not here.
 # Deliberate override: SKIP_COMMIT_IDENTITY_GATE=1 git commit ...
 set -euo pipefail
 # The expected identity is BAKED IN at install time, and there is deliberately NO
 # runtime override. Measured 2026-09-27, after Sam found it: with a runtime
-# MARVEEN_BOT_EMAIL default here,
-#     MARVEEN_BOT_EMAIL=x git -c user.email=x commit
+# ALFRED_BOT_EMAIL default here,
+#     ALFRED_BOT_EMAIL=x git -c user.email=x commit
 # passed and printed NOTHING -- a SILENT way around the gate, next to the two loud
 # documented ones. The expected value has to live somewhere the CALLER cannot set
 # per invocation, and an environment variable is not such a place.
@@ -150,7 +150,7 @@ if [ -z "\$BOT_EMAIL" ]; then
   echo "BLOCKED: the commit-identity gate has NO expected identity baked in." >&2
   echo "  An empty expected value must never count as a match, so this refuses instead." >&2
   echo "  Re-install it, giving the identity explicitly:" >&2
-  echo "      MARVEEN_BOT_EMAIL=<id>+<login>@users.noreply.github.com bash scripts/install-commit-identity-hook.sh" >&2
+  echo "      ALFRED_BOT_EMAIL=<id>+<login>@users.noreply.github.com bash scripts/install-commit-identity-hook.sh" >&2
   exit 1
 fi
 # git var reflects every override form: the config, \`git -c\`, GIT_AUTHOR_EMAIL,
@@ -186,7 +186,7 @@ chmod +x "$GUARD"
 if [ ! -e "$DISPATCH" ]; then
   cat > "$DISPATCH" <<'DISPEOF'
 #!/usr/bin/env bash
-# marveen-pre-commit-dispatcher : run every executable in pre-commit.d/.
+# alfred-pre-commit-dispatcher : run every executable in pre-commit.d/.
 set -euo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 status=0
@@ -199,7 +199,7 @@ DISPEOF
   chmod +x "$DISPATCH"
   echo "install-commit-identity-hook: dispatcher created."
 elif ! grep -q "$MARK" "$DISPATCH"; then
-  echo "install-commit-identity-hook: $DISPATCH exists and is NOT the marveen dispatcher." >&2
+  echo "install-commit-identity-hook: $DISPATCH exists and is NOT the alfred dispatcher." >&2
   echo "  Not overwriting it. Move its body into $HOOK_DIR/pre-commit.d/ and re-run." >&2
   exit 1
 fi

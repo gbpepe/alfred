@@ -692,7 +692,7 @@ describe('channel-monitor is wired to it', () => {
   })
 
   it('it runs the pass with the scrollback capture, the main agent and the real alert sink', () => {
-    expect(branch).toMatch(/runPermissionPromptPass\(label, t\.session, paneNow, \{\s*captureWithHistory: capturePaneWithHistory,\s*escalation: permPromptState,\s*isMainAgent: t\.isMarveen,\s*messageMainAgent: \(text\) => \{ createAgentMessage\('system', MAIN_AGENT_ID, text\) \},\s*send: \(text, meta\) => sendAlert\(text, meta\),\s*\}\)/)
+    expect(branch).toMatch(/runPermissionPromptPass\(label, t\.session, paneNow, \{\s*captureWithHistory: capturePaneWithHistory,\s*escalation: permPromptState,\s*isMainAgent: t\.isAlfred,\s*messageMainAgent: \(text\) => \{ createAgentMessage\('system', MAIN_AGENT_ID, text\) \},\s*send: \(text, meta\) => sendAlert\(text, meta\),\s*\}\)/)
     expect(branch.match(/sendAlert\(/g) ?? []).toHaveLength(1)
   })
 

@@ -10,22 +10,22 @@ const notAGitFile = () => false
 
 describe('shouldRunBackgroundServices', () => {
   it('the install itself runs them', () => {
-    expect(shouldRunBackgroundServices({ projectRoot: '/Users/x/ClaudeClaw', webOnly: false, allowSecondInstance: false, isGitFile: notAGitFile, tmpDir: '/var/folders/ab/T' }))
+    expect(shouldRunBackgroundServices({ projectRoot: '/Users/x/Alfred', webOnly: false, allowSecondInstance: false, isGitFile: notAGitFile, tmpDir: '/var/folders/ab/T' }))
       .toEqual({ run: true })
   })
 
   it('WEB_ONLY turns them off, the opt-in included', () => {
     for (const allowSecondInstance of [false, true]) {
-      const d = shouldRunBackgroundServices({ projectRoot: '/Users/x/ClaudeClaw', webOnly: true, allowSecondInstance, isGitFile: notAGitFile })
+      const d = shouldRunBackgroundServices({ projectRoot: '/Users/x/Alfred', webOnly: true, allowSecondInstance, isGitFile: notAGitFile })
       expect(d).toEqual({ run: false, reason: 'WEB_ONLY staging mode' })
     }
   })
 
   it('every second-instance kind is off without the opt-in', () => {
     const cases = [
-      { projectRoot: '/Users/x/ClaudeClaw/.claude/worktrees/agent-1', isGitFile: notAGitFile }, // worktree path
+      { projectRoot: '/Users/x/Alfred/.claude/worktrees/agent-1', isGitFile: notAGitFile }, // worktree path
       { projectRoot: '/Users/x/abel-wt-bridgemeasure', isGitFile: () => true }, // linked worktree (.git is a file)
-      { projectRoot: '/private/tmp/marveen-work', isGitFile: notAGitFile }, // temp root
+      { projectRoot: '/private/tmp/alfred-work', isGitFile: notAGitFile }, // temp root
       { projectRoot: '/var/folders/ab/T/clone', isGitFile: notAGitFile, tmpDir: '/var/folders/ab/T' },
     ]
     for (const c of cases) {
@@ -49,7 +49,7 @@ describe('web.ts wiring (source pins)', () => {
   const backfill = src.indexOf('const hookDecision = shouldRegisterHooks(')
 
   it('the decision reads the opt-in from the process environment, as WEB_ONLY, and comes before every service', () => {
-    expect(ALLOW_SECOND_INSTANCE_SERVICES_KEY).toBe('MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES')
+    expect(ALLOW_SECOND_INSTANCE_SERVICES_KEY).toBe('ALFRED_ALLOW_SECOND_INSTANCE_SERVICES')
     expect(decision).toBeGreaterThan(-1)
     expect(src.slice(decision, servicesOff)).toContain("allowSecondInstance: process.env[ALLOW_SECOND_INSTANCE_SERVICES_KEY] === '1'")
     expect(src).toContain("const webOnly = process.env['WEB_ONLY'] === 'true'")

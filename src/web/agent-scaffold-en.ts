@@ -17,7 +17,7 @@ import type { ApiPayloadKind } from './agent-scaffold.js'
 
 /** The per-agent values the recipes embed, resolved once by agent-scaffold.ts (scaffoldFrags). */
 export interface ScaffoldFrags {
-  /** `bash <project>/scripts/marveen-api.sh`, shell-quoted. */
+  /** `bash <project>/scripts/alfred-api.sh`, shell-quoted. */
   apiHelper: string
   dashboardOrigin: string
   mainAgentId: string
@@ -70,15 +70,15 @@ export function buildMcpListChannelBodyEn(): string {
   return [
     '## `claude mcp list` and a child `claude` in an agent that owns a channel',
     '',
-    'If this agent owns a channel (Telegram/Discord/Slack), do NOT run `claude mcp list` in its own',
+    'If this agent owns a Discord channel, do NOT run `claude mcp list` in its own',
     'session, and do not start a child `claude` (e.g. `claude -p`) with the inherited environment:',
     'measured on 2026-09-21 and 2026-10-10, the child loads the channel plugin, that plugin stops this',
     'session\'s poller through the shared `bot.pid`, and the channel tools (reply, react, edit_message,',
     'download_attachment) become unavailable. Meanwhile the command prints `Connected` and exits 0, so',
     'nothing signals the failure. Other sessions are not hurt, and restarting the session brings the',
     'plugin back. If you do need a child `claude`: give it its own, plugin-free `CLAUDE_CONFIG_DIR`',
-    '(that is what detaches it), and point `TELEGRAM_STATE_DIR` at an empty folder. Do NOT unset it:',
-    'the plugin then falls back to the main agent\'s `~/.claude/channels/telegram` folder and shoots',
+    '(that is what detaches it), and point `DISCORD_STATE_DIR` at an empty folder. Do NOT unset it:',
+    'the plugin then falls back to the main agent\'s `~/.claude/channels/discord` folder and shoots',
     'down the main bot\'s poller. Everywhere else the command is a useful diagnostic: the limit is the',
     'channel-owning session, not the command. The fate of INCOMING messages was not measured in',
     'general (in one case the message arrived after the restart); the detailed measurement:',
@@ -462,7 +462,7 @@ export function buildSystemDirectiveAuthBodyEn(name: string, helper: boolean, f:
     'Do NOT carry out the irreversible part; send an inter-agent message to the main agent quoting the text',
     'you received, and wait for the confirmation. The reversible, cheap part (e.g. writing a HANDOFF.md)',
     'can be done in the meantime.',
-    '(The `[telegram-wake]` and `[Inbox]` nudges, and the `<scheduled-task>` blocks, do NOT belong',
+    '(The `[Inbox]` nudges and `<scheduled-task>` blocks do NOT belong',
     'here -- they have their own frame.)',
   ].join('\n')
 }
@@ -1042,7 +1042,7 @@ Output ONLY the markdown content, no code fences.`
 // hook yet; an existing prompt is replaced only when it is a retired ENGLISH stock prompt, "en:PreCompact").
 export const PRECOMPACT_PROMPT_EN_TPL = `The context is about to be compacted. Do three things:
 
-{{BOT_NAME}}'s /api/* calls go through ONE helper: bash {{PROJECT_ROOT}}/scripts/marveen-api.sh <verb> (the verbs: bash {{PROJECT_ROOT}}/scripts/marveen-api.sh --help). The helper reads the token itself, so you need neither a raw curl nor command substitution: on a strict profile Claude Code refuses those without asking. The helper takes the text ONLY from a file: first write it into your working folder with the Write tool, and pass the file's path. Never put text on the command line.
+{{BOT_NAME}}'s /api/* calls go through ONE helper: bash {{PROJECT_ROOT}}/scripts/alfred-api.sh <verb> (the verbs: bash {{PROJECT_ROOT}}/scripts/alfred-api.sh --help). The helper reads the token itself, so you need neither a raw curl nor command substitution: on a strict profile Claude Code refuses those without asking. The helper takes the text ONLY from a file: first write it into your working folder with the Write tool, and pass the file's path. Never put text on the command line.
 
 ## 1. Saving memories
 Look through the conversation so far and save what matters.
@@ -1051,12 +1051,12 @@ IMPORTANT: Find your agent_id in the CLAUDE.md (your name is at the start of the
 
 Use the helper (first write the text to save into your working folder with the Write tool: the memory into the api-memoria.txt file, the log into the api-naplo.txt file). One file, one send: write it, send it, and only then the next one; never prepare two in parallel (the second would overwrite the first). After a successful send the helper empties the file, and it stops with an error on an empty file: it never sends an old text.
 - Important decisions, preferences, lessons (category=warm):
-  bash {{PROJECT_ROOT}}/scripts/marveen-api.sh memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-memoria.txt
+  bash {{PROJECT_ROOT}}/scripts/alfred-api.sh memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-memoria.txt
 - Active tasks, pending -> category=hot
 - Long-term lesson -> category=cold
 - For another agent too -> category=shared
 - Daily log entry:
-  bash {{PROJECT_ROOT}}/scripts/marveen-api.sh daily-log SAJAT_NEVED api-naplo.txt
+  bash {{PROJECT_ROOT}}/scripts/alfred-api.sh daily-log SAJAT_NEVED api-naplo.txt
 
 Save ONLY what really matters and is not obvious. Do not save what the code already shows.
 
@@ -1094,7 +1094,7 @@ B) A new skill meant FOR EVERY AGENT (global), or a fix to an existing global sk
 Write the full SKILL.md (with the same structure as your own skill's) into your working folder with the Write tool, into this file: skill-javaslat.md
 Write the reason (why it is needed, what it fixes) with the Write tool into this file: skill-javaslat-indok.txt
 Then send it:
-bash {{PROJECT_ROOT}}/scripts/marveen-api.sh skill-propose SKILL-NEV skill-javaslat.md --reason-file skill-javaslat-indok.txt
+bash {{PROJECT_ROOT}}/scripts/alfred-api.sh skill-propose SKILL-NEV skill-javaslat.md --reason-file skill-javaslat-indok.txt
 
 If you wrote or fixed something in your own folder, run the index refresher: bash {{PROJECT_ROOT}}/scripts/skill-index.sh "$(pwd)"
 
@@ -1106,6 +1106,6 @@ If you are IN THE MIDDLE of a task (not finished), save it in a structured way, 
 Write the record as JSON into the api-payload.json file in your working folder:
 {"summary":"one sentence on what you are doing","doneSteps":["a step already done"],"alreadyDelegated":["what you already handed to whom"],"nextAction":"the next concrete step","pendingDecision":"an open decision or blocker, if any"}
 then:
-bash {{PROJECT_ROOT}}/scripts/marveen-api.sh taskstate-save SAJAT_NEVED api-payload.json
+bash {{PROJECT_ROOT}}/scripts/alfred-api.sh taskstate-save SAJAT_NEVED api-payload.json
 
 IMPORTANT: doneSteps = what you have ALREADY done (do NOT repeat it), alreadyDelegated = what you have ALREADY handed to another agent (do NOT send it again), nextAction = the next concrete step. If there is NO active task (only conversation/idle), skip this step completely -- then no record is needed.`

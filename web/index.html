@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Marveen</title>
+  <title>Alfred</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/css/xterm.css">
   <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.js"></script>
@@ -14,13 +14,13 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js" integrity="sha384-e9EFD6BGC90bkW9aDV5xbbBfzwN7G8YImHao2lfLVKV/hPB0E0go+H3I64h7oHtA" crossorigin="anonymous"></script>
   <script src="/lang/hu.js"></script>
   <script src="/lang/en.js"></script>
-  <link rel="icon" href="/api/marveen/avatar">
-  <link rel="apple-touch-icon" href="/api/marveen/avatar">
+  <link rel="icon" href="/api/alfred/avatar">
+  <link rel="apple-touch-icon" href="/api/alfred/avatar">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1a1917">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Marveen">
+  <meta name="apple-mobile-web-app-title" content="Alfred">
   <script>
     // Service worker intentionally DISABLED. A caching SW caused iOS load
     // failures (respondWith null on cache miss) and a reload-loop when combined
@@ -40,7 +40,7 @@
   <div class="modal-overlay onboarding-overlay" id="onboardingOverlay" hidden>
     <div class="modal onboarding-modal">
       <button class="modal-close" id="onboardingClose" title="Bezárás" aria-label="Bezárás">&times;</button>
-      <h2 data-i18n="onboarding.title">Marveen beállítása</h2>
+      <h2 data-i18n="onboarding.title">Alfred beállítása</h2>
       <p class="onb-sub" data-i18n="onboarding.subtitle">Fejezd be a beállítást innen, a dashboardból -- SSH nélkül.</p>
       <!-- DOCKERUX1118 (owner 33327): the install's language, on the wizard's first screen, in the container only. Each
            label in its own language, so it is never translated. -->
@@ -52,7 +52,7 @@
         <div class="onboarding-step" data-ostep="1"><span class="onb-num">1</span> <span data-i18n="onboarding.login.tab">Belépés</span></div>
         <div class="onboarding-step" data-ostep="2"><span class="onb-num">2</span> <span data-i18n="onboarding.identity.tab">Név</span></div>
         <div class="onboarding-step" data-ostep="3"><span class="onb-num">3</span> <span data-i18n="onboarding.step1.tab">Claude auth</span></div>
-        <div class="onboarding-step" data-ostep="4"><span class="onb-num">4</span> <span data-i18n="onboarding.step2.tab">Telegram bot</span></div>
+        <div class="onboarding-step" data-ostep="4"><span class="onb-num">4</span> <span data-i18n="onboarding.step2.tab">Discord bot</span></div>
         <div class="onboarding-step" data-ostep="5"><span class="onb-num">5</span> <span data-i18n="onboarding.step3.tab">Párosítás</span></div>
       </div>
       <p class="onb-flow-note" id="onbFlowNote"></p>
@@ -64,14 +64,14 @@
     <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menü" aria-expanded="false">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-    <span class="mobile-topbar-title" id="mobileTopbarTitle">Marveen</span>
+    <span class="mobile-topbar-title" id="mobileTopbarTitle">Alfred</span>
   </div>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="sidebar-brand-mark" id="sidebarBrandMark">M</div>
       <div class="sidebar-brand-text">
-        <div class="sidebar-brand-name" id="sidebarBrandName">Marveen</div>
+        <div class="sidebar-brand-name" id="sidebarBrandName">Alfred</div>
         <div class="sidebar-brand-sub">online</div>
       </div>
     </div>
@@ -283,7 +283,7 @@
 
     <!-- CHANNELUNCONF1110: the main agent's channel provider has no token, so the session runs without its channel.
          Not dismissible: it is the install's real state until a token is set. Populated by
-         updateMainChannelUnconfBanner() from /api/marveen. -->
+         updateMainChannelUnconfBanner() from /api/alfred. -->
     <div id="mainChannelUnconfBanner" class="auth-setup-banner branch-drift-banner" role="status" hidden>
       <span id="mainChannelUnconfBannerText"></span>
       <span class="auth-setup-banner-actions">
@@ -1435,30 +1435,6 @@
       <nav class="tab-nav" id="settingsTabNav" style="margin-bottom:0"></nav>
       <div id="settingsTabPanels"></div>
 
-      <!-- GROMZOOWNERQR1030: the Gromzo card, collapsed at the bottom of Settings. GROMZOBRIDGEWIZARD1107 D5a: the
-           phone hookup is the Marveen Bridge's (its "Gromzo bekötése" wizard, the owner QR inside it); the card's
-           own owner QR is gone (dash.sock never hands out the owner's codes since marveen-mxd #89, so its button
-           always ended on consent_required). The card shows the link status and the agents. setupGromzoCard() in app.js. -->
-      <details class="card gromzo-card" id="gromzoCard" style="margin-top:16px">
-        <summary class="gromzo-summary" data-i18n="gromzo.card.title">Gromzo (mobilapp)</summary>
-        <p class="modal-desc" data-i18n="gromzo.card.desc">A telefonodat a Marveen Bridge-ben kötöd be: Menü (⋮), Gromzo bekötése. Ott kéred egy új telefon kódját is. Itt a kapcsolat állapotát látod, és azt, melyik ügynököd érhető el a Gromzo appban.</p>
-        <p class="gromzo-status" id="gromzoStatus"></p>
-        <div class="gromzo-owner-info" id="gromzoOwnerInfo" role="status" hidden>
-          <p class="gromzo-owner-info-text" data-i18n="gromzo.owner_login.info">Az ügynökök kapcsolásához és a telefon hozzáadásához be kell lépned a dashboard-jelszavaddal: a tulajdonost csak a jelszó azonosítja, a Bridge vagy a hozzáférési kulcs nem. A belépés ebben az ablakban megmarad, amíg ki nem jelentkezel, vagy le nem jár.</p>
-          <button class="btn-primary btn-compact" id="gromzoLoginBtn" data-i18n="gromzo.btn.login">Belépés jelszóval</button>
-        </div>
-        <div class="gromzo-owner-logout">
-          <button class="btn-secondary btn-compact" id="gromzoLogoutBtn" hidden data-i18n="gromzo.btn.logout">Tulajdonosi kijelentkezés</button>
-        </div>
-        <div class="gromzo-agents" id="gromzoAgents">
-          <h4 class="gromzo-agents-title" data-i18n="gromzo.agents.title">Ügynökök a Gromzóban</h4>
-          <p class="modal-desc" data-i18n="gromzo.agents.desc">Itt választod ki, melyik ügynököd érhető el a Gromzo appban. Bekapcsolás előtt a telefonodon, a Gromzo appban kell jóváhagynod.</p>
-          <p class="gromzo-agents-limit" data-i18n="gromzo.agents.limit">Óránként legfeljebb 3 változtatás. Minden változtatás után a chat-szolgáltatás néhány másodpercre újraindul.</p>
-          <p class="mobile-login-warn gromzo-agent-state is-error" id="gromzoAgentsRatchet" role="alert" hidden></p>
-          <ul class="gromzo-agent-list" id="gromzoAgentList"></ul>
-          <p class="mobile-login-warn" id="gromzoAgentsError" hidden></p>
-        </div>
-      </details>
       <!-- Sticky save bar -- shown only when there are unsaved changes -->
       <div id="settingsSaveBar" style="display:none;position:sticky;bottom:0;background:var(--bg-card);border-top:1px solid var(--border);padding:12px 24px;display:none;align-items:center;justify-content:space-between;gap:12px;z-index:10">
         <span id="settingsDirtyCount" style="font-size:13px;color:var(--text-muted)"></span>
@@ -2146,7 +2122,7 @@
                  [data-i18n] sweep in renderStaticI18n(), which would otherwise
                  clobber the rendered version on a language switch. The label is
                  re-localized by renderUpdatesVersion on every render instead. -->
-            <p class="subtitle" id="updatesSubtitle">Marveen verzió ellenőrzés</p>
+            <p class="subtitle" id="updatesSubtitle">Alfred verzió ellenőrzés</p>
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn-secondary btn-compact" id="updatesCheckBtn" data-i18n="updates.btn.check">
@@ -2713,21 +2689,21 @@
                 <span class="btn-loading" hidden><span class="spinner"></span></span>
               </button>
               <button class="btn-danger btn-compact" id="agentStopBtn" hidden data-i18n="agents.process.stop_btn">Leállítás</button>
-              <button class="btn-danger btn-compact" id="marveenRestartBtn" hidden>Channels restart</button>
+              <button class="btn-danger btn-compact" id="alfredRestartBtn" hidden>Channels restart</button>
             </div>
           </div>
         </div>
 
         <!-- Tab: Settings -->
         <div class="tab-panel" id="tabSettings" hidden>
-          <div class="form-group" id="marveenReadonlyNote" hidden>
+          <div class="form-group" id="alfredReadonlyNote" hidden>
             <div style="padding:12px 14px;background:var(--bg-input);border-radius:var(--radius);border-left:3px solid var(--accent);font-size:13px;line-height:1.5;color:var(--text-muted)">
               <strong style="color:var(--text)" data-i18n="agents.detail.main_readonly">Főagent konfiguráció -- csak olvasható</strong><br>
               A főagent identitás-fájljai biztonsági okból dashboardról nem szerkeszthetők
               (token szivárgás esetén távoli identitás-átírás kockázata).
               Szerkesztéshez nyisd meg fájlrendszerből a projekt gyökerében:
               <code>CLAUDE.md</code>, <code>SOUL.md</code>, <code>.mcp.json</code> --
-              vagy szólj az agent-nek Telegramon, hogy módosítsa.
+              vagy szólj az agent-nek Discordon, hogy módosítsa.
             </div>
           </div>
           <div class="form-group">
@@ -3077,38 +3053,23 @@
           <div class="form-group" style="margin-bottom:16px;">
             <label for="chProviderSelect" data-i18n="agents.channel.provider_label">Csatorna provider</label>
             <select id="chProviderSelect" style="max-width:200px;">
-              <option value="telegram">Telegram</option>
-              <option value="slack">Slack</option>
               <option value="discord">Discord</option>
-              <option value="teams">Microsoft Teams</option>
             </select>
           </div>
           <div id="chNotConnected">
             <div class="tg-instructions" id="chSetupInstructions">
-              <h4 id="chSetupTitle">Telegram bot bekotese</h4>
+              <h4 id="chSetupTitle">Discord bot bekötése</h4>
               <ol id="chSetupSteps">
-                <li>Nyisd meg a <strong>@BotFather</strong>-t a Telegramban</li>
-                <li>Hozz letre egy uj botot a <code>/newbot</code> paranccsal</li>
-                <li>Masold be az API tokent ide</li>
+                <li>Nyisd meg a Discord Developer Portalt és hozz létre egy botot</li>
+                <li>Kapcsold be a Message Content Intentet</li>
+                <li>Másold be a bot tokent ide</li>
               </ol>
             </div>
             <div class="form-group" id="chTokenGroup">
               <label for="chTokenInput" id="chTokenLabel">Bot API Token</label>
-              <input type="text" id="chTokenInput" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+              <input type="text" id="chTokenInput" placeholder="Discord bot token...">
             </div>
-            <div id="chSlackManifestBtnGroup" hidden style="margin-bottom:12px">
-              <button class="btn btn-secondary" id="chSlackManifestBtn" data-i18n="channel.btn.slack_manifest" style="font-size:13px;padding:6px 14px">
-                Slack App létrehozása (manifest)
-              </button>
-              <span id="chSlackManifestHint" style="font-size:12px;color:var(--text-muted);margin-left:8px">
-                Még nincs Slack App-od? Kattints ide!
-              </span>
-            </div>
-            <div class="form-group" id="chSlackAppTokenGroup" hidden>
-              <label for="chSlackAppToken">App-Level Token (xapp-...)</label>
-              <input type="text" id="chSlackAppToken" placeholder="xapp-1-...">
-            </div>
-            <div class="form-group" id="chDiscordChannelIdGroup" hidden>
+            <div class="form-group" id="chDiscordChannelIdGroup">
               <label for="chDiscordChannelId">Discord Channel ID</label>
               <input type="text" id="chDiscordChannelId" placeholder="1234567890123456789">
               <small style="display:block;margin-top:4px;color:var(--text-muted);font-size:12px" data-i18n="agents.channel.discord_channel_hint">Annak a server-csatornának az ID-je, amelyikbe a bot alapból ír. Discord &rarr; jobbklikk a csatornán &rarr; "Copy Channel ID" (Developer Mode kell hozzá).</small>
@@ -3165,21 +3126,21 @@
                   <p style="margin-top:0;"><strong data-i18n="agents.channel.tg_howto_dm_heading">1. Új ember (privát chat) hozzáadása:</strong></p>
                   <ol style="padding-left:20px; margin-top:4px;">
                     <li data-i18n="agents.channel.tg_howto_dm_1">Add meg az illetőnek a bot felhasználónevét (lent látható).</li>
-                    <li data-i18n-html="channel.tg_howto.start_li">Az illető indítsa el a botot a Telegramban (<code>/start</code>) és írjon neki egy üzenetet.</li>
+                    <li data-i18n-html="channel.tg_howto.start_li">Az illető írjon egy DM-et a botnak Discordon.</li>
                     <li data-i18n="agents.channel.tg_howto_dm_3">A bot válaszol egy 6-jegyű párosítási kóddal.</li>
                     <li data-i18n="agents.channel.tg_howto_dm_4">Az illető elküldi neked a kódot, te ide írod be és jóváhagyod.</li>
                   </ol>
-                  <p style="margin-top:10px;"><strong data-i18n="agents.channel.tg_howto_group_heading">2. Telegram csoport hozzáadása:</strong></p>
+                  <p style="margin-top:10px;"><strong data-i18n="agents.channel.tg_howto_group_heading">2. Discord csatorna hozzáadása:</strong></p>
                   <ol style="padding-left:20px; margin-top:4px;">
-                    <li data-i18n-html="channel.tg_howto.group_li">Hívd meg a botot egy meglévő Telegram csoportba (csoport beállítások &rarr; Tagok &rarr; Hozzáadás).</li>
-                    <li data-i18n-html="channel.tg_howto.pair_li">A csoportban írj <code>/pair</code>-t (vagy a bot által megadott parancsot).</li>
-                    <li data-i18n="agents.channel.tg_howto_group_3">Megjelenik egy párosítási kód a csoportban.</li>
-                    <li data-i18n="agents.channel.tg_howto_group_4">Másold be ide és hagyd jóvá. Ezután az ügynök fog tudni írni a csoportba és olvasni a tagok üzeneteit.</li>
+                    <li data-i18n-html="channel.tg_howto.group_li">Hívd meg a botot a Discord szerverre (csatorna jogosultságokkal).</li>
+                    <li data-i18n-html="channel.tg_howto.pair_li">A csatornában vagy beállításoknál használj <code>/discord:access</code> jóváhagyást.</li>
+                    <li data-i18n="agents.channel.tg_howto_group_3">Megjelenik a csatorna vagy párosítási kód a jóváhagyáshoz.</li>
+                    <li data-i18n="agents.channel.tg_howto_group_4">Másold be ide és hagyd jóvá. Ezután az ügynök fog tudni írni a csatornába és olvasni az üzeneteket.</li>
                   </ol>
                   <p style="margin-top:10px; color:var(--muted-foreground);" data-i18n-html="agents.channel.tg_howto_remove"><em>Eltávolításhoz használd a Bekötött chat-ek listájában az X gombot.</em></p>
                 </div>
               </details>
-              <p class="tg-pairing-info" id="chPairingInfo" data-i18n="agents.channel.slack_pairing_desc">Ha valaki ír a botnak, a plugin egy kódot küld neki. Ide írd be a kódot a jóváhagyáshoz.</p>
+              <p class="tg-pairing-info" id="chPairingInfo" data-i18n="agents.channel.pairing_desc">Ha valaki ír a botnak, a plugin egy kódot küld neki. Ide írd be a kódot a jóváhagyáshoz.</p>
               <div class="tg-pending-list" id="chPendingList"></div>
               <div class="form-row" style="gap:8px; align-items:flex-end; margin-top: 12px;">
                 <div class="form-group" style="flex:1; margin-bottom:0">
@@ -3190,11 +3151,6 @@
               </div>
               <button class="btn-secondary btn-compact" id="chRefreshPendingBtn" style="margin-top:10px; font-size:12px;" data-i18n="channel.refresh_pending_btn">Várakozók frissítése</button>
             </div>
-            <div class="tg-allowed-section" id="chRequestSection" hidden>
-              <h4><span data-i18n="agents.channel.requests_heading">Csatorna-kérések</span> <span class="badge badge-warn" id="chRequestBadge" hidden>0</span></h4>
-              <p class="tg-pairing-info" data-i18n="agents.channel.slack_requests_desc">Slack csatornák, amelyekben megemlítették a botot, de még nincsenek engedélyezve.</p>
-              <div id="chRequestList"></div>
-            </div>
             <div class="tg-notice tg-notice-warn" id="chDisconnectedNotice" hidden>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -3204,7 +3160,6 @@
             <div class="tg-connected-actions">
               <button class="btn-secondary" id="chTestBtn" data-i18n="channel.test_btn">Kapcsolat tesztelése</button>
               <button class="btn-secondary" id="chReconnectBtn" hidden data-i18n="channel.reconnect_btn">Channel-MCP újracsatlakoztatása</button>
-              <button class="btn-secondary" id="chSmokeTestBtn" hidden data-i18n="channel.smoke_test_btn">Slack-csatorna smoke-test</button>
               <button class="btn-danger" id="chDisconnectBtn" data-i18n="channel.disconnect_btn">Leválasztás</button>
             </div>
           </div>
@@ -3255,7 +3210,7 @@
               <input type="checkbox" id="editTeamAutoDelegation">
               <span data-i18n="agents.team.auto_delegation">Autodelegálás: a vezető maga szétbontja és kiosztja a feladatot</span>
             </label>
-            <small style="display:block;margin-top:6px;color:var(--text-muted);font-size:12px" data-i18n="agents.team.auto_approve_hint">Ha nincs bepipálva, a vezető csak javaslatot ad, te hagyod jóvá Telegramon.</small>
+            <small style="display:block;margin-top:6px;color:var(--text-muted);font-size:12px" data-i18n="agents.team.auto_approve_hint">Ha nincs bepipálva, a vezető csak javaslatot ad, te hagyod jóvá Discordon.</small>
           </div>
           <div class="form-group" id="editTeamTrustFromGroup">
             <label data-i18n="agents.team.trusted_label">Explicit megbízható kapcsolatok (opcionális)</label>
@@ -3679,42 +3634,6 @@
           <label data-i18n="clitools.field.readme">README (részlet)</label>
           <pre id="cliToolDetailReadme" style="white-space:pre-wrap;font-family:monospace;font-size:12px;margin:0;max-height:240px;overflow:auto"></pre>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Csatorna-kérés jóváhagyása -->
-  <div class="modal-overlay" id="chApproveModalOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chApproveModalTitle">
-    <div class="modal" style="max-width:420px">
-      <div class="modal-header">
-        <h2 id="chApproveModalTitle" data-i18n="channel.approve.title">Csatorna engedélyezése</h2>
-        <button class="modal-close" id="chApproveModalClose">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p id="chApproveModalDesc" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;"></p>
-        <div class="form-group" style="margin-bottom:14px;">
-          <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:12px;">
-            <span style="font-size:13px;line-height:1.4;"><strong data-i18n="channel.approve.mode1_title">Csak @-tageléskor figyeljen</strong><br>
-              <span style="color:var(--text-muted);font-size:12px;" data-i18n="channel.approve.mode1_desc">Az ügynök csak @-tagelt üzenetekre reagál</span>
-            </span>
-            <input type="checkbox" id="chApproveRequireMention" checked style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;">
-          </label>
-        </div>
-        <div class="form-group" style="margin-bottom:4px;">
-          <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:12px;">
-            <span style="font-size:13px;line-height:1.4;"><strong data-i18n="channel.approve.mode2_title">Bárkitől fogadjon</strong><br>
-              <span style="color:var(--text-muted);font-size:12px;" data-i18n="channel.approve.mode2_desc">Ha ki van kapcsolva, csak a kérést indító felhasználótól fogad</span>
-            </span>
-            <input type="checkbox" id="chApproveAllowFromAll" style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;">
-          </label>
-        </div>
-      </div>
-      <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="btn-secondary" id="chApproveModalCancel" data-i18n="common.btn.cancel">Mégse</button>
-        <button class="btn-primary btn-compact" id="chApproveModalConfirm">
-          <span class="btn-text" data-i18n="common.btn.approve">Jóváhagyás</span>
-          <span class="btn-loading" hidden><span class="spinner"></span></span>
-        </button>
       </div>
     </div>
   </div>

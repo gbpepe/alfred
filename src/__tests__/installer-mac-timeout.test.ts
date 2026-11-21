@@ -22,7 +22,7 @@ function sliceFn(src: string, name: string): string {
 const FN = sliceFn(MAC, '_mac_timeout')
 // The test builds its OWN PATH: a temp bin with only the tools the test commands use (sleep, touch). /usr/bin:/bin
 // is not enough, because a Linux CI runner has coreutils' timeout there and the perl branch would never run
-// (Marveen 73635, CI run 42499677634). The perl branch itself calls /usr/bin/perl by absolute path.
+// (Alfred 73635, CI run 42499677634). The perl branch itself calls /usr/bin/perl by absolute path.
 const TEST_BIN = mkdtempSync(join(tmpdir(), 'mac-to-bin-'))
 for (const tool of ['sleep', 'touch']) {
   const at = spawnSync('/bin/sh', ['-c', `command -v ${tool}`], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' } }).stdout.trim()

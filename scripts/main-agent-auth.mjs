@@ -23,7 +23,7 @@ import { fstatSync, writeSync } from 'node:fs'
 
 // The vault and logger modules must stay quiet and must not migrate the vault key here (vault-resolve.mjs:44-53).
 process.env.LOG_LEVEL = 'silent'
-process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION = '1'
+process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION = '1'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = join(__dirname, '..')

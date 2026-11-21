@@ -4,7 +4,7 @@
 // Note text is always rendered with textContent, never as HTML.
 (function () {
   'use strict'
-  var TOKEN_KEY = 'marveen-dashboard-token'
+  var TOKEN_KEY = 'alfred-dashboard-token'
   var PAGE_VERSION = '1.0.0'
   var $ = function (id) { return document.getElementById(id) }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ClaudeClaw fleet helper - shared, deterministic plumbing so agents don't burn
+Alfred fleet helper - shared, deterministic plumbing so agents don't burn
 tokens hand-rolling curl/SQL/escaping in the model.
 
 Covers: dashboard API auth (token always read from store/.dashboard-token, never
@@ -49,7 +49,7 @@ def token():
 
 
 def db_path():
-    return os.path.join(project_dir(), "store", "claudeclaw.db")
+    return os.path.join(project_dir(), "store", "alfred.db")
 
 
 def api(method, path, payload=None, timeout=20, want_headers=False):

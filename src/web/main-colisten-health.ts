@@ -1,12 +1,12 @@
 // BOOTSTAGGER1007 (b): the main session's CO-LISTEN channel plugins
 // (CHANNEL_PLUGINS_EXTRA) are watched too, not only the primary provider.
 //
-// MEASURED 2026-10-07 after a power cut: the co-listen Slack plugin's MCP
-// connect timed out at boot ("getaddrinfo ENOTFOUND slack.com"), and the
-// owner's main channel stayed deaf for 30 minutes. Every monitor watched only
-// the primary (Telegram), which was fine, so nothing alerted (channel-monitor's
-// own comment on readExtraChannelPluginIds names the gap: "Liveness probes
-// watch the primary, so nothing looks wrong").
+// MEASURED 2026-10-07 after a power cut: a co-listen plugin's MCP connect
+// timed out at boot ("getaddrinfo ENOTFOUND ..."), and the extra channel stayed
+// deaf for 30 minutes. Every monitor watched only the primary channel, which
+// was fine, so nothing alerted (channel-monitor's own comment on
+// readExtraChannelPluginIds names the gap: "Liveness probes watch the
+// primary, so nothing looks wrong").
 //
 // What is measured: the same per-provider process probe the primary uses
 // (probeChannelPluginLiveness: the provider's plugin process under the main

@@ -35,7 +35,7 @@ between settings files will not do it, because the main agent's settings file
 IS the global one.
 
 Identity comes from ledger_lib.agent_id_from_payload (LEDGERCWD828 / #1100):
-the session transcript path first, then MARVEEN_AGENT_ID, then cwd. The
+the session transcript path first, then ALFRED_AGENT_ID, then cwd. The
 transcript path is fixed when the session starts, so an agent that later cds
 into another repo (devy working in molyo) still logs under its own name --
 measured 2026-08-29, both branches.
@@ -172,7 +172,7 @@ def _success_from_payload(payload: dict) -> bool:
 
 
 def _read_payload():
-    """stdin through hook_switches (MARVEEN_DISABLED_HOOKS + input size cap).
+    """stdin through hook_switches (ALFRED_DISABLED_HOOKS + input size cap).
 
     Returns None to skip the call: disabled by env, or an oversize payload
     (pure logging, so both fail open). Without the helper: previous behaviour.

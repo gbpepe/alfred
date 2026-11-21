@@ -12,7 +12,7 @@
 #      command (the --key and --fp values are believed only after that);
 #   4. the connection (the nearest sshd ancestor) is younger than 60 minutes;
 #   5. the narrow token is there and has its exact shape;
-#   6. marveen.io answers the access check with a complete, canonical yes for
+#   6. alfred.io answers the access check with a complete, canonical yes for
 #      THIS key (v1 schema, the body matched whole, never parsed);
 #   7. the subcommand is on the closed list, with no free argument, or it is
 #      `run <text>` (v8) and the support line carries consent 2 or later.
@@ -24,7 +24,7 @@
 # from the client). It is logged BEFORE it starts (redacted, escaped, cut), and
 # again when it ends with the exit code, the duration and the byte counts of
 # stdin, stdout and stderr; the output itself is never stored. It stops at the
-# 60-minute mark of the connection, when marveen.io no longer says yes (asked
+# 60-minute mark of the connection, when alfred.io no longer says yes (asked
 # every minute), and at once when support is switched off here (the token or
 # this run's file in the run folder is gone).
 #
@@ -45,7 +45,7 @@ IFS='
 set -f
 umask 077
 
-ACCESS_CHECK_URL='https://api.marveen.io/support/v1/access-check'
+ACCESS_CHECK_URL='https://api.alfred.io/support/v1/access-check'
 MAX_CONNECTION_AGE_S=3600
 RECHECK_EVERY_S=60
 CAP_DEFAULT_S=30
@@ -224,12 +224,12 @@ case $SELF in
 esac
 KIT_DIR=${SELF%/support-dispatch.sh}
 SUPPORT_DIR=${KIT_DIR%/kit}
-HOME_DIR=${SUPPORT_DIR%/.marveen/support}
+HOME_DIR=${SUPPORT_DIR%/.alfred/support}
 case $HOME_DIR in
   /* ) ;;
   *) refuse bad_path ;;
 esac
-[ "$HOME_DIR/.marveen/support" = "$SUPPORT_DIR" ] || refuse bad_path
+[ "$HOME_DIR/.alfred/support" = "$SUPPORT_DIR" ] || refuse bad_path
 SPOOL=$SUPPORT_DIR/support-access.spool
 RUN_DIR=$SUPPORT_DIR/support-access.run
 for _d in "$SUPPORT_DIR" "$KIT_DIR"; do
@@ -269,7 +269,7 @@ case $_size in '' | *[!0-9]*) refuse kit_missing ;; esac
 INSTALL_ROOT= NODE_PATH= RELEASE= _header=0
 while IFS= read -r _line; do
   case $_line in
-    'marveen-support-kit 1') _header=1 ;;
+    'alfred-support-kit 1') _header=1 ;;
     'install-root '*) INSTALL_ROOT=${_line#install-root } ;;
     'node '*) NODE_PATH=${_line#node } ;;
     'release '*) RELEASE=${_line#release } ;;
@@ -301,7 +301,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 1' HUP INT TERM
 
-# Ask marveen.io. Prints nothing; sets CHECK_CODE and CHECK_BODY. Returns 0 only for a canonical body with HTTP 200.
+# Ask alfred.io. Prints nothing; sets CHECK_CODE and CHECK_BODY. Returns 0 only for a canonical body with HTTP 200.
 access_check() {
   CHECK_CODE= CHECK_BODY=
   [ -f "$TOKEN_FILE" ] && [ ! -L "$TOKEN_FILE" ] || return 2
@@ -347,7 +347,7 @@ body_allows_me() {
 }
 
 if [ "$PROBE" -eq 1 ]; then
-  # The enable self-probe: does the gate reach marveen.io with this token? It never opens anything.
+  # The enable self-probe: does the gate reach alfred.io with this token? It never opens anything.
   if access_check; then
     printf 'probe=reached\n'
     log_event probe reached
@@ -365,7 +365,7 @@ fi
 KEYS_FILE=$HOME_DIR/.ssh/authorized_keys
 [ -f "$KEYS_FILE" ] || refuse own_line_missing
 PREFIX='restrict,command="/bin/sh '$SELF' --key '$KEY' --fp '$FP' --grant '$GRANT' --consent '$CONSENT'",from="'
-SUFFIX=' marveen-support:'$GRANT':'$KEY
+SUFFIX=' alfred-support:'$GRANT':'$KEY
 _count=0
 while IFS= read -r _line || [ -n "$_line" ]; do
   case $_line in
@@ -415,7 +415,7 @@ _et=$(ps -o etime= -p "$SSHD_PID" 2>/dev/null | tr -d ' ')
 AGE_S=$(etime_seconds "$_et") || refuse connection_unknown
 [ "$AGE_S" -le "$MAX_CONNECTION_AGE_S" ] || refuse connection_too_old
 
-# --- 5 and 6. token and the yes from marveen.io -------------------------------------
+# --- 5 and 6. token and the yes from alfred.io -------------------------------------
 
 access_check
 case $? in
@@ -545,11 +545,11 @@ sub_versions() {
 sub_units() {
   case $(uname -s) in
     Linux)
-      env -i PATH="$PATH" XDG_RUNTIME_DIR="/run/user/$(id -u)" systemctl --user list-units --all --no-legend --plain 'marveen*' 2>/dev/null \
+      env -i PATH="$PATH" XDG_RUNTIME_DIR="/run/user/$(id -u)" systemctl --user list-units --all --no-legend --plain 'alfred*' 2>/dev/null \
         | awk '{print $1, $2, $3, $4}' | grep -E '^[A-Za-z0-9._@-]+ ' | redact
       ;;
     Darwin)
-      launchctl list 2>/dev/null | awk '{print $3, $1, $2}' | grep -E '^[A-Za-z0-9._-]*marveen[A-Za-z0-9._-]* ' | redact
+      launchctl list 2>/dev/null | awk '{print $3, $1, $2}' | grep -E '^[A-Za-z0-9._-]*alfred[A-Za-z0-9._-]* ' | redact
       ;;
     *) printf 'units=unknown_platform\n' ;;
   esac
@@ -854,7 +854,7 @@ run_main() {
 
 [ "$SUB" = run ] && run_main
 
-# Run the subcommand in the background under a hard cap, asking marveen.io again every minute.
+# Run the subcommand in the background under a hard cap, asking alfred.io again every minute.
 case $SUB in
   status) sub_status & ;;
   versions) sub_versions & ;;

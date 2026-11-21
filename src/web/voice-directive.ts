@@ -6,7 +6,7 @@ import { STORE_DIR, WEB_PORT } from '../config.js'
 import { AGENTS_BASE_DIR } from './agent-config.js'
 import { channelStateDir, type ChannelProviderType } from '../channel-provider.js'
 
-const KNOWN_PROVIDERS = new Set<string>(['telegram', 'slack', 'discord', 'googlechat', 'teams'])
+const KNOWN_PROVIDERS = new Set<string>(['discord'])
 
 // Resolve the directory where an agent's channel plugin stores its bot .env.
 // Search order:
@@ -28,7 +28,7 @@ export function resolveAgentChannelStateDir(agentId: string, provider: string): 
 
 // Which inbound attachment kinds are actually audio.
 //
-// The channel tag carries attachment_kind, and the Telegram plugin uses it for
+// The channel tag carries attachment_kind, and the channel plugin uses it for
 // EVERY attachment type -- "document", "photo" and so on, not just audio. The
 // directive endpoint used to decide "was this a voice message?" from the mere
 // PRESENCE of an attachment_file_id, so sending a PDF to an agent in `auto`
@@ -52,7 +52,7 @@ function shellSingleQuote(s: string): string {
 }
 
 export const TTS_TEXT_PLACEHOLDER = 'A_VÁLASZOD_SZÖVEGE'
-export const TTS_HEREDOC_END_PREFIX = 'MARVEEN_TTS_END_'
+export const TTS_HEREDOC_END_PREFIX = 'ALFRED_TTS_END_'
 
 // The heredoc's end marker, NEW for every directive. A fixed marker is known in advance:
 // a reply line equal to it would end the body there, and the reply's further lines would

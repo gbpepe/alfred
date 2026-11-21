@@ -67,7 +67,7 @@ describe('upgradeRetiredHookPrompts', () => {
   })
 
   it('a retired entry the #2338 pass already rewrote still migrates', () => {
-    // The ~/ClaudeClaw-era prompt (b8e4ff8e6) as #2338's pass leaves it: its curl lines are
+    // The ~/Alfred-era prompt (b8e4ff8e6) as #2338's pass leaves it: its curl lines are
     // helper lines, the rest is the old prompt, so it equals no entry as shipped.
     const b8 = fixture('precompact-prompt-b8e4ff8e6.txt')
     const rewritten = afterHelperPass(b8)
@@ -186,7 +186,7 @@ describe('ensureAgentHooks migrates a stock PreCompact prompt', () => {
 
   // Dani 65499/1, Samu 65501: a prompt someone rewrote by hand is not replaced; only the exact shipped lines move on.
   it('a prompt written by hand, with no shipped line in it, stays byte for byte', () => {
-    const own = 'A saját PreCompact szövegem.\n\nMentsd, amit fontosnak tartasz, a saját fájljaidból:\n  bash /x/marveen-api.sh memory-save SAJAT_NEVED warm "k" sajat-memoria.txt'
+    const own = 'A saját PreCompact szövegem.\n\nMentsd, amit fontosnak tartasz, a saját fájljaidból:\n  bash /x/alfred-api.sh memory-save SAJAT_NEVED warm "k" sajat-memoria.txt'
     write(own)
     ensureAgentHooks(PROBE, scopes())
     expect(read()).toBe(own)
@@ -290,12 +290,12 @@ describe('ensureAgentHooks migrates a stock PreCompact prompt', () => {
   })
 
   it('a prompt the helper pass turns into a retired one converges in the same start', () => {
-    // The last curl prompt with the ~/ClaudeClaw token path: no retired entry as it is, but
+    // The last curl prompt with the ~/Alfred token path: no retired entry as it is, but
     // the helper pass makes it the prompt #2340 shipped. Without the second retired-list pass
     // after the helper pass it would stop there until the next start.
     const pre = fixture('precompact-prompt-pre2338.txt')
     expect(pre).toContain('{{PROJECT_ROOT}}/store/.dashboard-token')
-    const old = resolveTemplatePlaceholders(pre.split('{{PROJECT_ROOT}}/store/.dashboard-token').join('~/ClaudeClaw/store/.dashboard-token'))
+    const old = resolveTemplatePlaceholders(pre.split('{{PROJECT_ROOT}}/store/.dashboard-token').join('~/Alfred/store/.dashboard-token'))
     expect(RETIRED.PreCompact).not.toContain(old)
     expect(RETIRED.PreCompact.map(afterHelperPass)).not.toContain(old)
     expect(afterHelperPass(old)).toBe(afterHelperPass(resolveTemplatePlaceholders(fixture('precompact-prompt-2340.txt'))))

@@ -8,7 +8,7 @@ import { getIgnoredEnvKeys, getOverridesFileState, getOverridesOnlyKeys, onOverr
 // ENVRELAXGATE1104 step 2: the two states of the settings layer the owner must SEE, because each one silently changes
 // a security control.
 //  1. A .env line that the overrides-only rule ignores (it would loosen a security key). Named in the boot log, the
-//     update output and the Settings page; never on Slack (Dani 67934: the very key ignored may be the notice target).
+//     update output and the Settings page; never sent to external targets before delivery verification (Dani 67934: the very key ignored may be the notice target).
 //  2. An unreadable config-overrides.json. Every override drops out, a TIGHTENING one too (e.g. VAULT_ACL_MODE=enforce
 //     saved on the dashboard), so this is a security step back. Boot log, the Settings page, and ONE owner notice per
 //     state change (Samu 67962), recorded in a store file so a restart does not repeat it.

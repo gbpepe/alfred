@@ -223,14 +223,14 @@ describe('token provisioning (ensureAgentToken)', () => {
     expect(dashboardTokenPathFor(AGENT, base, false)).toBe(mainTokenPath())
   })
 
-  // VOICETOKENLEAK1101 PR-A0: scripts/marveen-api.sh reads MARVEEN_TOKEN_FILE, else the SHARED token. The launch
+  // VOICETOKENLEAK1101 PR-A0: scripts/alfred-api.sh reads ALFRED_TOKEN_FILE, else the SHARED token. The launch
   // command points it at the agent's own token exactly when its curl recipes would have used that one.
   it('helperTokenEnv: the own token path when the agent has one, else unset (never the shared token by inheritance)', () => {
     const q = (x: string) => `'${x}'`
-    expect(helperTokenEnv(AGENT, q, base, true)).toBe(`export MARVEEN_TOKEN_FILE='${agentTokenPath(AGENT, base)}' && `)
-    expect(helperTokenEnv(MAIN_AGENT_ID, q, base, true)).toBe('unset MARVEEN_TOKEN_FILE && ')
+    expect(helperTokenEnv(AGENT, q, base, true)).toBe(`export ALFRED_TOKEN_FILE='${agentTokenPath(AGENT, base)}' && `)
+    expect(helperTokenEnv(MAIN_AGENT_ID, q, base, true)).toBe('unset ALFRED_TOKEN_FILE && ')
     mkdirSync(join(base, 'gamma'), { recursive: true })
-    expect(helperTokenEnv('gamma', q, base, true)).toBe('unset MARVEEN_TOKEN_FILE && ')
+    expect(helperTokenEnv('gamma', q, base, true)).toBe('unset ALFRED_TOKEN_FILE && ')
     // the path the helper is pointed at is the same one the agent's curl recipes used
     for (const name of [AGENT, 'gamma']) {
       const env = helperTokenEnv(name, q, base, true)
@@ -259,7 +259,7 @@ describe('token provisioning (ensureAgentToken)', () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined as never)
     try {
       mkdirSync(join(base, 'delta'), { recursive: true })
-      expect(helperTokenEnv('delta', (x) => `'${x}'`, base, true)).toBe('unset MARVEEN_TOKEN_FILE && ')
+      expect(helperTokenEnv('delta', (x) => `'${x}'`, base, true)).toBe('unset ALFRED_TOKEN_FILE && ')
       expect(warn).toHaveBeenCalledTimes(1)
       expect(String(warn.mock.calls[0][1])).toMatch(/no own token file.*SHARED token/)
       warn.mockClear()
@@ -1133,7 +1133,7 @@ describe('allowlist coverage and the measured replay', () => {
       // the owner's ids (calendar, Slack/Telegram user, Drive folder); invites: live invite tokens; the rest are writes.
       ['GET', '/api/settings'], ['GET', '/api/agents/samu/channels/slack/invites'], ['GET', '/api/gromzo/agents'],
       ['POST', '/api/claude-plans'], ['POST', '/api/claude-plans/rotate'], ['GET', '/api/claude-plans/plan-a'],
-      ['POST', '/api/agents/marveen/restart'], ['POST', '/api/skills'], ['POST', '/api/skills/propose/x'], ['POST', '/api/updates'],
+      ['POST', '/api/agents/alfred/restart'], ['POST', '/api/skills'], ['POST', '/api/skills/propose/x'], ['POST', '/api/updates'],
       ['GET', '/api/updates/status'], ['GET', '/api/claude-plans/state/x'],
     ]
     for (const [m, p] of outside) {

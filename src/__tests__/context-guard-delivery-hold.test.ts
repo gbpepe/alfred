@@ -15,7 +15,7 @@ const STORE = join(ROOT, 'store')
 
 vi.mock('../config.js', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
   PROJECT_ROOT: ROOT,
 }))
 const warn = vi.hoisted(() => vi.fn())
@@ -63,9 +63,9 @@ vi.mock('../web/system-directive.js', () => ({
   },
 }))
 vi.mock('../web/channel-monitor.js', () => ({
-  hardRestartMarveenChannels: () => ({ ok: true }),
+  hardRestartAlfredChannels: () => ({ ok: true }),
   lastMainRespawnAt: () => null,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 0,
+  ALFRED_POST_RESPAWN_GRACE_MS: 0,
   markAgentRestartPending: () => {},
 }))
 vi.mock('../web/stuck-tool-call-watcher.js', () => ({ shouldDeferForRecentRespawn: () => false }))
@@ -85,7 +85,7 @@ vi.mock('../web/active-model.js', () => ({
   readTranscriptTailFromProjectDir: () => null,
   readLastTurnActivityMs: () => null,
 }))
-vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'marveen-channels' }))
+vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'alfred-channels' }))
 vi.mock('../notify.js', () => ({ notifyChannel: async () => {} }))
 vi.mock('../db.js', () => ({
   createAgentMessage: (_from: string, _to: string, content: string, tag?: string) => {

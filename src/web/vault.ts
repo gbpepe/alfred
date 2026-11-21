@@ -78,7 +78,7 @@ function keyOpensVault(master: Buffer): boolean {
 // process that loads this module (dashboard, rotation check, setup, the vault scripts). It is read on every key
 // request, so a change in .env takes effect without a restart. Why it exists: with the default store a locked
 // login Keychain stops every decrypt in the dashboard (VaultKeyError "did not answer"), and the only switch that
-// kept the file key, MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION, is read from process.env alone, which .env never reaches
+// kept the file key, ALFRED_VAULT_NO_KEYCHAIN_MIGRATION, is read from process.env alone, which .env never reaches
 // (readEnvFile does not export), so on the dashboard it could only be set in the launchd plist the installer rewrites.
 // On a single-user install the Keychain item is no stronger a boundary than a 0600 file: the same user reads both.
 // Any other value (unset, empty, "keychain") keeps today's behaviour.
@@ -177,12 +177,12 @@ function getMasterKey(): Buffer {
       // LaunchDaemon), where `security` runs into its timeout on EVERY call and the failure line would corrupt that
       // stdout. They set this switch and use the file key as is; the migration belongs to the dashboard process.
       // The key check above has already run, so a wrong key still fails closed.
-      if (process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION === '1') {
+      if (process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION === '1') {
         // Once per process, at WARN: if this variable ever reaches the DASHBOARD process by mistake, the migration would
         // silently never happen -- a stricter operator LOG_LEVEL (warn) must not hide that. It names the variable, never a key value.
         if (!noMigrationNoticeLogged) {
           noMigrationNoticeLogged = true
-          logger.warn('MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION=1: the Keychain migration of the vault master key is skipped in this process')
+          logger.warn('ALFRED_VAULT_NO_KEYCHAIN_MIGRATION=1: the Keychain migration of the vault master key is skipped in this process')
         }
         return fileKeyBuf
       }

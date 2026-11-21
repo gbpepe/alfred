@@ -1467,9 +1467,9 @@ export const SECURITY_SQL_WRITE_RX = new RegExp(
 // stay allowed (a worker reads the board with sqlite3 SELECT); a FILE-level
 // write -- a redirect onto it, cp/mv/tee/dd/rm/ln/... naming it, or a sqlite3
 // dot-command that replaces or runs files -- is denied (dbSegmentWrites).
-const DASHBOARD_DB_REF_RX = /claudeclaw\.db(?:-wal|-shm|-journal)?(?![\w.-])/i
-const GLOB_TARGETS = [SCHEDULE_DIR_NAME, 'schedules', 'api', ...STORE_PARENTS, ...SCHEDULE_CLI_NAMES, 'claudeclaw.db']
-const FILE_GLOB_TARGETS = new Set([...SCHEDULE_CLI_NAMES, 'claudeclaw.db'])
+const DASHBOARD_DB_REF_RX = /alfred\.db(?:-wal|-shm|-journal)?(?![\w.-])/i
+const GLOB_TARGETS = [SCHEDULE_DIR_NAME, 'schedules', 'api', ...STORE_PARENTS, ...SCHEDULE_CLI_NAMES, 'alfred.db']
+const FILE_GLOB_TARGETS = new Set([...SCHEDULE_CLI_NAMES, 'alfred.db'])
 // Brace expansion is enumerated up to this many words; beyond it, a word that
 // could still spell a reference is treated as one (fail closed).
 const BRACE_EXPANSION_CAP = 1024
@@ -1668,7 +1668,7 @@ function globRefs(text, opts) {
     if (!/[*?[\]{}]/.test(word)) continue
     const flat = word.replace(/[{},]/g, '').toLowerCase()
     // a glob character can stand for any letters, so then always enumerate
-    const mayBrace = /[*?[]/.test(word) || ['schedules', 'scheduled-tasks', 'schedule-registry', 'claudeclaw.db'].some((t) => isSubsequence(t, flat))
+    const mayBrace = /[*?[]/.test(word) || ['schedules', 'scheduled-tasks', 'schedule-registry', 'alfred.db'].some((t) => isSubsequence(t, flat))
     const exps = /[{}]/.test(word) ? (mayBrace ? expandBraces(word, BRACE_EXPANSION_CAP) : [word.replace(/[{}]/g, '')]) : [word]
     if (!exps) return { api: true, dir: true, cli: true, db: true } // too many expansions to prove harmless
     for (const e of exps) {
@@ -4364,7 +4364,7 @@ const GATE_MSG =
   '<repo>/store/.dashboard-token, vagy a sajat <repo>/agents/<nev>/.dashboard-token utja -- relativ ut, ~ vagy ' +
   '$HOME nem), se ~/.claude/scheduled-tasks/ iras (olvasni ls/cat/grep/sed -n lehet, ' +
   'de NE cd-vel a store-ba -- abszolut uttal hivatkozz ra), se schedule-registry-cli register/unregister ' +
-  '(csak status es verify), se utemezes-tabla SQL-iras vagy a claudeclaw.db fajl felulirasa, ' +
+  '(csak status es verify), se utemezes-tabla SQL-iras vagy a alfred.db fajl felulirasa, ' +
   'se /loop self-pace. ' +
   'Kivetel: hosszu tesztfutashoz EGYETLEN azonnali, idozito nelkuli `systemd-run --user --collect -p RuntimeMaxSec=<1..7200> [--unit=NEV] <parancs>` megengedett, onallo parancskent (--on-*/--timer-property, -E/--setenv/Environment=, claude, utemezo, tmux, sleep es /api/ nelkul). ' +
   'Ha csak egy dokumentumot irsz, ami az utemezo API-t vagy a store-t emliti ' +

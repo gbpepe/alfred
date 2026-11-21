@@ -21,7 +21,7 @@
 # The whole scenario runs once per daemon branch -- [Linux] systemd units,
 # [Darwin] launchd plists -- on whatever platform the suite runs on.
 #
-# Hermetic: temp HOME, temp .env via MARVEEN_ENV_FILE (the installers' test
+# Hermetic: temp HOME, temp .env via ALFRED_ENV_FILE (the installers' test
 # hook), and EVERY installer run goes through run_installer, which puts PATH
 # shims for launchctl / systemctl / pidof in front. Both service managers act
 # on the real user domain whatever $HOME says: unshimmed, this suite registered
@@ -50,7 +50,7 @@ SCRIPTS="$REPO_ROOT/scripts"
 
 # Belt under the shims: `systemctl --user` talks to the real user manager
 # regardless of $HOME, so leave it no reachable manager either.
-export DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent-marveen-test"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent-alfred-test"
 export XDG_RUNTIME_DIR="$TMP/run"
 mkdir -p "$XDG_RUNTIME_DIR"
 
@@ -76,7 +76,7 @@ if [ -x /bin/bash ]; then SYS_BASH=/bin/bash; else SYS_BASH="$(command -v bash)"
 # runs an installer. PLAT (Linux|Darwin, set by the scenario loop) picks the
 # daemon branch.
 run_installer() {
-  HOME="$2" MARVEEN_ENV_FILE="$3" PATH="$SHIM_BIN:$PATH" FAKE_UNAME="$PLAT" \
+  HOME="$2" ALFRED_ENV_FILE="$3" PATH="$SHIM_BIN:$PATH" FAKE_UNAME="$PLAT" \
     "$SYS_BASH" "$1" >/dev/null 2>&1
 }
 

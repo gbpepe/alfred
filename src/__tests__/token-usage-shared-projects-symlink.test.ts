@@ -13,10 +13,10 @@ import { join } from 'node:path'
 const FIXTURE = mkdtempSync(join(tmpdir(), 'token-usage-symlink-'))
 const HOME = join(FIXTURE, 'home')
 const SHARED_PROJECTS = join(HOME, '.claude', 'projects')
-const PROJECT_ROOT = '/Users/x/marveen'
-const MAIN_DIR = join(SHARED_PROJECTS, '-Users-x-marveen')
-const ALPHA_DIR = join(SHARED_PROJECTS, '-Users-x-marveen-agents-alpha')
-const BETA_DIR = join(SHARED_PROJECTS, '-Users-x-marveen-agents-beta')
+const PROJECT_ROOT = '/Users/x/alfred'
+const MAIN_DIR = join(SHARED_PROJECTS, '-Users-x-alfred')
+const ALPHA_DIR = join(SHARED_PROJECTS, '-Users-x-alfred-agents-alpha')
+const BETA_DIR = join(SHARED_PROJECTS, '-Users-x-alfred-agents-beta')
 
 vi.mock('node:os', async () => {
   const actual = await vi.importActual<typeof import('node:os')>('node:os')
@@ -34,7 +34,7 @@ process.env.HOME = HOME
 
 vi.mock('../config.js', async () => {
   const actual = await vi.importActual<typeof import('../config.js')>('../config.js')
-  return { ...actual, MAIN_AGENT_ID: 'marveen', PROJECT_ROOT }
+  return { ...actual, MAIN_AGENT_ID: 'alfred', PROJECT_ROOT }
 })
 
 vi.mock('../logger.js', () => ({
@@ -73,7 +73,7 @@ describe('discoverAgentSources with a symlinked isolated projects dir', () => {
       [
         ['alpha', ALPHA_DIR],
         ['beta', BETA_DIR],
-        ['marveen', MAIN_DIR],
+        ['alfred', MAIN_DIR],
       ].sort(),
     )
   })

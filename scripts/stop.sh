@@ -7,7 +7,7 @@ if [ -f "$INSTALL_DIR/.env" ]; then
   SLUG="$(grep -E '^MAIN_AGENT_ID=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2-)"
   BOT_NAME="$(grep -E '^BOT_NAME=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2-)"
 fi
-SLUG="${SLUG:-marveen}"
+SLUG="${SLUG:-alfred}"
 # Unit name: SERVICE_ID, else MAIN_AGENT_ID, with a fallback to existing units (see the helper).
 # The tmux session name stays on SLUG.
 # shellcheck source=resolve-unit-id.sh
@@ -17,11 +17,11 @@ else
   UNIT_ID="$SLUG"  # helper missing (partial copy): the pre-SERVICE_ID behaviour
 fi
 
-MARVEEN_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
+ALFRED_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
 # shellcheck source=../install-lang.sh
 source "${INSTALL_DIR}/install-lang.sh"
 
-echo "${BOT_NAME:-Marveen} $(_t stop.stopping)"
+echo "${BOT_NAME:-Alfred} $(_t stop.stopping)"
 OS="$(uname -s)"
 if [ "$OS" = "Darwin" ]; then
   launchctl unload "$HOME/Library/LaunchAgents/com.${UNIT_ID}.dashboard.plist" 2>/dev/null
@@ -88,4 +88,4 @@ fi
 # update seamless for the operator.
 tmux kill-session -t "=${SLUG}-channels:" 2>/dev/null || true
 
-echo "✓ ${BOT_NAME:-Marveen} $(_t stop.stopped)"
+echo "✓ ${BOT_NAME:-Alfred} $(_t stop.stopped)"

@@ -44,7 +44,7 @@ echo "===================================================="
 FAKE="$TMP/repo"
 mkdir -p "$FAKE/scripts" "$FAKE/store"
 cp "$SCRIPT" "$FAKE/scripts/"
-oracle_exec "$FAKE/store/claudeclaw.db" "CREATE TABLE t(a); INSERT INTO t VALUES (1);"
+oracle_exec "$FAKE/store/alfred.db" "CREATE TABLE t(a); INSERT INTO t VALUES (1);"
 printf '#!/bin/bash\necho proba\n' > "$FAKE/scripts/sajat.sh"
 chmod +x "$FAKE/scripts/sajat.sh"
 printf 'scripts/sajat.sh\n' > "$FAKE/store/personal-scripts.txt"
@@ -107,7 +107,7 @@ OUT="$(PATH="$STUB" /usr/bin/env bash "$FAKE/scripts/pre-modify-backup.sh" kontr
 # a failed backup, and collapsing the two would trade one silent failure for a
 # louder but equally wrong one.
 SNAP="$(ls -1dt "$FAKE/store/backups"/*/ 2>/dev/null | head -1)"
-assert_eq "the snapshot is still written" "yes" "$([ -f "$SNAP/claudeclaw.db" ] && echo yes || echo no)"
+assert_eq "the snapshot is still written" "yes" "$([ -f "$SNAP/alfred.db" ] && echo yes || echo no)"
 assert_not_contains "it does NOT report a clean run" "$OUT" "backup ok"
 assert_contains "it says the manifest is incomplete" "$OUT" "backup INCOMPLETE"
 assert_contains "and names the missing tool" "$OUT" "no checksum tool found"
@@ -151,7 +151,7 @@ rm -rf "$FAKE/store/backups"
 OUT="$(PATH="$SHIM" "$SHIM/bash" "$FAKE/scripts/pre-modify-backup.sh" nosqlite 2>&1)"; RC=$?
 SNAP="$(ls -1dt "$FAKE/store/backups"/*/ 2>/dev/null | head -1)"
 assert_eq "exit 0: a raw copy IS a recoverable snapshot" "0" "$RC"
-ROWS="$(oracle_query "${SNAP}claudeclaw.db" "SELECT count(*) FROM t" 2>/dev/null)"
+ROWS="$(oracle_query "${SNAP}alfred.db" "SELECT count(*) FROM t" 2>/dev/null)"
 assert_eq "the snapshot holds a readable copy of the db (row count)" "1" "$ROWS"
 assert_contains "the run says it is NOT a consistent snapshot" "$OUT" "WARNING no consistent snapshot"
 assert_contains "and the closing line names the db mode" "$OUT" "db: raw db+wal+shm copy"
@@ -166,16 +166,16 @@ for i in 01 02 03 04 05 06 07 08 09 10; do
   mkdir -p "$FAKE/store/backups/20000101-0000$i-old"
   touch -t "200001010000.$i" "$FAKE/store/backups/20000101-0000$i-old"
 done
-chmod 000 "$FAKE/store/claudeclaw.db"
-if [ -r "$FAKE/store/claudeclaw.db" ]; then
-  chmod 644 "$FAKE/store/claudeclaw.db"
+chmod 000 "$FAKE/store/alfred.db"
+if [ -r "$FAKE/store/alfred.db" ]; then
+  chmod 644 "$FAKE/store/alfred.db"
   echo "  SKIP: running as root, an unreadable db cannot be produced -- case (4) NOT measured"
 else
   OUT="$(PATH="$SHIM" "$SHIM/bash" "$FAKE/scripts/pre-modify-backup.sh" unreadable 2>&1)"; RC=$?
-  chmod 644 "$FAKE/store/claudeclaw.db"
+  chmod 644 "$FAKE/store/alfred.db"
   assert_eq "exit 1" "1" "$RC"
   assert_contains "says BACKUP INCOMPLETE" "$OUT" "BACKUP INCOMPLETE"
-  assert_contains "and names the database" "$OUT" "claudeclaw.db"
+  assert_contains "and names the database" "$OUT" "alfred.db"
   assert_not_contains "never says backup ok" "$OUT" "backup ok"
   assert_eq "no old snapshot was pruned for an incomplete one (10 old + 1 new)" "11" \
     "$(ls -1d "$FAKE/store/backups"/*/ 2>/dev/null | wc -l | tr -d ' ')"
@@ -205,7 +205,7 @@ assert_eq "exit 0" "0" "$RC"
 assert_contains "says backup ok" "$OUT" "backup ok"
 assert_contains "names the python3 db mode" "$OUT" "db: python3 sqlite3 backup"
 assert_not_contains "no raw-copy warning" "$OUT" "WARNING no consistent snapshot"
-assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}claudeclaw.db")"
+assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}alfred.db")"
 
 # ---------------------------------------------------------------------------
 # 6. sqlite3 present but failing (leaves garbage), python3 present -> rescued.
@@ -229,10 +229,10 @@ OUT="$(PATH="$TORN:$PATH" bash "$FAKE/scripts/pre-modify-backup.sh" pyrescue 2>&
 SNAP="$(ls -1d "$FS/backups"/*-pyrescue/ | head -1)"
 assert_eq "exit 0" "0" "$RC"
 assert_contains "names the python3 db mode" "$OUT" "db: python3 sqlite3 backup"
-assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}claudeclaw.db")"
+assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}alfred.db")"
 assert_eq "the torn sqlite3 shim really ran" "yes" "$([ -e "$TORN_MARKER" ] && echo yes || echo no)"
 for s in -journal -wal -shm; do
-  assert_eq "no stale $s next to the snapshot" "no" "$([ -e "${SNAP}claudeclaw.db$s" ] && echo yes || echo no)"
+  assert_eq "no stale $s next to the snapshot" "no" "$([ -e "${SNAP}alfred.db$s" ] && echo yes || echo no)"
 done
 unset TORN_MARKER
 
@@ -241,16 +241,16 @@ unset TORN_MARKER
 # ---------------------------------------------------------------------------
 echo ""
 echo "(7) python3 present, source not a database -> raw copy with WARNING, exit 0"
-cp "$FS/claudeclaw.db" "$TMP/db.save"
-printf 'not a database' > "$FS/claudeclaw.db"
+cp "$FS/alfred.db" "$TMP/db.save"
+printf 'not a database' > "$FS/alfred.db"
 rm -rf "$FS/backups"
 OUT="$(PATH="$NOSQLPY" "$NOSQLPY/bash" "$FAKE/scripts/pre-modify-backup.sh" badsrc 2>&1)"; RC=$?
 SNAP="$(ls -1d "$FS/backups"/*-badsrc/ | head -1)"
 assert_eq "exit 0" "0" "$RC"
 assert_contains "WARNING line" "$OUT" "WARNING no consistent snapshot"
 assert_contains "names the raw db mode" "$OUT" "db: raw db+wal+shm copy"
-if cmp -s "$FS/claudeclaw.db" "${SNAP}claudeclaw.db"; then pass "snapshot is byte-identical to the source"; else fail "snapshot is byte-identical to the source"; fi
-cp "$TMP/db.save" "$FS/claudeclaw.db"
+if cmp -s "$FS/alfred.db" "${SNAP}alfred.db"; then pass "snapshot is byte-identical to the source"; else fail "snapshot is byte-identical to the source"; fi
+cp "$TMP/db.save" "$FS/alfred.db"
 
 # ---------------------------------------------------------------------------
 # 8/9. Source stays locked -> only the deadline ends python3; falls to raw copy.
@@ -258,7 +258,7 @@ cp "$TMP/db.save" "$FS/claudeclaw.db"
 locked_case() { # label deadline [ignore-alrm|block-alrm]
   rm -rf "$FS/backups"; rm -f "$TMP/locked"
   python3 -c 'import sqlite3,sys,time; c=sqlite3.connect(sys.argv[1], isolation_level=None); c.execute("BEGIN EXCLUSIVE"); open(sys.argv[2],"w").close(); time.sleep(60)' \
-    "$FS/claudeclaw.db" "$TMP/locked" &
+    "$FS/alfred.db" "$TMP/locked" &
   HOLDER=$!
   for _ in $(seq 50); do [ -e "$TMP/locked" ] && break; sleep 0.1; done
   assert_eq "the holder really took the lock" "yes" "$([ -e "$TMP/locked" ] && echo yes || echo no)"
@@ -291,7 +291,7 @@ echo "(10) deadline value malformed -> the 120 s default, still the python3 path
 # malformed value read as the 1 s floor would kill the copy and degrade the run.
 rm -rf "$FS/backups"; rm -f "$TMP/locked"
 python3 -c 'import sqlite3,sys,time; c=sqlite3.connect(sys.argv[1], isolation_level=None); c.execute("BEGIN EXCLUSIVE"); open(sys.argv[2],"w").close(); time.sleep(5)' \
-  "$FS/claudeclaw.db" "$TMP/locked" &
+  "$FS/alfred.db" "$TMP/locked" &
 HOLDER=$!
 for _ in $(seq 50); do [ -e "$TMP/locked" ] && break; sleep 0.1; done
 assert_eq "the holder really took the lock" "yes" "$([ -e "$TMP/locked" ] && echo yes || echo no)"
@@ -300,7 +300,7 @@ wait "$HOLDER" 2>/dev/null
 SNAP="$(ls -1d "$FS/backups"/*-badddl/ | head -1)"
 assert_eq "exit 0" "0" "$RC"
 assert_contains "names the python3 db mode" "$OUT" "db: python3 sqlite3 backup"
-assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}claudeclaw.db")"
+assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}alfred.db")"
 
 echo ""
 echo "(11) caller ignores SIGALRM, source locked, deadline 2 s -> raw copy, exit 0"
@@ -317,26 +317,26 @@ OUT="$(PRE_MODIFY_BACKUP_PY_DEADLINE_S=99999999999 PATH="$NOSQLPY" "$NOSQLPY/bas
 SNAP="$(ls -1d "$FS/backups"/*-hugeddl/ | head -1)"
 assert_eq "exit 0" "0" "$RC"
 assert_contains "names the python3 db mode" "$OUT" "db: python3 sqlite3 backup"
-assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}claudeclaw.db")"
+assert_eq "the snapshot holds the source row" "1" "$(py_count "${SNAP}alfred.db")"
 
 echo ""
 echo "(12) WAL-mode source with an open writer and uncheckpointed rows"
-cp "$FS/claudeclaw.db" "$TMP/db.wal.save"
+cp "$FS/alfred.db" "$TMP/db.wal.save"
 rm -rf "$FS/backups"; rm -f "$TMP/walready"
 python3 -c 'import sqlite3,sys,time; c=sqlite3.connect(sys.argv[1], isolation_level=None); c.execute("PRAGMA journal_mode=WAL"); c.execute("PRAGMA wal_autocheckpoint=0"); c.execute("INSERT INTO t VALUES (2)"); open(sys.argv[2],"w").close(); time.sleep(60)' \
-  "$FS/claudeclaw.db" "$TMP/walready" &
+  "$FS/alfred.db" "$TMP/walready" &
 HOLDER=$!
 for _ in $(seq 50); do [ -e "$TMP/walready" ] && break; sleep 0.1; done
 assert_eq "the writer is ready" "yes" "$([ -e "$TMP/walready" ] && echo yes || echo no)"
-assert_eq "the row is only in the -wal" "yes" "$([ -s "$FS/claudeclaw.db-wal" ] && echo yes || echo no)"
+assert_eq "the row is only in the -wal" "yes" "$([ -s "$FS/alfred.db-wal" ] && echo yes || echo no)"
 OUT="$(PATH="$NOSQLPY" "$NOSQLPY/bash" "$FAKE/scripts/pre-modify-backup.sh" walsrc 2>&1)"; RC=$?
 kill "$HOLDER" 2>/dev/null; wait "$HOLDER" 2>/dev/null
 SNAP="$(ls -1d "$FS/backups"/*-walsrc/ | head -1)"
 assert_eq "exit 0" "0" "$RC"
 assert_contains "names the python3 db mode" "$OUT" "db: python3 sqlite3 backup"
-assert_eq "no -wal next to the snapshot" "no" "$([ -e "${SNAP}claudeclaw.db-wal" ] && echo yes || echo no)"
-assert_eq "the snapshot alone has both rows" "2" "$(py_count "${SNAP}claudeclaw.db")"
-cp "$TMP/db.wal.save" "$FS/claudeclaw.db"; rm -f "$FS/claudeclaw.db-wal" "$FS/claudeclaw.db-shm"
+assert_eq "no -wal next to the snapshot" "no" "$([ -e "${SNAP}alfred.db-wal" ] && echo yes || echo no)"
+assert_eq "the snapshot alone has both rows" "2" "$(py_count "${SNAP}alfred.db")"
+cp "$TMP/db.wal.save" "$FS/alfred.db"; rm -f "$FS/alfred.db-wal" "$FS/alfred.db-shm"
 
 # ---------------------------------------------------------------------------
 # 13. The function itself: a failed call clears a HOT journal and stale sidecars.
@@ -350,14 +350,14 @@ assert_eq "extracted whole function (first line)" "_py_sqlite_backup() {" "$(hea
 assert_eq "extracted whole function (last line)" "}" "$(tail -1 "$TMP/pyfn.sh")"
 assert_contains "the copy call is inside it" "$(cat "$TMP/pyfn.sh")" "src.backup(dst)"
 J="$TMP/hotj"; mkdir -p "$J"
-python3 -c 'import sqlite3,sys,os; c=sqlite3.connect(sys.argv[1]); c.execute("PRAGMA cache_size=1"); c.execute("CREATE TABLE x(a)"); c.commit(); c.execute("BEGIN"); [c.execute("INSERT INTO x VALUES (zeroblob(4000))") for _ in range(200)]; os._exit(0)' "$J/claudeclaw.db"
-printf 'stale' > "$J/claudeclaw.db-wal"; printf 'stale' > "$J/claudeclaw.db-shm"
-assert_eq "the fixture really has a non-empty -journal" "yes" "$([ -s "$J/claudeclaw.db-journal" ] && echo yes || echo no)"
+python3 -c 'import sqlite3,sys,os; c=sqlite3.connect(sys.argv[1]); c.execute("PRAGMA cache_size=1"); c.execute("CREATE TABLE x(a)"); c.commit(); c.execute("BEGIN"); [c.execute("INSERT INTO x VALUES (zeroblob(4000))") for _ in range(200)]; os._exit(0)' "$J/alfred.db"
+printf 'stale' > "$J/alfred.db-wal"; printf 'stale' > "$J/alfred.db-shm"
+assert_eq "the fixture really has a non-empty -journal" "yes" "$([ -s "$J/alfred.db-journal" ] && echo yes || echo no)"
 printf 'not a database' > "$TMP/notdb"
-( source "$TMP/pyfn.sh"; _py_sqlite_backup "$TMP/notdb" "$J/claudeclaw.db" ) 2>/dev/null; FRC=$?
+( source "$TMP/pyfn.sh"; _py_sqlite_backup "$TMP/notdb" "$J/alfred.db" ) 2>/dev/null; FRC=$?
 assert_eq "the failing call returns non-zero" "yes" "$([ "$FRC" -ne 0 ] && echo yes || echo no)"
 for s in -journal -wal -shm; do
-  assert_eq "no $s left next to the destination" "no" "$([ -e "$J/claudeclaw.db$s" ] && echo yes || echo no)"
+  assert_eq "no $s left next to the destination" "no" "$([ -e "$J/alfred.db$s" ] && echo yes || echo no)"
 done
 # mode=rw: a source that vanished between the caller's -f check and the call
 # must fail, not be created as an empty database at the live path.

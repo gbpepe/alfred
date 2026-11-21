@@ -1,5 +1,5 @@
 #!/bin/bash
-# Marveen Memory Auto-Save Hook
+# Alfred Memory Auto-Save Hook
 # Runs before context compaction to extract and save important information
 # Called by Claude Code PreCompact hook (agent type handles the AI extraction)
 
@@ -11,7 +11,7 @@ load_env_file "$INSTALL_DIR/.env"
 
 API="http://localhost:${WEB_PORT:-3420}/api"
 
-AGENT_ID="${1:-marveen}"
+AGENT_ID="${1:-alfred}"
 CONTENT="$2"
 
 if [ -z "$CONTENT" ]; then

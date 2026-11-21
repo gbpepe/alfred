@@ -188,10 +188,10 @@ assert_eq "second run calls no systemctl" "0" "$(wc -c < "$TMP/systemctl.calls" 
 assert_eq "second run prints nothing" "" "$OUT"
 
 # 2d. A renamed agent: the timer follows the unit name actually on disk.
-printf '[Service]\n' > "$UNITS/marveen-channels.service"
+printf '[Service]\n' > "$UNITS/alfred-channels.service"
 OUT="$(run_fn "$UNITS")"
 assert_eq "second agent gets its own probe timer" "yes" \
-  "$([ -f "$UNITS/marveen-channel-keepalive-probe.timer" ] && echo yes || echo no)"
+  "$([ -f "$UNITS/alfred-channel-keepalive-probe.timer" ] && echo yes || echo no)"
 
 # 2e. No probe script (an install predating it) -> write nothing rather than
 #     enabling a unit whose ExecStart does not exist.
@@ -206,7 +206,7 @@ assert_eq "missing probe script -> no units written" "1" "$(ls "$UNITS2" | wc -l
 #    for #1313; the launchd twin only ever existed in the install-macos.sh
 #    TEMPLATE, which by definition never reaches a Mac installed before it. So
 #    every such Mac kept the bug, and the weekly update could not cure it.
-#    Measured 2026-09-26: launchctl had no com.marveen.channel-keepalive-probe
+#    Measured 2026-09-26: launchctl had no com.alfred.channel-keepalive-probe
 #    and channels-failures.log showed respawns only between 22:00 and 07:00,
 #    every ~15 minutes, zero during the day.
 # ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@ install_keepalive_probe_launchd" 2>&1
 }
 
 # 3a. Not a Mac -> the Linux path already owns this host, touch nothing.
-write_mac_installer "com.marveen.channel-keepalive-probe"
+write_mac_installer "com.alfred.channel-keepalive-probe"
 : > "$MAC/installer.calls"
 OUT="$(run_mac_fn Linux)"
 assert_eq "non-Darwin host -> installer never called" "0" "$(wc -c < "$MAC/installer.calls" | tr -d ' ')"
@@ -275,8 +275,8 @@ assert_eq "non-Darwin host -> prints nothing" "" "$OUT"
 OUT="$(run_mac_fn Darwin)"
 assert_contains "installer called with --load" "$(cat "$MAC/installer.calls")" "--load"
 assert_eq "plist landed in ~/Library/LaunchAgents" "yes" \
-  "$([ -f "$MAC/home/Library/LaunchAgents/com.marveen.channel-keepalive-probe.plist" ] && echo yes || echo no)"
-assert_contains "reports what it did" "$OUT" "com.marveen.channel-keepalive-probe"
+  "$([ -f "$MAC/home/Library/LaunchAgents/com.alfred.channel-keepalive-probe.plist" ] && echo yes || echo no)"
+assert_contains "reports what it did" "$OUT" "com.alfred.channel-keepalive-probe"
 
 # 3c. Idempotent: update.sh runs weekly, and a reload every week is not a fix.
 : > "$MAC/installer.calls"
@@ -306,19 +306,19 @@ assert_eq "missing installer -> nothing written" "0" \
 assert_eq "missing installer -> update is not failed" "" "$OUT"
 
 # 3f. A failing installer must WARN, not pass silently.
-write_mac_installer "com.marveen.channel-keepalive-probe" 1
+write_mac_installer "com.alfred.channel-keepalive-probe" 1
 rm -f "$MAC/home/Library/LaunchAgents/"*.plist "$MAC/loaded/"*
 OUT="$(run_mac_fn Darwin)"
 assert_contains "a failed install is reported, not swallowed" "$OUT" "FIGYELEM"
 assert_contains "and it carries the remedy for a GUI terminal" "$OUT" \
-  "launchctl bootstrap gui/$(id -u) \"$MAC/home/Library/LaunchAgents/com.marveen.channel-keepalive-probe.plist\" 2>/dev/null; launchctl kickstart gui/$(id -u)/com.marveen.channel-keepalive-probe"
+  "launchctl bootstrap gui/$(id -u) \"$MAC/home/Library/LaunchAgents/com.alfred.channel-keepalive-probe.plist\" 2>/dev/null; launchctl kickstart gui/$(id -u)/com.alfred.channel-keepalive-probe"
 
 # 3g. ISSUE1891 (#1891): the plist is there but the job is NOT loaded -- a Mac
 #     without a GUI login, or a load that failed. That used to read as
 #     "installed" and return quietly forever; it must be retried (and reported).
-write_mac_installer "com.marveen.channel-keepalive-probe" 1
+write_mac_installer "com.alfred.channel-keepalive-probe" 1
 rm -f "$MAC/loaded/"*
-: > "$MAC/home/Library/LaunchAgents/com.marveen.channel-keepalive-probe.plist"
+: > "$MAC/home/Library/LaunchAgents/com.alfred.channel-keepalive-probe.plist"
 : > "$MAC/installer.calls"
 OUT="$(run_mac_fn Darwin)"
 assert_contains "plist present, job not loaded -> the installer is run again" "$(cat "$MAC/installer.calls")" "--load"

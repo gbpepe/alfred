@@ -102,7 +102,7 @@ PY
 printf '%s\n' 'if ! "$TMUX_BIN" has-session -t "$SESSION" 2>/dev/null; then' > "$TMP/c1.sh"
 printf '%s\n' '  pane="$("$TMUX_BIN" capture-pane -t "$SESSION" -p 2>/dev/null || true)"' > "$TMP/c2.sh"
 printf '%s\n' 'while $TMUX has-session -t "$SESSION" 2>/dev/null; do' > "$TMP/c3.sh"
-printf '%s\n' 'tmux kill-session -t marveen-channels 2>/dev/null || true' > "$TMP/c4.sh"
+printf '%s\n' 'tmux kill-session -t alfred-channels 2>/dev/null || true' > "$TMP/c4.sh"
 printf '%s\n' 'tmux link-window -s "a:0" \' '  -t "$SESSION:1"' > "$TMP/c5.sh"
 for c in c1 c2 c3 c4 c5; do
   [ -n "$(python3 "$TMP/scan.py" "$TMP/$c.sh")" ] && pass "control $c: a bare target is caught" || fail "control $c: a bare target is caught"

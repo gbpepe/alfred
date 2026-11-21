@@ -1,10 +1,10 @@
 // Owner slash commands over HTTP (CMD920, ELSOKOR922 spec D-4).
 //
 //   POST /api/commands/dispatch   {text, chatId, messageId?} -> {handled, outcome, replies}
-//   GET  /api/commands/menu       the Telegram command menu from the registry
+//   GET  /api/commands/menu       the Discord command menu from the registry
 //
 // The caller is the main session's UserPromptSubmit hook
-// (scripts/hooks/marveen-commands.py): it sees the owner's Telegram message
+// (scripts/hooks/alfred-commands.py): it sees the owner's channel message
 // BEFORE the model does, posts it here, sends `replies` back on the main bot
 // and blocks the turn (exit 2) -- a registry command costs no model tokens.
 //
@@ -18,7 +18,7 @@
 // without it). A call carrying an agent identity is refused (the same check
 // as the custom-commands CRUD). That alone rests on the ABSENCE of a header,
 // and every fleet agent shares the token, so a WRITE also needs positive
-// evidence: `messageId`, the Telegram message it came in, must be on record in
+// evidence: `messageId`, the inbound message it came in, must be on record in
 // the channel plugin's own inbound log (write-evidence.ts; #1530 review).
 
 import type http from 'node:http'
@@ -31,7 +31,7 @@ import { logger } from '../../logger.js'
 import type { RouteContext } from './types.js'
 
 const AGENT_BODY_FIELDS = ['agent_id', 'agent', 'from_agent', 'updated_by', 'requested_by'] as const
-const AGENT_HEADERS = ['x-agent-id', 'x-agent-name', 'x-marveen-agent'] as const
+const AGENT_HEADERS = ['x-agent-id', 'x-agent-name', 'x-alfred-agent'] as const
 
 // Non-null = the call is refused, with the reason.
 export function agentIdentityOf(req: http.IncomingMessage, body: unknown, auth: RouteContext['auth']): string | null {
@@ -84,10 +84,8 @@ export interface DispatchResult {
 // OWN turn as "pane-busy" and refused, every time (measured on the test bot,
 // ELSOKOR922 Phase 7). The hook then re-sends the command once, from a
 // detached watcher that wakes on the hook process's exit.
-// `forwarded`: the Telegram message was forwarded (the plugin patch marks it,
-// scripts/patch-telegram-plugin.py). The owner forwarding someone else's
-// "/model opus keep" must not run it (ELSOKOR922 spec 5.; measured on the
-// test bot before the patch: a forwarded /status ran).
+// `forwarded`: the inbound message was forwarded. The owner forwarding someone
+// else's "/model opus keep" must not run it (ELSOKOR922 spec 5.).
 // OWNERAUTHGUESS1106 (Samu 71849): with several paired DMs and no explicit owner id, a registry command is answered
 // with one generic line (nothing about who the owner is) instead of being run for, or refused to, a guessed owner.
 // Anything that is not a registry command passes as before.
@@ -157,14 +155,12 @@ export async function dispatchForChat(
 
 // DCEXT1111 F1s: the same command from the owner's Discord DM (a slash command the Discord overlay turns into the
 // "/word" text, answered by the same hook). The owner is the explicit DISCORD_OWNER_USER_ID only. Only READ commands
-// run: a write needs the Telegram plugin's inbound evidence (write-evidence.ts), which Discord does not have yet, and a
-// custom command (kind write) would answer on Telegram. Those get one line instead. No new command logic: the read
-// runs through the same dispatchCommand as on Telegram (a parity test pins it).
-export const DISCORD_WRITE_REPLY = (name: string) => `/${name} Discordról nem fut: ez a parancs állít vagy indít valamit, és ahhoz a Telegram-üzenet kell bizonyítéknak. Telegramon kiadhatod.`
+// run on Discord slash commands; write commands get one explanatory line instead.
+export const DISCORD_WRITE_REPLY = (name: string) => `/${name} Discordról nem fut: ez a parancs állít vagy indít valamit, Discordról csak az olvasó parancsok futnak.`
 
 export async function dispatchForDiscord(
   text: string, userId: string, ownerUserId: string | null, now = Date.now(), forwarded = false,
-  telegramOwnerChatId: string | null = null,
+  ownerChatId: string | null = null,
 ): Promise<DispatchResult> {
   const parsed = parseCommand(text)
   const helpAsk = parsed !== null && isHelpRequest(parsed.args) && hasCommand(parsed.name, 'discord')
@@ -184,7 +180,7 @@ export async function dispatchForDiscord(
   const replies: string[] = []
   const outcome = await dispatchCommand(text, {
     reply: async (t: string) => { replies.push(t) },
-    ownerId: Number(telegramOwnerChatId ?? 0),
+    ownerId: Number(ownerChatId ?? 0),
     now,
     channel: 'discord',
   })
@@ -194,16 +190,15 @@ export async function dispatchForDiscord(
 export async function tryHandleCommands(ctx: RouteContext): Promise<boolean> {
   const { req, res, path, method, auth } = ctx
   if (path === '/api/commands/menu' && method === 'GET') {
-    // ?channel=discord: the Discord slash list (scripts/patch-discord-plugin.py); without it the Telegram menu.
     const channel = ctx.url.searchParams.get('channel')
-    if (channel !== null && channel !== 'telegram' && channel !== 'discord') {
-      json(res, { error: 'unknown channel', known: ['telegram', 'discord'] }, 400)
+    if (channel !== null && channel !== 'discord') {
+      json(res, { error: 'unknown channel', known: ['discord'] }, 400)
       return true
     }
-    json(res, { commands: botCommandList(channel ?? 'telegram') })
+    json(res, { commands: botCommandList('discord') })
     return true
   }
-  // The main session's Stop hook (marveen-commands.py --stop): a turn ended.
+  // The main session's Stop hook (alfred-commands.py --stop): a turn ended.
   // Only acts when a model hold is past its expiry (the session was busy
   // then); it arms one revert retry -- nothing else reads this.
   if (path === '/api/commands/turn-ended' && method === 'POST') {
@@ -254,7 +249,7 @@ export async function tryHandleCommands(ctx: RouteContext): Promise<boolean> {
   const identity = resolveOwnerIdentity()
   const unset = ownerUnsetResult(text, identity)
   if (unset) {
-    logger.warn({ command: parseCommand(text)?.name }, 'commands: refused, several paired DMs and no TELEGRAM_OWNER_USER_ID -- nobody is guessed as the owner')
+    logger.warn({ command: parseCommand(text)?.name }, 'commands: refused, several paired DMs and no DISCORD_OWNER_USER_ID -- nobody is guessed as the owner')
     json(res, unset)
     return true
   }

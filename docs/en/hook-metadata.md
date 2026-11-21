@@ -51,7 +51,7 @@ CI (`.github/workflows/test.yml`) runs the validator's tests and the validator i
 
 ### Env switches
 
-`MARVEEN_DISABLED_HOOKS=tool-log-capture` disables the listed hooks, if they use the `hook_switches` helper (currently: `tool-log-capture`). A listed hook exits 0 before reading its input.
+`ALFRED_DISABLED_HOOKS=tool-log-capture` disables the listed hooks, if they use the `hook_switches` helper (currently: `tool-log-capture`). A listed hook exits 0 before reading its input.
 
 **Locked** hooks can NOT be disabled from the environment: their names are ignored whatever the variable says. An env var is exactly what the wrong party can set: a prompt injection or a careless `export`.
 
@@ -98,7 +98,7 @@ Resolve a conflict or restore the file first. Without a sidecar only the built-i
 
 #### Input cap and inheritance
 
-`MARVEEN_HOOK_INPUT_MAX_BYTES` (default 8 MiB) caps the hook's stdin payload. Over the cap a logging hook skips the call silently (fail-open), a locked hook blocks with exit 2 (fail-closed).
+`ALFRED_HOOK_INPUT_MAX_BYTES` (default 8 MiB) caps the hook's stdin payload. Over the cap a logging hook skips the call silently (fail-open), a locked hook blocks with exit 2 (fail-closed).
 
 A hook inherits the variable from the Claude Code process, so set it before the session starts (or in the `env` block of settings.json). An `export` in a running session's Bash tool stays in that Bash subprocess and never reaches the hook. (This follows from process inheritance; it was not measured on a live session, nor was the `env` block's effect on hooks.)
 

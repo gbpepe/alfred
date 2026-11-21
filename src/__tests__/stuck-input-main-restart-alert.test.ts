@@ -10,11 +10,11 @@ import { parkedGiveUpAlertText, parkedGiveUpOrchestratorText } from '../web/stuc
 
 describe('parkedGiveUpAlertText', () => {
   it('main agent: the dashboard button or an explicit force, and it says the force cuts the turn', () => {
-    const s = parkedGiveUpAlertText('marveen', true)
-    expect(s).toContain('POST /api/marveen/restart {"force": true}')
+    const s = parkedGiveUpAlertText('alfred', true)
+    expect(s).toContain('POST /api/alfred/restart {"force": true}')
     expect(s).toContain('dashboardon')
     expect(s).toContain('megszakítja a futó kört')
-    expect(s).not.toContain('/api/agents/marveen/restart')
+    expect(s).not.toContain('/api/agents/alfred/restart')
   })
 
   it('sub-agent: its own restart route, as before', () => {

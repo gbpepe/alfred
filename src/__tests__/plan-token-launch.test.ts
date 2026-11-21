@@ -149,7 +149,7 @@ describe('resolveAgentConfigDir: a token plan resolves to the agent\'s own isola
   it('the fleet leg leaves a token-plan agent alone (its configured dir is non-null)', () => {
     agentCfg('devy', { claudePlan: 'tok-b' })
     expect(agentUsesFleetToken({
-      name: 'devy', mainAgentId: 'marveen', model: 'claude-opus-5', authMode: 'subscription',
+      name: 'devy', mainAgentId: 'alfred', model: 'claude-opus-5', authMode: 'subscription',
       configuredConfigDir: resolveAgentConfigDir('devy').configDir, remote: false, ownTokenFile: false,
     })).toBe(false)
   })
@@ -210,18 +210,18 @@ describe('subAgentTokenPlanIds + selectPlansToProbe: a sub-agent\'s token plan i
     { id: 'b', label: 'b', tokenSecretId: 'claude-plan-token-b', planType: 'personal', channelsAllowed: true },
     { id: 'team', label: 'team', configDir: '/opt/team', planType: 'team', channelsAllowed: true },
   ] as Parameters<typeof subAgentTokenPlanIds>[0]
-  const planOf: Record<string, string | null> = { marveen: 'a', iris: 'b', devy: 'team', zara: null, ghost: 'gone' }
+  const planOf: Record<string, string | null> = { alfred: 'a', iris: 'b', devy: 'team', zara: null, ghost: 'gone' }
 
   it('only a SUB-agent\'s TOKEN plan counts: not the main agent\'s, not a configDir plan, not an unknown id', () => {
-    expect([...subAgentTokenPlanIds(plans, Object.keys(planOf), (n) => planOf[n] ?? null, 'marveen')]).toEqual(['b'])
+    expect([...subAgentTokenPlanIds(plans, Object.keys(planOf), (n) => planOf[n] ?? null, 'alfred')]).toEqual(['b'])
   })
   it('a config read that throws is skipped, not fatal', () => {
-    expect([...subAgentTokenPlanIds(plans, ['iris', 'broken'], (n) => { if (n === 'broken') throw new Error('x'); return planOf[n] ?? null }, 'marveen')]).toEqual(['b'])
+    expect([...subAgentTokenPlanIds(plans, ['iris', 'broken'], (n) => { if (n === 'broken') throw new Error('x'); return planOf[n] ?? null }, 'alfred')]).toEqual(['b'])
   })
   it('selectPlansToProbe skips a reserved plan, and without the set behaves as before', () => {
-    const state = { activePlanByAgent: { marveen: 'a' }, plans: {} }
-    expect(selectPlansToProbe({ plans, state, activeAgentId: 'marveen', nowMs: 1e13 }).map((p) => p.id)).toEqual(['b'])
-    expect(selectPlansToProbe({ plans, state, activeAgentId: 'marveen', nowMs: 1e13, reservedPlanIds: new Set(['b']) })).toEqual([])
+    const state = { activePlanByAgent: { alfred: 'a' }, plans: {} }
+    expect(selectPlansToProbe({ plans, state, activeAgentId: 'alfred', nowMs: 1e13 }).map((p) => p.id)).toEqual(['b'])
+    expect(selectPlansToProbe({ plans, state, activeAgentId: 'alfred', nowMs: 1e13, reservedPlanIds: new Set(['b']) })).toEqual([])
   })
 })
 

@@ -17,7 +17,7 @@ vi.mock('../config.js', async (importOriginal) => ({
 }))
 
 const { nicknameFor } = await import('../web/team-nicknames.js')
-const { tryHandleMarveen } = await import('../web/routes/marveen.js')
+const { tryHandleAlfred } = await import('../web/routes/alfred.js')
 
 const FILE = join(STORE, 'team-nicknames.json')
 let tick = 1_700_000_000
@@ -68,11 +68,11 @@ describe('nicknameFor', () => {
   })
 })
 
-describe('GET /api/marveen/owner-avatar', () => {
+describe('GET /api/alfred/owner-avatar', () => {
   async function get(path: string): Promise<{ status: number; type: string | null; cache: string | null; body: Buffer }> {
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url || '/', 'http://localhost')
-      const handled = await tryHandleMarveen({ req, res, path: url.pathname, method: req.method || 'GET', url } as never, tmpRoot)
+      const handled = await tryHandleAlfred({ req, res, path: url.pathname, method: req.method || 'GET', url } as never, tmpRoot)
       if (!handled) { res.writeHead(599); res.end() }
     })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
@@ -90,13 +90,13 @@ describe('GET /api/marveen/owner-avatar', () => {
   })
 
   it('404s when no portrait is on disk (the board keeps the initial)', async () => {
-    const r = await get('/api/marveen/owner-avatar')
+    const r = await get('/api/alfred/owner-avatar')
     expect(r.status).toBe(404)
   })
 
   it('serves store/owner-avatar.* with revalidation, not a max-age', async () => {
     writeFileSync(join(STORE, 'owner-avatar.webp'), Buffer.from('RIFF0000WEBPfake'))
-    const r = await get('/api/marveen/owner-avatar')
+    const r = await get('/api/alfred/owner-avatar')
     expect(r.status).toBe(200)
     expect(r.body.toString()).toBe('RIFF0000WEBPfake')
     expect(r.cache).toBe('no-cache')
@@ -105,20 +105,20 @@ describe('GET /api/marveen/owner-avatar', () => {
   it('prefers .png when several formats exist', async () => {
     writeFileSync(join(STORE, 'owner-avatar.jpg'), 'jpg')
     writeFileSync(join(STORE, 'owner-avatar.png'), 'png')
-    expect((await get('/api/marveen/owner-avatar')).body.toString()).toBe('png')
+    expect((await get('/api/alfred/owner-avatar')).body.toString()).toBe('png')
   })
 
   it('is read-only: a POST is not handled by this route', async () => {
     writeFileSync(join(STORE, 'owner-avatar.png'), 'png')
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url || '/', 'http://localhost')
-      const handled = await tryHandleMarveen({ req, res, path: url.pathname, method: req.method || 'GET', url } as never, tmpRoot)
+      const handled = await tryHandleAlfred({ req, res, path: url.pathname, method: req.method || 'GET', url } as never, tmpRoot)
       if (!handled) { res.writeHead(599); res.end() }
     })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
     try {
       const { port } = server.address() as AddressInfo
-      const r = await fetch(`http://127.0.0.1:${port}/api/marveen/owner-avatar`, { method: 'POST', body: 'x' })
+      const r = await fetch(`http://127.0.0.1:${port}/api/alfred/owner-avatar`, { method: 'POST', body: 'x' })
       expect(r.status).toBe(599)
     } finally {
       server.close()

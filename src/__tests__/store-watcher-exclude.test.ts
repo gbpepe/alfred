@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import type { EventEmitter } from 'node:events'
 
 const h = vi.hoisted(() => ({
-  dir: `${(process.env.TMPDIR || '/tmp').replace(/\/+$/, '')}/marveen-store-watcher-exclude-test-${process.pid}`,
+  dir: `${(process.env.TMPDIR || '/tmp').replace(/\/+$/, '')}/alfred-store-watcher-exclude-test-${process.pid}`,
   records: [] as {
     dir: string
     opts: { recursive?: boolean }

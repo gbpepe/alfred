@@ -15,7 +15,7 @@
 //
 //   restrict,command="/bin/sh <dispatcher> --key <name> --fp <fingerprint>
 //   --grant <uuid> --consent <n>",from="<host>[,<host>]",verify-required
-//   sk-ssh-ed25519@openssh.com <blob> marveen-support:<uuid>:<name>
+//   sk-ssh-ed25519@openssh.com <blob> alfred-support:<uuid>:<name>
 //
 // THE OPTION LIST IS CLOSED: these four options, in this order, and nothing
 // else. Why each part, with what was measured on OpenSSH 7.6, 8.2, 8.4, 8.9,
@@ -63,8 +63,8 @@ import {
   type SupportKeyPin,
 } from './support-access-pins.js'
 
-/** Every support line's comment starts with this; `marveen-remote:` lines belong to the Bridge. */
-export const SUPPORT_COMMENT_PREFIX = 'marveen-support:'
+/** Every support line's comment starts with this; `alfred-remote:` lines belong to the Bridge. */
+export const SUPPORT_COMMENT_PREFIX = 'alfred-support:'
 
 export interface SshdVersion {
   readonly major: number

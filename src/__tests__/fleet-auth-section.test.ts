@@ -20,12 +20,12 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-fleetauth-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-fleetauth-test-'))
 
 vi.mock('../config.js', () => ({
   // agent-scaffold imports settings-store (MCPOROKLES923), which derives a path from
   // STORE_DIR at import time. A never-created dir: nothing here reads the store.
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -141,7 +141,7 @@ describe('body hygiene', () => {
   it('is host-agnostic: no operator or per-install agent names', () => {
     const body = buildFleetAuthBody()
     expect(body).not.toMatch(/\/(Users|home)\/[A-Za-z0-9._-]+/)
-    expect(body).not.toMatch(/Juhász|Viktor|Szabolcs|marveenja/i)
+    expect(body).not.toMatch(/Juhász|Viktor|Szabolcs|alfredja/i)
   })
 })
 

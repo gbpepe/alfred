@@ -122,7 +122,7 @@ class TestAgentIdFromCwd(unittest.TestCase):
     def test_install_root_returns_main_agent_id(self):
         install = self._install()
         result = self._call(install)
-        # Should fall back to MAIN_AGENT_ID or 'marveen'
+        # Should fall back to MAIN_AGENT_ID or 'alfred'
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 0)
 
@@ -166,7 +166,7 @@ class TestProjectScopedSkills(unittest.TestCase):
 
     def test_project_scoped_skill_md_matches(self):
         self.assertEqual(
-            self._classify("/srv/marveen/.claude/skills/my-skill/SKILL.md"),
+            self._classify("/srv/alfred/.claude/skills/my-skill/SKILL.md"),
             ("my-skill", "skill_read"),
         )
 
@@ -183,7 +183,7 @@ class TestProjectScopedSkills(unittest.TestCase):
         self.assertIsNone(self._classify(f"{home}/.claude/scheduled-tasks/foo/SKILL.md"))
 
     def test_nested_reference_still_does_not_match(self):
-        self.assertIsNone(self._classify("/srv/marveen/.claude/skills/my-skill/references/x.md"))
+        self.assertIsNone(self._classify("/srv/alfred/.claude/skills/my-skill/references/x.md"))
 
 
 # SKILLBASHREAD1109: 2026-11-09-en merve 11-07 20:21 es 11-09 08:10 kozott nulla

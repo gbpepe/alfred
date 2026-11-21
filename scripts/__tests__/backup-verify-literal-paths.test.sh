@@ -36,7 +36,7 @@ repo/agents/x/reports/r1/app/items/[id]/edit/form.tsx
 repo/app/(group)/a+b.ts
 repo/app/q?/x{1}/y|z^$.ts
 repo/store/
-repo/store/claudeclaw.db
+repo/store/alfred.db
 repo/storex/y
 home/.claude/skills/
 home/.claude/skills/a/SKILL.md
@@ -55,7 +55,7 @@ if grep -qE "^${want}(/|$)" "$LIST"; then fail "control: the old regex form shou
 has "parentheses and plus are literal" "repo/app/(group)/a+b.ts"
 has "? { } | ^ \$ are literal" 'repo/app/q?/x{1}/y|z^$.ts'
 has "a directory named once matches its members" "repo/store"
-has "a load-bearing file marker" "repo/store/claudeclaw.db"
+has "a load-bearing file marker" "repo/store/alfred.db"
 has "a load-bearing directory marker" "home/.claude/skills"
 
 hasnt "the character-class reading of [id] does not match" \
@@ -65,10 +65,10 @@ hasnt "a prefix without a path boundary does not match" "repo/sto"
 # longer one, the wanted path is a prefix of it without a "/" after it. Only the
 # boundary check stops these (card TESTFOLLOWUP1007D: the two cases below used to
 # hold the opposite direction under these names).
-hasnt "store/x is not satisfied by store/xyz" "repo/store/claudeclaw"
+hasnt "store/x is not satisfied by store/xyz" "repo/store/alfred"
 hasnt "a longer archived file name does not satisfy a shorter wanted one" "repo/app/(group)/a+b.t"
 # The opposite direction: a wanted path LONGER than any archived member.
-hasnt "a wanted path longer than the archived file does not match" "repo/store/claudeclaw.dbx"
+hasnt "a wanted path longer than the archived file does not match" "repo/store/alfred.dbx"
 hasnt "a wanted file name longer than the archived one does not match" "repo/app/(group)/a+b.tsx"
 hasnt "an empty path never matches" ""
 : > "$TMP/empty.txt"
@@ -92,7 +92,7 @@ set --
 # simpler parse took the first definition, kept the quotes, and aborted under
 # pipefail when the line was missing). The block runs as written, in isolation.
 BLOCK="$TMP/resolve.sh"
-sed -n '/^MAIN_AGENT_ID="marveen"$/,/^fi$/p' "$B" > "$BLOCK"
+sed -n '/^MAIN_AGENT_ID="alfred"$/,/^fi$/p' "$B" > "$BLOCK"
 # A trailing no-op: the block's last command is `[[ -n "$_mid" ]] && ...`, which is
 # non-zero when the line is missing; in the script that is harmless (a failure inside
 # an && list does not trigger errexit), but `.` would return it. A real abort inside
@@ -103,7 +103,7 @@ mkdir -p "$TMP/envq" "$TMP/envnone"
 printf 'MAIN_AGENT_ID=first\nOTHER=1\nMAIN_AGENT_ID="quoted-main"\n' > "$TMP/envq/.env"
 printf 'OTHER=1\n' > "$TMP/envnone/.env"
 got=$(resolve "$TMP/envq" 2>&1); if [ "$got" = "quoted-main" ]; then pass "the last definition wins and its quotes are stripped"; else fail "resolved '$got', want 'quoted-main'"; fi
-got=$(resolve "$TMP/envnone" 2>&1); rc=$?; if [ "$rc" -eq 0 ] && [ "$got" = "marveen" ]; then pass "no MAIN_AGENT_ID line: default, and no abort under pipefail"; else fail "no MAIN_AGENT_ID line: rc=$rc, resolved '$got'"; fi
+got=$(resolve "$TMP/envnone" 2>&1); rc=$?; if [ "$rc" -eq 0 ] && [ "$got" = "alfred" ]; then pass "no MAIN_AGENT_ID line: default, and no abort under pipefail"; else fail "no MAIN_AGENT_ID line: rc=$rc, resolved '$got'"; fi
 
 echo
 echo "passed: $PASS, failed: $FAIL"

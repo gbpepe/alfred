@@ -21,7 +21,7 @@ import type { ClaudePlansState } from '../web/claude-plans-state.js'
 const NOW = Date.UTC(2026, 8, 24, 8, 30, 15)
 const fakeToken = (tag: string) => ['fake', 'fleet', 'tok', tag].join('-')
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-fleet-rotation-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-fleet-rotation-test-'))
 afterAll(() => rmSync(tmpRoot, { recursive: true, force: true }))
 
 function tokenPlan(over: Partial<ClaudePlan> = {}): ClaudePlan {

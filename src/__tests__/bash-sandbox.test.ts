@@ -10,12 +10,12 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-bash-sandbox-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-bash-sandbox-test-'))
 const STORE = join(tmpRoot, 'store')
 mkdirSync(STORE, { recursive: true })
 afterAll(() => { execFileSync('chmod', ['-R', 'u+w', tmpRoot]); rmSync(tmpRoot, { recursive: true, force: true }) })
 
-vi.mock('../config.js', () => ({ STORE_DIR: STORE, PROJECT_ROOT: tmpRoot, MAIN_AGENT_ID: 'marveen' }))
+vi.mock('../config.js', () => ({ STORE_DIR: STORE, PROJECT_ROOT: tmpRoot, MAIN_AGENT_ID: 'alfred' }))
 const settings: Record<string, string> = {}
 vi.mock('../settings-store.js', () => ({ getEffectiveSettingValue: (k: string) => settings[k] ?? '' }))
 vi.mock('../web/agent-config.js', () => ({ agentDir: (n: string) => join(tmpRoot, 'agents', n) }))
@@ -35,7 +35,7 @@ describe('BASH_SANDBOX_AGENTS', () => {
   })
   it('takes ids separated by commas or spaces, lower-cases them, and never the main agent', () => {
     expect([...parseSandboxAgents(' Soma, neo  trinity,,')].sort()).toEqual(['neo', 'soma', 'trinity'])
-    expect([...parseSandboxAgents('marveen soma')]).toEqual(['soma'])
+    expect([...parseSandboxAgents('alfred soma')]).toEqual(['soma'])
     expect([...parseSandboxAgents('../x soma $(id)')]).toEqual(['soma'])
     settings.BASH_SANDBOX_AGENTS = 'soma'
     expect(bashSandboxEnabledFor('soma')).toBe(true)

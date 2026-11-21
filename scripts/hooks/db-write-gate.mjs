@@ -11,7 +11,7 @@
 //      PRAGMA writable_schema and any write on sqlite_master / sqlite_schema
 //      (and the temp aliases): through them a table is renamed, written under
 //      the new name and renamed back without its name ever being spelled.
-//   2. A FILE-level write of the database (store/claudeclaw.db and its -wal,
+//   2. A FILE-level write of the database (store/alfred.db and its -wal,
 //      -shm, -journal): a redirect onto it, cp/mv/tee/dd/rm/ln/... naming it, a
 //      sqlite3 dot-command that replaces or runs files, a native Write/Edit.
 //   3. A write of this gate's own wiring and of the autonomy levels, in THIS
@@ -186,11 +186,11 @@ export const PROTECTED_INSTALL_PATHS = [
   // every hook of that agent. Claude Code's own writes (/effort, /model) are not tool calls, so this gate never sees them.
   { rel: 'agents/*/.claude-config/settings.json', pattern: true },
   // Support access (SUPPORTKULCS1109, D5; terv-v7 3.9): EVERY support state of this machine is one folder outside the
-  // install tree, ~/.marveen/support: the narrow token, the group record, the kit with the dispatcher (the command every
+  // install tree, ~/.alfred/support: the narrow token, the group record, the kit with the dispatcher (the command every
   // support line binds) and its manifest, the spool and the run folder. Only the routine writes it (the installer's and
   // the updater's install-kit, the dashboard's enable and disable, the reconcile), never a tool call; a write there
   // could swap the gate a support login runs through, plant or keep a token, or erase the spool the owner reads.
-  { home: '.marveen/support', dir: true },
+  { home: '.alfred/support', dir: true },
 ]
 // ENVRELAXGATE1104 (Dani's inventory 67751 and plan v2, Samu 67732/67752/67763): files whose ONE write turns a gate off or
 // gives an agent a right, for a SUB-AGENT only. The main agent writes the install .env legitimately (self-rename), so
@@ -252,7 +252,7 @@ export const SUBAGENT_PROTECTED_INSTALL_PATHS = [
   { rel: 'agents/*/.claude-config/.claude.json', pattern: true },
   // ...and its record of which of those servers came from the shared config (MCPWRITEGATE1104 D4): dropping a name
   // from it would keep a server the reconcile is about to take back out
-  { rel: 'agents/*/.claude-config/.marveen-mcp-inherited.json', pattern: true },
+  { rel: 'agents/*/.claude-config/.alfred-mcp-inherited.json', pattern: true },
   { rel: '.mcp.json' },
   { home: '.claude.json' },
   // The Claude Code plugin trees and the shared user-level trees every session loads (PLUGINCODEWRITE1104, Samu
@@ -262,12 +262,12 @@ export const SUBAGENT_PROTECTED_INSTALL_PATHS = [
   // real path is compared, so the symlink route lands on these entries.
   //   ~/.claude/plugins            -- the plugin code (cache, marketplaces), data, and the shared registries
   //   <root>/plugins               -- the install's own plugin code (state observer, worksource MCP server, ...)
-  //   ~/marveen-local-plugins      -- the gromzo directory marketplace: its plugin RUNS from there (installPath)
+  //   ~/alfred-local-plugins      -- the gromzo directory marketplace: its plugin RUNS from there (installPath)
   //   ~/.claude/agents|skills|hooks -- subagent types, skills, hook scripts every session can load
   //   agents/*/.claude-config/plugins/{installed_plugins,known_marketplaces}.json -- each agent's own registries
   { home: '.claude/plugins', dir: true },
   { rel: 'plugins', dir: true },
-  { home: 'marveen-local-plugins', dir: true },
+  { home: 'alfred-local-plugins', dir: true },
   { home: '.claude/agents', dir: true },
   { home: '.claude/skills', dir: true },
   { home: '.claude/hooks', dir: true },
@@ -281,9 +281,9 @@ export const SUBAGENT_PROTECTED_INSTALL_PATHS = [
   // into ~/.claude and are judged where they land. The config dir replaces #2505's two plugins entries, which it
   // contains. The default id's homes are listed here; a renamed install's (MAIN_AGENT_ID) are added per call by
   // workerConfigEntries.
-  ...workerHomeTargets('.marveen-worker'),
-  ...workerHomeTargets('.marveen-worker-fast'),
-  // The channel plugins' trust files (CHANSTATEWRITE1104, Marveen 69167, Samu 69174/69201): what decides who is the
+  ...workerHomeTargets('.alfred-worker'),
+  ...workerHomeTargets('.alfred-worker-fast'),
+  // The channel plugins' trust files (CHANSTATEWRITE1104, Alfred 69167, Samu 69174/69201): what decides who is the
   // owner or an allowed sender, what is paired or approved, which bot identity is used and what an inbound message's
   // provenance is (measured: work/chanstate-measure.md). Under every state root a plugin uses: the shared
   // ~/.claude/channels (every agent's .claude-config/channels and the main agent's .channels-config/channels link
@@ -334,13 +334,13 @@ export function isSubAgentCaller(projectDir, root = INSTALL_ROOT, configDir = nu
 }
 
 // The database file, by NAME anywhere (as the Bash rule reads it).
-const DB_FILE_NAME_RX = /(?:^|\/)claudeclaw\.db(?:-wal|-shm|-journal)?$/i
+const DB_FILE_NAME_RX = /(?:^|\/)alfred\.db(?:-wal|-shm|-journal)?$/i
 
 // The CALLER's own Claude settings, wherever they are (Samu 67803, 67832): a sub-agent's gate hooks live in
 // <CLAUDE_PROJECT_DIR>/.claude/settings.json, and its user-level settings in <CLAUDE_CONFIG_DIR>/settings.json (unset:
 // ~/.claude/settings.json, which then is the sub-agent's). Under the install's agents/ the common patterns cover the
 // first two already; these entries also cover a caller outside it (the two workers: their config dir is
-// ~/.marveen-worker{,-fast}/.claude-config). Sub-agent list only.
+// ~/.alfred-worker{,-fast}/.claude-config). Sub-agent list only.
 function callerSettingsEntries(projectDir, configDir) {
   const out = []
   if (projectDir) {
@@ -351,7 +351,7 @@ function callerSettingsEntries(projectDir, configDir) {
   if (configDir) {
     const dir = resolve(String(configDir))
     // ...and its user-scope MCP servers in the config dir's .claude.json (ENVRELAXMCPCFG1104)
-    for (const f of ['settings.json', 'settings.local.json', '.claude.json', '.marveen-mcp-inherited.json']) out.push({ rel: `${basename(dir)}/${f}`, abs: join(dir, f), caller: true })
+    for (const f of ['settings.json', 'settings.local.json', '.claude.json', '.alfred-mcp-inherited.json']) out.push({ rel: `${basename(dir)}/${f}`, abs: join(dir, f), caller: true })
     // ...and its plugins tree (PLUGINCODEWRITE1104)
     out.push({ rel: `${basename(dir)}/plugins`, abs: join(dir, 'plugins'), dir: true, caller: true })
   }
@@ -360,7 +360,7 @@ function callerSettingsEntries(projectDir, configDir) {
 
 // --- plugin code loaded from outside the cache, and the other config roots (PLUGINCODEWRITE1104) -----------------
 // Claude Code loads a directory-marketplace plugin from where installed_plugins.json's installPath points (the gromzo
-// plugin runs from ~/marveen-local-plugins, gromzo-marketplace.ts), and a config root other than the agents' (the
+// plugin runs from ~/alfred-local-plugins, gromzo-marketplace.ts), and a config root other than the agents' (the
 // main agent's MAIN_AGENT_CONFIG_DIR, a plan's configDir) has a plugins tree of its own. Read here, per hook call:
 //   registries: ~/.claude/plugins and <root>/.channels-config/plugins (installed_plugins.json installPath,
 //               known_marketplaces.json source.path of a directory/file marketplace, installLocation), and the same
@@ -441,12 +441,12 @@ export function dynamicPluginEntries(root, projectDir, src = dynamicSources(root
 // The workers' start-up files of a renamed install (WORKERCFGDIR1104): their home is ~/.<MAIN_AGENT_ID>-worker{,-fast}
 // (agent-worker.ts workerHomeFor), with MAIN_AGENT_ID read from the install like the other settings here (overrides,
 // then .env; both files' mtimes are in the cache key). Only a plain id (letters, digits, _ and -) is used; the default
-// id adds nothing (the static entries cover it). A MARVEEN_WORKER_DIR{,_FAST} set only in the dashboard's process
+// id adds nothing (the static entries cover it). A ALFRED_WORKER_DIR{,_FAST} set only in the dashboard's process
 // environment is not visible to a hook (stated limit).
 const WORKER_ID_RX = /^[A-Za-z0-9_-]{1,64}$/
 export function workerConfigEntries(root) {
   const id = installSetting(root, 'MAIN_AGENT_ID')
-  if (!id || !WORKER_ID_RX.test(id) || id === 'marveen') return []
+  if (!id || !WORKER_ID_RX.test(id) || id === 'alfred') return []
   return ['', '-fast'].flatMap((v) => workerHomeTargets(`.${id}-worker${v}`))
     .map((t) => ({ rel: t.home, abs: join(homedir(), t.home), ...(t.dir ? { dir: true } : {}), ...(t.noBareGlob ? { noBareGlob: true } : {}) }))
 }
@@ -484,7 +484,7 @@ export const TARGET_SEGMENT_NAMES = new Set(['settings.json', 'settings.local.js
   // GATEFILES1110: an agent's agent-config.json, from its parent (`cd agents/samu && sed -i ... agent-config.json`)
   'agent-config.json',
   // PLUGINCODEWRITE1104 (E3): a bare plugin-tree name from its parent (`cd ~/.claude && rm -rf plugins`)
-  'plugins', 'marveen-local-plugins', 'gromzo',
+  'plugins', 'alfred-local-plugins', 'gromzo',
   // CPDESTDIR1104 (Dani B2, Samu 69132): the same for the start-loaded trees a session reads (`cd ~/.claude && rm -rf
   // skills` named no path-like word and passed)
   'rules', 'skills', 'agents', 'commands', 'output-styles',
@@ -2099,7 +2099,7 @@ export function installFileDeny(command, opts = {}) {
     }
   }
   // An unresolved quoting whose only mention is a directory on the way to a protected path, the install root itself
-  // most often (`cd <root>; ... "$(cd $d; git remote get-url origin)"`, Marveen 57083). Holds when the rest, read
+  // most often (`cd <root>; ... "$(cd $d; git remote get-url origin)"`, Alfred 57083). Holds when the rest, read
   // roughly with its cd followed, names no protected path from the cwd each command runs in, and no substitution's own
   // text names one (ancestor too) from any of those cwds. A cd that cannot be followed outside a substitution: no.
   // The git rule and the implicit writer rule run from the followed cwd too, every command of a substitution from each
@@ -2280,7 +2280,7 @@ export function installFileDeny(command, opts = {}) {
     // contents there, not its arguments, so only its heredoc body counts. The script text is judged as commands: a
     // protected name in it is denied; a directory on the way to one (the install root) passes only when the text,
     // read with its cd followed, names and writes nothing protected (ancestorOnlyHolds). A message or comment file
-    // that is only written, read or sent on (curl -d @file) passes (Marveen 56653). This replaces the heredoc-only
+    // that is only written, read or sent on (curl -d @file) passes (Alfred 56653). This replaces the heredoc-only
     // rule. A printf/echo escape (\n, \r) is the line break it prints.
     if (words && words.length) {
       const targets = words.redirects.map((r) => r.value).filter((v) => v !== '/dev/null')
@@ -2587,7 +2587,7 @@ export const DB_GATE_MSG =
   'Biztonsagi DB-iras TILTOTT (APPROVALDBGATE1030, minden ugynokre, a fo ugynokre is). NEM irhatod a ' +
   'dashboard adatbazisanak biztonsagi tablait (approvals, approval_events, approval_slack_posts, approval_teams_cards, approval_gromzo_posts, agent_create_specs, auth_sessions, dashboard_users, ' +
   'device_keys, vault_ssh_keys, support_consents, support_password_state) semmilyen programmal (sqlite3, python, node, heredoc), es NEM irhatod fajl ' +
-  'szinten a store/claudeclaw.db-t (-wal/-shm/-journal is: cp/mv/tee/>/rm/ln, sqlite3 .restore/.read/.backup), ' +
+  'szinten a store/alfred.db-t (-wal/-shm/-journal is: cp/mv/tee/>/rm/ln, sqlite3 .restore/.read/.backup), ' +
   'es NEM hasznalhatod a PRAGMA writable_schema-t, sem a sqlite_master/sqlite_schema irasat. ' +
   'Jovahagyast a dashboard API-n kerj es hasznalj fel (/api/approvals). Olvasni szabad (SELECT, sqlite3 -readonly), ' +
   'mas tablat irni is (agent_messages, daily_logs). Egy $(...) behelyettesitesben allo sqlite3-at (idezojellel benne) ' +
@@ -2622,7 +2622,7 @@ export const SUBAGENT_FILE_GATE_MSG =
   'sem egy MCP-szerverlistat (ENVRELAXMCPCFG1104: egy oda irt szerver a kovetkezo indulaskor parancskent fut): ' +
   'barmely agens agents/<nev>/.mcp.json es .claude-config/.claude.json fajljat, a SAJAT CLAUDE_CONFIG_DIR .claude.json-jat, ' +
   'a telepites .mcp.json fajljat es a ~/.claude.json-t, a `claude mcp add|add-json|remove` paranccsal sem (barmely --scope); ' +
-  'sem a Claude Code plugin-fajat (~/.claude/plugins, a telepites plugins/ mappaja, ~/marveen-local-plugins, a config-direk plugins/ mappaja es registry-jei) es a kozos ~/.claude/agents, skills, hooks fat, ' +
+  'sem a Claude Code plugin-fajat (~/.claude/plugins, a telepites plugins/ mappaja, ~/alfred-local-plugins, a config-direk plugins/ mappaja es registry-jei) es a kozos ~/.claude/agents, skills, hooks fat, ' +
   'a `claude plugin` paranccsal sem (csak list, validate, marketplace list, --help), es `--plugin-dir`-rel sem (PLUGINCODEWRITE1104; plugin-deploy a fo agensen at); ' +
   'sem barmely agens Telegram inbound-evidence naplojat (agents/<nev>/.claude/channels/telegram/inbound-evidence.jsonl es .1, es a folotte allo telegram/ es channels/ konyvtarat celzo parancsot; TGINREPLAYGATE1104: a pluginja irja, nem eszkozhivas); ' +
   'sem barmely agens agents/<nev>/agent-config.json fajljat (GATEFILES1110: customProvider, model, oauthTokenFile; az API-n owner-kapus, valtoztatas a fo agensen at); ' +

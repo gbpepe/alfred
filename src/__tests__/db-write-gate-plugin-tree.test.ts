@@ -1,5 +1,5 @@
 // PLUGINCODEWRITE1104: a sub-agent may not write the Claude Code plugin trees or the shared user-level trees every
-// session loads (~/.claude/plugins, <root>/plugins, ~/marveen-local-plugins, ~/.claude/agents|skills|hooks, each agent's
+// session loads (~/.claude/plugins, <root>/plugins, ~/alfred-local-plugins, ~/.claude/agents|skills|hooks, each agent's
 // plugin registries, the workers' plugins, a plugin's installPath outside the cache, other config roots' plugins), nor
 // run `claude plugin` beyond list/validate/marketplace list/--help. The decision functions only read paths: nothing
 // here writes to the home directory.
@@ -35,14 +35,14 @@ describe('the static targets: a sub-agent may not write them', () => {
     join(H, '.claude', 'plugins', 'cache', 'm', 'p', '1.0', 'server.ts'),
     join(H, '.claude', 'plugins', 'known_marketplaces.json'),
     join(root, 'plugins', 'worksource', 'server.mjs'),
-    join(H, 'marveen-local-plugins', 'gromzo', 'gromzo-channel', 'server.ts'),
+    join(H, 'alfred-local-plugins', 'gromzo', 'gromzo-channel', 'server.ts'),
     join(H, '.claude', 'agents', 'x.md'),
     join(H, '.claude', 'skills', 'x', 'SKILL.md'),
     join(H, '.claude', 'hooks', 'x.cjs'),
     join(agent, '.claude-config', 'plugins', 'installed_plugins.json'),
     join(root, 'agents', 'other', '.claude-config', 'plugins', 'known_marketplaces.json'),
-    join(H, '.marveen-worker', '.claude-config', 'plugins', 'x.json'),
-    join(H, '.marveen-worker-fast', '.claude-config', 'plugins', 'x.json'),
+    join(H, '.alfred-worker', '.claude-config', 'plugins', 'x.json'),
+    join(H, '.alfred-worker-fast', '.claude-config', 'plugins', 'x.json'),
   ]
   it('native Write', () => {
     for (const t of targets()) expect(write(t)).toEqual(SUB)
@@ -66,7 +66,7 @@ describe('Bash: bare names, ancestors below $HOME, $CLAUDE_CONFIG_DIR', () => {
   it.each([
     ['cd ~/.claude && rm -rf plugins', undefined],
     ['rm -rf plugins', join(H, '.claude')],
-    ['cd ~/marveen-local-plugins && rm -rf gromzo', undefined],
+    ['cd ~/alfred-local-plugins && rm -rf gromzo', undefined],
     ['rsync -a /tmp/x/ ~/.claude/', undefined],
     ['cp -R /tmp/x/plugins ~/.claude/', undefined],
     ['cp -R src/ ~/.claude/', undefined],

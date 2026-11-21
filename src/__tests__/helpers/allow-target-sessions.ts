@@ -5,7 +5,7 @@
 // itself (schedule-target-session-guard, schedule-registry-runner-tick) do not use this.
 import { afterAll } from 'vitest'
 
-export const TARGET_SESSION_TEST_ALLOW = Symbol.for('marveen.schedule.targetSessionAllowForTest')
+export const TARGET_SESSION_TEST_ALLOW = Symbol.for('alfred.schedule.targetSessionAllowForTest')
 
 export function allowTargetSessionsForTest(names: string[]): void {
   ;(globalThis as Record<symbol, unknown>)[TARGET_SESSION_TEST_ALLOW] = new Set(names)

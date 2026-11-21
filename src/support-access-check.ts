@@ -1,4 +1,4 @@
-// Support access: the reconcile's self-probe to marveen.io (SUPPORTKULCS1109,
+// Support access: the reconcile's self-probe to alfred.io (SUPPORTKULCS1109,
 // PR1b 2b-3; Mira 78172 and 78183, Dani 32056 G1-G6).
 //
 // The machine asks the access check with `"probe": true`. The answer of a probe

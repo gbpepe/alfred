@@ -26,7 +26,7 @@ set -u
 case "$(uname -s)" in
   Darwin) MANAGED_FILE="/Library/Application Support/ClaudeCode/managed-settings.json" ;;
   Linux)  MANAGED_FILE="/etc/claude-code/managed-settings.json" ;;
-  *) echo "  channelsEnabled: nem tamogatott OS ($(uname -s)); kihagyva."; echo "MARVEEN_CHANNELS_GATE=ok"; exit 0 ;;
+  *) echo "  channelsEnabled: nem tamogatott OS ($(uname -s)); kihagyva."; echo "ALFRED_CHANNELS_GATE=ok"; exit 0 ;;
 esac
 
 # Idempotent: already true -> nothing to do.
@@ -36,7 +36,7 @@ esac
 # sudo handling below. Resolving sudo first meant a host where the key was
 # ALREADY set, but the invoking user had no sudo, reported
 #   ! channelsEnabled: nem root es nincs sudo -- kihagyva.
-#   MARVEEN_CHANNELS_GATE=manual
+#   ALFRED_CHANNELS_GATE=manual
 # and sent the operator off to fix something that was already correct. Ask the
 # question that costs nothing first; only a WRITE needs privilege.
 #
@@ -55,7 +55,7 @@ PY
 
 report_enabled() {
   echo "  channelsEnabled: mar be van kapcsolva ($MANAGED_FILE)"
-  echo "MARVEEN_CHANNELS_GATE=ok"
+  echo "ALFRED_CHANNELS_GATE=ok"
 }
 
 # MANAGEDUMASK1119: an EXISTING managed dir keeps its mode under `mkdir -p -m 0755` (below), and an older install made
@@ -98,7 +98,7 @@ if [ "$(id -u)" -ne 0 ]; then
     echo "  ! channelsEnabled: nem root es nincs sudo -- kihagyva."
     echo "    Kezi lepes (rootkent futtatva biztonsagos, meglevo kulcsokat megorzi):"
     echo "      sudo bash $0"
-    echo "MARVEEN_CHANNELS_GATE=manual"
+    echo "ALFRED_CHANNELS_GATE=manual"
     exit 0
   fi
 fi
@@ -121,7 +121,7 @@ fi
 if ! $SUDO mkdir -p -m 0755 "$MANAGED_DIR" 2>/dev/null; then
   echo "  ! channelsEnabled: nem sikerult letrehozni $MANAGED_DIR -- kezi root-lepes szukseges:"
   echo "      sudo bash $0"
-  echo "MARVEEN_CHANNELS_GATE=manual"
+  echo "ALFRED_CHANNELS_GATE=manual"
   exit 0
 fi
 
@@ -137,18 +137,18 @@ MSW="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/managed-settings-write.py
 if [ ! -f "$MSW" ]; then
   echo "  ! channelsEnabled: a managed-settings iro hianyzik ($MSW) -- kezi root-lepes szukseges:"
   echo "      sudo bash $0"
-  echo "MARVEEN_CHANNELS_GATE=manual"
+  echo "ALFRED_CHANNELS_GATE=manual"
   exit 0
 fi
 if $SUDO python3 -I "$MSW" "$MANAGED_FILE" --create --channels-enabled
 then
   echo "  channelsEnabled=true beallitva a managed-settings-ben ($MANAGED_FILE)"
   echo "    (a bejovo channel-uzenetek team/enterprise orgnal is celba ernek; restart utan lep eletbe.)"
-  echo "MARVEEN_CHANNELS_GATE=ok"
+  echo "ALFRED_CHANNELS_GATE=ok"
 else
   echo "  ! channelsEnabled: a managed-settings frissitese sikertelen."
   echo "    Kezi lepes (rootkent futtatva biztonsagos, meglevo kulcsokat megorzi):"
   echo "      sudo bash $0"
-  echo "MARVEEN_CHANNELS_GATE=manual"
+  echo "ALFRED_CHANNELS_GATE=manual"
 fi
 exit 0

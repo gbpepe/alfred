@@ -169,7 +169,7 @@ const SYNTHETIC_USERS = new Set([
   'root', 'admin', 'myuser', 'someone', 'alice', 'bob', 'shared', 'guest',
   'public', 'default', 'owner', 'home', 'x', 'xyz', 'abc', 'op', 'operator',
   'old-user', 'testuser', 'test-user', 'test_user', 'john_doe', 'jane_doe', 'jdoe',
-  'somebody', 'marveen', 'linuxbrew',
+  'somebody', 'alfred', 'linuxbrew',
 ]);
 
 // Separators between digit groups: space ( ) . / - -- Hungarian numbers are written with any of

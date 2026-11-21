@@ -16,17 +16,17 @@ afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, f
 
 describe('reauth escalation on an API key', () => {
   it('names the key and the Console, and neither OAuth nor /login', () => {
-    const m = buildEscalationMessage('marveen', 'Invalid API key', 10, false, false, false, true)
+    const m = buildEscalationMessage('alfred', 'Invalid API key', 10, false, false, false, true)
     expect(m).toContain('API-kulccsal fut')
     expect(m).toContain('Anthropic Console')
     expect(m).not.toContain('/login')
     expect(m).not.toContain('OAuth')
   })
   it('without the flag the message is the OAuth one, as before', () => {
-    expect(buildEscalationMessage('marveen', 'Not logged in', 10)).toContain('halott OAuth tokent')
+    expect(buildEscalationMessage('alfred', 'Not logged in', 10)).toContain('halott OAuth tokent')
   })
   it('the morning summary gives the key line, and no /login line when only key entries are left', () => {
-    const e: QuietSuppressedEntry = { session: 's', label: 'marveen', reason: 'Invalid API key', consecutiveDead: 10, apiKey: true }
+    const e: QuietSuppressedEntry = { session: 's', label: 'alfred', reason: 'Invalid API key', consecutiveDead: 10, apiKey: true }
     const m = buildQuietSummaryMessage([e])
     expect(m).toContain('API-kulcs')
     expect(m).not.toContain('/login')

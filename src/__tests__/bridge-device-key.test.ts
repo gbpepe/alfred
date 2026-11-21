@@ -18,7 +18,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 //     replace-by-id, listed, revocable;
 //   - the default (no flag) keeps the shared-token behavior byte for byte.
 //
-// The CLIs open the install's real store/claudeclaw.db, so the device-key
+// The CLIs open the install's real store/alfred.db, so the device-key
 // paths are driven in-process against ':memory:' (their openDb seam); only
 // argv refusals that exit BEFORE any database or ~/.ssh access run as a
 // subprocess.
@@ -83,7 +83,7 @@ function keyLine(installId: string = randomUUID()): { line: string; installId: s
     Buffer.from([0, 0, 0, type.length]), type,
     Buffer.from([0, 0, 0, 32]), randomBytes(32),
   ])
-  return { line: `ssh-ed25519 ${blob.toString('base64')} marveen-remote:${installId}`, installId }
+  return { line: `ssh-ed25519 ${blob.toString('base64')} alfred-remote:${installId}`, installId }
 }
 
 function enrolledAuthorizedKeys(installId: string): string {
@@ -229,7 +229,7 @@ describe('remote-enroll end to end: the bundle that leaves the CLI carries the r
     const row = findDeviceKeyByInstallId(installId)
     expect(row).toMatchObject({ name: 'Nova MacBook', installId })
     expect(resolveDeviceKey(token!)).toMatchObject({ id: row!.id })
-    expect(readFileSync(join(sshDir, 'authorized_keys'), 'utf8')).toContain(`marveen-remote:${installId}`)
+    expect(readFileSync(join(sshDir, 'authorized_keys'), 'utf8')).toContain(`alfred-remote:${installId}`)
   })
 
   it('without the flag the bundle still carries the shared token, and nothing is minted', async () => {
@@ -283,7 +283,7 @@ describe('bridge-device-key: the installer backfill issues the device key, not t
 
   it('an id that appears only inside ANOTHER line does not count as enrolled', () => {
     const { installId } = keyLine()
-    const lookalike = `ssh-ed25519 AAAA operator note marveen-remote:${installId}-old\n`
+    const lookalike = `ssh-ed25519 AAAA operator note alfred-remote:${installId}-old\n`
     expect(checkDeviceKeyRequest(installId, undefined, lookalike).ok).toBe(false)
   })
 
@@ -301,7 +301,7 @@ describe('bridge-device-key: the installer backfill issues the device key, not t
       let stderr = ''
       try {
         out = execFileSync(TSX, [join(ROOT, 'scripts', 'bridge-device-key.ts'), '--install-id', randomUUID()], {
-          encoding: 'utf-8', timeout: 30_000, stdio: 'pipe', env: { ...process.env, MARVEEN_SSH_DIR: sshDir },
+          encoding: 'utf-8', timeout: 30_000, stdio: 'pipe', env: { ...process.env, ALFRED_SSH_DIR: sshDir },
         })
       } catch (err) {
         const e = err as { status: number; stdout: string; stderr: string }

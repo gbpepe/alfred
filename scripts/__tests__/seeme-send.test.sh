@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/sms/seeme-send.py teszt -- kartya `adbabf7f`, marveen 4. kikötese: a
+# scripts/sms/seeme-send.py teszt -- kartya `adbabf7f`, alfred 4. kikötese: a
 # negativ kontroll TUDJON MEGBUKNI (szerkezetileg kepes "nem"-et adni), ne csak
 # egyszer atmenjen. Az utolso szakasz ezt EGY MUTACIOVAL igazolja: a kapu-agat
 # kiveszi egy IDEIGLENES masolatbol, es ELVARJA, hogy AKKOR a teszt buktassa el

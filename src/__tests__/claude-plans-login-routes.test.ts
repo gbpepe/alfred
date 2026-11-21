@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-claude-plans-login-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-claude-plans-login-test-'))
 // A fresh install has its store dir (only the files are missing): the plan-login first-run check reads a missing
 // store DIR as holding a plan (fail closed, OWNERGATE4-1104 review), so the sandbox needs one.
 mkdirSync(join(tmpRoot, 'store'), { recursive: true })

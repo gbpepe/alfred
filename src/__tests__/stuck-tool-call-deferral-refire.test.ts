@@ -43,10 +43,10 @@ vi.mock('../web/active-model.js', () => ({ readTranscriptMtimeAcrossConfigDirs: 
 vi.mock('../web/inbound-probe.js', () => ({ mainConfigRoots: () => [] }))
 vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'main-test', withoutMainAgent: (a: string[]) => a }))
 vi.mock('../web/channel-monitor.js', () => ({
-  resumeMarveenSession: h.resume,
+  resumeAlfredSession: h.resume,
   sendAlert: vi.fn(),
   lastMainRespawnAt: () => h.respawnAt,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 120_000,
+  ALFRED_POST_RESPAWN_GRACE_MS: 120_000,
 }))
 vi.mock('../web/routine-alert.js', () => ({ sendRoutineAlert: vi.fn() }))
 

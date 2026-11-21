@@ -51,7 +51,7 @@ A CI (`.github/workflows/test.yml`) a validátor tesztjeit és magát a validát
 
 ### Env-kapcsolók
 
-`MARVEEN_DISABLED_HOOKS=tool-log-capture` kikapcsolja a felsorolt hookokat, ha azok a `hook_switches` segédet használják (jelenleg: `tool-log-capture`). A felsorolt hook a bemenete beolvasása előtt 0-val kilép.
+`ALFRED_DISABLED_HOOKS=tool-log-capture` kikapcsolja a felsorolt hookokat, ha azok a `hook_switches` segédet használják (jelenleg: `tool-log-capture`). A felsorolt hook a bemenete beolvasása előtt 0-val kilép.
 
 A **zárolt** hookok NEM kapcsolhatók ki env-ből: a nevük figyelmen kívül marad, bármit mond a változó. Egy env-változót pont az tud beállítani, aki nem kellene: egy prompt-injekció vagy egy figyelmetlen `export`.
 
@@ -98,7 +98,7 @@ Előbb oldd fel a konfliktust, vagy állítsd vissza a fájlt. Ha az oldalfájl 
 
 #### Bemeneti korlát és öröklés
 
-`MARVEEN_HOOK_INPUT_MAX_BYTES` (alap 8 MiB) a hook bemenetének felső korlátja. Fölötte a naplózó hook csendben kihagyja a hívást (fail-open), a zárolt hook 2-es kóddal blokkol (fail-closed).
+`ALFRED_HOOK_INPUT_MAX_BYTES` (alap 8 MiB) a hook bemenetének felső korlátja. Fölötte a naplózó hook csendben kihagyja a hívást (fail-open), a zárolt hook 2-es kóddal blokkol (fail-closed).
 
 A változót a hook a Claude Code folyamattól örökli, ezért a session indítása előtt kell beállítani (vagy a settings.json `env` blokkjába tenni). Egy futó session Bash-eszközében kiadott `export` a Bash alfolyamatban marad, a hookig nem jut el. (Ez a folyamat-öröklésből következik; élő sessionen nem mértük, ahogy az `env` blokk hook-hatását sem.)
 

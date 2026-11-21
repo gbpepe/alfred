@@ -144,7 +144,7 @@ assert_contains "ExecStart points at the observer" "$(cat "$UNITS/hex-main-inbox
 # The shipped units under scripts/systemd/ are placeholder templates. The unit
 # that lands on a host must carry the REAL paths, or it fails at first fire.
 assert_not_contains "no placeholder path survives into the written unit" \
-  "$(cat "$UNITS/hex-main-inbox-observer.service")" "/path/to/marveen"
+  "$(cat "$UNITS/hex-main-inbox-observer.service")" "/path/to/alfred"
 assert_not_contains "no placeholder user survives into the written unit" \
   "$(cat "$UNITS/hex-main-inbox-observer.service")" "/home/USER"
 assert_contains "Description carries BOT_NAME from .env" \
@@ -161,10 +161,10 @@ assert_eq "second run calls no systemctl" "0" "$(wc -c < "$TMP/systemctl.calls" 
 assert_eq "second run prints nothing" "" "$OUT"
 
 # 3d. A second agent on the same host gets its own timer.
-printf '[Service]\n' > "$UNITS/marveen-channels.service"
+printf '[Service]\n' > "$UNITS/alfred-channels.service"
 run_fn "$UNITS" >/dev/null
 assert_eq "second agent gets its own observer timer" "yes" \
-  "$([ -f "$UNITS/marveen-main-inbox-observer.timer" ] && echo yes || echo no)"
+  "$([ -f "$UNITS/alfred-main-inbox-observer.timer" ] && echo yes || echo no)"
 
 # 3e. macOS: the same function must reach the launchd path instead, or every
 #     existing mac install stays exactly as broken as before.

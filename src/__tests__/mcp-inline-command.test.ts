@@ -138,7 +138,7 @@ describe('classifyMcpInlineReply -- safety', () => {
   it('does not accept a reply about a DIFFERENT server', () => {
     // Guards the scrollback-bleed failure: another agent's server, or an older
     // line, must not be read as this command's answer.
-    expect(classifyMcpInlineReply('MCP server "plugin:slack-channel:marveen-marketplace" enabled', 'enable', SERVER)).toBe(
+    expect(classifyMcpInlineReply('MCP server "plugin:slack-channel:alfred-marketplace" enabled', 'enable', SERVER)).toBe(
       'unknown',
     )
   })
@@ -179,7 +179,7 @@ describe('typed /mcp command parsing (CLI 2.1.291 fixtures)', () => {
 
   it('isSafeMcpServerName accepts the shapes plugin pane ids take and refuses everything else', () => {
     expect(isSafeMcpServerName('plugin:telegram:telegram')).toBe(true)
-    expect(isSafeMcpServerName('plugin:slack-channel:marveen-marketplace')).toBe(true)
+    expect(isSafeMcpServerName('plugin:slack-channel:alfred-marketplace')).toBe(true)
     expect(isSafeMcpServerName('okserver')).toBe(true)
     // Whitespace would split the argument (and a bare verb opens the full
     // modal); the rest are keystroke-injection metacharacters.

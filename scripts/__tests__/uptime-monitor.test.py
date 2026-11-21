@@ -95,7 +95,7 @@ Cases:
       text; T22b ALLOWED_CHAT_ID is the "0" placeholder and access.json holds one DM entry next to a group id: the alert
       goes to that DM entry; T22c access.json holds two DM entries: no chat (exit 4, nothing reaches the stub, the
       preflight log line carries the resolver's "refusing to guess" reason); T22d access.json holds only a group id: the
-      same, with the "no DM entry" reason; T22e MARVEEN_ALERT_CHAT_ID is an explicit override over the .env id
+      same, with the "no DM entry" reason; T22e ALFRED_ALERT_CHAT_ID is an explicit override over the .env id
   G1  every alert/recovery/blind text the script can build for the target names 'site', 'widget', 'website' and
       'caf\u00e9-booking' (example URLs only), with every error text in G1's own list (not every exception name the script
       can print), passes the outgoing-copy gate; G1k: the same alert with an em dash in it is REFUSED (the gate is
@@ -255,7 +255,7 @@ def run(script, folder, config_path, sender="file", env_extra=None, env_drop=())
     env = dict(os.environ, UPTIME_CONFIG=config_path, UPTIME_STATE=os.path.join(folder, "state.json"),
                UPTIME_LOG=os.path.join(folder, "log.jsonl"), UPTIME_TIMEOUT="5",
                UPTIME_SENDER=("file:" + messages) if sender == "file" else sender,
-               TELEGRAM_ENV="/nonexistent", TELEGRAM_STATE_DIR="/nonexistent", MARVEEN_ALERT_CHAT_ID="",
+               TELEGRAM_ENV="/nonexistent", TELEGRAM_STATE_DIR="/nonexistent", ALFRED_ALERT_CHAT_ID="",
                TELEGRAM_API_BASE="http://127.0.0.1:%d" % DEAD, HOME=folder, PYTHONDONTWRITEBYTECODE="1")
     for v in ("UPTIME_MAX_BYTES",) + PROXY_VARS + tuple(env_drop):
         env.pop(v, None)
@@ -786,7 +786,7 @@ def t22d(s, srv, m):
 
 def t22e(s, srv, m):
     code, calls, out = send_path(s, srv, m, "ALLOWED_CHAT_ID=111\n", {"allowFrom": ["222"]},
-                                 env_extra={"MARVEEN_ALERT_CHAT_ID": "555"})
+                                 env_extra={"ALFRED_ALERT_CHAT_ID": "555"})
     return code == 3 and sent_to(calls, "555"), "code %s, calls %s, %s" % (code, calls, out[-300:])
 
 

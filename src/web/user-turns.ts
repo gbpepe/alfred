@@ -1,7 +1,7 @@
 import { closeSync, openSync, readdirSync, readSync, statSync, type Stats } from 'node:fs'
 import { join } from 'node:path'
 
-// GET /api/overview counts "real" user turns (operator prompts, Telegram
+// GET /api/overview counts "real" user turns (operator prompts, channel
 // messages) across every Claude Code session transcript under
 // ~/.claude/projects, and asks twice per request: today and yesterday. The old
 // counter re-read every *.jsonl in full on both calls, which on a busy install

@@ -42,8 +42,8 @@ vi.mock('node:fs', async (importOriginal) => {
 vi.mock('../web/atomic-write.js', () => ({ atomicWriteFileSync: vi.fn() }))
 vi.mock('../web/scheduled-tasks-io.js', () => ({ SCHEDULED_TASKS_DIR: '/mock/tasks' }))
 vi.mock('../config.js', () => ({
-  PROJECT_ROOT: '/mock/project', STORE_DIR: '/mock/store', MAIN_AGENT_ID: 'marveen', BOT_NAME: 'Marveen',
-  BRAND_NAME: 'Marveen', OWNER_NAME: 'Owner', CHANNEL_PROVIDER: 'telegram',
+  PROJECT_ROOT: '/mock/project', STORE_DIR: '/mock/store', MAIN_AGENT_ID: 'alfred', BOT_NAME: 'Alfred',
+  BRAND_NAME: 'Alfred', OWNER_NAME: 'Owner', CHANNEL_PROVIDER: 'telegram',
 }))
 vi.mock('../web/vault-bindings.js', () => ({ getBindings: () => [] }))
 vi.mock('../env.js', () => ({ updateEnvFile: vi.fn(), readEnvFile: () => ({}) }))

@@ -11,7 +11,7 @@
 // a caller composed.
 //
 // The directory is a PARAMETER. Which directory production uses, and whether a
-// MARVEEN_SSH_DIR override is acceptable, is the caller's question; this layer
+// ALFRED_SSH_DIR override is acceptable, is the caller's question; this layer
 // only ever writes where it is told.
 //
 // ASYMMETRY ON PURPOSE: adding access is refused through a symbolic link, be

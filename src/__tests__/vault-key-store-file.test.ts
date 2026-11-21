@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 // VAULTKEYSTOREFILE1118: VAULT_KEY_STORE=file in .env keeps the vault master key in store/.vault-key and never
 // calls the Keychain, in every process that loads vault.js. Before it, the only file-key switch
-// (MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION) was read from process.env alone, which .env never reaches, so a locked
+// (ALFRED_VAULT_NO_KEYCHAIN_MIGRATION) was read from process.env alone, which .env never reaches, so a locked
 // login Keychain stopped every decrypt in the dashboard. The Keychain is a mock here: no test touches a real one.
 
 const tmpRoot = vi.hoisted(() => {
@@ -13,7 +13,7 @@ const tmpRoot = vi.hoisted(() => {
   const { join } = require('node:path') as typeof import('node:path')
   const root = mkdtempSync(join(tmpdir(), 'vaultkeystore-test-'))
   // env.ts reads .env from here instead of the repo root (its test-only hatch, read at import time).
-  process.env.CLAUDECLAW_ENV_DIR = root
+  process.env.ALFRED_ENV_DIR = root
   return root
 })
 

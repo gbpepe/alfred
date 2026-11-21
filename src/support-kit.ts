@@ -54,7 +54,7 @@ import { join, resolve } from 'node:path'
 export const KIT_SUBFOLDER = 'kit'
 export const KIT_MANIFEST_NAME = 'manifest'
 export const KIT_LOCK_NAME = 'kit.lock'
-const KIT_MANIFEST_HEADER = 'marveen-support-kit 1'
+const KIT_MANIFEST_HEADER = 'alfred-support-kit 1'
 /** A manifest is never larger than this, and never names more files: the launcher refuses a larger one unread. */
 export const KIT_MANIFEST_MAX_BYTES = 4096
 export const KIT_MAX_FILES = 16

@@ -20,14 +20,14 @@ import { mainConfigDecisionForTest } from '../web/main-config-decision.js'
 // it the respawned bun telegram bridge can't be located and the session comes
 // up channel-less. Lock it so a future refactor can't silently drop it.
 describe('buildMainSessionRespawnCmd', () => {
-  const base = { claudePath: '/usr/local/bin/claude', pluginId: 'telegram@claude-plugins-official', model: "claude-opus-4-8[1m]", config: mainConfigDecisionForTest(), channelStateEnv: { name: 'TELEGRAM_STATE_DIR', dir: '/opt/marveen/.claude/channels/telegram' } }
+  const base = { claudePath: '/usr/local/bin/claude', pluginId: 'telegram@claude-plugins-official', model: "claude-opus-4-8[1m]", config: mainConfigDecisionForTest(), channelStateEnv: { name: 'TELEGRAM_STATE_DIR', dir: '/opt/alfred/.claude/channels/telegram' } }
 
   // #915 regression: without the *_STATE_DIR export the plugin falls back to
   // ~/.claude/channels/<provider>/, finds no .env and exits -- the respawned
   // session comes up channel-deaf (2026-09-24, twice in one evening).
   it('exports the channel state dir before launching claude', () => {
     const cmd = buildMainSessionRespawnCmd({ ...base, continueSession: false })
-    expect(cmd).toContain("export TELEGRAM_STATE_DIR='/opt/marveen/.claude/channels/telegram'")
+    expect(cmd).toContain("export TELEGRAM_STATE_DIR='/opt/alfred/.claude/channels/telegram'")
     expect(cmd.indexOf('TELEGRAM_STATE_DIR')).toBeLessThan(cmd.indexOf(base.claudePath))
   })
 
@@ -254,11 +254,11 @@ describe('shouldDeferKeepaliveRespawn', () => {
 // ---------------------------------------------------------------------------
 // B2 CONTRACT: cross-path respawn storm prevention
 //
-// Invariant: after an inbound-probe respawn fires (setting marveenLastHardRestart
-// via hardRestartMarveenChannels), the keepalive path must be suppressed for
+// Invariant: after an inbound-probe respawn fires (setting alfredLastHardRestart
+// via hardRestartAlfredChannels), the keepalive path must be suppressed for
 // KEEPALIVE_RESPAWN_GRACE_MS. This is achieved by passing msSinceLastRespawn
 // = now - lastMainRespawnAt() to shouldRespawnForStaleKeepalive, where
-// lastMainRespawnAt() = Math.max(marveenLastKeepaliveRespawn, marveenLastHardRestart).
+// lastMainRespawnAt() = Math.max(alfredLastKeepaliveRespawn, alfredLastHardRestart).
 //
 // The pure-function test below locks the decision: even when only the
 // inbound-probe path has respawned (keepalive variable = 0, hardRestart > 0),
@@ -328,7 +328,7 @@ describe('B2 cross-path respawn storm prevention', () => {
     // The keepalive path computes msSinceLastRespawn = now - Math.max(0, T_respawn) = elapsed.
     // If elapsed < GRACE_MS, shouldRespawnForStaleKeepalive must return false.
     const elapsedSinceInboundRespawn = GRACE_MS - 60_000 // 14 min — within grace
-    // Math.max(marveenLastKeepaliveRespawn=0, marveenLastHardRestart=T_respawn):
+    // Math.max(alfredLastKeepaliveRespawn=0, alfredLastHardRestart=T_respawn):
     // Since 0 < T_respawn, max = T_respawn, so msSinceCrossPath = elapsed < GRACE.
     expect(shouldRespawnForStaleKeepalive({
       keepaliveAgeMs: AGE_MS,
@@ -350,7 +350,7 @@ describe('B2 cross-path respawn storm prevention', () => {
 
   it('suppresses keepalive respawn when keepalive path itself respawned recently (pre-existing self-grace)', () => {
     const elapsedSinceKeepaliveRespawn = GRACE_MS - 30_000 // 14.5 min — within grace
-    // Math.max(marveenLastKeepaliveRespawn=T, marveenLastHardRestart=0) = T_keepalive
+    // Math.max(alfredLastKeepaliveRespawn=T, alfredLastHardRestart=0) = T_keepalive
     expect(shouldRespawnForStaleKeepalive({
       keepaliveAgeMs: AGE_MS,
       stalenessThresholdMs: STALE_MS,

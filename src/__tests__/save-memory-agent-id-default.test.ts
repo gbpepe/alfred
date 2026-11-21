@@ -1,12 +1,12 @@
 /**
- * Default install (MAIN_AGENT_ID = 'marveen'): saveMemory rows keep the same
+ * Default install (MAIN_AGENT_ID = 'alfred'): saveMemory rows keep the same
  * owner they always had, so the agent_id fix changes nothing there.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 
 vi.mock('../config.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../config.js')>()),
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
   ALLOWED_CHAT_ID: 'test-chat',
   OLLAMA_URL: '',
   EMBED_URL: '',
@@ -23,16 +23,16 @@ beforeAll(() => {
 })
 
 describe('saveMemory agent_id (default install)', () => {
-  it("still writes agent_id 'marveen'", () => {
+  it("still writes agent_id 'alfred'", () => {
     saveMemory('chat-d', 'numbatone default', 'episodic')
     const row = getDb().prepare('SELECT agent_id, category FROM memories WHERE content = ?')
       .get('numbatone default') as { agent_id: string; category: string }
-    expect(row.agent_id).toBe('marveen')
+    expect(row.agent_id).toBe('alfred')
     expect(row.category).toBe('warm')
   })
 
-  it("the row is in the 'marveen' list", () => {
+  it("the row is in the 'alfred' list", () => {
     clearMemoryCache()
-    expect(getAgentMemories('marveen', 50).map(m => m.content)).toContain('numbatone default')
+    expect(getAgentMemories('alfred', 50).map(m => m.content)).toContain('numbatone default')
   })
 })

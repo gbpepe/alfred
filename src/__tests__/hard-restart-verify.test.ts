@@ -49,11 +49,11 @@ describe('scheduleHardRestartVerify', () => {
 
 describe('wiring in channel-monitor.ts', () => {
   const src = readFileSync(join(__dirname, '../web/channel-monitor.ts'), 'utf-8')
-  const start = src.indexOf('export function hardRestartMarveenChannels')
+  const start = src.indexOf('export function hardRestartAlfredChannels')
   const body = src.slice(start, src.indexOf('\n}\n', start))
   it('every success path of the hard restart schedules the check, right after its own stamp', () => {
     expect(body.match(/verifyHardRestartLater\(\)/g)?.length).toBe(3)
-    expect(body.match(/noteOwnHardRestartStamp\(marveenLastHardRestart\)[^\n]*\n\s*verifyHardRestartLater\(\)/g)?.length).toBe(3)
+    expect(body.match(/noteOwnHardRestartStamp\(alfredLastHardRestart\)[^\n]*\n\s*verifyHardRestartLater\(\)/g)?.length).toBe(3)
   })
   it('the check probes the pane with the liveness detection and, when claude is gone, logs an error and alerts the owner unconditionally', () => {
     const a = src.indexOf('function verifyHardRestartLater')
@@ -66,7 +66,7 @@ describe('wiring in channel-monitor.ts', () => {
     const lines = cb.split('\n').map((l) => l.trim()).filter(Boolean)
     expect(lines).toHaveLength(4)
     expect(lines[0]).toMatch(/^logger\.error\(/)
-    // Owner-action alert (Szotasz/marveen#2353 review): a verification
+    // Owner-action alert (gbpepe/alfred#2353 review): a verification
     // failure is never a self-heal, so it must stay off the gated path.
     expect(lines.some((l) => /^sendOwnerActionAlert\('main-hard-restart-no-claude', /.test(l))).toBe(true)
     expect(lines.some((l) => /^sendRoutineAlert\(/.test(l))).toBe(false)

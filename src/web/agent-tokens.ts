@@ -198,8 +198,8 @@ function isDanglingLink(path: string): boolean {
 }
 
 /**
- * The launch-command piece that tells scripts/marveen-api.sh which token to read (VOICETOKENLEAK1101 PR-A0).
- * The helper reads MARVEEN_TOKEN_FILE, else the SHARED store/.dashboard-token. A sub-agent with its own token
+ * The launch-command piece that tells scripts/alfred-api.sh which token to read (VOICETOKENLEAK1101 PR-A0).
+ * The helper reads ALFRED_TOKEN_FILE, else the SHARED store/.dashboard-token. A sub-agent with its own token
  * (AGENT_TOKENS on, its file in place: dashboardTokenPathFor) must send THAT one, the narrower token the server
  * confines to the agent API; otherwise the helper would write with the shared token, a wider scope than the
  * agent's own curl recipes had. So, with the switch on: export the agent's own path when it has one; else unset
@@ -214,12 +214,12 @@ function isDanglingLink(path: string): boolean {
 export function helperTokenEnv(name: string, quote: (s: string) => string, baseDir: string = agentsBaseDir(), enabled: boolean = agentTokensEnabled()): string {
   if (!enabled) return ''
   const own = dashboardTokenPathFor(name, baseDir, true)
-  if (own !== mainTokenPath()) return `export MARVEEN_TOKEN_FILE=${quote(own)} && `
+  if (own !== mainTokenPath()) return `export ALFRED_TOKEN_FILE=${quote(own)} && `
   if (isPlausibleAgentName(name)) {
     logger.warn({ name, path: agentTokenPath(name, baseDir) },
-      'agent token: AGENT_TOKENS is on but the agent has no own token file; marveen-api.sh uses the SHARED token for it (wider scope) until a start provisions one')
+      'agent token: AGENT_TOKENS is on but the agent has no own token file; alfred-api.sh uses the SHARED token for it (wider scope) until a start provisions one')
   }
-  return 'unset MARVEEN_TOKEN_FILE && '
+  return 'unset ALFRED_TOKEN_FILE && '
 }
 
 /**

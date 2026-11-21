@@ -1,5 +1,5 @@
 #!/bin/bash
-# Marveen system health check. Run: bash scripts/doctor.sh
+# Alfred system health check. Run: bash scripts/doctor.sh
 # Exit 0 = all OK, 1 = something failed
 
 set -u
@@ -18,13 +18,13 @@ MAIN_AGENT_ID="$(grep -E '^MAIN_AGENT_ID=' .env 2>/dev/null | head -1 | cut -d= 
 # and it is run precisely when something is already wrong.
 WEB_PORT="${WEB_PORT:-$(grep -E '^WEB_PORT=' "$(dirname "$0")/../.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d ' "')}"
 WEB_PORT="${WEB_PORT:-3420}"
-MAIN_AGENT_ID="${MAIN_AGENT_ID:-marveen}"
+MAIN_AGENT_ID="${MAIN_AGENT_ID:-alfred}"
 # Active channel provider (telegram default) -- the progress-watchdog section
 # below compares the live hook/timer plumbing against it.
 CHANNEL_PROVIDER="$(grep -E '^CHANNEL_PROVIDER=' .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d ' "')"
 CHANNEL_PROVIDER="${CHANNEL_PROVIDER:-telegram}"
 
-echo -e "\n${BOLD}Marveen Doctor${RESET}: $(date '+%Y-%m-%d %H:%M:%S')\n"
+echo -e "\n${BOLD}Alfred Doctor${RESET}: $(date '+%Y-%m-%d %H:%M:%S')\n"
 
 # --- Services (systemd on Linux, launchd on macOS) ---
 echo -e "${BOLD}Services${RESET}"
@@ -218,7 +218,7 @@ OAUTH=$(grep -E "^CLAUDE_CODE_OAUTH_TOKEN=" .env 2>/dev/null | head -1 | cut -d=
 # APIKEYSCOPE1107 (Samu 72223): where an API key in .env goes now, in the install's language. The value is never shown.
 if [ -n "$API_KEY" ] && . "$INSTALL_DIR/scripts/lib/auth-key-mode.sh" 2>/dev/null; then
   _akm_line="$(auth_key_mode_notice "$(auth_key_mode "$INSTALL_DIR")" "$(cat "$INSTALL_DIR/.lang" 2>/dev/null || echo hu)")"
-  [ -n "$_akm_line" ] && warn "${_akm_line#Marveen: }"
+  [ -n "$_akm_line" ] && warn "${_akm_line#Alfred: }"
   unset _akm_line
 fi
 if [ -n "$API_KEY" ]; then
@@ -296,11 +296,11 @@ fi
 
 # --- Database ---
 echo -e "\n${BOLD}Database${RESET}"
-if [ -f "store/claudeclaw.db" ]; then
-  MEM=$(sqlite3 store/claudeclaw.db "SELECT COUNT(*) FROM memories;" 2>/dev/null || echo "?")
-  ok "claudeclaw.db: alive ($MEM memories)"
+if [ -f "store/alfred.db" ]; then
+  MEM=$(sqlite3 store/alfred.db "SELECT COUNT(*) FROM memories;" 2>/dev/null || echo "?")
+  ok "alfred.db: alive ($MEM memories)"
 else
-  fail "store/claudeclaw.db missing"
+  fail "store/alfred.db missing"
 fi
 
 # --- Scheduled tasks ---

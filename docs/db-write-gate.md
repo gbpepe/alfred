@@ -6,7 +6,7 @@
    `approval_teams_cards`, `agent_create_specs`, `auth_sessions`, `dashboard_users`, `device_keys`, `vault_ssh_keys`, and the support access tables
    `support_consents` and `support_password_state`), `PRAGMA writable_schema`, and any write on `sqlite_master` /
    `sqlite_schema`;
-2. a file-level write of `store/claudeclaw.db` (and its `-wal`, `-shm`, `-journal`);
+2. a file-level write of `store/alfred.db` (and its `-wal`, `-shm`, `-journal`);
 3. a write of this install's gate wiring and autonomy levels: `.claude/settings.json`, `.claude/settings.local.json`,
    `scripts/hooks/`, `scripts/self-pace-gate.mjs`, `store/extra-hooks.json`, `store/autonomy-config.json`, the main
    checkout's `.git/config`, `.git/packed-refs`, `.git/refs/remotes/`, `.git/hooks/`, and the user's `~/.gitconfig` and
@@ -14,7 +14,7 @@
    and the owner-gated agent settings the dashboard keeps in `store/` (GATEFILES1110): `store/custom-providers.json`
    (each provider's `baseUrl`) and `store/context-guard.json`. Their API routes are owner-gated; only the dashboard
    writes them;
-   and the support state of this machine, one folder outside the install tree: `~/.marveen/support` (SUPPORTKULCS1109,
+   and the support state of this machine, one folder outside the install tree: `~/.alfred/support` (SUPPORTKULCS1109,
    D5: the narrow token, the group record, the kit with the dispatcher every support line binds, the spool and the run
    folder). Only the support routine writes it (install-kit from the installer and the updater; enable, disable and
    the reconcile from the dashboard), never a tool call;
@@ -86,7 +86,7 @@ run too (an interactive shell runs it).
 **Shell code is a command of its own** (Refs #2974, #2975). The code a command hands to a shell (`sh`/`bash -c`, also
 behind a wrapper such as `timeout`, `eval`, `trap`, a nested `-c`, a shell reading a heredoc or a here-string on stdin)
 is judged as a command by every rule above, in the caller's own context (its cwd, main agent or sub-agent), down to
-eight levels; deeper nesting is denied. So a file-level database write (`bash -c 'rm store/claudeclaw.db'`) is denied
+eight levels; deeper nesting is denied. So a file-level database write (`bash -c 'rm store/alfred.db'`) is denied
 like the same write at the top level, and a `cd` to an unknown directory counts as the install inside the code too
 (`bash -c 'cd $X && echo x > scripts/hooks/f'`). A shell with a script operand reads its stdin as the script's data,
 not as code (`bash x.sh <<'E' ... E`), unless `-s` is given. The inner code is judged in the cwd the command started
@@ -108,7 +108,7 @@ checkout. The repair goes through the owner, in one of two ways.
 **1. The owner's own terminal.** Run as the owner, not through an agent:
 
 ```bash
-cd /Users/marvin/ClaudeClaw          # the install's root
+cd /Users/marvin/Alfred          # the install's root
 git status                           # what is changed; save anything that should be kept first
 git fetch origin
 git checkout develop                 # the branch the install runs (develop or main)
@@ -116,7 +116,7 @@ git reset --hard origin/develop      # the reviewed tree; untracked files (store
 npm ci && npm run build              # only if src/ or package*.json changed
 ```
 
-Then restart the dashboard the usual way (`claudeclaw-host-update-to-develop`, its restart step).
+Then restart the dashboard the usual way (`alfred-host-update-to-develop`, its restart step).
 
 **2. An approval request, carried out by the owner.** The agent that found the broken tree sends an approval request
 (`POST /api/approvals`) whose description holds the exact commands above for this case and why they are needed. The

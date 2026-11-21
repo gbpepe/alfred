@@ -15,9 +15,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const FIXTURE = mkdtempSync(join(tmpdir(), 'gate-wiring-'))
-const PROJECT_ROOT = join(FIXTURE, 'marveen')
+const PROJECT_ROOT = join(FIXTURE, 'alfred')
 const CONFIG_DIR = join(FIXTURE, 'config')
-const MAIN = 'marveen'
+const MAIN = 'alfred'
 const SUB = 'gatewire-sub'
 
 vi.mock('../config.js', async (orig) => ({

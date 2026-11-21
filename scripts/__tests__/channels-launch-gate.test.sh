@@ -6,7 +6,7 @@
 # to the NORMAL launch and started a second main session on the live tmux
 # server -- a second getUpdates poller on the owner's bot, 409, the live
 # channel deaf until a restart. A checkout without .env launched the same way
-# as "marveen-channels". The gate must:
+# as "alfred-channels". The gate must:
 #   - refuse any unknown argument with exit 2, nothing started,
 #   - refuse a checkout without .env with exit 3, nothing started,
 #   - let no argument and `restart` through (the installers' documented

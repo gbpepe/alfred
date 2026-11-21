@@ -41,7 +41,7 @@ vi.mock('node:os', async () => {
 
 vi.mock('../config.js', async () => {
   const actual = await vi.importActual<typeof import('../config.js')>('../config.js')
-  return { ...actual, MAIN_AGENT_ID: 'marveen', PROJECT_ROOT }
+  return { ...actual, MAIN_AGENT_ID: 'alfred', PROJECT_ROOT }
 })
 
 vi.mock('../logger.js', () => ({
@@ -96,11 +96,11 @@ function writeTwoTurns(dir: string, file: string, sessionId: string): void {
 }
 
 function mainRow() {
-  return getTokenSummary().find((r) => r.agent === 'marveen')
+  return getTokenSummary().find((r) => r.agent === 'alfred')
 }
 
 function mainDirs(): string[] {
-  return discoverAgentSources().filter((s) => s.agent === 'marveen').map((s) => s.projectDir)
+  return discoverAgentSources().filter((s) => s.agent === 'alfred').map((s) => s.projectDir)
 }
 
 beforeAll(() => {
@@ -201,7 +201,7 @@ describe('token usage: the main agent under its launcher-resolved config dir', (
       { id: 'b', label: 'B', configDir: planB, planType: 'personal', channelsAllowed: true },
     ]))
     writeFileSync(join(PROJECT_ROOT, 'store', 'claude-plans-state.json'),
-      JSON.stringify({ activePlanByAgent: { marveen: 'b' }, plans: {} }))
+      JSON.stringify({ activePlanByAgent: { alfred: 'b' }, plans: {} }))
     writeTwoTurns(join(planB, 'projects', ENCODED), 'rotated.jsonl', 'sess-rotated')
     // A plan is a pooled dir: a sub-agent assigned to it (now or earlier) leaves
     // its own project dir there. That one is never the main agent's.

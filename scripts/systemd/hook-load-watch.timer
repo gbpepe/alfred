@@ -1,5 +1,5 @@
 [Unit]
-Description=Run the Marveen hook-load watcher every 5 minutes
+Description=Run the Alfred hook-load watcher every 5 minutes
 
 [Timer]
 # Deliberately NOT bound to the dashboard unit: what this watches (a gate that stands open, or blocks every call)

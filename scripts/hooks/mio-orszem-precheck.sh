@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scheduler preCheck for the marveen-io-kozosseg-orszem task (ORSICTX912).
+# Scheduler preCheck for the alfred-io-kozosseg-orszem task (ORSICTX912).
 #
 # runPreCheck contract: exit 0 + stdout "SKIP" = no model turn this tick;
 # exit 0 + other stdout = run the task with stdout as a context prefix;
@@ -27,10 +27,10 @@
 # override envs are test seams, not configuration).
 set -u
 
-STATE="${MIO_PRECHECK_STATE:-/Users/marvin/ClaudeClaw/store/mio-kozosseg-orszem-state.json}"
+STATE="${MIO_PRECHECK_STATE:-/Users/marvin/Alfred/store/mio-kozosseg-orszem-state.json}"
 NODE="${MIO_PRECHECK_NODE:-/opt/homebrew/bin/node}"
 SUPABASE="${MIO_PRECHECK_SUPABASE:-/opt/homebrew/bin/supabase}"
-VAULT_RESOLVE="${MIO_PRECHECK_VAULT:-/Users/marvin/ClaudeClaw/scripts/vault-resolve.mjs}"
+VAULT_RESOLVE="${MIO_PRECHECK_VAULT:-/Users/marvin/Alfred/scripts/vault-resolve.mjs}"
 PROJECT_REF="${MIO_PRECHECK_PROJECT_REF:-fpxycpxdxgifimbmwgzj}"
 
 fail_open() { echo "mio-orszem-precheck: $1" >&2; exit 3; }
@@ -71,7 +71,7 @@ PURCHASE_AT="$(echo "$THRESHOLDS" | sed -n 4p)"
 # VAULTRESOLVECASE1105: `--value`, not the `| cut` pipe. The pipe reported cut's exit code, so a missing label came
 # back as an empty string with exit 0 and this `||` never fired; now the resolver's own code reaches it
 # (3 missing, 4 refused, 6 empty value).
-SUPABASE_ACCESS_TOKEN="$("$NODE" "$VAULT_RESOLVE" --value MARVEEN-CONNECTORS-PAT)" || fail_open "vault resolve failed (exit $?)"
+SUPABASE_ACCESS_TOKEN="$("$NODE" "$VAULT_RESOLVE" --value ALFRED-CONNECTORS-PAT)" || fail_open "vault resolve failed (exit $?)"
 [ -n "$SUPABASE_ACCESS_TOKEN" ] || fail_open "vault returned an empty PAT"
 export SUPABASE_ACCESS_TOKEN
 
@@ -79,7 +79,7 @@ SQL="select
  (select count(*) from auth.users where created_at > '$USER_AT') as users,
  (select count(*) from posts where created_at > '$POST_AT') as posts,
  (select count(*) from comments where created_at > '$COMMENT_AT') as comments,
- (select count(*) from marveen_purchases where created_at > '$PURCHASE_AT') as purchases;"
+ (select count(*) from alfred_purchases where created_at > '$PURCHASE_AT') as purchases;"
 
 RAW="$("$SUPABASE" db query "$SQL" --linked --project-ref "$PROJECT_REF" --output-format json 2>/dev/null)" || fail_open "supabase db query failed"
 

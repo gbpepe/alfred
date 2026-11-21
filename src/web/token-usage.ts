@@ -165,7 +165,7 @@ export function discoverAgentSources(projectRootOverride?: string): AgentTranscr
   // parses, so the dashboard keeps showing a number instead of a gap.
   //
   // MEASURED 2026-09-15 08:5x on this install: the newest transcript under
-  // ~/.claude/projects/-home-bobeklajos-marveen/ was frozen at 2026-09-13 07:27
+  // ~/.claude/projects/-home-bobeklajos-alfred/ was frozen at 2026-09-13 07:27
   // (288 KB), while the live file under .channels-config/projects/<same name>
   // was 5.0 MB and minutes old. token_usage's last row carried exactly that
   // 07:27 timestamp: 30 hours of the main agent's consumption missing from the
@@ -558,7 +558,7 @@ export function getModelDistribution(from?: number, to?: number, agent?: string)
 // APRO920 (c)(1): a Bash row in the token log said only "Bash"; likewise the
 // model distribution said only "claude-sonnet-4-6, 227 rows" with no way to
 // tell WHICH task or agent drove them (D001, ELSOKOR922 Phase 0: all 227 rows
-// were agent='marveen', task_title empty, spread across 21 sessions -- a CLI
+// were agent='alfred', task_title empty, spread across 21 sessions -- a CLI
 // fallback-model pattern, not one configured source). This breaks a single
 // model's rows down by agent / session_id so that question is answerable from
 // the API, not by hand-editing a SQL query against the DB. Since DBSIZE1111 the

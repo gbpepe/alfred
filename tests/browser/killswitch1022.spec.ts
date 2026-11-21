@@ -26,7 +26,7 @@ async function open(page: import('@playwright/test').Page, lang: 'hu' | 'en', in
     calls.push({ path: 'unfreeze', body: null })
     return r.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'x', code: 'owner_session_required' }) })
   })
-  await page.addInitScript((l) => { try { localStorage.setItem('marveen.lang', l) } catch { /* ignore */ } }, lang)
+  await page.addInitScript((l) => { try { localStorage.setItem('alfred.lang', l) } catch { /* ignore */ } }, lang)
   await page.goto('/index.html')
   return { errors, calls }
 }

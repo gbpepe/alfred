@@ -11,7 +11,7 @@ import { beginRestart, endRestart } from '../restart-lock.js'
 import { restartOptsFromBody, scheduleMainRestartWake, wantsMainRestartWake } from '../restart-wake.js'
 import { isModelProfileId, MODEL_PROFILE_IDS } from '../../model-profiles.js'
 import { MAIN_AGENT_ID, currentBotName, PROJECT_ROOT } from '../../config.js'
-import { listPendingChannelRequests, updateChannelRequestStatus, getDb, claimPendingForAgent, markMessageFailed, countNewerMessagesFromSameSender,
+import { getDb, claimPendingForAgent, markMessageFailed, countNewerMessagesFromSameSender,
   getAgentToolActivity, getAgentMessageActivity, getAgentCurrentCards, requeueDeliveredOpenForAgent } from '../../db.js'
 import { nicknameFor } from '../team-nicknames.js'
 import { deriveAgentStatus, AGENT_STATUS_THRESHOLDS } from '../agent-status.js'
@@ -82,37 +82,20 @@ import {
   reportsToCreatesCycle,
   type TeamConfig,
 } from '../agent-team.js'
-import {
-  readAgentTelegramConfig,
-  readAgentDiscordConfig,
-  readAgentSlackConfig,
-  readAgentGooglechatConfig,
-  readAgentTeamsConfig,
-  readMarveenTelegramConfig,
-  sendAvatarChangeMessage,
-  sendWelcomeMessage,
-  validateTelegramToken,
-  parseTelegramToken,
-} from '../telegram.js'
+import { readAgentDiscordConfig } from '../channel-config.js'
 import {
   createInvite,
   listInvites,
   revokeInvite,
   agentChannelDir,
 } from '../channel-invites.js'
-import { hardRestartMarveenChannels } from '../channel-monitor.js'
+import { hardRestartAlfredChannels } from '../channel-monitor.js'
 import { channelsRestartCommand, isMainChannelsAgent, MAIN_CHANNELS_SESSION, withoutMainAgent } from '../main-agent.js'
 import { gateManualRestart, MANUAL_RESTART_FORCE_HINT, wantsForceRestart } from '../manual-restart-gate.js'
 import {
   getProvider,
   channelStateDir,
   readChannelToken,
-  readChannelEnv,
-  teamsSecretExpiry,
-  TEAMS_SECRET_EXPIRY_KEY,
-  checkTelegramTokenBusy,
-  generateSlackAppManifest,
-  getSlackAppSetupInstructions,
   type ChannelProviderType,
 } from '../../channel-provider.js'
 import {
@@ -209,40 +192,6 @@ import { isValidModelId, InvalidModelIdError } from '../../model-id.js'
 
 const execFileAsync = promisify(execFile)
 
-// The Slack smoke test runs for up to 60 s: run it off the event loop, and as an
-// argv, so the agent name is a plain argument, never part of a shell command
-// line. stdin is closed at once, as execSync did.
-async function runSlackSmokeTestNow(scriptPath: string, name: string): Promise<{ ok: boolean; output: string }> {
-  try {
-    const pending = execFileAsync('bash', [scriptPath, name], {
-      timeout: 60000,
-      encoding: 'utf-8',
-      env: { ...process.env, SLACK_SMOKE_TEST_ALLOWED: 'true' },
-    })
-    pending.child.stdin?.end()
-    const { stdout, stderr } = await pending
-    // execSync let the script's stderr through to the dashboard's own; keep that
-    // for a passing run (a failing run already returns it in `output`).
-    if (stderr) process.stderr.write(stderr)
-    return { ok: true, output: stdout }
-  } catch (err: unknown) {
-    const execErr = err as { stdout?: string; stderr?: string }
-    return { ok: false, output: (execErr.stdout || '') + (execErr.stderr || '') }
-  }
-}
-
-// One smoke test at a time, as while the call was synchronous: the script
-// passes on ANY new gate.inbound.deliver entry that lands in the agent's
-// audit.jsonl after it started, so a run overlapping another could pass on
-// the other run's delivery.
-let slackSmokeQueue: Promise<unknown> = Promise.resolve()
-
-export function runSlackSmokeTest(scriptPath: string, name: string): Promise<{ ok: boolean; output: string }> {
-  const run = slackSmokeQueue.then(() => runSlackSmokeTestNow(scriptPath, name))
-  slackSmokeQueue = run.catch(() => {})
-  return run
-}
-
 // Which credential kinds may read a transcript. NAMED principals only: a
 // logged-in human, or a key enrolled to that human's own device. Deliberately
 // excludes the shared dashboard 'token' (the fleet credential every sub-agent
@@ -251,7 +200,7 @@ export function runSlackSmokeTest(scriptPath: string, name: string): Promise<{ o
 // in a boolean.
 const TRANSCRIPT_CALLER_KINDS = ['session', 'device'] as const
 
-const VALID_PROVIDERS = new Set<ChannelProviderType>(['telegram', 'slack', 'discord', 'googlechat', 'teams'])
+const VALID_PROVIDERS = new Set<ChannelProviderType>(['discord'])
 
 export { PERSONALITY_PENDING_SENTINEL } from '../agent-create.js'
 
@@ -278,7 +227,7 @@ function agentRunStateCached(name: string, isRemote: boolean): AgentRunState {
 // long in practice (current Discord scheme is 64-bit, with the leading bit
 // always 0). Rejects empty, whitespace-only, non-numeric, or wrong-length
 // values before any state write so a typo in the dashboard cannot bounce the
-// live Marveen session through hardRestartMarveenChannels().
+// live Alfred session through hardRestartAlfredChannels().
 // #1878 item 6: a channel save on the main agent restarts the channels session,
 // and that restart can fail. The failure reason used to be dropped (restarted
 // false, nothing else), so the onboarding step showed a neutral "saved" and only
@@ -302,75 +251,14 @@ function parseChannelProvider(raw: string): ChannelProviderType | null {
   return null
 }
 
-// Match both new /channels/:provider/ and legacy /telegram/ URL patterns.
-// Returns [agentName, provider] or null. Legacy routes always resolve to 'telegram'.
 function matchChannelRoute(path: string, suffix: string): [string, ChannelProviderType] | null {
-  const newPattern = new RegExp(`^/api/agents/([^/]+)/channels/(telegram|slack|discord|googlechat|teams)${suffix}$`)
+  const newPattern = new RegExp(`^/api/agents/([^/]+)/channels/(discord)${suffix}$`)
   const newMatch = path.match(newPattern)
   if (newMatch) {
     const provider = parseChannelProvider(newMatch[2])
     if (provider) return [decodeURIComponent(newMatch[1]), provider]
   }
-  const legacyPattern = new RegExp(`^/api/agents/([^/]+)/telegram${suffix}$`)
-  const legacyMatch = path.match(legacyPattern)
-  if (legacyMatch) return [decodeURIComponent(legacyMatch[1]), 'telegram']
   return null
-}
-
-function managedSettingsPath(): string {
-  switch (platform()) {
-    case 'darwin':
-      return '/Library/Application Support/ClaudeCode/managed-settings.json'
-    case 'win32':
-      return join(process.env.ProgramData || 'C:\\ProgramData', 'ClaudeCode', 'managed-settings.json')
-    default:
-      return '/etc/claude-code/managed-settings.json'
-  }
-}
-const MANAGED_SETTINGS_PATH = managedSettingsPath()
-const SLACK_ALLOWLIST_ENTRY = { plugin: 'slack-channel', marketplace: 'marveen-marketplace' }
-
-export function isManagedSettingsReady(): boolean {
-  if (!existsSync(MANAGED_SETTINGS_PATH)) return false
-  try {
-    const data = JSON.parse(readFileSync(MANAGED_SETTINGS_PATH, 'utf-8')) as {
-      channelsEnabled?: boolean
-      allowedChannelPlugins?: Array<{ plugin: string; marketplace: string }>
-    }
-    if (!data.channelsEnabled) return false
-    const plugins = data.allowedChannelPlugins ?? []
-    return plugins.some(
-      p => p.plugin === SLACK_ALLOWLIST_ENTRY.plugin && p.marketplace === SLACK_ALLOWLIST_ENTRY.marketplace
-    )
-  } catch {
-    return false
-  }
-}
-
-export function getManagedSettingsSudoCommand(): string {
-  const mergeScript = [
-    'import json, sys',
-    'new_data = json.loads(sys.stdin.read())',
-    'try:\n  with open(' + JSON.stringify(MANAGED_SETTINGS_PATH) + ') as f: data = json.load(f)',
-    'except:\n  data = {}',
-    'data["channelsEnabled"] = True',
-    'existing = data.get("allowedChannelPlugins", [])',
-    'for e in new_data["allowedChannelPlugins"]:\n  if not any(p.get("plugin")==e["plugin"] and p.get("marketplace")==e["marketplace"] for p in existing):\n    existing.append(e)',
-    'data["allowedChannelPlugins"] = existing',
-    'print(json.dumps(data, indent=2))',
-  ].join('\n')
-  const payload = JSON.stringify({
-    allowedChannelPlugins: [
-      SLACK_ALLOWLIST_ENTRY,
-      { plugin: 'telegram', marketplace: 'claude-plugins-official' },
-    ],
-  })
-  if (platform() === 'win32') {
-    const dir = dirname(MANAGED_SETTINGS_PATH)
-    return `New-Item -ItemType Directory -Force -Path '${dir}' | Out-Null; '${payload}' | python -c '${mergeScript}' | Set-Content -LiteralPath '${MANAGED_SETTINGS_PATH}' -Encoding utf8`
-  }
-  const escapedScript = mergeScript.replace(/'/g, "'\\''")
-  return `echo '${payload}' | sudo python3 -c '${escapedScript}' | sudo tee "${MANAGED_SETTINGS_PATH}" > /dev/null`
 }
 
 export function setAgentEnabledPlugins(name: string, provider: ChannelProviderType): void {
@@ -406,8 +294,7 @@ function resolveAccessPath(name: string, provider: ChannelProviderType): string 
 }
 
 // ACCESSREADFAIL1030: the read half of every dashboard write to a channel
-// access.json (pairing approve, allowlist remove, Slack channel-request
-// approve). A MISSING file is a fresh start ({}), as before. A file that
+// access.json (pairing approve, allowlist remove). A MISSING file is a fresh start ({}), as before. A file that
 // EXISTS but cannot be read (EACCES/EPERM/...) or is not a JSON object is
 // refused: the route answers 500, writes nothing and renames nothing.
 // readFileOr's '{}' fallback used to turn an unreadable file into an empty
@@ -535,12 +422,7 @@ export interface AgentSummary {
    *  never the token), or null when the agent is not on a token plan. */
   planTokenLaunch: PlanTokenLaunchStatus | null
   team: TeamConfig
-  hasTelegram: boolean
-  telegramBotUsername?: string
   hasDiscord: boolean
-  hasSlack: boolean
-  hasGooglechat: boolean
-  hasTeams: boolean
   /** The agent's own channel provider from agent-config.json, null when unset. */
   channelProvider: string | null
   status: 'configured' | 'draft'
@@ -604,8 +486,8 @@ interface AgentDetail extends AgentSummary {
 // pointed at a different working directory than the one being written.
 //
 // Measured on the live install, 2026-09-09, same moment, same process:
-//   agents/<main>  -> projects/-Users-marvin-ClaudeClaw-agents-marveen  (exists) -> null
-//   PROJECT_ROOT   -> projects/-Users-marvin-ClaudeClaw                 (exists) -> claude-opus-5
+//   agents/<main>  -> projects/-Users-marvin-Alfred-agents-alfred  (exists) -> null
+//   PROJECT_ROOT   -> projects/-Users-marvin-Alfred                 (exists) -> claude-opus-5
 // The old directory is not missing, which is why this never surfaced as an
 // error: it is a real directory holding another session's history, and it
 // simply has no current model to report.
@@ -643,11 +525,7 @@ function getAgentSummary(name: string): AgentSummary {
   const configRoot = agentConfigRoot(name)
   const claudeMd = readFileOr(join(configRoot, 'CLAUDE.md'), '')
   const soulMd = readFileOr(join(dir, 'SOUL.md'), '')
-  const tg = readAgentTelegramConfig(name)
   const dc = readAgentDiscordConfig(name)
-  const sc = readAgentSlackConfig(name)
-  const gc = readAgentGooglechatConfig(name)
-  const tc = readAgentTeamsConfig(name)
   const hasClaudeMd = claudeMd.trim().length > 0
   const hasSoulMd = soulMd.trim().length > 0
   // Card c755f4b2 Block B: resolve once and report both the answer and how it
@@ -663,7 +541,7 @@ function getAgentSummary(name: string): AgentSummary {
   //
   // MSGWARN908: the MAIN agent lives in `${MAIN_AGENT_ID}-channels` (launchd /
   // channels.sh), not `agent-<name>` -- agentRunState() on its id always said
-  // 'stopped', so this roster reported a running Marveen as down, and on
+  // 'stopped', so this roster reported a running Alfred as down, and on
   // 2026-09-08 that false state was relayed to the owner as a system-down
   // report. Probe the channels session instead (same source the activity
   // endpoint already uses).
@@ -704,12 +582,7 @@ function getAgentSummary(name: string): AgentSummary {
     claudePlan: readAgentClaudePlan(name),
     planTokenLaunch: name === MAIN_AGENT_ID ? null : readPlanTokenStatus(name),
     team: readAgentTeam(name),
-    hasTelegram: tg.hasTelegram,
-    telegramBotUsername: tg.botUsername,
     hasDiscord: dc.hasDiscord,
-    hasSlack: sc.hasSlack,
-    hasGooglechat: gc.hasGooglechat,
-    hasTeams: tc.hasTeams,
     channelProvider: readAgentChannelProvider(name),
     status: hasClaudeMd && hasSoulMd ? 'configured' : 'draft',
     running,
@@ -847,127 +720,28 @@ export function applyAgentTeam(name: string, data: any): { ok: true; team: TeamC
  *  unchanged (the agent-create consumer issues the invite of an approved spec through it). The token is in the
  *  returned body; the caller decides who sees it. */
 export async function issueAgentChannelInvite(name: string, provider: ChannelProviderType): Promise<{ status: number; body: Record<string, unknown> }> {
-  let botName: string | undefined
-  if (provider === 'telegram') {
-    botName = name === MAIN_AGENT_ID
-      ? readMarveenTelegramConfig().botUsername
-      : readAgentTelegramConfig(name).botUsername
-    if (!botName) {
-      const stateDir = name === MAIN_AGENT_ID ? channelStateDir(provider) : channelStateDir(provider, agentDir(name))
-      const token = readChannelToken(provider, join(stateDir, '.env'))
-      if (token) {
-        const r = await getProvider(provider).validateToken(token)
-        if (r.ok) botName = r.botName
-      }
-    }
-  }
   const accessPath = resolveAccessPath(name, provider)
   try {
-    return { status: 200, body: createInvite(accessPath, botName, provider) as unknown as Record<string, unknown> }
+    return { status: 200, body: createInvite(accessPath, undefined, provider) as unknown as Record<string, unknown> }
   } catch (err) {
     logger.error({ err }, 'Failed to create invite')
-    // The detail names a refused unreadable/invalid access.json or
-    // invites.json (ACCESSREADFAIL1030) -- path only, never contents.
     return { status: 500, body: { error: 'Failed to create invite', detail: err instanceof Error ? err.message : String(err) } }
   }
 }
 
-// AGENTCREATEPR2-1119: the channel setup after its owner gate, lifted out of the route unchanged so that the approved
-// agent_create consumer sets a channel up through the SAME code (agent-channel-setup-characterization.test.ts pins it).
 export async function setupAgentChannel(name: string, provider: ChannelProviderType, data: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
   const isMain = name === MAIN_AGENT_ID
-
-  // Google Chat is creds-based (service-account key + Pub/Sub), not a bot
-  // token. Handle it on its own path: write the channel .env + identity
-  // access.json, enable the plugin, and restart.
-  if (provider === 'googlechat') {
-    const { saKeyPath, projectId, subscription, owner, allowDomain } =
-      data as { saKeyPath?: string; projectId?: string; subscription?: string; owner?: string; allowDomain?: string }
-    if (!saKeyPath?.trim() || !projectId?.trim() || !subscription?.trim() || !owner?.trim()) {
-      return { status: 400, body: { error: 'Google Chat: saKeyPath, projectId, subscription és owner kötelező' } }
-    }
-    // Each goes into the channel .env as one KEY=value line (ENVTEAMSNAME1028).
-    if (![saKeyPath, projectId, subscription].every((v) => isSingleLineEnvValue(v.trim()))) {
-      return { status: 400, body: { error: 'Google Chat: a mezők nem tartalmazhatnak sortörést' } }
-    }
-    const gcDir = isMain ? channelStateDir(provider) : channelStateDir(provider, agentDir(name))
-    mkdirSync(gcDir, { recursive: true })
-    const gcEnv =
-      `GOOGLE_APPLICATION_CREDENTIALS=${saKeyPath.trim()}\n` +
-      `GOOGLECHAT_PROJECT_ID=${projectId.trim()}\n` +
-      `GOOGLECHAT_SUBSCRIPTION=${subscription.trim()}\n`
-    atomicWriteFileSync(join(gcDir, '.env'), gcEnv, { mode: 0o600 })
-    atomicWriteFileSync(join(gcDir, 'access.json'), JSON.stringify({
-      policy: allowDomain?.trim() ? 'domain' : 'allowlist',
-      owner: owner.trim(),
-      allowFrom: [],
-      allowDomains: allowDomain?.trim() ? [allowDomain.trim()] : [],
-      roles: {},
-      spaces: {},
-      flatReplies: true,
-    }, null, 2))
-    let gcRestarted = false
-    let gcWasRunning = false
-    let gcRestartError: string | undefined
-    if (isMain) {
-      const gcOutcome = mainChannelsRestartOutcome(hardRestartMarveenChannels())
-      gcRestarted = gcOutcome.restarted
-      gcRestartError = gcOutcome.restartError
-      if (gcRestartError) logger.error({ error: gcRestartError }, 'Channel save (googlechat): channels restart FAILED')
-      gcWasRunning = true
-    } else {
-      writeAgentChannelProvider(name, provider)
-      setAgentEnabledPlugins(name, provider)
-      gcWasRunning = isAgentRunning(name)
-      // This is a stop -> (2s) -> start unit, so it holds the shared restart
-      // slot like every other one: a context-guard rescue landing in the 2s
-      // gap would start with ITS options (fresh:true) while this path
-      // reported restarted:true. When a managed restart is already in
-      // flight, skip loudly -- the config was written BEFORE the stop, so
-      // the in-flight restart's own start picks it up (PR1014KONFIG821).
-      if (gcWasRunning && !beginRestart(name)) {
-        logger.info({ name }, 'Channel-config restart skipped -- a managed restart is already in flight; it will start with the new config')
-      } else if (gcWasRunning) {
-        try {
-          const stopRes = await stopAgentProcess(name)
-          if (stopRes.ok) {
-            await delay(2000)
-            // 'Agent is already running' here means the 60s reconcile sweep
-            // raced us in the stop..start gap and started the agent with the
-            // NEW config (written above, before the stop) -- the end state is
-            // exactly what a restart promises, only the starter differs
-            // (PR1014KONFIG821).
-            const gcStartRes = await startAgentProcess(name)
-            gcRestarted = gcStartRes.ok || gcStartRes.error === 'Agent is already running'
-          }
-        } finally {
-          endRestart(name)
-        }
-      }
-    }
-    return { status: 200, body: { ok: true, botName: 'Google Chat', restarted: gcRestarted, wasRunning: gcWasRunning, ...(gcRestartError ? { restartError: gcRestartError, restartCommand: channelsRestartCommand() } : {}) } }
-  }
-
-  const { botToken, appToken, channelId, extra, allowFrom } = data as { botToken: string; appToken?: string; channelId?: string; extra?: unknown; allowFrom?: unknown }
+  const { botToken, channelId, extra, allowFrom } = data as { botToken: string; channelId?: string; extra?: unknown; allowFrom?: unknown }
   if (!botToken?.trim()) { return { status: 400, body: { error: 'botToken is required' } } }
-  // Each token goes into the channel .env as one KEY=value line (ENVTEAMSNAME1028); refused before any network check.
-  if (![botToken, appToken ?? '', channelId ?? ''].every((v) => typeof v === 'string' && isSingleLineEnvValue(v.trim()))) {
+  if (![botToken, channelId ?? ''].every((v) => typeof v === 'string' && isSingleLineEnvValue(v.trim()))) {
     return { status: 400, body: { error: 'A token nem tartalmazhat sortörést' } }
   }
 
-  // AGENTEXTRACH1006: `extra: true` connects this provider NEXT TO the
-  // agent's primary channel instead of replacing it. The primary's
-  // channelProvider and enabledPlugins stay untouched; the provider is
-  // appended to agent-config extraChannels and the launcher co-listens.
   const asExtra = extra === true
   if (asExtra) {
     if (isMain) { return { status: 400, body: { error: 'The main agent co-listens through CHANNEL_PLUGINS_EXTRA in .env, not through extraChannels' } } }
     if (resolveAgentProvider(name) === provider) { return { status: 400, body: { error: `${provider} is already this agent's primary channel` } } }
   }
-  // Optional explicit allowlist (AGENTEXTRACH1006): a non-empty list of user
-  // ids writes dmPolicy 'allowlist' instead of 'pairing', so an operator
-  // wiring a known owner does not have to pair by hand. Anything that is not
-  // a plain id is refused rather than written into an access policy.
   let accessAllowFrom: string[] | null = null
   if (allowFrom !== undefined) {
     if (!Array.isArray(allowFrom) || allowFrom.length === 0 || !allowFrom.every(v => typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v))) {
@@ -976,11 +750,6 @@ export async function setupAgentChannel(name: string, provider: ChannelProviderT
     accessAllowFrom = [...new Set(allowFrom as string[])]
   }
 
-  // Discord-specific channelId guard: the dashboard ships the channel where
-  // the bot will post by default; without it the plugin spins up but cannot
-  // resolve a default channel, and on the main Marveen agent the missing
-  // value would still trigger hardRestartMarveenChannels and bounce the
-  // live session for no useful reason. Reject before any state write.
   if (provider === 'discord') {
     const cidCheck = validateDiscordChannelId(channelId)
     if (!cidCheck.ok) { return { status: 400, body: { error: cidCheck.error } } }
@@ -992,48 +761,12 @@ export async function setupAgentChannel(name: string, provider: ChannelProviderT
 
   const dupeOwner = findBotTokenDuplicate(provider, botToken.trim(), name)
   if (dupeOwner) {
-    return { status: 409, body: { error: `This bot token is already used by agent "${dupeOwner}". Each agent needs its own bot token to avoid getUpdates conflicts.` } }
+    return { status: 409, body: { error: `This bot token is already used by agent "${dupeOwner}". Each agent needs its own bot token.` } }
   }
 
-  // MCPTOKEN807: a token reused from a PREVIOUS install (webhook bound, or a
-  // poller still running elsewhere) passes getMe and the local dupe check,
-  // then kills the plugin at runtime with an opaque -32000. Probe at save
-  // time and answer with the remedy. Skipped when re-saving the token this
-  // agent already runs with -- its OWN live poller would read as busy.
-  // INSTTGPOLLWARN1119: whether another install polls this bot cannot be checked from here; a new Telegram token's
-  // save says so (pollerNote), and is not blocked by it.
-  let pollerNote = false
-  if (provider === 'telegram') {
-    const preEnvPath = join(isMain ? channelStateDir(provider) : channelStateDir(provider, agentDir(name)), '.env')
-    const currentToken = readChannelToken(provider, preEnvPath)
-    if (botToken.trim() !== currentToken) {
-      const busyCheck = await checkTelegramTokenBusy(botToken.trim())
-      if (busyCheck.busy) { return { status: 409, body: { error: busyCheck.error } } }
-      pollerNote = true
-    }
-  }
-
-  if (provider === 'slack' && !isManagedSettingsReady()) {
-    const displayName = readAgentDisplayName(name) || name
-    return { status: 409, body: {
-      error: 'managed-settings-missing',
-      sudoCommand: getManagedSettingsSudoCommand(),
-      slackAppManifest: generateSlackAppManifest(displayName),
-      slackAppInstructions: getSlackAppSetupInstructions(),
-    } }
-  }
-
-  // Main agent's channel state lives under ~/.claude/channels/<provider>,
-  // sub-agents under agents/<name>/.claude/channels/<provider>.
   const stateDir = isMain ? channelStateDir(provider) : channelStateDir(provider, agentDir(name))
   mkdirSync(stateDir, { recursive: true })
-  const tokenKey = provider === 'slack' ? 'SLACK_BOT_TOKEN'
-    : provider === 'discord' ? 'DISCORD_BOT_TOKEN'
-    : 'TELEGRAM_BOT_TOKEN'
-  let envContent = `${tokenKey}=${botToken.trim()}\n`
-  if (provider === 'slack' && appToken?.trim()) {
-    envContent += `SLACK_APP_TOKEN=${appToken.trim()}\n`
-  }
+  let envContent = `DISCORD_BOT_TOKEN=${botToken.trim()}\n`
   if (provider === 'discord' && channelId?.trim()) {
     envContent += `DISCORD_CHANNEL_ID=${channelId.trim()}\n`
   }
@@ -1045,15 +778,11 @@ export async function setupAgentChannel(name: string, provider: ChannelProviderT
     pending: {},
   }, null, 2))
 
-  // Main agent doesn't have an agent-config.json or enabled-plugins entry
-  // (the channels session reuses the system claude install), so skip the
-  // sub-agent-specific bookkeeping. Restart goes through the dedicated
-  // marveen-channels helper instead of the agent process lifecycle.
   let restarted = false
   let wasRunning = false
   let restartError: string | undefined
   if (isMain) {
-    const outcome = mainChannelsRestartOutcome(hardRestartMarveenChannels())
+    const outcome = mainChannelsRestartOutcome(hardRestartAlfredChannels())
     restarted = outcome.restarted
     restartError = outcome.restartError
     if (restartError) logger.error({ error: restartError }, 'Channel save: channels restart FAILED')
@@ -1065,12 +794,7 @@ export async function setupAgentChannel(name: string, provider: ChannelProviderT
       writeAgentChannelProvider(name, provider)
       setAgentEnabledPlugins(name, provider)
     }
-    if (provider === 'telegram') sendWelcomeMessage(name, botToken.trim()).catch(() => {})
     wasRunning = isAgentRunning(name)
-    // Same restart-slot discipline as the GC branch above: this too is a
-    // stop -> (2s) -> start unit; skip loudly when a managed restart is in
-    // flight (the pre-stop config write means that restart's start already
-    // yields the new provider config).
     if (wasRunning && !beginRestart(name)) {
       logger.info({ name }, 'Channel-config restart skipped -- a managed restart is already in flight; it will start with the new config')
     } else if (wasRunning) {
@@ -1079,9 +803,6 @@ export async function setupAgentChannel(name: string, provider: ChannelProviderT
         if (stopRes.ok) {
           await delay(2000)
           const startRes = await startAgentProcess(name)
-          // Same reconcile-race as the GC branch above: an 'already running'
-          // start after our own stop means the agent IS up with the new
-          // provider config (PR1014KONFIG821).
           restarted = startRes.ok || startRes.error === 'Agent is already running'
         }
       } finally {
@@ -1090,7 +811,7 @@ export async function setupAgentChannel(name: string, provider: ChannelProviderT
     }
   }
 
-  return { status: 200, body: { ok: true, botName: validation.botName, restarted, wasRunning, ...(restartError ? { restartError, restartCommand: channelsRestartCommand() } : {}), ...(asExtra ? { extra: true } : {}), ...(pollerNote ? { pollerNote: true } : {}) } }
+  return { status: 200, body: { ok: true, botName: validation.botName, restarted, wasRunning, ...(restartError ? { restartError, restartCommand: channelsRestartCommand() } : {}), ...(asExtra ? { extra: true } : {}) } }
 }
 
 export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promise<boolean> {
@@ -1149,7 +870,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
       deepseekConfigured: hasDeepseek,
       // Direct MiniMax API -- native Anthropic-compatible endpoint (no OpenRouter markup).
       // Model id verified live against the real endpoint before this list is trusted;
-      // see agent-provider-env.test.ts + the marveen kanban card 964a9567.
+      // see agent-provider-env.test.ts + the alfred kanban card 964a9567.
       minimax: hasMinimax ? [{ id: 'minimax-m3', label: 'MiniMax M3 (közvetlen API)' }] : [],
       minimaxConfigured: hasMinimax,
       // OpenRouter tiers for the model picker. `auto` per tier feeds the "Auto"
@@ -1534,7 +1255,6 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
       const ext = extname(galleryAvatar) || '.png'
       const destPath = join(agentDir(name), `avatar${ext}`)
       copyFileSync(srcPath, destPath)
-      sendAvatarChangeMessage(name, destPath).catch(() => {})
       json(res, { ok: true })
       return true
     } else {
@@ -1543,7 +1263,6 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
       const ext = extname(file.name) || '.png'
       const destPath = join(agentDir(name), `avatar${ext}`)
       writeFileSync(destPath, file.data)
-      sendAvatarChangeMessage(name, destPath).catch(() => {})
       json(res, { ok: true })
       return true
     }
@@ -1553,42 +1272,9 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     const name = decodeURIComponent(avatarUploadMatch[1])
     // Public route: a traversal name gets the plain 404 below, not a thrown 500 from agentDir().
     const avatarPath = AGENT_NAME_RE.test(name) ? findAvatarForAgent(name) : null
-    // 1h client cache: see /api/marveen/avatar for the staleness trade-off.
+    // 1h client cache: see /api/alfred/avatar for the staleness trade-off.
     if (avatarPath) { serveFile(req, res, avatarPath, { cacheSeconds: 3600 }); return true }
     res.writeHead(404); res.end()
-    return true
-  }
-
-  // GET /api/agents/:name/channels/slack/manifest
-  const manifestMatch = path.match(/^\/api\/agents\/([^/]+)\/channels\/slack\/manifest$/)
-  if (manifestMatch && method === 'GET') {
-    const name = decodeURIComponent(manifestMatch[1])
-    if (!existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
-    const displayName = readAgentDisplayName(name) || name
-    json(res, {
-      manifest: generateSlackAppManifest(displayName),
-      instructions: getSlackAppSetupInstructions(),
-    })
-    return true
-  }
-
-  // POST /api/agents/:name/channels/slack/smoke-test
-  const smokeTestMatch = path.match(/^\/api\/agents\/([^/]+)\/channels\/slack\/smoke-test$/)
-  if (smokeTestMatch && method === 'POST') {
-    const name = decodeURIComponent(smokeTestMatch[1])
-    if (!existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
-    const provider = readAgentChannelProvider(name) as ChannelProviderType
-    if (provider !== 'slack') { json(res, { error: 'Nem Slack provider' }, 400); return true }
-    const scriptPath = join(agentDir(name), '..', '..', 'scripts', 'smoke-test-slack-channel.sh')
-    if (!existsSync(scriptPath)) { json(res, { error: 'Smoke-test script nem található' }, 404); return true }
-    const agentEnvPath = join(channelStateDir('slack', agentDir(name)), '.env')
-    let envContent = ''
-    try { envContent = readFileSync(agentEnvPath, 'utf-8') } catch { /* no .env */ }
-    if (!/SLACK_SMOKE_TEST_ALLOWED=true/.test(envContent)) {
-      json(res, { error: 'SLACK_SMOKE_TEST_ALLOWED=true nincs beállítva az agent .env-jében' }, 403)
-      return true
-    }
-    json(res, await runSlackSmokeTest(scriptPath, name))
     return true
   }
 
@@ -1618,50 +1304,35 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // POST /api/agents/:name/channels/:provider/test (legacy: /telegram/test)
+  // POST /api/agents/:name/channels/:provider/test
   const testMatch = matchChannelRoute(path, '/test')
   if (testMatch && method === 'POST') {
     const [name, provider] = testMatch
-    // SLACKMAINTEST1007: the main agent lives at the install root, not under
-    // agents/<name>/, and its channel tokens (primary and co-listen alike) are
-    // in the MAIN channel state dir, as the setup route below and the
-    // schedule-runner's resolveBoundChannel read them. Reading agents/<main>/
-    // here answered 404 "not configured", so the dashboard's Teszt button and
-    // its scope warning (SLACKSCOPEJELZ1007) never worked for the main agent.
     const isMain = name === MAIN_AGENT_ID
     if (!isMain && !existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
     const stateDir = isMain ? channelStateDir(provider) : channelStateDir(provider, agentDir(name))
     const envPath = join(stateDir, '.env')
-    const token = readChannelToken(provider, envPath) || (!isMain && provider === 'telegram' ? parseTelegramToken(name) : null)
+    const token = readChannelToken(provider, envPath)
     if (!token) { json(res, { error: `${provider} not configured for this agent` }, 404); return true }
     const channelProvider = getProvider(provider)
-    const channelEnv = readChannelEnv(envPath, [...channelProvider.envKeys, TEAMS_SECRET_EXPIRY_KEY])
-    const result = channelProvider.validateCredentials
-      ? await channelProvider.validateCredentials(channelEnv)
-      : await channelProvider.validateToken(token)
-    const secretExpiry = provider === 'teams' ? teamsSecretExpiry(channelEnv[TEAMS_SECRET_EXPIRY_KEY]) : undefined
-    if (secretExpiry?.state === 'invalid') {
-      logger.warn({ agent: name, value: secretExpiry.value }, 'Teams secret expiry date is not YYYY-MM-DD; ignored')
-    }
+    const result = await channelProvider.validateToken(token)
     if (result.ok) {
       json(res, {
         ok: true,
         botName: result.botName,
-        ...(result.missingScopes ? { scopes: result.scopes, missingScopes: result.missingScopes } : {}),
-        ...(secretExpiry ? { secretExpiry } : {}),
       })
       return true
     }
-    json(res, { error: result.error, ...(secretExpiry ? { secretExpiry } : {}) }, 400)
+    json(res, { error: result.error }, 400)
     return true
   }
 
-  // POST /api/agents/:name/channels/:provider (legacy: /telegram) -- setup
+  // POST /api/agents/:name/channels/:provider -- setup
   const setupMatch = matchChannelRoute(path, '')
   if (setupMatch && method === 'POST') {
     const [name, provider] = setupMatch
     const isMain = name === MAIN_AGENT_ID
-    // Marveen lives at PROJECT_ROOT, not under agents/marveen/ -- skip the
+    // Alfred lives at PROJECT_ROOT, not under agents/alfred/ -- skip the
     // dir check for the main agent and route writes to ~/.claude/channels/.
     if (!isMain && !existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
     // OWNERGATE2-1104: writes the channel .env (bot token) and access.json (allowFrom, owner), i.e. who may talk to
@@ -1683,7 +1354,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // DELETE /api/agents/:name/channels/:provider (legacy: /telegram) -- remove
+  // DELETE /api/agents/:name/channels/:provider -- remove
   if (setupMatch && method === 'DELETE') {
     const [name, provider] = setupMatch
     if (!existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
@@ -1994,7 +1665,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // GET /api/agents/:name/channels/:provider/pending (legacy: /telegram/pending)
+  // GET /api/agents/:name/channels/:provider/pending
   const pendingMatch = matchChannelRoute(path, '/pending')
   if (pendingMatch && method === 'GET') {
     const [name, provider] = pendingMatch
@@ -2021,7 +1692,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // POST /api/agents/:name/channels/:provider/approve (legacy: /telegram/approve)
+  // POST /api/agents/:name/channels/:provider/approve
   const approveMatch = matchChannelRoute(path, '/approve')
   if (approveMatch && method === 'POST') {
     const [name, provider] = approveMatch
@@ -2070,10 +1741,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
 
       const approvedDir = join(chDir, 'approved')
       mkdirSync(approvedDir, { recursive: true })
-      // Marker contents = chatId, per the plugin's /telegram:access pair
-      // contract (the channel server polls approved/ to send the "Paired!"
-      // confirmation; current server keys off the filename, the chatId
-      // contents keep us aligned with the documented format).
+      // Marker contents = chatId, per the channel plugin's pairing contract
       writeFileSync(join(approvedDir, entry.senderId), String(entry.chatId ?? ''))
 
       logger.info({ name, provider, senderId: entry.senderId, code }, 'Channel pairing approved')
@@ -2085,7 +1753,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // GET /api/agents/:name/channels/:provider/allowed (legacy: /telegram/allowed)
+  // GET /api/agents/:name/channels/:provider/allowed
   const allowedListMatch = matchChannelRoute(path, '/allowed')
   if (allowedListMatch && method === 'GET') {
     const [name, provider] = allowedListMatch
@@ -2106,7 +1774,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // POST /api/agents/:name/channels/:provider/invites (legacy: /telegram/invites)
+  // POST /api/agents/:name/channels/:provider/invites
   const inviteCreateMatch = matchChannelRoute(path, '/invites')
   if (inviteCreateMatch && method === 'POST') {
     const [name, provider] = inviteCreateMatch
@@ -2125,45 +1793,28 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // GET /api/agents/:name/channels/:provider/invites (legacy: /telegram/invites)
+  // GET /api/agents/:name/channels/:provider/invites
   if (inviteCreateMatch && method === 'GET') {
     const [name, provider] = inviteCreateMatch
     if (name !== MAIN_AGENT_ID && !existsSync(agentDir(name))) {
       json(res, { error: 'Agent not found' }, 404)
       return true
     }
-    // OWNERGATE2-1104: returns the live invite tokens (and prunes invites.json); a listed token auto-approves whoever
-    // redeems it, so reading them is as strong as minting one.
     if (!mayActAsOwner(ctx.auth, req)) {
       refuseOwner(res, 'Listing channel invites needs the dashboard login (an owner session).')
       return true
     }
     const accessPath = resolveAccessPath(name, provider)
-    let botName: string | undefined
-    if (provider === 'telegram') {
-      botName = name === MAIN_AGENT_ID
-        ? readMarveenTelegramConfig().botUsername
-        : readAgentTelegramConfig(name).botUsername
-    }
-    const cleanBotName = botName?.replace(/^@/, '')
-    const items = listInvites(accessPath).map((inv) => ({
-      ...inv,
-      deepLink: provider === 'telegram' && cleanBotName
-        ? `https://t.me/${cleanBotName}?start=invite-${inv.token}`
-        : undefined,
-    }))
+    const items = listInvites(accessPath)
     json(res, items)
     return true
   }
 
-  // DELETE /api/agents/:name/channels/:provider/invites/:token (legacy: /telegram/invites/:token)
-  const inviteRevokeNewMatch = path.match(/^\/api\/agents\/([^/]+)\/channels\/(telegram|slack|discord)\/invites\/(.+)$/)
-  const inviteRevokeLegacyMatch = path.match(/^\/api\/agents\/([^/]+)\/telegram\/invites\/(.+)$/)
+  // DELETE /api/agents/:name/channels/:provider/invites/:token
+  const inviteRevokeNewMatch = path.match(/^\/api\/agents\/([^/]+)\/channels\/(discord)\/invites\/(.+)$/)
   const inviteRevokeMatch = inviteRevokeNewMatch
     ? { name: decodeURIComponent(inviteRevokeNewMatch[1]), provider: inviteRevokeNewMatch[2] as ChannelProviderType, token: decodeURIComponent(inviteRevokeNewMatch[3]) }
-    : inviteRevokeLegacyMatch
-      ? { name: decodeURIComponent(inviteRevokeLegacyMatch[1]), provider: 'telegram' as ChannelProviderType, token: decodeURIComponent(inviteRevokeLegacyMatch[2]) }
-      : null
+    : null
   if (inviteRevokeMatch && method === 'DELETE') {
     const { name, provider, token } = inviteRevokeMatch
     if (name !== MAIN_AGENT_ID && !existsSync(agentDir(name))) {
@@ -2183,14 +1834,11 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     return true
   }
 
-  // DELETE /api/agents/:name/channels/:provider/allowed/:type/:id (legacy: /telegram/allowed/:type/:id)
-  const allowedRemoveNewMatch = path.match(/^\/api\/agents\/([^/]+)\/channels\/(telegram|slack|discord)\/allowed\/(user|group)\/(.+)$/)
-  const allowedRemoveLegacyMatch = path.match(/^\/api\/agents\/([^/]+)\/telegram\/allowed\/(user|group)\/(.+)$/)
+  // DELETE /api/agents/:name/channels/:provider/allowed/:type/:id
+  const allowedRemoveNewMatch = path.match(/^\/api\/agents\/([^/]+)\/channels\/(discord)\/allowed\/(user|group)\/(.+)$/)
   const allowedRemoveMatch = allowedRemoveNewMatch
     ? { name: decodeURIComponent(allowedRemoveNewMatch[1]), provider: allowedRemoveNewMatch[2] as ChannelProviderType, kind: allowedRemoveNewMatch[3], id: decodeURIComponent(allowedRemoveNewMatch[4]) }
-    : allowedRemoveLegacyMatch
-      ? { name: decodeURIComponent(allowedRemoveLegacyMatch[1]), provider: 'telegram' as ChannelProviderType, kind: allowedRemoveLegacyMatch[2], id: decodeURIComponent(allowedRemoveLegacyMatch[3]) }
-      : null
+    : null
   if (allowedRemoveMatch && method === 'DELETE') {
     const { name, provider, kind, id } = allowedRemoveMatch
     if (name !== MAIN_AGENT_ID && !existsSync(agentDir(name))) {
@@ -2227,90 +1875,6 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     } catch (err) {
       logger.error({ err }, 'Failed to remove allowlist entry')
       json(res, { error: 'Failed to remove allowlist entry' }, 500)
-    }
-    return true
-  }
-
-  // --- Channel Requests (Slack channel opt-in workflow) ---
-
-  const chReqListMatch = path.match(/^\/api\/agents\/([^/]+)\/channel-requests$/)
-  if (chReqListMatch && method === 'GET') {
-    const name = decodeURIComponent(chReqListMatch[1])
-    if (name !== MAIN_AGENT_ID && !existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
-    json(res, listPendingChannelRequests(name))
-    return true
-  }
-
-  const chReqApproveMatch = path.match(/^\/api\/agents\/([^/]+)\/channel-requests\/(\d+)\/approve$/)
-  if (chReqApproveMatch && method === 'POST') {
-    const name = decodeURIComponent(chReqApproveMatch[1])
-    const reqId = Number(chReqApproveMatch[2])
-    if (name !== MAIN_AGENT_ID && !existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
-    // OWNERGATE2-1104: adds the Slack channel to access.json (with allowFromAll everyone in it may talk to the
-    // agent) and marks the request approved; owner-only.
-    if (!mayActAsOwner(ctx.auth, req)) {
-      refuseOwner(res, 'Approving a channel request needs the dashboard login (an owner session).')
-      return true
-    }
-
-    const body = await readBody(req)
-    let opts: { requireMention?: boolean; allowFromAll?: boolean } = {}
-    try { opts = JSON.parse(body.toString() || '{}') } catch { json(res, { error: 'Invalid JSON body' }, 400); return true }
-
-    const pending = listPendingChannelRequests(name)
-    const request = pending.find(r => r.id === reqId)
-    if (!request) { json(res, { error: 'Request not found' }, 404); return true }
-
-    const provider = readAgentChannelProvider(name) as ChannelProviderType
-    if (provider !== 'slack') { json(res, { error: 'Only Slack agents support channel requests' }, 400); return true }
-
-    const accessPath = resolveAccessPath(name, provider)
-    // A missing file starts from the default policy, as before. An existing
-    // file that cannot be read or parsed is refused (ACCESSREADFAIL1030): it
-    // used to be renamed to .corrupt-* and replaced by a fresh one, which
-    // dropped the live allowFrom/groups -- for a read error too, not only for
-    // a corrupt file.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let access: any = { dmPolicy: 'allowlist', allowFrom: [], groups: {} }
-    if (existsSync(accessPath)) {
-      access = readChannelAccessForWrite(res, accessPath)
-      if (!access) return true
-    }
-    try {
-      if (!access.channels) access.channels = {}
-
-      const channelConfig: Record<string, unknown> = { requireMention: opts.requireMention !== false }
-      if (!opts.allowFromAll && request.user_id) {
-        channelConfig.allowFrom = [request.user_id]
-      }
-      access.channels[request.channel_id] = channelConfig
-
-      atomicWriteFileSync(accessPath, JSON.stringify(access, null, 2))
-      updateChannelRequestStatus(reqId, 'approved')
-      logger.info({ name, channelId: request.channel_id, channelName: request.channel_name }, 'Channel request approved')
-      json(res, { ok: true })
-    } catch (err) {
-      logger.error({ err }, 'Failed to approve channel request')
-      json(res, { error: 'Failed to approve request' }, 500)
-    }
-    return true
-  }
-
-  const chReqDenyMatch = path.match(/^\/api\/agents\/([^/]+)\/channel-requests\/(\d+)\/deny$/)
-  if (chReqDenyMatch && method === 'POST') {
-    const name = decodeURIComponent(chReqDenyMatch[1])
-    const reqId = Number(chReqDenyMatch[2])
-    if (name !== MAIN_AGENT_ID && !existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
-    // OWNERGATE2-1104: resolves the Slack channel request in the DB (denied); every channel-access write is
-    // owner-only (tech lead decision), so a sub-agent cannot decide the owner's pending requests.
-    if (!mayActAsOwner(ctx.auth, req)) {
-      refuseOwner(res, 'Denying a channel request needs the dashboard login (an owner session).')
-      return true
-    }
-    if (updateChannelRequestStatus(reqId, 'denied')) {
-      json(res, { ok: true })
-    } else {
-      json(res, { error: 'Request not found or already resolved' }, 404)
     }
     return true
   }
@@ -2362,7 +1926,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
   if (startMatch && method === 'POST') {
     const name = decodeURIComponent(startMatch[1])
     if (isMainChannelsAgent(name)) {
-      json(res, { error: 'Main agent lifecycle is service-managed; use /api/marveen/restart for recovery' }, 400)
+      json(res, { error: 'Main agent lifecycle is service-managed; use /api/alfred/restart for recovery' }, 400)
       return true
     }
     if (!existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
@@ -2387,7 +1951,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
   if (stopMatch && method === 'POST') {
     const name = decodeURIComponent(stopMatch[1])
     if (isMainChannelsAgent(name)) {
-      json(res, { error: 'Main agent lifecycle is service-managed; use /api/marveen/restart for recovery' }, 400)
+      json(res, { error: 'Main agent lifecycle is service-managed; use /api/alfred/restart for recovery' }, 400)
       return true
     }
     // Explicit stop clears intent so the monitor will not resurrect it -- and
@@ -2501,9 +2065,9 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
         const gate = await gateManualRestart(MAIN_CHANNELS_SESSION)
         if (!gate.allow) { json(res, { error: 'restart-blocked', reason: gate.reason, hint: MANUAL_RESTART_FORCE_HINT }, 409); return true }
       }
-      const r = hardRestartMarveenChannels()
+      const r = hardRestartAlfredChannels()
       if (r.ok) {
-        // MAINRESTARTWAKE1115: same wake as POST /api/marveen/restart -- the same restart must not
+        // MAINRESTARTWAKE1115: same wake as POST /api/alfred/restart -- the same restart must not
         // wake or stay silent depending on which of the two URLs asked for it. See restart-wake.ts.
         if (wantsMainRestartWake(mainRestartBody)) scheduleMainRestartWake(MAIN_AGENT_ID, MAIN_CHANNELS_SESSION, join(PROJECT_ROOT, 'HANDOFF.md'))
         json(res, { ok: true })
@@ -2574,7 +2138,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
   // would be read as an agent name.
   if (path === '/api/agents/export-all' && method === 'GET') {
     const includeSecrets = /[?&]secrets=(1|true)\b/.test(req.url || '')
-    const work = mkdtempSync(join(tmpdir(), 'marveen-fleet-dl-'))
+    const work = mkdtempSync(join(tmpdir(), 'alfred-fleet-dl-'))
     const outPath = join(work, fleetBundleFilename())
     try {
       // The tar reads every agent's skills: it waits on the skills directory queue, like the fleet export.
@@ -2617,7 +2181,7 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
     }
     if (!existsSync(agentDir(name))) { json(res, { error: 'Agent not found' }, 404); return true }
     const includeSecrets = /[?&]secrets=(1|true)\b/.test(req.url || '')
-    const work = mkdtempSync(join(tmpdir(), 'marveen-agent-dl-'))
+    const work = mkdtempSync(join(tmpdir(), 'alfred-agent-dl-'))
     const outPath = join(work, bundleFilename(name))
     try {
       // The tar reads the agent's skills: it waits on the skills directory queue.

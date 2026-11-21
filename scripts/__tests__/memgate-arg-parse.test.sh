@@ -78,10 +78,10 @@ run_gate() {
   rm -f "$SAFE_FLAG" "$SANDBOX/store/.fleet-memgate-alert"
   OUT="$(with_timeout "$secs" env PATH="$SANDBOX/bin:$PATH" \
       MEMGATE_PROC_MEMINFO="$SANDBOX/meminfo" \
-      MARVEEN_STORE="$SANDBOX/store" \
-      MARVEEN_ALERT_CHAT_ID="111" \
-      MARVEEN_CORE_AGENTS="__no_core__" \
-      MARVEEN_MEM_GATE_OBSERVE=0 \
+      ALFRED_STORE="$SANDBOX/store" \
+      ALFRED_ALERT_CHAT_ID="111" \
+      ALFRED_CORE_AGENTS="__no_core__" \
+      ALFRED_MEM_GATE_OBSERVE=0 \
       bash "$GATE" "$@" 2>&1)"
   RC=$?
 }

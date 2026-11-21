@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # agent-msg.sh and agent-msg-get.sh call the install's dashboard port (#1869).
 #
-# WHAT THIS GUARDS. Both helpers used to know only MARVEEN_WEB_PORT (or nothing
+# WHAT THIS GUARDS. Both helpers used to know only ALFRED_WEB_PORT (or nothing
 # at all) and fell back to 3420. An agent's tmux session sets neither
-# MARVEEN_WEB_PORT nor WEB_PORT, so on an install whose .env says WEB_PORT=3520
+# ALFRED_WEB_PORT nor WEB_PORT, so on an install whose .env says WEB_PORT=3520
 # every message went to 3420: connection refused, or another install's
 # dashboard if one listens there. The chain is now the doctor.sh one:
-# MARVEEN_WEB_PORT, WEB_PORT, this install's .env, 3420.
+# ALFRED_WEB_PORT, WEB_PORT, this install's .env, 3420.
 #
 # Nothing listens and nothing leaves the machine: a curl stub records the URL
 # it was given. The helpers run from a sandbox copy of the install tree, so
@@ -49,7 +49,7 @@ printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/sleep"; chmod +x "$BIN/sleep"
 run() {
   local helper="$1"; shift
   : > "$SANDBOX/curl.log"
-  env -u MARVEEN_WEB_PORT -u WEB_PORT -u MARVEEN_API_BASE \
+  env -u ALFRED_WEB_PORT -u WEB_PORT -u ALFRED_API_BASE \
       PATH="$BIN:$PATH" CURL_LOG="$SANDBOX/curl.log" "$@" \
       /bin/bash "$INST/scripts/$helper" $( [ "$helper" = agent-msg.sh ] && echo 'igor hex tiszta' || echo 1 ) \
       >"$SANDBOX/out.txt" 2>"$SANDBOX/err.txt"
@@ -65,8 +65,8 @@ for helper in agent-msg.sh agent-msg-get.sh; do
   run "$helper" WEB_PORT=3522
   ok "$helper: WEB_PORT in the environment wins over .env" "$(port_is 3522)" "url=$URL"
 
-  run "$helper" WEB_PORT=3522 MARVEEN_WEB_PORT=3523
-  ok "$helper: MARVEEN_WEB_PORT wins over both" "$(port_is 3523)" "url=$URL"
+  run "$helper" WEB_PORT=3522 ALFRED_WEB_PORT=3523
+  ok "$helper: ALFRED_WEB_PORT wins over both" "$(port_is 3523)" "url=$URL"
 
   printf 'OTHER=1\nWEB_PORT="3524"\n' > "$INST/.env"
   run "$helper"

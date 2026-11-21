@@ -8,7 +8,7 @@ import { join } from 'node:path'
 // file, so on a host where channelsEnabled was ALREADY true but the invoking
 // user had no usable sudo it reported
 //   ! channelsEnabled: nem root es nincs sudo -- kihagyva.
-//   MARVEEN_CHANNELS_GATE=manual
+//   ALFRED_CHANNELS_GATE=manual
 // and pointed the operator at a manual root step that had nothing left to do.
 // The reverse of the usual failure: the work was done, the report said it was
 // not. Measured 2026-09-01 on a Linux/Docker install whose image already
@@ -63,7 +63,7 @@ function runGate(opts: {
   mode?: number
   umask?: string
 }): { out: string; file: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'marveen-gate-'))
+  const dir = mkdtempSync(join(tmpdir(), 'alfred-gate-'))
   dirs.push(dir)
   const file = join(dir, 'managed-settings.json')
   if (opts.managed !== null) writeFileSync(file, opts.managed)
@@ -125,7 +125,7 @@ const mode = (file: string) => statSync(file).mode & 0o777
 describe('ensure-managed-channels-enabled: report what is true, not what is reachable', () => {
   it('reports ok when already enabled and sudo is not installed -- the regression', () => {
     const { out, file } = runGate({ managed: ENABLED, sudo: 'hidden' })
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
     // Not just the report: the claim is that an already-configured host needs
     // no write at all. A rewrite would reformat the JSON, so byte equality with
     // the fixture is what proves the early exit was taken.
@@ -134,7 +134,7 @@ describe('ensure-managed-channels-enabled: report what is true, not what is reac
 
   it('reports ok when already enabled and sudo exists but cannot be used', () => {
     const { out, file } = runGate({ managed: ENABLED, sudo: 'broken' })
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
     expect(readFileSync(file, 'utf-8')).toBe(ENABLED)
   })
 
@@ -145,7 +145,7 @@ describe('ensure-managed-channels-enabled: report what is true, not what is reac
     // prompt -- a file that was already correct, on every single run.
     const { out, file } = runGate({ managed: ENABLED, sudo: 'usable', mode: 0o000 })
     expect(out).toContain('mar be van kapcsolva')
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
     chmodSync(file, 0o644)
     expect(readFileSync(file, 'utf-8')).toBe(ENABLED)
   })
@@ -155,7 +155,7 @@ describe('ensure-managed-channels-enabled: report what is true, not what is reac
       managed: JSON.stringify({ allowedChannelPlugins: ['telegram'] }),
       sudo: 'root',
     })
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
 
     // The point of the test is the FILE, not the report: a merge that threw the
     // existing org policy away would still report ok. allowedChannelPlugins is
@@ -173,7 +173,7 @@ describe('ensure-managed-channels-enabled: report what is true, not what is reac
     // 0600 -- and the next run's unprivileged check fell back to the manual
     // branch on a host that was already configured.
     const { out, file } = runGate({ managed: null, sudo: 'root', umask: '077' })
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
     expect(mode(file)).toBe(0o644)
   })
 
@@ -186,7 +186,7 @@ describe('ensure-managed-channels-enabled: report what is true, not what is reac
       sudo: 'root',
       mode: 0o600,
     })
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
     expect(mode(file)).toBe(0o600)
   })
 
@@ -198,24 +198,24 @@ describe('ensure-managed-channels-enabled: report what is true, not what is reac
     // and no tmp file may be left next to it.
     const corrupt = '{ "allowedChannelPlugins": [ {"plugin":"telegram"'
     const { out, file } = runGate({ managed: corrupt, sudo: 'root' })
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=manual')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=manual')
     expect(readFileSync(file, 'utf-8')).toBe(corrupt)
     expect(readdirSync(join(file, '..')).filter((n) => n !== 'bin')).toEqual(['managed-settings.json'])
   })
 
   it('leaves a non-object policy file untouched and reports manual', () => {
     const { out, file } = runGate({ managed: '["telegram"]', sudo: 'root' })
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=manual')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=manual')
     expect(readFileSync(file, 'utf-8')).toBe('["telegram"]')
   })
 
   it('still reports manual when a write is needed but cannot be made', () => {
-    expect(runGate({ managed: null, sudo: 'hidden' }).out).toContain('MARVEEN_CHANNELS_GATE=manual')
+    expect(runGate({ managed: null, sudo: 'hidden' }).out).toContain('ALFRED_CHANNELS_GATE=manual')
   })
 
   it('still reports manual when the key is present but false and there is no privilege', () => {
     expect(runGate({ managed: JSON.stringify({ channelsEnabled: false }), sudo: 'hidden' }).out)
-      .toContain('MARVEEN_CHANNELS_GATE=manual')
+      .toContain('ALFRED_CHANNELS_GATE=manual')
   })
 })
 
@@ -230,7 +230,7 @@ function runDirGate(o: {
   existing?: number | 'symlink' | 'other-owner'
   managed?: string
 }): { out: string; dir: string; target?: string; sudoLog: string } {
-  const base = mkdtempSync(join(tmpdir(), 'marveen-gate-dir-'))
+  const base = mkdtempSync(join(tmpdir(), 'alfred-gate-dir-'))
   dirs.push(base)
   const dir = join(base, 'ClaudeCode')
   let target: string | undefined
@@ -278,7 +278,7 @@ describe('ensure-managed-channels-enabled: the managed directory is 0755 (MANAGE
   for (const umask of ['077', '022', '002']) {
     it(`a fresh dir is 0755 under umask ${umask}, the policy 0644 inside`, () => {
       const { out, dir } = runDirGate({ as: 'sudo', umask })
-      expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+      expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
       expect(mode(dir)).toBe(0o755)
       expect(mode(join(dir, 'managed-settings.json'))).toBe(0o644)
       expect(out).not.toContain('0755-re allitva') // nothing to repair on a fresh dir
@@ -290,7 +290,7 @@ describe('ensure-managed-channels-enabled: the managed directory is 0755 (MANAGE
     expect(mode(dir)).toBe(0o755)
     expect(out).toContain('700 volt')
     expect(out).toContain('0755-re allitva')
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
     chmodSync(join(dir, 'managed-settings.json'), 0o644)
     expect(readFileSync(join(dir, 'managed-settings.json'), 'utf-8')).toBe(ENABLED) // the early exit, no rewrite
   })
@@ -299,13 +299,13 @@ describe('ensure-managed-channels-enabled: the managed directory is 0755 (MANAGE
     const { out, dir } = runDirGate({ as: 'root', existing: 0o700, managed: ENABLED })
     expect(mode(dir)).toBe(0o755)
     expect(out).toContain('0755-re allitva')
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
   })
 
   it('an existing 0700 dir without the key: repaired and written', () => {
     const { out, dir } = runDirGate({ as: 'sudo', existing: 0o700 })
     expect(mode(dir)).toBe(0o755)
-    expect(out).toContain('MARVEEN_CHANNELS_GATE=ok')
+    expect(out).toContain('ALFRED_CHANNELS_GATE=ok')
     expect(JSON.parse(readFileSync(join(dir, 'managed-settings.json'), 'utf-8')).channelsEnabled).toBe(true)
   })
 

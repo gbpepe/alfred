@@ -23,7 +23,7 @@ const CLIENT_CREDS_PATH = join(homedir(), '.gmail-mcp', 'gcp-oauth.keys.json')
 // cannot do -- a service account cannot read a consumer gmail.com mailbox
 // without Workspace domain-wide delegation -- so the OAuth path below stays
 // as the Gmail route and as the fallback wherever no key file is installed.
-const SERVICE_ACCOUNT_PATH = join(homedir(), '.config', 'marveen', 'google-service-account.json')
+const SERVICE_ACCOUNT_PATH = join(homedir(), '.config', 'alfred', 'google-service-account.json')
 
 // One token covers both APIs: Google accepts a space-separated scope claim in
 // the JWT, so we do not need a token per API.

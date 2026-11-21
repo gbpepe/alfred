@@ -7,12 +7,12 @@ import { tmpdir } from 'node:os'
 // envelope's msg_id from provenance into protection, so its presence and
 // idempotency get the same pin as the other generated sections.
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-sysdir-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-sysdir-test-'))
 
 vi.mock('../config.js', () => ({
   // agent-scaffold imports settings-store (MCPOROKLES923), which derives a path from
   // STORE_DIR at import time. A never-created dir: nothing here reads the store.
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   APP_TZ: 'Europe/Budapest',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',

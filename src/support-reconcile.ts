@@ -14,7 +14,7 @@
 //     `tampered`, and the owner is told); the kit must still verify and its
 //     dispatcher be the path the record binds; the lines are reconciled to what
 //     the record and THIS release's pins give (a deviant line goes, a missing
-//     one is not written back); and marveen.io is asked with the self-probe;
+//     one is not written back); and alfred.io is asked with the self-probe;
 //     when that changes nothing, the host key sshd offers is asked again and
 //     sent (support-access-hostkey.ts, confirmed by a root-owned .pub): the
 //     resend of an enable whose send did not get a 200, and the news of a
@@ -164,6 +164,6 @@ async function reconcileOnce(deps: ReconcileDeps): Promise<ReconcileOutcome> {
   removeGroupRecord(supportDir)
   deps.consents.revokeOpen('external')
   deps.log('token_revoked_done')
-  deps.notifyOwner('ℹ️ Support-hozzáférés: a gépet a marveen.io fiókban eltávolítottad, ezért a gépről is levettem a support-sorokat és a tokent.')
+  deps.notifyOwner('ℹ️ Support-hozzáférés: a gépet a alfred.io fiókban eltávolítottad, ezért a gépről is levettem a support-sorokat és a tokent.')
   return 'removed_token_revoked'
 }

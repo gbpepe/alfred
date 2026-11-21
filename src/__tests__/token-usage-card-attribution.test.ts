@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { initDatabase, getDb } from '../db.js'
 import { getTokenDetails, likeContains, TOKEN_DETAILS_Q_MAX_WINDOWS } from '../web/token-usage.js'
 
-const MAP = { botName: 'Marveen', mainAgentId: 'marveen', now: 100_000 }
+const MAP = { botName: 'Alfred', mainAgentId: 'alfred', now: 100_000 }
 
 function row(agent: string, ts: number, opts: { taskTitle?: string; preview?: string; toolName?: string } = {}) {
   getDb().prepare(

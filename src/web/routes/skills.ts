@@ -511,7 +511,7 @@ export async function tryHandleSkills(ctx: RouteContext): Promise<boolean> {
     return true
   }
 
-  // MARVEENGAPS1020 (b): a generated skill is QUEUED for approval, never written
+  // ALFREDGAPS1020 (b): a generated skill is QUEUED for approval, never written
   // into the global root, which every agent of the fleet loads. See
   // skill-quarantine.ts for what the approver is shown and what is not covered.
   if (path === '/api/skills' && method === 'POST') {

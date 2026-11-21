@@ -130,13 +130,13 @@ rc, out, err, sent, vc = run([CHANNEL, TITLE, BODY, "--confirm"])
 check("json: --confirm -> exit 0", rc == 0)
 check("json: exactly one request", len(sent) == 1)
 r = sent[0] if sent else {}
-check("json: URL and method", r.get("url") == "https://api.marveen.io/agent/v1/feed/posts"
+check("json: URL and method", r.get("url") == "https://api.alfred.io/agent/v1/feed/posts"
       and r.get("method") == "POST")
 check("json: body bytes unchanged", r.get("data") == EXPECTED_JSON)
 check("json: headers unchanged", r.get("headers") == {"Authorization": f"Bearer {KEY}",
                                                       "Content-type": "application/json"})
 check("json: timeout 30", r.get("timeout") == 30)
-check("json: the key comes from MARVEEN_IO_API_KULCS", vc == ["MARVEEN_IO_API_KULCS"])
+check("json: the key comes from ALFRED_IO_API_KULCS", vc == ["ALFRED_IO_API_KULCS"])
 check("json: stdout is the status and the answer", out == 'HTTP 201\n{"status":"published"}\n')
 
 rc, out, err, sent, vc = run([CHANNEL, TITLE, BAD_BODY, "--confirm"])
@@ -211,7 +211,7 @@ check("attach: the .md check ignores case, Hungarian accents pass", rc == 3)
 rc, out, err, sent, vc = run([CHANNEL, TITLE, BODY, "--attach", GOOD, "--confirm"])
 check("attach: --confirm -> exit 0, one request", rc == 0 and len(sent) == 1)
 r = sent[0] if sent else {"headers": {}, "data": b""}
-check("attach: same URL and method", r.get("url") == "https://api.marveen.io/agent/v1/feed/posts"
+check("attach: same URL and method", r.get("url") == "https://api.alfred.io/agent/v1/feed/posts"
       and r.get("method") == "POST")
 ctype = r["headers"].get("Content-type", "")
 check("attach: multipart/form-data with a boundary", ctype.startswith("multipart/form-data; boundary="))
@@ -512,8 +512,8 @@ refused("zip: one entry over the ratio (per entry, not per archive)",
         "'nulla.bin' bejegyzes tomoritesi aranya a plafon")
 
 # ---------------------------------------------------------------------------
-# 5. MIOFEEDMARVEEN1014: the two narrow exceptions
-#    - the product name "Marveen" passes the agent-name gate in the attachment's
+# 5. MIOFEEDALFRED1014: the two narrow exceptions
+#    - the product name "Alfred" passes the agent-name gate in the attachment's
 #      content and name ONLY; title and body keep the gate;
 #    - the Hungarian quote pair (U+201E, U+201D) passes everywhere; every other
 #      non-Latin character still fails.
@@ -526,17 +526,17 @@ def dry(args):
 
 QTITLE = fpath("qcim.txt", "\u201eIdezett\u201d cim\n")
 QBODY = fpath("qtorzs.txt", "A torzsben \u201eidezojel\u201d all.\n")
-MTITLE = fpath("mcim.txt", "A Marveen flotta\n")
-MBODY = fpath("mtorzs.txt", "Ezt a Marveen flotta irta.\n")
-MBODY_RAG = fpath("mtorzs-rag.txt", "Kerdezd a Marveent errol.\n")
+MTITLE = fpath("mcim.txt", "A Alfred flotta\n")
+MBODY = fpath("mtorzs.txt", "Ezt a Alfred flotta irta.\n")
+MBODY_RAG = fpath("mtorzs-rag.txt", "Kerdezd a Alfredet errol.\n")
 EMOJI_BODY = fpath("etorzs.txt", "Egy emoji \U0001F600 itt.\n")
 ARROW_TITLE = fpath("ncim.txt", "A \u2192 B\n")
 
 for label, path in (
-    ("product name in the content", fpath("termek.md", "# Hangvezerles\n\nA Marveen flotta hangja.\n")),
-    ("product name with a suffix in the content", fpath("rag.md", "Kerdezd a Marveent, vagy a Marveennel beszelj.\n")),
-    ("product name in a compound in the content", fpath("osszetett.md", "A Marveen-eszkozkulcs kell hozza.\n")),
-    ("product name in the file name", fpath("Marveen-hangvezerles.md", "# Hangvezerles\n")),
+    ("product name in the content", fpath("termek.md", "# Hangvezerles\n\nA Alfred flotta hangja.\n")),
+    ("product name with a suffix in the content", fpath("rag.md", "Kerdezd a Alfredet, vagy a Alfreddel beszelj.\n")),
+    ("product name in a compound in the content", fpath("osszetett.md", "A Alfred-eszkozkulcs kell hozza.\n")),
+    ("product name in the file name", fpath("Alfred-hangvezerles.md", "# Hangvezerles\n")),
     ("Hungarian quotes in the content", fpath("idezet.md", "A \u201ehangvezerles\u201d szo.\n")),
 ):
     rc, err, sent, vc = dry([CHANNEL, TITLE, BODY, "--attach", path])
@@ -546,22 +546,22 @@ for label, path in (
 # name: the exception must not widen silently to a second name. The list comes from the
 # script itself, so a name added later is covered too.
 _names = load().AGENT_NEVEK
-_others = [n for n in _names if n != "Marveen"]
-check("exception: the script's agent-name list still holds Marveen and at least 13 others",
-      "Marveen" in _names and len(_others) >= 13)
+_others = [n for n in _names if n != "Alfred"]
+check("exception: the script's agent-name list still holds Alfred and at least 13 others",
+      "Alfred" in _names and len(_others) >= 13)
 for n in _others:
     refused(f"agent name {n} in the content", fpath(f"tartalom-{n.lower()}.md", f"Ezt {n} irta.\n"),
             f"csatolmany: agens-nev a szovegben: {n}")
     refused(f"agent name {n} in the file name", fpath(f"{n}-jegyzet.md", MD), f"csatolmany: agens-nev a szovegben: {n}")
-refused("another agent name next to the product name", fpath("vegyes.md", "A Marveen flotta, Samu irta.\n"), "csatolmany: agens-nev a szovegben: Samu")
+refused("another agent name next to the product name", fpath("vegyes.md", "A Alfred flotta, Samu irta.\n"), "csatolmany: agens-nev a szovegben: Samu")
 refused("emoji in the content", fpath("emoji.md", "Egy emoji \U0001F600 itt.\n"), "csatolmany: nem-latin karakter: U+1F600")
 refused("a quote that is not the Hungarian pair", fpath("angol.md", "An \u201cEnglish\u201d quote.\n"), "csatolmany: nem-latin karakter: U+201C")
 
 for label, args, needle in (
-    ("product name in the title", [CHANNEL, MTITLE, BODY], "agens-nev a szovegben: Marveen"),
-    ("product name in the body", [CHANNEL, TITLE, MBODY], "agens-nev a szovegben: Marveen"),
-    ("product name with a suffix in the body", [CHANNEL, TITLE, MBODY_RAG], "agens-nev a szovegben: Marveen"),
-    ("product name in the body, even with an attachment", [CHANNEL, TITLE, MBODY, "--attach", GOOD], "agens-nev a szovegben: Marveen"),
+    ("product name in the title", [CHANNEL, MTITLE, BODY], "agens-nev a szovegben: Alfred"),
+    ("product name in the body", [CHANNEL, TITLE, MBODY], "agens-nev a szovegben: Alfred"),
+    ("product name with a suffix in the body", [CHANNEL, TITLE, MBODY_RAG], "agens-nev a szovegben: Alfred"),
+    ("product name in the body, even with an attachment", [CHANNEL, TITLE, MBODY, "--attach", GOOD], "agens-nev a szovegben: Alfred"),
     ("emoji in the body", [CHANNEL, TITLE, EMOJI_BODY], "nem-latin karakter: U+1F600"),
     ("arrow in the title", [CHANNEL, ARROW_TITLE, BODY], "nem-latin karakter: U+2192"),
 ):

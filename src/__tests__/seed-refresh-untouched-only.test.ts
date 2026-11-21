@@ -54,7 +54,7 @@ function makeFixture() {
   mkdirSync(join(install, 'seed-scheduled-tasks', 'demo-task'), { recursive: true })
   mkdirSync(join(home, '.claude', 'skills'), { recursive: true })
   mkdirSync(join(home, '.claude', 'scheduled-tasks'), { recursive: true })
-  writeFileSync(join(install, '.env'), 'MAIN_AGENT_ID=marveen\nBOT_NAME=Marveen\nOWNER_NAME=Szabolcs\nWEB_PORT=3420\n')
+  writeFileSync(join(install, '.env'), 'MAIN_AGENT_ID=alfred\nBOT_NAME=Alfred\nOWNER_NAME=Szabolcs\nWEB_PORT=3420\n')
 
   git(install, ['init', '-q'])
   git(install, ['config', 'user.email', 'test@example.invalid'])
@@ -156,9 +156,9 @@ describe('seed refresh touches only provably untouched copies', () => {
     try {
       const dir = join(f.home, '.claude', 'scheduled-tasks', 'demo-task')
       mkdirSync(dir, { recursive: true })
-      writeFileSync(join(dir, 'SKILL.md'), 'task v1 marveen\n')          // rendered v1, untouched
+      writeFileSync(join(dir, 'SKILL.md'), 'task v1 alfred\n')          // rendered v1, untouched
       runRefresh(f.install, f.home)
-      expect(readFileSync(join(dir, 'SKILL.md'), 'utf-8')).toBe('task v3 marveen\n')
+      expect(readFileSync(join(dir, 'SKILL.md'), 'utf-8')).toBe('task v3 alfred\n')
     } finally {
       rmSync(f.base, { recursive: true, force: true })
     }
@@ -169,7 +169,7 @@ describe('seed refresh touches only provably untouched copies', () => {
     // to an empty-id render, so only the gate keeps it from being rewritten.
     const f = makeFixture()
     try {
-      writeFileSync(join(f.install, '.env'), 'BOT_NAME=Marveen\nOWNER_NAME=Szabolcs\nWEB_PORT=3420\n')
+      writeFileSync(join(f.install, '.env'), 'BOT_NAME=Alfred\nOWNER_NAME=Szabolcs\nWEB_PORT=3420\n')
       const dir = join(f.home, '.claude', 'scheduled-tasks', 'demo-task')
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, 'SKILL.md'), 'task v1 \n')
@@ -189,7 +189,7 @@ describe('seed refresh touches only provably untouched copies', () => {
     try {
       const dir = join(f.home, '.claude', 'scheduled-tasks', 'demo-task')
       mkdirSync(dir, { recursive: true })
-      const edited = 'task v1 marveen\n# operator note\n'
+      const edited = 'task v1 alfred\n# operator note\n'
       writeFileSync(join(dir, 'SKILL.md'), edited)
       runRefresh(f.install, f.home)
       expect(readFileSync(join(dir, 'SKILL.md'), 'utf-8')).toBe(edited)
@@ -324,7 +324,7 @@ describe('top-level scheduled-tasks/ refresh (SEEDREFRESH826)', () => {
     }
     // What the NODE seeder wrote at install time: v1 with PROJECT_ROOT and
     // MAIN_AGENT_ID resolved -- exactly the on-disk shape update.sh meets.
-    const rendered = (s: string) => s.replaceAll('{{PROJECT_ROOT}}', install).replaceAll('{{MAIN_AGENT_ID}}', 'marveen')
+    const rendered = (s: string) => s.replaceAll('{{PROJECT_ROOT}}', install).replaceAll('{{MAIN_AGENT_ID}}', 'alfred')
     const liveDir = join(home, '.claude', 'scheduled-tasks', 'demo-top')
     mkdirSync(liveDir, { recursive: true })
     return { base, install, home, versions, rendered, livePath: join(liveDir, 'SKILL.md') }
@@ -337,7 +337,7 @@ describe('top-level scheduled-tasks/ refresh (SEEDREFRESH826)', () => {
       'GREEN=""; NC=""; ORANGE=""',
       `INSTALL_DIR="${install}"`,
       `HOME="${home}"`,
-      'MAIN_AGENT_ID="marveen"; BOT_NAME="Bot"; OWNER_NAME="Owner"; WEB_PORT="3420"',
+      'MAIN_AGENT_ID="alfred"; BOT_NAME="Bot"; OWNER_NAME="Owner"; WEB_PORT="3420"',
       FUNCS,
       'run_seed_refresh',
     ].join('\n') + '\n')
@@ -386,11 +386,11 @@ describe('top-level scheduled-tasks/ refresh (SEEDREFRESH826)', () => {
 // #2285: the dashboard seeder (copyTaskConfigWithAgentRewrite) writes a top-level
 // task-config.json with "agent" set to MAIN_AGENT_ID, re-serialised, and no
 // placeholder substitution. The refresh compared against the placeholder render,
-// which kept the shipped literal "agent": "marveen": on any other MAIN_AGENT_ID an
+// which kept the shipped literal "agent": "alfred": on any other MAIN_AGENT_ID an
 // untouched config never matched, so a shipped config fix never arrived while its
 // SKILL.md did.
 describe('top-level task-config.json on a non-default MAIN_AGENT_ID (#2285)', () => {
-  const v1 = { name: 'demo-cfg', type: 'dream-engine', schedule: '7 2 * * *', agent: 'marveen', note: '{{PROJECT_ROOT}}/x' }
+  const v1 = { name: 'demo-cfg', type: 'dream-engine', schedule: '7 2 * * *', agent: 'alfred', note: '{{PROJECT_ROOT}}/x' }
   const v2 = { ...v1, type: 'heartbeat' }
   // Exactly what copyTaskConfigWithAgentRewrite writes.
   const seeded = (cfg: Record<string, unknown>, agent: string) => JSON.stringify({ ...cfg, agent }, null, 2) + '\n'
@@ -434,7 +434,7 @@ describe('top-level task-config.json on a non-default MAIN_AGENT_ID (#2285)', ()
     }
   }
 
-  for (const agent of ['jarvis', 'marveen']) {
+  for (const agent of ['jarvis', 'alfred']) {
     it(`an untouched seeded config is refreshed on MAIN_AGENT_ID=${agent}, agent kept, nothing substituted`, () => {
       const f = makeCfgFixture()
       try {

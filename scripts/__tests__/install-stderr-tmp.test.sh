@@ -1,6 +1,6 @@
 #!/bin/bash
 # INSTSTDERRTMP1104: what the installers leave behind and print about secrets.
-#   1. install-macos.sh's stderr copy ($TMPDIR/marveen-install-stderr.*) is gone
+#   1. install-macos.sh's stderr copy ($TMPDIR/alfred-install-stderr.*) is gone
 #      after every exit path: success, exit 1 (fail()), the ERR trap, TERM, INT.
 #      The block under test is cut from the REAL script, so the test follows it.
 #   2. explain_install_error's raw tail lines are masked (redact_install_line).
@@ -69,7 +69,7 @@ TG_ID="123456789"; TG_SECRET="AAH4k5j6h7g8f9d0""s1a2q3w4e5r6t7y8u9i0"
   echo "CLAUDE_CODE_OAUTH_TOKEN=${SKA}-zzz and SLACK_BOT_TOKEN=${XOX}-1234-5678-abcdEFGH"
   echo "Authorization: Bearer eyJhbGciOi.payload.sig bot ${TG_ID}:${TG_SECRET}"
 } > "$LOG"
-out="$(MARVEEN_LANG=en /bin/bash -c ". '$REPO/install-lang.sh'; explain_install_error '$LOG'")"
+out="$(ALFRED_LANG=en /bin/bash -c ". '$REPO/install-lang.sh'; explain_install_error '$LOG'")"
 assert_not_contains "no dashboard token" "$out" "4f2c9d0e1b7a6c5d4f2c9d0e"
 assert_not_contains "no sk-ant body" "$out" "AbCdEf_123"
 assert_not_contains "no oauth env value" "$out" "${SKA}-zzz"
@@ -85,7 +85,7 @@ for script in install-macos.sh install-linux.sh; do
   assert_contains "$script: block found" "$blk" '[ -t 1 ]'
   printf '%s\n' "$blk" > "$TMP/dash.sh"
   for lang in hu en; do
-    out="$(MARVEEN_LANG=$lang DASH_TOKEN=deadbeefcafe0123 WEB_PORT=3420 /bin/bash -c ". '$REPO/install-lang.sh'; . '$TMP/dash.sh'" 2>&1)"
+    out="$(ALFRED_LANG=$lang DASH_TOKEN=deadbeefcafe0123 WEB_PORT=3420 /bin/bash -c ". '$REPO/install-lang.sh'; . '$TMP/dash.sh'" 2>&1)"
     assert_not_contains "$script $lang redirected: no token" "$out" "deadbeefcafe0123"
     assert_contains "$script $lang redirected: points at the file" "$out" "store/.dashboard-token"
   done

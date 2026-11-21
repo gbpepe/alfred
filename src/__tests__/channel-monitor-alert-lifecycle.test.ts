@@ -9,7 +9,7 @@ import {
   mainInputBoxProvenEmpty,
   decideStuckInputRestart,
   carryOutageAcrossRecreate,
-  decideMarveenRecoveryReport,
+  decideAlfredRecoveryReport,
   hardRestartStageAlertText,
   type StuckRestartLadder,
   type StuckRestartObservation,
@@ -495,19 +495,19 @@ describe('maybeRestartWedgedMainChannel wiring', () => {
     expect(count(code, 'monitorMainRespawnAt')).toBe(7)
     expect(count(code, 'monitorMainRespawnAt =')).toBe(6)
     // The ladder's restart, the keep-alive respawn.
-    expect(fn).toMatch(/\n  const r = hardRestartMarveenChannels\(\)\n  lastStuckRestartAt = Date\.now\(\)\n  monitorMainRespawnAt = lastStuckRestartAt\n/)
-    expect(src).toMatch(/\n    marveenLastKeepaliveRespawn = now\n    monitorMainRespawnAt = Date\.now\(\)\n/)
+    expect(fn).toMatch(/\n  const r = hardRestartAlfredChannels\(\)\n  lastStuckRestartAt = Date\.now\(\)\n  monitorMainRespawnAt = lastStuckRestartAt\n/)
+    expect(src).toMatch(/\n    alfredLastKeepaliveRespawn = now\n    monitorMainRespawnAt = Date\.now\(\)\n/)
     // What dashboard routes, plan rotation and onboarding call never marks.
-    for (const name of ['hardRestartMarveenChannels', 'respawnMarveenSessionFresh', 'createMainChannelsSession', 'restartMainForRotationContinue']) {
+    for (const name of ['hardRestartAlfredChannels', 'respawnAlfredSessionFresh', 'createMainChannelsSession', 'restartMainForRotationContinue']) {
       expect(sliceFn(name, code), name).not.toContain('monitorMainRespawnAt')
     }
     // The external-respawn detector keeps its own signal.
-    expect(src).toMatch(/^    lastSelfRespawnMs: Math\.max\(marveenLastHardRestart, marveenLastKeepaliveRespawn, marveenLastSessionCreate, lastSelfStampWriteMs\),$/m)
+    expect(src).toMatch(/^    lastSelfRespawnMs: Math\.max\(alfredLastHardRestart, alfredLastKeepaliveRespawn, alfredLastSessionCreate, lastSelfStampWriteMs\),$/m)
   })
 
   it('a resume marks only when the monitor asked for it, immediately before its only respawn', () => {
-    const resume = sliceFn('resumeMarveenSession')
-    expect(src).toMatch(/^export async function resumeMarveenSession\(opts: \{ byMonitor\?: boolean \} = \{\}\): Promise<boolean> \{$/m)
+    const resume = sliceFn('resumeAlfredSession')
+    expect(src).toMatch(/^export async function resumeAlfredSession\(opts: \{ byMonitor\?: boolean \} = \{\}\): Promise<boolean> \{$/m)
     expect(resume).toMatch(new RegExp([
       '',
       '    if \\(opts\\.byMonitor\\) monitorMainRespawnAt = Date\\.now\\(\\)',
@@ -517,12 +517,12 @@ describe('maybeRestartWedgedMainChannel wiring', () => {
     expect(count(resume, "'respawn-pane'")).toBe(1)
     // The only monitor caller is the stage-3 resume. The plan rotation passes
     // the function as is (no options); the watcher and the co-listen check call it bare.
-    expect(sliceFn('handleMarveenDown')).toMatch(/^    await resumeMarveenSession\(\{ byMonitor: true \}\)$/m)
-    expect(sliceFn('checkMainColistenChannels')).toMatch(/^    restart: \(\) => resumeMarveenSession\(\),$/m)
+    expect(sliceFn('handleAlfredDown')).toMatch(/^    await resumeAlfredSession\(\{ byMonitor: true \}\)$/m)
+    expect(sliceFn('checkMainColistenChannels')).toMatch(/^    restart: \(\) => resumeAlfredSession\(\),$/m)
     expect(count(code, 'byMonitor: true')).toBe(1)
-    expect(sliceFn('restartMainForRotationContinue')).toMatch(/^    resume: resumeMarveenSession,$/m)
+    expect(sliceFn('restartMainForRotationContinue')).toMatch(/^    resume: resumeAlfredSession,$/m)
     const watcher = readFileSync(join(__dirname, '..', 'web', 'stuck-tool-call-watcher.ts'), 'utf-8')
-    expect(watcher).toContain('await resumeMarveenSession()')
+    expect(watcher).toContain('await resumeAlfredSession()')
     expect(watcher).not.toContain('byMonitor')
   })
 
@@ -573,7 +573,7 @@ describe('control flow of the touched functions', () => {
   // guard on the line above (the pinned statement becomes its body), or by an
   // early return inserted before it.
   it('no brace-less if has its body on a later line (nested callbacks included)', () => {
-    for (const name of ['maybeRestartWedgedMainChannel', 'handleMarveenUp', 'handleMarveenDown', 'resumeMarveenSession', 'startChannelPluginMonitor']) {
+    for (const name of ['maybeRestartWedgedMainChannel', 'handleAlfredUp', 'handleAlfredDown', 'resumeAlfredSession', 'startChannelPluginMonitor']) {
       const offenders: number[] = []
       walkBody(fnNode(name), false, (node) => {
         if (ts.isIfStatement(node) && !ts.isBlock(node.thenStatement)
@@ -583,13 +583,13 @@ describe('control flow of the touched functions', () => {
     }
   })
 
-  it('handleMarveenUp has no return and maybeRestartWedgedMainChannel exactly three', () => {
+  it('handleAlfredUp has no return and maybeRestartWedgedMainChannel exactly three', () => {
     const returns = (name: string): number => {
       let n = 0
       walkBody(fnNode(name), true, (node) => { if (ts.isReturnStatement(node)) n++ })
       return n
     }
-    expect(returns('handleMarveenUp')).toBe(0)
+    expect(returns('handleAlfredUp')).toBe(0)
     expect(returns('maybeRestartWedgedMainChannel')).toBe(3)
   })
 })
@@ -614,74 +614,74 @@ describe('carryOutageAcrossRecreate', () => {
   })
 })
 
-describe('decideMarveenRecoveryReport', () => {
+describe('decideAlfredRecoveryReport', () => {
   it('nothing open -> no report', () => {
-    expect(decideMarveenRecoveryReport(null, null, T0)).toBeNull()
+    expect(decideAlfredRecoveryReport(null, null, T0)).toBeNull()
   })
 
   it('regression: an outage carried across a recreate is reported with its full duration', () => {
-    const r = decideMarveenRecoveryReport(null, { downSince: T0, stage: 'gave_up' }, T0 + 900_000)
+    const r = decideAlfredRecoveryReport(null, { downSince: T0, stage: 'gave_up' }, T0 + 900_000)
     expect(r).toEqual({ downedForSec: 900, stage: 'recreated', notify: true })
   })
 
   it('a carried outage plus a fresh cascade state counts from the earliest start', () => {
-    const r = decideMarveenRecoveryReport({ downSince: T0 + 600_000, stage: 'soft' }, { downSince: T0, stage: 'resume' }, T0 + 660_000)
+    const r = decideAlfredRecoveryReport({ downSince: T0 + 600_000, stage: 'soft' }, { downSince: T0, stage: 'resume' }, T0 + 660_000)
     expect(r?.downedForSec).toBe(660)
     expect(r?.stage).toBe('recreated')
     expect(r?.notify).toBe(true)
   })
 
   it('a disruptive fresh stage after the recreate is named as such', () => {
-    const r = decideMarveenRecoveryReport({ downSince: T0 + 600_000, stage: 'hard' }, { downSince: T0, stage: 'soft' }, T0 + 700_000)
+    const r = decideAlfredRecoveryReport({ downSince: T0 + 600_000, stage: 'hard' }, { downSince: T0, stage: 'soft' }, T0 + 700_000)
     expect(r?.stage).toBe('hard')
   })
 
   it('without a recreate the existing rule holds: short soft blips stay quiet', () => {
-    expect(decideMarveenRecoveryReport({ downSince: T0, stage: 'soft' }, null, T0 + 60_000)?.notify).toBe(false)
-    expect(decideMarveenRecoveryReport({ downSince: T0, stage: 'save' }, null, T0 + 60_000)?.notify).toBe(false)
-    expect(decideMarveenRecoveryReport({ downSince: T0, stage: 'save' }, null, T0 + 180_000)?.notify).toBe(true)
+    expect(decideAlfredRecoveryReport({ downSince: T0, stage: 'soft' }, null, T0 + 60_000)?.notify).toBe(false)
+    expect(decideAlfredRecoveryReport({ downSince: T0, stage: 'save' }, null, T0 + 60_000)?.notify).toBe(false)
+    expect(decideAlfredRecoveryReport({ downSince: T0, stage: 'save' }, null, T0 + 180_000)?.notify).toBe(true)
     // A long blip is reported under its own stage, not as a recreate.
-    expect(decideMarveenRecoveryReport({ downSince: T0, stage: 'soft' }, null, T0 + 600_000))
+    expect(decideAlfredRecoveryReport({ downSince: T0, stage: 'soft' }, null, T0 + 600_000))
       .toEqual({ downedForSec: 600, stage: 'soft', notify: true })
-    expect(decideMarveenRecoveryReport({ downSince: T0, stage: 'resume' }, null, T0 + 10_000)?.notify).toBe(true)
+    expect(decideAlfredRecoveryReport({ downSince: T0, stage: 'resume' }, null, T0 + 10_000)?.notify).toBe(true)
   })
 
   it('regression: a recreate-closed outage under 180s is still reported', () => {
     // A recreate needs only ~120s of confirmed suspicion, so this is reachable.
-    expect(decideMarveenRecoveryReport(null, { downSince: T0, stage: 'soft' }, T0 + 30_000))
+    expect(decideAlfredRecoveryReport(null, { downSince: T0, stage: 'soft' }, T0 + 30_000))
       .toEqual({ downedForSec: 30, stage: 'recreated', notify: true })
-    expect(decideMarveenRecoveryReport({ downSince: T0 + 10_000, stage: 'soft' }, { downSince: T0, stage: 'soft' }, T0 + 40_000)?.notify).toBe(true)
+    expect(decideAlfredRecoveryReport({ downSince: T0 + 10_000, stage: 'soft' }, { downSince: T0, stage: 'soft' }, T0 + 40_000)?.notify).toBe(true)
   })
 
-  it('handleMarveenUp sends exactly when the report says so', () => {
-    const up = sliceFn('handleMarveenUp')
-    expect(up).toMatch(/^  const report = decideMarveenRecoveryReport\(marveenDownState, marveenRecreatedOutage, Date\.now\(\)\)$/m)
+  it('handleAlfredUp sends exactly when the report says so', () => {
+    const up = sliceFn('handleAlfredUp')
+    expect(up).toMatch(/^  const report = decideAlfredRecoveryReport\(alfredDownState, alfredRecreatedOutage, Date\.now\(\)\)$/m)
     expect(up).toMatch(/^  if \(report\) \{$/m)
     expect(up).toMatch(/^    const downedFor = report\.downedForSec$/m)
     expect(up).toMatch(/^    const stage = report\.stage$/m)
     expect(up).toMatch(/\n    if \(report\.notify\) \{\n      sendAlert\(\n/)
     const block = sliceBlock(up, 'if (report.notify) {')
-    expect(count(sliceBlock(sliceFn('handleMarveenUp', code), 'if (report.notify) {'), 'sendAlert(')).toBe(1)
-    expect(count(sliceFn('handleMarveenUp', code), 'sendAlert(')).toBe(1)
+    expect(count(sliceBlock(sliceFn('handleAlfredUp', code), 'if (report.notify) {'), 'sendAlert(')).toBe(1)
+    expect(count(sliceFn('handleAlfredUp', code), 'sendAlert(')).toBe(1)
     expect(block).toContain('${stage} szint')
     // Both states are cleared at the end of the report branch.
-    expect(up).toMatch(/\n    \}\n    marveenDownState = null\n    marveenRecreatedOutage = null\n  \}$/)
+    expect(up).toMatch(/\n    \}\n    alfredDownState = null\n    alfredRecreatedOutage = null\n  \}$/)
   })
 
-  it('the monitor loop carries the open state into the recreate and handleMarveenUp clears it', () => {
+  it('the monitor loop carries the open state into the recreate and handleAlfredUp clears it', () => {
     expect(src).toMatch(new RegExp([
       '',
-      " {12}if \\(shouldEscalateMarveenDown\\(\\) && createMainChannelsSession\\(\\) === 'started'\\) \\{",
+      " {12}if \\(shouldEscalateAlfredDown\\(\\) && createMainChannelsSession\\(\\) === 'started'\\) \\{",
       ' {14}monitorMainRespawnAt = Date\\.now\\(\\)',
-      ' {14}marveenRecreatedOutage = carryOutageAcrossRecreate\\(marveenDownState, marveenRecreatedOutage\\)',
-      ' {14}marveenDownState = null',
-      ' {14}marveenSuspectFirstSeen = null',
+      ' {14}alfredRecreatedOutage = carryOutageAcrossRecreate\\(alfredDownState, alfredRecreatedOutage\\)',
+      ' {14}alfredDownState = null',
+      ' {14}alfredSuspectFirstSeen = null',
       ' {12}\\}',
       '',
     ].join('\n')))
     // The definition and this one call.
     expect(count(code, 'carryOutageAcrossRecreate(')).toBe(2)
-    expect(count(code, 'marveenRecreatedOutage = null')).toBe(1)
+    expect(count(code, 'alfredRecreatedOutage = null')).toBe(1)
   })
 })
 
@@ -704,11 +704,11 @@ describe('stage-4 hard restart message reflects the result', () => {
   })
 
   it('the stage-4 branch sends one alert, after the call, using its result', () => {
-    const stage = sliceBlock(sliceFn('handleMarveenDown'), "if (marveenDownState.stage === 'resume') {")
+    const stage = sliceBlock(sliceFn('handleAlfredDown'), "if (alfredDownState.stage === 'resume') {")
     expect(stage).toMatch(new RegExp([
       '',
       "    const svcName = process\\.platform === 'linux' \\? 'systemctl' : 'launchctl'",
-      '    const r = hardRestartMarveenChannels\\(\\)',
+      '    const r = hardRestartAlfredChannels\\(\\)',
       '    monitorMainRespawnAt = Date\\.now\\(\\)',
       "    if \\(!r\\.ok\\) logger\\.error\\(\\{ provider: providerLabel, err: r\\.error \\}, 'Stage-4 hard restart failed'\\)",
       '    sendAlert\\(hardRestartStageAlertText\\(svcName, MAIN_CHANNELS_SESSION, r\\)\\)',
@@ -717,13 +717,13 @@ describe('stage-4 hard restart message reflects the result', () => {
     ].join('\n')))
     // Same block in the literal-free view: literals are emptied there, so find
     // it as the same occurrence of the stage test.
-    const down = sliceFn('handleMarveenDown')
-    const downCode = sliceFn('handleMarveenDown', code)
-    const nth = count(down.slice(0, down.indexOf("if (marveenDownState.stage === 'resume') {")), 'if (marveenDownState.stage === ')
-    const at = downCode.split("if (marveenDownState.stage === '') {").slice(0, nth + 1).join("if (marveenDownState.stage === '') {").length
-    const stageCode = sliceBlock(downCode.slice(at), "if (marveenDownState.stage === '') {")
+    const down = sliceFn('handleAlfredDown')
+    const downCode = sliceFn('handleAlfredDown', code)
+    const nth = count(down.slice(0, down.indexOf("if (alfredDownState.stage === 'resume') {")), 'if (alfredDownState.stage === ')
+    const at = downCode.split("if (alfredDownState.stage === '') {").slice(0, nth + 1).join("if (alfredDownState.stage === '') {").length
+    const stageCode = sliceBlock(downCode.slice(at), "if (alfredDownState.stage === '') {")
     expect(count(stageCode, 'sendAlert(')).toBe(1)
-    expect(count(stageCode, 'hardRestartMarveenChannels()')).toBe(1)
+    expect(count(stageCode, 'hardRestartAlfredChannels()')).toBe(1)
     expect(stage).not.toContain('Hard restart (${svcName}) most')
   })
 })

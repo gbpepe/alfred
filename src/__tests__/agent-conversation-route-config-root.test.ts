@@ -29,7 +29,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const FIXTURE = mkdtempSync(join(tmpdir(), 'conversation-root-'))
-const PROJECT_ROOT = '/Users/x/marveen'
+const PROJECT_ROOT = '/Users/x/alfred'
 const SUB = 'ponder'
 const SUB_WORKING_DIR = join(PROJECT_ROOT, 'agents', SUB)
 
@@ -58,7 +58,7 @@ vi.mock('../web/inbound-probe.js', () => ({
 
 vi.mock('../config.js', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
   PROJECT_ROOT,
 }))
 
@@ -116,7 +116,7 @@ describe('conversation view: which config root the transcript is read from (#271
   })
 
   it('shows the main agent\'s live session from its isolated root, not the stale shared one', async () => {
-    const body = await getConversation('marveen')
+    const body = await getConversation('alfred')
     expect(body.sessionId).toBe('live-session')
     expect(body.entries.map(e => e.text)).toEqual(['live main reply'])
     // Stated rather than implied: this is what the pre-fix route returned.

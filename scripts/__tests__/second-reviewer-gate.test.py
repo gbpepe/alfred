@@ -85,9 +85,9 @@ def run(payload, stdin=None, gate=None, agent="probe-agent", extra_env=None):
     for k in ("SECOND_REVIEWER_URL", "SECOND_REVIEWER_TOKEN_FILE", "WEB_PORT"):
         env.pop(k, None)
     env.update(NO_PROXY="127.0.0.1", no_proxy="127.0.0.1")
-    env.pop("MARVEEN_AGENT_NAME", None)
+    env.pop("ALFRED_AGENT_NAME", None)
     if agent:
-        env["MARVEEN_AGENT_NAME"] = agent
+        env["ALFRED_AGENT_NAME"] = agent
     env.update(extra_env or {})
     p = subprocess.run([sys.executable, gate or GATE],
                        input=stdin if stdin is not None else json.dumps(payload),

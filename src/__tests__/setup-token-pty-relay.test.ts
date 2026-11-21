@@ -29,7 +29,7 @@ let privateTmp: string
 let parentTmpdir: string | undefined
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), 'marveen-stw-relay-test-'))
+  dir = mkdtempSync(join(tmpdir(), 'alfred-stw-relay-test-'))
   privateTmp = join(dir, 'tmp')
   mkdirSync(privateTmp)
   parentTmpdir = process.env.TMPDIR
@@ -88,7 +88,7 @@ function waitFor(cond: () => boolean, ms = 8000): Promise<void> {
 const tempRoots = () => {
   // Guard: the listing must be the private tmpdir, never the host's huge one.
   expect(tmpdir()).toBe(privateTmp)
-  return readdirSync(tmpdir()).filter((n) => n.startsWith('marveen-setup-token-'))
+  return readdirSync(tmpdir()).filter((n) => n.startsWith('alfred-setup-token-'))
 }
 
 describe('setup-token PTY relay (real python3, stub claude)', () => {
@@ -111,8 +111,8 @@ describe('setup-token PTY relay (real python3, stub claude)', () => {
     expect(env.cols).toBe(512)
     expect(env.keys).not.toContain('CLAUDE_CODE_OAUTH_TOKEN')
     expect(env.keys).not.toContain('ANTHROPIC_API_KEY')
-    expect(env.configDir).toMatch(/marveen-setup-token-[^/]+\/config$/)
-    expect(env.tgDir).toMatch(/marveen-setup-token-[^/]+\/telegram$/)
+    expect(env.configDir).toMatch(/alfred-setup-token-[^/]+\/config$/)
+    expect(env.tgDir).toMatch(/alfred-setup-token-[^/]+\/telegram$/)
     expect(env.tgEmpty).toBe(true)
     expect(env.browserExecutable).toBe(true)
     const root = dirname(env.configDir)

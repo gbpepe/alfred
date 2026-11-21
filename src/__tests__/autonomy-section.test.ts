@@ -7,12 +7,12 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, statSync } from 'n
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-autonomy-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-autonomy-test-'))
 
 vi.mock('../config.js', () => ({
   // agent-scaffold imports settings-store (MCPOROKLES923), which derives a path from
   // STORE_DIR at import time. A never-created dir: nothing here reads the store.
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -67,7 +67,7 @@ describe('ensureAutonomySection -- main agent (PROJECT_ROOT/CLAUDE.md)', () => {
     expect(result).toContain(MARKER_END)
     expect(result).toContain('## Autonómia és jóváhagyás')
     // VOICETOKENLEAK1101 PR-A1: the main agent gets the helper recipes too, its payloads in the project root
-    expect(result).toContain('marveen-api.sh approval-request agent-a CATEGORY_KEY 3600')
+    expect(result).toContain('alfred-api.sh approval-request agent-a CATEGORY_KEY 3600')
     expect(result).not.toContain('$(cat')
     // Persona content must be preserved
     expect(result).toContain('# Main Agent')
@@ -105,7 +105,7 @@ describe('ensureAutonomySection', () => {
     // Must contain the autonomy section heading
     expect(result).toContain('## Autonómia és jóváhagyás')
     // Must contain the approval request for level 2 (through the helper since VOICETOKENLEAK1101 PR-A1)
-    expect(result).toContain('marveen-api.sh approval-request')
+    expect(result).toContain('alfred-api.sh approval-request')
   })
 
   it('(a) level 2 recipe in the written block uses the agent name, not a placeholder', () => {
@@ -128,7 +128,7 @@ describe('ensureAutonomySection', () => {
     const level1Block = result.slice(level1Idx, level2Idx)
     expect(level1Block).not.toContain('approval-request')
     // Level 1 must have inter-agent message and MEGÁLL
-    expect(level1Block).toContain('marveen-api.sh message level1-agent')
+    expect(level1Block).toContain('alfred-api.sh message level1-agent')
     expect(level1Block).toContain('ÁLLJ MEG')
   })
 

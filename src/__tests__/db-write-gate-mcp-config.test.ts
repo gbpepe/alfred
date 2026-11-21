@@ -89,7 +89,7 @@ describe('a sub-agent may not write an MCP server list', () => {
 })
 
 describe('the caller\'s own lists outside the install (a worker), per call', () => {
-  const proj = () => join(base, 'home', '.marveen-worker')
+  const proj = () => join(base, 'home', '.alfred-worker')
   const cfg = () => join(proj(), '.claude-config')
   beforeEach(() => {
     mkdirSync(cfg(), { recursive: true })
@@ -170,7 +170,7 @@ describe('the hook end to end: CLAUDE_PROJECT_DIR and CLAUDE_CONFIG_DIR are read
     return spawnSync(process.execPath, [hook], { input: JSON.stringify({ tool_name, tool_input, cwd }), encoding: 'utf-8', env: { ...e, ...env } })
   }
   it('a worker may not write its own config .claude.json or project .mcp.json; the message names the class', () => {
-    const proj = join(base, 'home', '.marveen-worker')
+    const proj = join(base, 'home', '.alfred-worker')
     const cfg = join(proj, '.claude-config')
     mkdirSync(cfg, { recursive: true })
     const env = { CLAUDE_PROJECT_DIR: proj, CLAUDE_CONFIG_DIR: cfg }
@@ -183,7 +183,7 @@ describe('the hook end to end: CLAUDE_PROJECT_DIR and CLAUDE_CONFIG_DIR are read
     }
   })
   it('control: another path of the same worker passes', () => {
-    const proj = join(base, 'home', '.marveen-worker')
+    const proj = join(base, 'home', '.alfred-worker')
     const r = run({ CLAUDE_PROJECT_DIR: proj, CLAUDE_CONFIG_DIR: join(proj, '.claude-config') }, 'Write', { file_path: join(proj, 'notes.md'), content: 'x' }, proj)
     expect(r.stdout).toBe('')
     expect(r.status).toBe(0)
@@ -197,7 +197,7 @@ it('the deny message names the npx form the CLI rule does not see (Samu 68172)',
 describe('a bare glob in the sub-agent\'s own directory follows the shell dotfile rule (worker-gates count(*), #2497)', () => {
   const own = () => ({ subAgent: true, projectDir: agent, configDir: join(agent, '.claude-config') })
   it.each([
-    'sqlite3 ../../store/claudeclaw.db "SELECT count(*) FROM kanban_cards"',
+    'sqlite3 ../../store/alfred.db "SELECT count(*) FROM kanban_cards"',
     'sqlite3 x.db "SELECT * FROM t"',
     // GATEQUOTEDSQL1104: a "(...d...)" elsewhere in the command is not a zsh dot qualifier (the old test was
     // case-insensitive and needed no glob before the parenthesis, so these read-only queries were denied).

@@ -46,7 +46,7 @@ with open(bad_file, "w", encoding="utf-8") as fh:
 with open(good_file, "w", encoding="utf-8") as fh:
     json.dump({"content": GOOD}, fh, ensure_ascii=False)
 
-MIO = "https://api.marveen.io/agent/v1"
+MIO = "https://api.alfred.io/agent/v1"
 CASES = [
     # community API
     ("community comment, inline -d, em dash BLOCKS",

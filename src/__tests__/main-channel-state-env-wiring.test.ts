@@ -34,9 +34,9 @@ describe('buildMainSessionRespawnCmd with a non-Telegram provider', () => {
       model: '',
       config: mainConfigDecisionForTest(),
       continueSession: false,
-      channelStateEnv: { name: 'DISCORD_STATE_DIR', dir: '/opt/marveen/.claude/channels/discord' },
+      channelStateEnv: { name: 'DISCORD_STATE_DIR', dir: '/opt/alfred/.claude/channels/discord' },
     })
-    expect(cmd).toContain("export DISCORD_STATE_DIR='/opt/marveen/.claude/channels/discord'")
+    expect(cmd).toContain("export DISCORD_STATE_DIR='/opt/alfred/.claude/channels/discord'")
     expect(cmd).not.toContain('TELEGRAM_STATE_DIR')
     expect(cmd.indexOf('DISCORD_STATE_DIR')).toBeLessThan(cmd.indexOf('/usr/local/bin/claude'))
   })

@@ -63,7 +63,7 @@ const EXEMPT: Record<string, string> = {
   'ledger_lib.py':
     'shared library imported by the ledger hooks; not itself a hook',
   'command_prompt.py':
-    'shared library: the one "is this prompt an owner slash command" check, imported by marveen-commands.py, inbox-drain.py and channel-inbox-drain.py; not itself a hook',
+    'shared library: the one "is this prompt an owner slash command" check, imported by alfred-commands.py, inbox-drain.py and channel-inbox-drain.py; not itself a hook',
   'hook_errlog.py':
     'shared library imported by hooks to record a swallowed failure in store/hook-errors.log (SILENTOLLAMA926); not itself a hook',
   'clearstate_lib.py':
@@ -73,7 +73,7 @@ const EXEMPT: Record<string, string> = {
   'memory_frontmatter_lib.py':
     'shared library: the one memory-frontmatter check, imported by memory-frontmatter-gate.py (Write/Edit) and memory-frontmatter-bash-gate.py (Bash, KAPUEGYUT918); not itself a hook',
   'hook_switches.py':
-    'shared library (HOOKDRIFT926): MARVEEN_DISABLED_HOOKS + stdin size cap, imported by tool-log-capture.py and read by scripts/hook-metadata.py; not itself a hook',
+    'shared library (HOOKDRIFT926): ALFRED_DISABLED_HOOKS + stdin size cap, imported by tool-log-capture.py and read by scripts/hook-metadata.py; not itself a hook',
   'email_extract.py':
     'shared library imported by outgoing-copy-gate.py (and the level-2 email approval gate, EMAILKAPU901 PR2); not itself a hook',
   'recipient_ledger.py':
@@ -91,7 +91,7 @@ const EXEMPT: Record<string, string> = {
   'channel-process-gate.py':
     'scheduled/CLI gate (--only / --notify / --json), not a settings hook: it compares the channels a session DECLARES against the plugin processes actually alive under it, which is a periodic check rather than a per-tool-call one',
   'mio-orszem-precheck.sh':
-    'scheduler preCheck for the HOST-LOCAL marveen-io-kozosseg-orszem task (ORSICTX912): the mio community sentinel is this install\'s own and deliberately NOT seeded (a repo seed would ship it to every customer install), so its registration lives in the host ~/.claude/scheduled-tasks task-config -- outside this corpus by design. Wiring is gated on the ORSICTX912 activation order (host restart -> verify -> merge -> build+restart); the hermetic fail-direction tests are scripts/__tests__/mio-orszem-precheck.test.py.',
+    'scheduler preCheck for the HOST-LOCAL alfred-io-kozosseg-orszem task (ORSICTX912): the mio community sentinel is this install\'s own and deliberately NOT seeded (a repo seed would ship it to every customer install), so its registration lives in the host ~/.claude/scheduled-tasks task-config -- outside this corpus by design. Wiring is gated on the ORSICTX912 activation order (host restart -> verify -> merge -> build+restart); the hermetic fail-direction tests are scripts/__tests__/mio-orszem-precheck.test.py.',
 }
 
 function readSurfaces(rels: readonly string[]): string {

@@ -84,7 +84,7 @@ cp "$TMP/uname" "$TMP/launchctl" "$SYS/"
 for INST in install-channel-keepalive-probe.sh install-main-inbox-observer.sh; do
   H="$TMP/e13 sp"'$x#b'"-$INST"; stub_tmux "$H/.local/bin"
   printf 'SERVICE_ID=hpe\n' > "$TMP/.env"
-  HOME="$H" PATH="$SYS" MARVEEN_ENV_FILE="$TMP/.env" /bin/bash "$REPO/scripts/$INST" >"$TMP/out" 2>&1
+  HOME="$H" PATH="$SYS" ALFRED_ENV_FILE="$TMP/.env" /bin/bash "$REPO/scripts/$INST" >"$TMP/out" 2>&1
   p="$(find "$H/Library/LaunchAgents" -name '*.plist' 2>/dev/null | head -1)"
   got="$(python3 -c "import plistlib,sys; print(plistlib.load(open(sys.argv[1],'rb'))['EnvironmentVariables']['PATH'])" "$p" 2>&1)"
   assert_eq "E13 $INST: the plist parses and its PATH starts with the awkward dir" "$H/.local/bin:$BASE" "$got"

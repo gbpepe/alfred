@@ -23,7 +23,7 @@ HOOK_DIR="$(cd "$GIT_COMMON_DIR" && pwd)/hooks"
 DISPATCH="$HOOK_DIR/pre-push"
 GUARD="$HOOK_DIR/pre-push.d/30-review-gate"
 SRC="$ROOT/scripts/git-hooks/pre-push-review-gate.py"
-MARK="marveen-pre-push-dispatcher"
+MARK="alfred-pre-push-dispatcher"
 
 # core.hooksPath pointing anywhere but $HOOK_DIR means git never runs the hook we are about to
 # write: the installer would print a success line and the gate would enforce nothing (measured in

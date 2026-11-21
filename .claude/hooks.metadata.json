@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_comment": "Sidecar for the hooks block of settings.json (HOOKDRIFT926). One entry per matcher group, same event and index. After editing hooks run: python3 scripts/hook-metadata.py --update, review the printed diff, fix any TODO purpose, commit both files. Optional top-level 'non_disableable': extra hook names (this install's own gates / audit ledgers) that MARVEEN_DISABLED_HOOKS may never switch off; it can only add to the built-in list in scripts/hooks/hook_switches.py.",
+  "_comment": "Sidecar for the hooks block of settings.json (HOOKDRIFT926). One entry per matcher group, same event and index. After editing hooks run: python3 scripts/hook-metadata.py --update, review the printed diff, fix any TODO purpose, commit both files. Optional top-level 'non_disableable': extra hook names (this install's own gates / audit ledgers) that ALFRED_DISABLED_HOOKS may never switch off; it can only add to the built-in list in scripts/hooks/hook_switches.py.",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -21,14 +21,6 @@
       },
       {
         "index": 2,
-        "id": "user-prompt-submit/telegram-reply-directive",
-        "hook": "telegram-reply-directive",
-        "gate": false,
-        "purpose": "UserPromptSubmit hook: inject a reply-tool directive whenever an inbound Telegram TEXT message arrives.",
-        "fingerprint": "61889545e21db54a1b9da6cecb2344443700dd45b5d6ac53199eeb12c53f7ee1"
-      },
-      {
-        "index": 3,
         "id": "user-prompt-submit/provenance-gate",
         "hook": "provenance-gate",
         "gate": true,
@@ -36,7 +28,7 @@
         "fingerprint": "682fe777ea9db098c346b9990c0b472e0d45c5a9975b9cb368d933f8f551b1d7"
       },
       {
-        "index": 4,
+        "index": 3,
         "id": "user-prompt-submit/staleness-guard",
         "hook": "staleness-guard",
         "gate": true,
@@ -44,7 +36,7 @@
         "fingerprint": "d4dc155274071971c8b399e78da0abfb538388ece5255af74a7f30648c5d2168"
       },
       {
-        "index": 5,
+        "index": 4,
         "id": "user-prompt-submit/memory-lookup-nudge",
         "hook": "memory-lookup-nudge",
         "gate": false,
@@ -52,15 +44,15 @@
         "fingerprint": "65d80343e524a2ece861720f187afceae34673ed2373247a5cd7f9335084c3f4"
       },
       {
-        "index": 6,
+        "index": 5,
         "id": "user-prompt-submit/channel-inbox-drain",
         "hook": "channel-inbox-drain",
         "gate": false,
-        "purpose": "UserPromptSubmit hook: drain sub-agent Telegram channel notifications.",
+        "purpose": "UserPromptSubmit hook: drain sub-agent channel notifications.",
         "fingerprint": "101c6c0ed43cc506bb96cc596a5cddf48fa546ffb1db8cced759f516f1eb3fab"
       },
       {
-        "index": 7,
+        "index": 6,
         "id": "user-prompt-submit/voice-reply-directive",
         "hook": "voice-reply-directive",
         "gate": false,
@@ -68,39 +60,15 @@
         "fingerprint": "d08c8b922be426b706504f48fd419f56bb502a07c9a0913dbb6d678fca2cf78c"
       },
       {
-        "index": 8,
-        "id": "user-prompt-submit/telegram_progress",
-        "hook": "telegram_progress",
-        "gate": false,
-        "purpose": "Posts the Telegram \"processing\" indicator when an inbound message starts a turn.",
-        "fingerprint": "0e5787c1583a0ee01711c54924d3468e5cb978d350b3dfa47340a01b15c7e9c1"
-      },
-      {
-        "index": 9,
-        "id": "user-prompt-submit/slack_progress",
-        "hook": "slack_progress",
-        "gate": false,
-        "purpose": "Posts the Slack \"processing\" indicator when an inbound message starts a turn.",
-        "fingerprint": "39155d23e69be104a79e48a9f2663781385623b7283436460bdcc36dc7f717ea"
-      },
-      {
-        "index": 10,
-        "id": "user-prompt-submit/googlechat-thread-guard",
-        "hook": "googlechat-thread-guard",
-        "gate": true,
-        "purpose": "UserPromptSubmit half of the Google Chat thread guard (PELENKAGCHAT1113): records which message arrived in which thread, identifiers only, for the PreToolUse half to judge a reply by.",
-        "fingerprint": "9c97b8ab521de58f707156b64bbade9848e5edc4d14f55f9f363fc2350ffa19e"
-      },
-      {
-        "index": 11,
-        "id": "user-prompt-submit/marveen-commands",
-        "hook": "marveen-commands",
+        "index": 7,
+        "id": "user-prompt-submit/alfred-commands",
+        "hook": "alfred-commands",
         "gate": false,
         "purpose": "Answers the owner's slash commands without a model turn.",
         "fingerprint": "dba408c7acf29f1656b7bb66ba03372a85df5748297fd90a171ed71453384c80"
       },
       {
-        "index": 12,
+        "index": 8,
         "id": "user-prompt-submit/taskstate-stub",
         "hook": "taskstate-stub",
         "gate": false,
@@ -135,14 +103,6 @@
       },
       {
         "index": 3,
-        "id": "post-tool-use/telegram_progress_reply_clear",
-        "hook": "telegram_progress_reply_clear",
-        "gate": false,
-        "purpose": "Clears the Telegram progress placeholder as soon as a reply is actually sent.",
-        "fingerprint": "1b600ddbac67bbe9ee36cde1419a2415d277ce977995dcfe42861700b38ce13d"
-      },
-      {
-        "index": 4,
         "id": "post-tool-use/browser-content-notice",
         "hook": "browser-content-notice",
         "gate": false,
@@ -150,15 +110,7 @@
         "fingerprint": "53b134909e6878b70e957df21a1f6336c5efae334b527d8624cc0ea5f8560e64"
       },
       {
-        "index": 5,
-        "id": "post-tool-use/slack_progress_reply_clear",
-        "hook": "slack_progress_reply_clear",
-        "gate": false,
-        "purpose": "Clears the Slack progress placeholder as soon as a reply is actually sent.",
-        "fingerprint": "b9923c7d15679fb40e63cf5647313ce4ed8585bbe052a134dad122a714c52ad4"
-      },
-      {
-        "index": 6,
+        "index": 4,
         "id": "post-tool-use/skill-usage-capture",
         "hook": "skill-usage-capture",
         "gate": false,
@@ -166,7 +118,7 @@
         "fingerprint": "43cdce9efa393106fecba1c91a85ba24ca600bb43317245aadec143d0a31ff16"
       },
       {
-        "index": 7,
+        "index": 5,
         "id": "post-tool-use/memory-frontmatter-bash-gate",
         "hook": "memory-frontmatter-bash-gate",
         "gate": true,
@@ -259,14 +211,6 @@
       },
       {
         "index": 8,
-        "id": "pre-tool-use/outgoing-copy-gate/telegram-reply",
-        "hook": "outgoing-copy-gate",
-        "gate": true,
-        "purpose": "Copy QA gate on outgoing Telegram reply / edit_message text.",
-        "fingerprint": "d292582ae1adda412acdb544c6c36f8191759ce2fe0562cf92e788bc9fdac45d"
-      },
-      {
-        "index": 9,
         "id": "pre-tool-use/outgoing-copy-gate/discord-reply",
         "hook": "outgoing-copy-gate",
         "gate": true,
@@ -274,7 +218,7 @@
         "fingerprint": "b7b26a4c86cbfb0828a2512939acabdf370fa08adbd5436587d4f74c2391ea0f"
       },
       {
-        "index": 10,
+        "index": 9,
         "id": "pre-tool-use/email-approval-gate",
         "hook": "email-approval-gate",
         "gate": true,
@@ -282,7 +226,7 @@
         "fingerprint": "496e1328b3acf0ff757f4a7452d7b75ee9cad1a940e1f2f8b2dca5748eee616a"
       },
       {
-        "index": 11,
+        "index": 10,
         "id": "pre-tool-use/email-approval-gate/send-email",
         "hook": "email-approval-gate",
         "gate": true,
@@ -290,7 +234,7 @@
         "fingerprint": "332cecf4c440ff24467225484aea39feaeb628acebe3a9fb390694c72a2d93c8"
       },
       {
-        "index": 12,
+        "index": 11,
         "id": "pre-tool-use/email-approval-gate/manage-email",
         "hook": "email-approval-gate",
         "gate": true,
@@ -298,7 +242,7 @@
         "fingerprint": "a094e7338342de4d36ccb2674dfa262254094e270f939ad212c997dffdb65b0d"
       },
       {
-        "index": 13,
+        "index": 12,
         "id": "pre-tool-use/email-approval-gate/messages",
         "hook": "email-approval-gate",
         "gate": true,
@@ -306,7 +250,7 @@
         "fingerprint": "90eff86c2ad3c3e82c793b3eff03db362d50a473a681a3e8f6bc35952f771848"
       },
       {
-        "index": 14,
+        "index": 13,
         "id": "pre-tool-use/email-approval-gate/gmail",
         "hook": "email-approval-gate",
         "gate": true,
@@ -314,7 +258,7 @@
         "fingerprint": "507c77e3d360bdffb86fba1fbffa397bc63a711dac267ca95523a8b83d29a2c5"
       },
       {
-        "index": 15,
+        "index": 14,
         "id": "pre-tool-use/email-approval-gate/draft-email",
         "hook": "email-approval-gate",
         "gate": true,
@@ -322,7 +266,7 @@
         "fingerprint": "fe8c00c608779013364e333420bcb12baed860dfdfae8e67033d6d45f3c012a1"
       },
       {
-        "index": 16,
+        "index": 15,
         "id": "pre-tool-use/email-approval-gate/mail-tool-family",
         "hook": "email-approval-gate",
         "gate": true,
@@ -330,7 +274,7 @@
         "fingerprint": "cc5f44ad15278d23f0bf433820840f7048886b012bfe268a8fc57be0175bbd3f"
       },
       {
-        "index": 17,
+        "index": 16,
         "id": "pre-tool-use/channel-image-resize",
         "hook": "channel-image-resize",
         "gate": false,
@@ -338,7 +282,7 @@
         "fingerprint": "6470bb700bcc630a5566246b081d408a8816d9e2380bd7a34569cd1a76afefb6"
       },
       {
-        "index": 18,
+        "index": 17,
         "id": "pre-tool-use/egress-gate",
         "hook": "egress-gate",
         "gate": true,
@@ -346,7 +290,7 @@
         "fingerprint": "94368f91e67d77d3cef978d63541bd2dcb5824dd82d2cc90404763644b622b87"
       },
       {
-        "index": 19,
+        "index": 18,
         "id": "pre-tool-use/memory-frontmatter-gate",
         "hook": "memory-frontmatter-gate",
         "gate": true,
@@ -354,7 +298,7 @@
         "fingerprint": "8fb3c47be81f397747a88bbf892cea7df2cd92b0cfd1fadf90a0a9a8e9f5379b"
       },
       {
-        "index": 20,
+        "index": 19,
         "id": "pre-tool-use/memory-frontmatter-bash-gate",
         "hook": "memory-frontmatter-bash-gate",
         "gate": true,
@@ -362,7 +306,7 @@
         "fingerprint": "4c2cc281846835bbf1614c13aeabd202f7e9f8f51b0d054b0611c5e791c088c6"
       },
       {
-        "index": 21,
+        "index": 20,
         "id": "pre-tool-use/db-write-gate",
         "hook": "db-write-gate",
         "gate": true,
@@ -370,57 +314,25 @@
         "fingerprint": "38f20fadd64d70a1adb20d98e52f82cc8add436d5d68fde932e5d52eebeae94d"
       },
       {
-        "index": 22,
+        "index": 21,
         "id": "pre-tool-use/shell-rescan-guard",
         "hook": "shell-rescan-guard",
         "gate": true,
         "purpose": "PreToolUse gate: refuse a Bash command whose own TEXT will be re-scanned by the shell, because that is how prose becomes an executed command.",
         "fingerprint": "c57da1ed93fdc70ed0ede7bf1eb03c19d7a9de601178c97f0a5f4ce777c54342"
-      },
-      {
-        "index": 23,
-        "id": "pre-tool-use/googlechat-thread-guard",
-        "hook": "googlechat-thread-guard",
-        "gate": true,
-        "purpose": "PreToolUse half of the Google Chat thread guard (PELENKAGCHAT1113): stops a reply that would not land in the thread of the question it answers, and names the thread to use.",
-        "fingerprint": "d226afbb836e3ae6011082173f34c2f2746906a8aabed55bfce8305373379e8b"
       }
     ],
     "Stop": [
       {
         "index": 0,
-        "id": "stop/telegram-reply-guard",
-        "hook": "telegram-reply-guard",
-        "gate": true,
-        "purpose": "Stop hook: ENFORCE that an inbound Telegram message is answered through the reply tool before the turn ends.",
-        "fingerprint": "b2324389301b2d389cc42ffce69ea72bdd1f0ecf9ce3314e76b572f28d79f925"
-      },
-      {
-        "index": 1,
-        "id": "stop/telegram_progress_clear",
-        "hook": "telegram_progress_clear",
-        "gate": false,
-        "purpose": "At turn end: clears the Telegram progress placeholder and owns the per-session progress state.",
-        "fingerprint": "19ad51202dbeeee7749404f13f596ead6d0134a553e27d59822e02dff88dcccd"
-      },
-      {
-        "index": 2,
-        "id": "stop/slack_progress_clear",
-        "hook": "slack_progress_clear",
-        "gate": false,
-        "purpose": "At turn end: clears the Slack progress placeholder and owns the per-session progress state.",
-        "fingerprint": "245f394107f1b4328877fdcb77f13b1a6469a71adc9ce2a418f9fb28aadd7dda"
-      },
-      {
-        "index": 3,
-        "id": "stop/marveen-commands",
-        "hook": "marveen-commands",
+        "id": "stop/alfred-commands",
+        "hook": "alfred-commands",
         "gate": false,
         "purpose": "Slash-command bookkeeping at turn end (--stop).",
         "fingerprint": "aa25f7fe40defbe59ed2604249a067c1ba4bfeabbe4f4b5adf9cfcd0208138e4"
       },
       {
-        "index": 4,
+        "index": 1,
         "id": "stop/login-lost-alert",
         "hook": "login-lost-alert",
         "gate": false,
@@ -473,8 +385,8 @@
       },
       {
         "index": 3,
-        "id": "session-start/marveen-commands",
-        "hook": "marveen-commands",
+        "id": "session-start/alfred-commands",
+        "hook": "alfred-commands",
         "gate": false,
         "purpose": "Slash-command bookkeeping at session start (--session-start).",
         "fingerprint": "ab108fcd2404449a0de080ca4ee9fb942afcd33b63419c36763fd80b0e51f08d"

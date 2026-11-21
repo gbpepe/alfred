@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const sendSpy = vi.hoisted(() => vi.fn(async () => 4242))
-vi.mock('../config.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../config.js')>()), MAIN_AGENT_ID: 'marveen', TELEGRAM_BOT_TOKEN: 'test-token', CHANNEL_PROVIDER: 'telegram' }))
+vi.mock('../config.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../config.js')>()), MAIN_AGENT_ID: 'alfred', TELEGRAM_BOT_TOKEN: 'test-token', CHANNEL_PROVIDER: 'telegram' }))
 vi.mock('../owner-chat.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../owner-chat.js')>()), resolveOwnerChatId: () => '777' }))
 vi.mock('../web/telegram.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../web/telegram.js')>()), sendTelegramMessage: sendSpy }))
 
@@ -33,7 +33,7 @@ const td = mkdtempSync(join(tmpdir(), 'approvals-owner-only-'))
 afterAll(() => rmSync(td, { recursive: true, force: true }))
 const store = join(td, 'store'); mkdirSync(store, { recursive: true })
 writeFileSync(join(store, 'autonomy-config.json'), JSON.stringify({ categories: [{ key: 'email_send', label: 'Email', level: 2, locked: false }] }))
-initDatabase(join(store, 'claudeclaw.db'))
+initDatabase(join(store, 'alfred.db'))
 // A dashboard login exists (the normal state): the bare token no longer counts as the owner.
 const ownerUser = createDashboardUser('owner', 'x'.repeat(60))
 const ownerCookie = () => `${SESSION_COOKIE_NAME}=${createSession({ userId: ownerUser.id, username: 'owner' })}`
@@ -82,7 +82,7 @@ describe('born-approved POST (owner_approved_message_id)', () => {
     const p = letter()
     const anchor = anchorOf(p)
     const before = listApprovals({ limit: 500 }).length
-    const r = await post({ agent_id: 'marveen', category: 'email_send', action_description: 'x', content_hash: anchor, owner_approved_message_id: 1 }, TOKEN)
+    const r = await post({ agent_id: 'alfred', category: 'email_send', action_description: 'x', content_hash: anchor, owner_approved_message_id: 1 }, TOKEN)
     expect(r.status).toBe(403)
     expect(r.body.code).toBe('owner_session_required')
     expect(listApprovals({ limit: 500 }).length).toBe(before)
@@ -92,7 +92,7 @@ describe('born-approved POST (owner_approved_message_id)', () => {
   it('POSITIVE CONTROL: the owner session files it born approved, and the gate opens for that letter', async () => {
     const p = letter()
     const anchor = anchorOf(p)
-    const r = await post({ agent_id: 'marveen', category: 'email_send', action_description: 'x', content_hash: anchor, owner_approved_message_id: 2 }, OWNER)
+    const r = await post({ agent_id: 'alfred', category: 'email_send', action_description: 'x', content_hash: anchor, owner_approved_message_id: 2 }, OWNER)
     expect(r.status).toBe(201)
     expect(r.body.status).toBe('approved')
     expect(gate(p).code).toBe(0)
@@ -151,7 +151,7 @@ describe('PATCH status=approved', () => {
 
   it.each(['rejected', 'timeout'])('the token may still resolve a request as %s: that only cancels it', async (status) => {
     const own = await post({ agent_id: 'soma', category: 'email_send', action_description: status }, TOKEN)
-    const r = await patch(own.body.id, { status, resolved_by: 'marveen' }, TOKEN)
+    const r = await patch(own.body.id, { status, resolved_by: 'alfred' }, TOKEN)
     expect(r.status).toBe(200)
     expect(r.body.status).toBe(status)
   })
@@ -166,7 +166,7 @@ describe('standing-recipient activation (STANDING_CATEGORY)', () => {
     const first = gate(letter(addr))
     expect(first.code).toBe(2)
     expect(first.err).toMatch(/NINCS ELESITVE/)
-    const spoof = await post({ agent_id: 'marveen', category: 'email_standing_recipient', action_description: 'Allando cimzett elesitese', content_hash: anchor, owner_approved_message_id: 3 }, TOKEN)
+    const spoof = await post({ agent_id: 'alfred', category: 'email_standing_recipient', action_description: 'Allando cimzett elesitese', content_hash: anchor, owner_approved_message_id: 3 }, TOKEN)
     expect(spoof.status).toBe(403)
     const pending = await post({ agent_id: 'soma', category: 'email_standing_recipient', action_description: 'Allando cimzett elesitese', content_hash: anchor }, TOKEN)
     expect((await patch(pending.body.id, { status: 'approved', resolved_by: 'telegram_text' }, TOKEN)).status).toBe(403)
@@ -177,7 +177,7 @@ describe('standing-recipient activation (STANDING_CATEGORY)', () => {
   })
 
   it('POSITIVE CONTROL: the owner session activates it, and later letters to it pass', async () => {
-    const r = await post({ agent_id: 'marveen', category: 'email_standing_recipient', action_description: 'Allando cimzett elesitese', content_hash: anchor, owner_approved_message_id: 4 }, OWNER)
+    const r = await post({ agent_id: 'alfred', category: 'email_standing_recipient', action_description: 'Allando cimzett elesitese', content_hash: anchor, owner_approved_message_id: 4 }, OWNER)
     expect(r.status).toBe(201)
     expect(gate(letter(addr)).code).toBe(0)
     expect(gate(letter(addr)).code).toBe(0)

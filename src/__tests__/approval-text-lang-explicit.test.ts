@@ -11,7 +11,7 @@ vi.mock('../config.js', async () => {
   const { mkdtempSync: mk } = await import('node:fs')
   const { tmpdir: td } = await import('node:os')
   const { join: j } = await import('node:path')
-  root.dir = mk(j(td(), 'marveen-approval-lang-'))
+  root.dir = mk(j(td(), 'alfred-approval-lang-'))
   return { ...actual, PROJECT_ROOT: root.dir }
 })
 

@@ -53,8 +53,8 @@ ANALYSIS_SCRIPT = GARMIN_DIR / "running_analysis.py"
 STATE_FILE = GARMIN_DIR / "last_analyzed_run.json"
 PENDING_FILE = GARMIN_DIR / "pending_run_analysis.txt"
 
-MARVEEN_DIR = Path(__file__).resolve().parents[1]
-TOKEN_FILE = MARVEEN_DIR / "store" / ".dashboard-token"
+ALFRED_DIR = Path(__file__).resolve().parents[1]
+TOKEN_FILE = ALFRED_DIR / "store" / ".dashboard-token"
 MESSAGES_URL = "http://localhost:3420/api/messages"
 
 # The whitespace set of JavaScript's String.prototype.trim() (ECMA-262 WhiteSpace plus
@@ -76,10 +76,10 @@ def main_agent_id() -> str:
     failure -- the dashboard rejects the POST with 403 and the gate's alert is
     lost, or worse, it is accepted into a mailbox nobody reads.
 
-    The fallback is "marveen" ON PURPOSE, and it is not the old defect coming
+    The fallback is "alfred" ON PURPOSE, and it is not the old defect coming
     back: src/config.ts resolves MAIN_AGENT_ID exactly this way
-    (`env['MAIN_AGENT_ID'] ?? 'marveen'`) so that an older install upgrading in
-    place keeps working. On such an install "marveen" IS the registered main
+    (`env['MAIN_AGENT_ID'] ?? 'alfred'`) so that an older install upgrading in
+    place keeps working. On such an install "alfred" IS the registered main
     agent, so the POST is accepted. The defect was never "there is a default" --
     it was a name written into this script that had nothing to do with the
     install it runs on. Resolving it the same way the product does is the fix.
@@ -110,7 +110,7 @@ def main_agent_id() -> str:
       - "trim" is JavaScript's trim set, see _JS_TRIM: it includes U+FEFF, so a UTF-8 BOM in
         front of the first key is trimmed away like in the product
     """
-    env = MARVEEN_DIR / ".env"
+    env = ALFRED_DIR / ".env"
     talalt: str | None = None
     try:
         for line in env.read_bytes().decode("utf-8", errors="replace").split("\n"):
@@ -131,10 +131,10 @@ def main_agent_id() -> str:
             talalt = ertek
     except OSError:
         pass
-    return "marveen" if talalt is None else talalt
+    return "alfred" if talalt is None else talalt
 # Proof-of-life artefact: its mtime answers "did the silent path actually run
 # today", which "is the task enabled" does not.
-HEARTBEAT_FILE = MARVEEN_DIR / "store" / "garmin-run-gate-last.txt"
+HEARTBEAT_FILE = ALFRED_DIR / "store" / "garmin-run-gate-last.txt"
 
 RC_NOTHING_NEW = 0
 RC_NEW_RUN = 2

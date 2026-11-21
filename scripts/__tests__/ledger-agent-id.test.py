@@ -19,7 +19,7 @@ sys.path.insert(0, HOOKS)
 
 INSTALL = os.path.dirname(os.path.dirname(HERE))
 os.environ.setdefault("MAIN_AGENT_ID", "mainagent")
-os.environ.pop("MARVEEN_AGENT_ID", None)
+os.environ.pop("ALFRED_AGENT_ID", None)
 
 import ledger_lib  # noqa: E402
 
@@ -32,7 +32,7 @@ CASES = [
     ("trailing slash tolerated", INSTALL + "/", MAIN),
     ("agent dir maps to that agent", os.path.join(INSTALL, "agents", "dia"), "dia"),
     ("agent subdir maps to that agent", os.path.join(INSTALL, "agents", "dia", "x", "y"), "dia"),
-    ("outside the install attributes to the main agent (never invents an id)", "/tmp/someone/marveen", MAIN),
+    ("outside the install attributes to the main agent (never invents an id)", "/tmp/someone/alfred", MAIN),
     ("empty cwd falls back to main", "", MAIN),
     ("None cwd falls back to main", None, MAIN),
 ]
@@ -45,15 +45,15 @@ for name, cwd, want in CASES:
         failed.append(name)
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}: got={got!r} want={want!r}")
 
-# MARVEEN_AGENT_ID lets a launcher name an out-of-tree session explicitly.
-os.environ["MARVEEN_AGENT_ID"] = "explicit-agent"
-got = ledger_lib.agent_id_from_cwd("/tmp/someone/marveen")
+# ALFRED_AGENT_ID lets a launcher name an out-of-tree session explicitly.
+os.environ["ALFRED_AGENT_ID"] = "explicit-agent"
+got = ledger_lib.agent_id_from_cwd("/tmp/someone/alfred")
 ok = got == "explicit-agent"
 if not ok:
-    failed.append("MARVEEN_AGENT_ID override for out-of-tree cwd")
-print(f"  [{'PASS' if ok else 'FAIL'}] MARVEEN_AGENT_ID override for out-of-tree cwd: "
+    failed.append("ALFRED_AGENT_ID override for out-of-tree cwd")
+print(f"  [{'PASS' if ok else 'FAIL'}] ALFRED_AGENT_ID override for out-of-tree cwd: "
       f"got={got!r} want='explicit-agent'")
-os.environ.pop("MARVEEN_AGENT_ID", None)
+os.environ.pop("ALFRED_AGENT_ID", None)
 
 # ---------------------------------------------------------------------------
 # agent_id_from_payload (LEDGERCWD828): the cwd is MUTABLE within a session --
@@ -116,7 +116,7 @@ for name, payload, want in PAYLOAD_CASES:
 
 # Env override sits BETWEEN transcript and cwd: it wins when the transcript is
 # silent, and loses when the transcript speaks.
-os.environ["MARVEEN_AGENT_ID"] = "explicit-agent"
+os.environ["ALFRED_AGENT_ID"] = "explicit-agent"
 got = ledger_lib.agent_id_from_payload({"transcript_path": "/tmp/none/t.jsonl", "cwd": "/tmp/none"})
 if got != "explicit-agent":
     failed.append("env override when transcript silent")
@@ -125,13 +125,13 @@ got = ledger_lib.agent_id_from_payload({"transcript_path": SUB_TRANSCRIPT})
 if got != "iris":
     failed.append("transcript beats env override")
 print(f"  [{'PASS' if got == 'iris' else 'FAIL'}] transcript beats env override: got={got!r}")
-os.environ.pop("MARVEEN_AGENT_ID", None)
+os.environ.pop("ALFRED_AGENT_ID", None)
 
 # ---------------------------------------------------------------------------
 # End-to-end through the REAL outbound hook: same incident shape, but the row
 # that lands in the (temp) ledger DB is what gets asserted -- not the resolver
 # in isolation. The hook runs from a tmp install (<tmp>/scripts linked to the
-# repo's), so its DB is <tmp>/store/claudeclaw.db, off the live store; no
+# repo's), so its DB is <tmp>/store/alfred.db, off the live store; no
 # environment variable picks the DB since ENVRELAXGATE1104.
 # ---------------------------------------------------------------------------
 import json
@@ -143,9 +143,9 @@ with tempfile.TemporaryDirectory() as tmp:
     os.makedirs(os.path.join(tmp, "store"))
     os.symlink(os.path.dirname(HOOKS), os.path.join(tmp, "scripts"))
     HOOK = os.path.join(tmp, "scripts", "hooks", "ledger-outbound.py")
-    db = os.path.join(tmp, "store", "claudeclaw.db")
+    db = os.path.join(tmp, "store", "alfred.db")
     env = dict(os.environ, MAIN_AGENT_ID="mainagent")
-    env.pop("MARVEEN_AGENT_ID", None)
+    env.pop("ALFRED_AGENT_ID", None)
     env.pop("LEDGER_DB_PATH", None)
 
     def run_hook(transcript, cwd):

@@ -1,5 +1,5 @@
 // The shared package text vector (MIOAGENTINSTALL1114, plan 10.1), copied from
-// marveen-io (supabase/functions/_shared/package-text-vector.json, PR 372 head
+// alfred-io (supabase/functions/_shared/package-text-vector.json, PR 372 head
 // ae6c3dac). Swapping in the next vector is ONE edit here: the file name and
 // its sha256 below. The test pins the copy to this hash, so a changed file
 // without a changed hash is red.

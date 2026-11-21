@@ -1,4 +1,4 @@
-// VOICETOKENLEAK1101 round 2: the kanban dispatch recipe's commands are scripts/marveen-api.sh calls. Tests run a
+// VOICETOKENLEAK1101 round 2: the kanban dispatch recipe's commands are scripts/alfred-api.sh calls. Tests run a
 // recipe line for real against a local capture server, so what they check is what reaches the wire (method, path,
 // JSON body, the token header), not the text of the line. The .txt payload files the recipe names (in the agent's
 // own directory) are swapped for temp files with the given content.
@@ -16,13 +16,13 @@ export const RECIPE_TOKEN = 'recipe-test-token-0123456789'
 /** The recipe line that runs `verb` with these leading args (e.g. ['t-1', 'done']). */
 export function recipeLine(out: string, verb: string, ...args: string[]): string {
   const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const re = new RegExp(`marveen-api\\.sh ${[verb, ...args].map(esc).join(' ')}(\\s|$)`)
+  const re = new RegExp(`alfred-api\\.sh ${[verb, ...args].map(esc).join(' ')}(\\s|$)`)
   const line = out.split('\n').find((l) => re.test(l))
   if (!line) throw new Error(`no recipe line for ${verb} ${args.join(' ')}`)
   return line
 }
 
-/** Runs one recipe line (a `bash .../marveen-api.sh ...` command, no pipe) against a capture server. */
+/** Runs one recipe line (a `bash .../alfred-api.sh ...` command, no pipe) against a capture server. */
 export async function runRecipeLine(line: string, files: Record<string, string> = {}, reply = '{"ok":true}'): Promise<Captured> {
   const dir = mkdtempSync(join(tmpdir(), 'kanban-recipe-'))
   const tokenFile = join(dir, '.dashboard-token')
@@ -34,7 +34,7 @@ export async function runRecipeLine(line: string, files: Record<string, string> 
     writeFileSync(p, files[basename(w)] ?? 'tartalom')
     return p
   })
-  if (!/^bash \S+marveen-api\.sh /.test(cmd)) throw new Error('not a helper line: ' + line)
+  if (!/^bash \S+alfred-api\.sh /.test(cmd)) throw new Error('not a helper line: ' + line)
   const argv = ['-c', cmd]
   let got: Captured | null = null
   const srv: Server = await new Promise((resolve) => {
@@ -52,7 +52,7 @@ export async function runRecipeLine(line: string, files: Record<string, string> 
   try {
     await new Promise<void>((resolve, reject) => {
       execFile('bash', argv, {
-        env: { PATH: process.env.PATH!, MARVEEN_API_BASE: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, MARVEEN_TOKEN_FILE: tokenFile },
+        env: { PATH: process.env.PATH!, ALFRED_API_BASE: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, ALFRED_TOKEN_FILE: tokenFile },
         timeout: 20_000,
       }, (err, _stdout, stderr) => (err ? reject(new Error(stderr || String(err))) : resolve()))
     })

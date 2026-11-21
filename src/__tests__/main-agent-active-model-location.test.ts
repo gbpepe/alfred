@@ -39,7 +39,7 @@ describe('resolveTranscriptLocation', () => {
 
   it('encodes to the project dir the session actually writes', () => {
     // The encoding is what ties the two halves together: PROJECT_ROOT
-    // /Users/x/ClaudeClaw becomes -Users-x-ClaudeClaw, which is the directory
+    // /Users/x/Alfred becomes -Users-x-Alfred, which is the directory
     // name observed on a live install.
     const loc = resolveTranscriptLocation(MAIN_AGENT_ID)
     const dir = projectsDirFor(loc.workingDir, loc.configDir)

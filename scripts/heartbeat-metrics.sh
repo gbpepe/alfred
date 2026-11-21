@@ -42,7 +42,7 @@
 # instrument failure", never "looks like output").
 #
 # Env (all optional):
-#   CLAW_STORE_DIR         store/ holding .dashboard-token + claudeclaw.db
+#   CLAW_STORE_DIR         store/ holding .dashboard-token + alfred.db
 #                          (default: <repo root>/store, derived from this
 #                          script's own location)
 #   CLAW_DASHBOARD_ORIGIN  dashboard origin (default http://localhost:3420)
@@ -191,7 +191,7 @@ if tok is not None:
 # the beginning". strftime('%s','now') instead of unixepoch() so the query
 # also runs on sqlite < 3.38.
 try:
-    db = os.path.join(store, 'claudeclaw.db')
+    db = os.path.join(store, 'alfred.db')
     if not os.path.exists(db):
         err('task_runs', 'db not found: %s' % db)
     else:

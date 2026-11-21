@@ -17,7 +17,7 @@
 #   (i) a settings.json the helper cannot read fails LOUDLY, not silently
 #
 # Hermetic on every platform:
-#   - isolated temp HOME, and a temp .env handed in via MARVEEN_ENV_FILE (the
+#   - isolated temp HOME, and a temp .env handed in via ALFRED_ENV_FILE (the
 #     script's test hook), so nothing depends on the checkout's own .env;
 #   - launchctl / systemctl / pidof are PATH-shimmed for EVERY run. Both
 #     service managers act on the real user domain regardless of $HOME, so an
@@ -49,7 +49,7 @@ SCRIPT="$REPO_ROOT/scripts/retire-progress-watchdog.sh"
 if [ -x /bin/bash ]; then SYS_BASH=/bin/bash; else SYS_BASH="$(command -v bash)"; fi
 
 # Belt under the shims: no reachable user manager even if one were bypassed.
-export DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent-marveen-test"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent-alfred-test"
 export XDG_RUNTIME_DIR="$TMP/run"
 mkdir -p "$XDG_RUNTIME_DIR"
 
@@ -71,7 +71,7 @@ printf 'SERVICE_ID=%s\nBOT_NAME=TestBot\n' "$SERVICE_ID" > "$ENV_FILE"
 # run_retire <home> [script args...]   (FAKE_UNAME / ENV_FILE read from the caller)
 run_retire() {
   local home="$1"; shift
-  HOME="$home" MARVEEN_ENV_FILE="$ENV_FILE" PATH="$SHIM_BIN:$PATH" \
+  HOME="$home" ALFRED_ENV_FILE="$ENV_FILE" PATH="$SHIM_BIN:$PATH" \
     FAKE_UNAME="${FAKE_UNAME:-Linux}" "$SYS_BASH" "$SCRIPT" "$@" 2>&1
 }
 

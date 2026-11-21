@@ -19,7 +19,7 @@ Go through the memories and the daily log of EVERY agent (the main agent and all
 
 SQL example:
 ```bash
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT agent_id, content, keywords FROM memories WHERE created_at > strftime('%s', 'now', '-24 hours') AND category IN ('hot','warm') ORDER BY agent_id, created_at"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT agent_id, content, keywords FROM memories WHERE created_at > strftime('%s', 'now', '-24 hours') AND category IN ('hot','warm') ORDER BY agent_id, created_at"
 ```
 
 Output: 0-2 concrete skill suggestions. For each: title + 1 sentence of reasoning + "fleet level" or "agent: <name>".
@@ -28,7 +28,7 @@ Output: 0-2 concrete skill suggestions. For each: title + 1 sentence of reasonin
 
 ```bash
 # Vectorization check
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT COUNT(*) as total, COUNT(embedding) as with_emb FROM memories"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT COUNT(*) as total, COUNT(embedding) as with_emb FROM memories"
 # If NOT 100%, call the backfill endpoint (it embeds the missing IDs with Ollama):
 curl -s -X POST http://localhost:{{WEB_PORT}}/api/memories/backfill -H "Authorization: Bearer $(cat {{INSTALL_DIR}}/store/.dashboard-token)"
 
@@ -43,7 +43,7 @@ curl -s -X POST http://localhost:{{WEB_PORT}}/api/memories/backfill -H "Authoriz
 #   out and the hot tier never emptied (2026-09-16: 38 of 57 hot rows were like this). updated_at is refreshed
 #   on a content or category change (memories_touch trigger) and can be NULL -> COALESCE to
 #   created_at, which is never NULL. This way an old row rewritten today does not drop out either.
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT id, content, created_at, updated_at FROM memories WHERE category='hot' AND COALESCE(updated_at, created_at) < CAST(strftime('%s', 'now', '-7 days') AS INTEGER)"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT id, content, created_at, updated_at FROM memories WHERE category='hot' AND COALESCE(updated_at, created_at) < CAST(strftime('%s', 'now', '-7 days') AS INTEGER)"
 ```
 
 **BEFORE THE BULK UPDATE IT IS MANDATORY:** first run the `SELECT` above, look at the
@@ -59,7 +59,7 @@ Operations:
 
 Make the changes directly with SQL:
 ```bash
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "UPDATE memories SET category='cold' WHERE id IN (...)"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "UPDATE memories SET category='cold' WHERE id IN (...)"
 ```
 
 **DO NOT READ THE SUCCESS OF THE UPDATE FROM `changes()` (2026-08-07).** `sqlite3 db "SELECT changes()"`
@@ -76,7 +76,7 @@ Output: a short statistic ("X memories moved to the cold tier, Y unvectorized re
 
 ```bash
 # Open kanban cards by project + priority
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT id, title, status, project, priority, assignee FROM kanban_cards WHERE status IN ('planned','in_progress','waiting') AND archived_at IS NULL ORDER BY project, priority DESC"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT id, title, status, project, priority, assignee FROM kanban_cards WHERE status IN ('planned','in_progress','waiting') AND archived_at IS NULL ORDER BY project, priority DESC"
 ```
 
 Group by project. In the daily log (last 7 days) check which project has active movement (commit, PR, kanban move). Produce a TOP 3 suggestion for tomorrow, weighted by priority + activity.
@@ -84,7 +84,7 @@ Group by project. In the daily log (last 7 days) check which project has active 
 **THE LOG TABLE IS NAMED `daily_logs`, PLURAL (2026-08-09 02:1x, my own slip).** `daily_log` does NOT exist, and a query against it dies with an `Error: in prepare, no such table` line. This is dangerous because the error comes in the MIDDLE of the run, at the bottom of a `head`-ed output, and the run simply goes on: that day the top 3 was put together WITHOUT the activity data, from the kanban priority alone. The correct query (columns: `agent_id`, `date`, `content`, `created_at`):
 
 ```bash
-sqlite3 {{INSTALL_DIR}}/store/claudeclaw.db "SELECT agent_id, date, substr(content,1,120) FROM daily_logs WHERE created_at > CAST(strftime('%s','now','-7 days') AS INTEGER) ORDER BY created_at DESC"
+sqlite3 {{INSTALL_DIR}}/store/alfred.db "SELECT agent_id, date, substr(content,1,120) FROM daily_logs WHERE created_at > CAST(strftime('%s','now','-7 days') AS INTEGER) ORDER BY created_at DESC"
 ```
 
 **PROCEDURE: if the query of a bucket FAILS WITH AN ERROR, that is not an empty result but missing input.** Either fix it and run it again in the same run, or state in the `## ⚠️ Errors` section of DREAM.md that the given bucket worked from truncated input. Silently moving on is the worst option, because the output looks just as confident.

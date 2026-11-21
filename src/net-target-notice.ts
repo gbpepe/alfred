@@ -15,7 +15,7 @@ import { getEffectiveSettingValue } from './settings-store.js'
 // A key seen for the first time (no record, a deleted record, a key new to it) is recorded; if its origin is not its
 // registry default's, the owner is told once ("első rögzítés, nem alapérték"), so a target rewritten before the first
 // record does not become the baseline unseen (Samu 68838/68852). Every first record is written to the boot log, origins
-// only (Marveen 68843). The record file is on the db-write-gate's protected list (Dani 68849).
+// only (Alfred 68843). The record file is on the db-write-gate's protected list (Dani 68849).
 
 /** Where the last seen host of each target key is recorded. */
 export function netTargetRecordPath(storeDir: string = STORE_DIR): string {

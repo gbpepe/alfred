@@ -82,7 +82,7 @@
 // where it is stdin to an interpreter or a `read` loop (4. and 3.); to anything else (`cat <<EOF`,
 // `curl --data-binary @- <<'JSON'`) it stays inert text.
 //
-// WHAT THIS DOES NOT CLOSE -- said here so nobody reads "merged" as "closed" (owner/Marveen 29047):
+// WHAT THIS DOES NOT CLOSE -- said here so nobody reads "merged" as "closed" (owner/Alfred 29047):
 // the name-and-shape list will never be complete. Still open, by family:
 //   - network calls INSIDE a script file: only a PYTHON file named on the command line is read
 //     (EGRESSPYFILE1113, `python3 f.py`), and only when the install turned it on ("script_files" in
@@ -206,9 +206,9 @@ export function hostInDomains(host, domains) {
   return false
 }
 // EGRESSMEASURE1025: a MEASURE-ONLY host class (owner decision A, 2026-10-25), so the fleet can read
-// the response headers of its own product (app.marveen.io) without that host being a vendor host
+// the response headers of its own product (app.alfred.io) without that host being a vendor host
 // that any method, body, header or cookie may reach. store/egress-measure-hosts.json =
-// { "hosts": ["app.marveen.io"] }, the same exact-host shape check as the vendor list (no wildcard,
+// { "hosts": ["app.alfred.io"] }, the same exact-host shape check as the vendor list (no wildcard,
 // no suffix, no subdomain). A listed host is NOT added to the vendor hosts: classify() keeps denying
 // it. The only thing that passes is ONE command of exactly this shape, checked before classify():
 //   curl -q [ -s | -S | -sS | -Ss | --silent | --show-error | -I | --head | -i | --include
@@ -263,7 +263,7 @@ export function measureOnly(command, measureHosts) {
   let u
   try { u = new URL(url) } catch { return null }
   if (u.protocol !== 'https:' || u.username || u.password || u.port || !measureHosts.has(u.hostname)) return null
-  // The query's LENGTH, never its text (Marveen 45624): enough to tell a token-carrying link from a
+  // The query's LENGTH, never its text (Alfred 45624): enough to tell a token-carrying link from a
   // bare one. Counted on the command's own spelling, not u.search: WHATWG re-encodes ' in a query.
   const q = url.indexOf('?')
   return { host: u.hostname, path: u.pathname, query: u.search !== '', queryLength: q === -1 ? 0 : url.length - q - 1 }

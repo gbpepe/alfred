@@ -165,7 +165,7 @@ describe('moveKanbanCard expectedStatus (db layer)', () => {
 // done payload exactly as the dispatch hands it over and send it to the real
 // route.
 describe('dispatch recipe sends expected_status on the close', () => {
-  // The recipe's done line is run for real (scripts/marveen-api.sh against a capture server), and the body it sent is
+  // The recipe's done line is run for real (scripts/alfred-api.sh against a capture server), and the body it sent is
   // what goes to the real route here.
   const donePayload = async (): Promise<Record<string, unknown>> => {
     const out = kanbanMoveInstructions('t-1', 'dex')

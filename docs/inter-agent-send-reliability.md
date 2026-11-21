@@ -25,7 +25,7 @@ with HTTP 200). Verify the HTTP status **and** the returned id, and resend if mi
 - `scripts/agent-msg.sh <from> <to> "<content>"` — builds the JSON body with `json.dumps` (no quoting
   pitfalls), checks HTTP status + `id`, retries up to 3×, logs failures to `store/agent-msg-failures.log`.
   Large/multi-line content may come from STDIN with a `-` third arg. Base dir is auto-detected, port from
-  `MARVEEN_WEB_PORT` (default 3420), so it runs from any CWD / any install.
+  `ALFRED_WEB_PORT` (default 3420), so it runs from any CWD / any install.
 - The generated agent `CLAUDE.md` (from `templates/CLAUDE.md.template`) now documents this rule and points
   at the helper, so every agent in every fleet verifies its sends by default.
 
@@ -87,7 +87,7 @@ is still trying". A row still pending at 30 min means nothing is coming.
 Checking the observer itself, from outside:
 
     cat store/.main-inbox-observer          # "<epoch> <verdict> pending=<n> oldest_age_s=<s>", rewritten every tick
-    bash scripts/main-inbox-observer.sh --check store/claudeclaw.db   # 0 = ok, 1 = stalled, 2 = unreadable
+    bash scripts/main-inbox-observer.sh --check store/alfred.db   # 0 = ok, 1 = stalled, 2 = unreadable
 
 The stamp is not decoration. Without it, an observer that stopped running is indistinguishable from a
 healthy queue - which is exactly the failure mode that lets an unregistered watchdog sit at zero runs

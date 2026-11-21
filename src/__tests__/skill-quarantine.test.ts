@@ -1,4 +1,4 @@
-// MARVEENGAPS1020 (b): new skill content (generated or imported, global or
+// ALFREDGAPS1020 (b): new skill content (generated or imported, global or
 // per-agent) is QUEUED for approval and goes live only through an approval
 // bound to the hash of what was shown. Real route handlers, real unzip, a
 // sandboxed HOME / store / agents tree; only the LLM generator is stubbed.

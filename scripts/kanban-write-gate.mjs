@@ -19,7 +19,7 @@
 //     into its own segment, and the pattern needs no binary name.
 //   - Write-method calls to the dashboard kanban API (/api/kanban with
 //     -X POST/PUT/PATCH/DELETE or a data flag).
-//   - The write verbs of scripts/marveen-api.sh (kanban-create, -move, -claim,
+//   - The write verbs of scripts/alfred-api.sh (kanban-create, -move, -claim,
 //     -release, -comment): see KANBAN_HELPER_WRITE_RX below.
 //
 // What must PASS (the worker's actual duties):
@@ -55,9 +55,9 @@ const KANBAN_API_RX = /\/api\/kanban\b/i
 const WRITE_METHOD_RX = /(?:^|\s)(?:-X|--request)[\s=]*["']?(POST|PUT|PATCH|DELETE)\b/i
 const DATA_FLAG_RX = /(?:^|\s)(?:-d|--data(?:-(?:raw|binary|ascii|urlencode))?|--json|-F|--form)\b/
 
-// The kanban recipes live on scripts/marveen-api.sh: a write is a VERB of the helper, with no /api/kanban URL and no
+// The kanban recipes live on scripts/alfred-api.sh: a write is a VERB of the helper, with no /api/kanban URL and no
 // SQL on the command line, so the two rules above never see it. A segment denies when a write verb follows
-//   - the helper's name (marveen-api.sh / marveen_api.py), or
+//   - the helper's name (alfred-api.sh / alfred_api.py), or
 //   - a runner (a shell or python, with or without a path) or a parameter expansion (`$H`, `${H}`), since the helper's
 //     path may sit in a variable: `bash "$H" kanban-move`, `"$H" kanban-move`, `timeout 30 bash "$H" ...`.
 // Both match the segment the shell would run: quotes and backslashes removed (`kanban-"move"`, `'kanban'-move`), and
@@ -65,7 +65,7 @@ const DATA_FLAG_RX = /(?:^|\s)(?:-d|--data(?:-(?:raw|binary|ascii|urlencode))?|-
 // --help and `message` (the worker's report) pass. A write hidden in a function, an alias or a variable verb stays
 // out of reach: the gate catches the worker's mistake, not a determined detour.
 const KANBAN_HELPER_VERB = String.raw`(?:^|\s)kanban-(?:create|move|claim|release|comment)(?=$|[\s;|&)])`
-const KANBAN_HELPER_WRITE_RX = new RegExp(String.raw`marveen[-_]api\.(?:sh|py)\b.*?` + KANBAN_HELPER_VERB)
+const KANBAN_HELPER_WRITE_RX = new RegExp(String.raw`alfred[-_]api\.(?:sh|py)\b.*?` + KANBAN_HELPER_VERB)
 const KANBAN_RUNNER_WRITE_RX = new RegExp(
   String.raw`(?:^|\s)(?:(?:\S*/)?(?:bash|sh|dash|zsh|python3?)|\$\{?[A-Za-z_]\w*\}?)(?=\s).*?` + KANBAN_HELPER_VERB)
 const dequote = (seg) => seg.replace(/["'\\]/g, '')

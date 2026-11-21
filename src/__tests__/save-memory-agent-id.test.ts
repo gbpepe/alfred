@@ -1,10 +1,10 @@
 /**
  * saveMemory must stamp the main agent's id on the row.
  *
- * The INSERT used to omit agent_id, so the column default ('marveen') applied.
+ * The INSERT used to omit agent_id, so the column default ('alfred') applied.
  * MAIN_AGENT_ID is configurable (installers derive it from the bot name) and
  * every per-agent memory reader filters `(agent_id = ? OR category = 'shared')`,
- * so on an install whose main agent is not called 'marveen' the rows written
+ * so on an install whose main agent is not called 'alfred' the rows written
  * here (the nightly daily-log digest) never showed up in that agent's list,
  * search or recall. This file runs with MAIN_AGENT_ID mocked to 'orin'.
  */
@@ -97,9 +97,9 @@ describe('saveMemory agent_id (MAIN_AGENT_ID = orin)', () => {
     expect(list.map(m => m.content)).toContain('wombatone default owner')
   })
 
-  it("the row is NOT in the list of an agent literally called 'marveen'", () => {
+  it("the row is NOT in the list of an agent literally called 'alfred'", () => {
     clearMemoryCache()
-    const list = getAgentMemories('marveen', 100)
+    const list = getAgentMemories('alfred', 100)
     expect(list.map(m => m.content)).not.toContain('wombatone default owner')
   })
 

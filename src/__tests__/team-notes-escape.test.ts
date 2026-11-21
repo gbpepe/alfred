@@ -53,7 +53,7 @@ async function renderNotes(rows: unknown[]) {
     ['fe' + 'tch']: async () => ({ ok: true, json: async () => rows }),
     t: (k: string) => k,
     wireNotesPage: () => {},
-    ensureMarveenLoaded: async () => {},
+    ensureAlfredLoaded: async () => {},
     loadNotesAssignees: async () => {},
   }
   vm.createContext(ctx)

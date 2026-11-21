@@ -179,7 +179,7 @@ describe('sweepScheduledRunSnapshots (integration over real files)', () => {
 })
 
 describe('isScheduledRunReference (#1396 review: body-file restricted to store/scheduled-runs/)', () => {
-  const dir = '/opt/marveen/store/scheduled-runs'
+  const dir = '/opt/alfred/store/scheduled-runs'
   const good = `${dir}/20260921-160000-kanban-audit-a3f9.md`
 
   afterEach(() => vi.restoreAllMocks())

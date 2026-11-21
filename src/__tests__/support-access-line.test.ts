@@ -29,7 +29,7 @@ import {
 
 const GRANT = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
 const OTHER_GRANT = '9b2e7c1a-5d44-4e0b-8f3a-6c1d2e3f4a5b'
-const DISPATCH = '/opt/marveen/scripts/support-dispatch.sh'
+const DISPATCH = '/opt/alfred/scripts/support-dispatch.sh'
 
 function input(over: Partial<SupportLineInput> = {}): SupportLineInput {
   return {
@@ -105,14 +105,14 @@ function optionList(line: string): string[] {
 describe('buildSupportLine', () => {
   it('builds exactly this line (golden)', () => {
     expect(buildSupportLine(input())).toBe(
-      'restrict,command="/bin/sh /opt/marveen/scripts/support-dispatch.sh --key key1 --fp ' +
+      'restrict,command="/bin/sh /opt/alfred/scripts/support-dispatch.sh --key key1 --fp ' +
         TEST_ONLY_KEYS[0].fingerprint +
         ' --grant ' +
         GRANT +
         ' --consent 1",from="203.0.113.7/32",verify-required ' +
         'sk-ssh-ed25519@openssh.com ' +
         TEST_ONLY_BLOB_1 +
-        ' marveen-support:' +
+        ' alfred-support:' +
         GRANT +
         ':key1',
     )
@@ -221,14 +221,14 @@ describe('buildSupportLine', () => {
   })
 
   it.each([
-    ['a space', '/Users/some one/marveen/scripts/support-dispatch.sh'],
+    ['a space', '/Users/some one/alfred/scripts/support-dispatch.sh'],
     ['a double quote', '/opt/mar"veen/support-dispatch.sh'],
     ['a dollar sign', '/opt/$HOME/support-dispatch.sh'],
-    ['a semicolon', '/opt/marveen/x.sh;id'],
-    ['a backtick', '/opt/marveen/`id`.sh'],
+    ['a semicolon', '/opt/alfred/x.sh;id'],
+    ['a backtick', '/opt/alfred/`id`.sh'],
     ['a relative path', 'scripts/support-dispatch.sh'],
     ['an empty path', ''],
-    ['a newline', '/opt/marveen/x.sh\nid'],
+    ['a newline', '/opt/alfred/x.sh\nid'],
   ])('refuses a dispatcher path with %s', (_label, dispatchPath) => {
     expect(codeOf(() => buildSupportLine(input({ dispatchPath })))).toBe('install_path_unsupported')
   })
@@ -255,7 +255,7 @@ describe('sshdAtLeast', () => {
 
 const BRIDGE_UUID = '11111111-2222-4333-8444-555555555555'
 const BRIDGE_LINE =
-  'restrict,port-forwarding,permitopen="localhost:3420" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJC marveen-remote:' +
+  'restrict,port-forwarding,permitopen="localhost:3420" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJC alfred-remote:' +
   BRIDGE_UUID
 const PERSONAL_LINE = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH someone on a laptop'
 const LINE1 = buildSupportLine(input({ key: TEST_ONLY_KEYS[0] }))
@@ -280,7 +280,7 @@ describe('splitAuthorizedKeysLine', () => {
   it('returns null for a blank line, a comment and an unbalanced quote', () => {
     expect(splitAuthorizedKeysLine('')).toBeNull()
     expect(splitAuthorizedKeysLine('   ')).toBeNull()
-    expect(splitAuthorizedKeysLine('# marveen-support:x')).toBeNull()
+    expect(splitAuthorizedKeysLine('# alfred-support:x')).toBeNull()
     expect(splitAuthorizedKeysLine('command="oops ssh-ed25519 AAAA c')).toBeNull()
     expect(splitAuthorizedKeysLine('options-only')).toBeNull()
   })
@@ -392,7 +392,7 @@ describe('removeSupportLines', () => {
     expect(out.content).toBe([PERSONAL_LINE, BRIDGE_LINE, '# a note'].join('\n') + '\n')
   })
 
-  it('never removes a marveen-remote line', () => {
+  it('never removes a alfred-remote line', () => {
     const out = removeSupportLines(BRIDGE_LINE + '\n' + LINE1 + '\n', TEST_ONLY_BLOBS)
     expect(out.content).toBe(BRIDGE_LINE + '\n')
   })
@@ -454,7 +454,7 @@ describe('mergeSupportLines', () => {
   // A built line is printable ASCII, so nothing else is taken: how sshd reads
   // a NUL in the middle of a line is not something this check has to know.
   it.each([
-    ['a foreign key, a NUL, then our comment', FOREIGN_KEY + '\0' + 'marveen-support:' + GRANT + ':k1'],
+    ['a foreign key, a NUL, then our comment', FOREIGN_KEY + '\0' + 'alfred-support:' + GRANT + ':k1'],
     ['a foreign key, a NUL, then a whole built line', FOREIGN_KEY + '\0' + LINE1],
     ['a built line with a tab in it', LINE1 + '\tx'],
     ['a built line with a DEL at the end', LINE1 + '\x7f'],
@@ -482,7 +482,7 @@ describe('mergeSupportLines', () => {
   })
 
   it('refuses a comment line and a blank line: sshd would ignore them, and so would every removal', () => {
-    expect(codeOf(() => mergeSupportLines('', ['# marveen-support:note'], TEST_ONLY_BLOBS))).toBe('line_refused')
+    expect(codeOf(() => mergeSupportLines('', ['# alfred-support:note'], TEST_ONLY_BLOBS))).toBe('line_refused')
     expect(codeOf(() => mergeSupportLines('', [''], TEST_ONLY_BLOBS))).toBe('line_refused')
   })
 })

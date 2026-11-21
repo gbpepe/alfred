@@ -146,7 +146,7 @@ describe('asking the local sshd', () => {
   })
 })
 
-describe('sending the key to marveen.io', () => {
+describe('sending the key to alfred.io', () => {
   const transportOf = (answer: { status: number; body: string } | 'throw') => {
     const sent: RedeemRequest[] = []
     const transport: RedeemTransport = async (req) => {
@@ -162,7 +162,7 @@ describe('sending the key to marveen.io', () => {
     expect(await sendSupportHostKey({ token: TOKEN, hostKey: KEY }, t.transport)).toBe('stored')
     expect(t.sent).toEqual([
       {
-        origin: 'https://api.marveen.io',
+        origin: 'https://api.alfred.io',
         path: SUPPORT_HOST_KEY_PATH,
         body: '{"host_key":"' + KEY + '"}',
         timeoutMs: SUPPORT_HOST_KEY_TIMEOUT_MS,

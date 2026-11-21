@@ -48,9 +48,9 @@ async function open(page: Page, srv: Srv, lang: 'hu' | 'en') {
     : json({ code: 'owner_session_required', error: 'Changing the owner and agent names needs the dashboard login (an owner session).' }, 403)))
   await page.addInitScript(([l, k]) => {
     try {
-      localStorage.setItem('marveen.lang', l)
+      localStorage.setItem('alfred.lang', l)
       if (!sessionStorage.getItem('onb-seeded')) {
-        localStorage.setItem('marveen-dashboard-token', k)
+        localStorage.setItem('alfred-dashboard-token', k)
         sessionStorage.setItem('onb-seeded', '1')
       }
     } catch { /* ignore */ }
@@ -80,7 +80,7 @@ for (const lang of ['hu', 'en'] as const) {
     await expect(page.locator('#onbIdentityBtn')).toBeVisible()
     expect(srv.creates).toEqual(['szabolcs'])
     expect(srv.logins).toEqual(['szabolcs'])
-    expect(await page.evaluate(() => localStorage.getItem('marveen-dashboard-token'))).toBe(KEY)
+    expect(await page.evaluate(() => localStorage.getItem('alfred-dashboard-token'))).toBe(KEY)
     await page.screenshot({ path: `test-results/onboardownerpw1107-step2-${lang}.png` })
     expect(errors, errors.join(' | ')).toEqual([])
   })
@@ -91,7 +91,7 @@ test('an owner refusal on the name step goes back to the login step; Settings ne
   const errors = await open(page, srv, 'hu')
   expect(await activeStep(page)).toBe('2')
   srv.session = false // the session ended meanwhile
-  await page.locator('#onbAgentName').fill('Marveen')
+  await page.locator('#onbAgentName').fill('Alfred')
   await page.locator('#onbOwnerName').fill('Szabolcs')
   await page.locator('#onbIdentityBtn').click()
   await expect.poll(() => activeStep(page)).toBe('1')
@@ -111,7 +111,7 @@ test('an existing login, a wrong password: the error shows, the Bridge key stays
   await page.locator('#onbLoginSignInBtn').click()
   await expect(page.locator('#onbMsg')).toHaveText('Hibás belépési adatok.')
   await expect(page.locator('#onbLoginPass')).toHaveValue('')
-  expect(await page.evaluate(() => localStorage.getItem('marveen-dashboard-token'))).toBe(KEY)
+  expect(await page.evaluate(() => localStorage.getItem('alfred-dashboard-token'))).toBe(KEY)
   await expect(page.locator('#mv-login-overlay')).toHaveCount(0)
   await page.screenshot({ path: 'test-results/onboardownerpw1107-signin-error-hu.png' })
   await page.locator('#onbLoginPass').fill('good-password-1')
@@ -125,7 +125,7 @@ test('an operator key gets no login step; its refusal is shown as text and nothi
   const srv = fresh('operator')
   const errors = await open(page, srv, 'en')
   expect(await activeStep(page)).toBe('2')
-  await page.locator('#onbAgentName').fill('Marveen')
+  await page.locator('#onbAgentName').fill('Alfred')
   await page.locator('#onbOwnerName').fill('Owner')
   await page.locator('#onbIdentityBtn').click()
   await expect(page.locator('#onbMsg')).toContainText('needs the dashboard login')

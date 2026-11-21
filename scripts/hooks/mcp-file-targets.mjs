@@ -112,7 +112,7 @@ function fileUriPath(s) {
 // on a 10k-cell sheet update, 3.8 s p50 / 4.5 s p95 with every bare leaf a candidate, against the gates' 5 s
 // decision deadline. A plain number is never a path.
 const BARE_GUARDED_NAMES = new Set(['store', 'scripts', 'hooks', 'plugins', 'agents', 'skills', 'local-hooks',
-  'scheduled-tasks', 'marveen-local-plugins'])
+  'scheduled-tasks', 'alfred-local-plugins'])
 function looksLikePath(s, cls) {
   if (!s) return false
   if (/^file:\/\//i.test(s)) return true
@@ -191,6 +191,6 @@ export function mcpFileTargets(toolName, toolInput) {
   const bare = cls === 'other' ? [] : [...new Set(values.filter((v) => v && !/\s|\//.test(v) && !v.startsWith('~')
     && !/^[-+]?\d+(?:[.,]\d+)?$/.test(v) && !looksLikePath(v, cls)))]
   // every leaf naming the dashboard DB by name, whatever the class (Dani 68192 (1)): judged for every caller
-  const dbNamed = values.some((v) => /(?:^|\/)claudeclaw\.db(?:-wal|-shm|-journal)?$/i.test(fileUriPath(v.trim())))
+  const dbNamed = values.some((v) => /(?:^|\/)alfred\.db(?:-wal|-shm|-journal)?$/i.test(fileUriPath(v.trim())))
   return { server: parsed.server, tool: parsed.tool, cls, known: !!known, targets, missingPath, truncated, dbNamed, bare }
 }

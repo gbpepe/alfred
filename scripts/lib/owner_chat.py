@@ -161,7 +161,7 @@ def resolve_owner_chat_id(env, provider="telegram"):
     return resolve_owner_chat(env, provider)[0]
 
 
-# ---------------------------------------------------------------- OWNER_ALERT_CHAT_ID (ISSUE2556X, marveen#2556)
+# ---------------------------------------------------------------- OWNER_ALERT_CHAT_ID (ISSUE2556X, alfred#2556)
 # The owner's alert chat, set on the dashboard's settings page: an overrides-only registry key, so it is read from
 # <install>/store/config-overrides.json only (a .env line never counts), exactly as settings-store answers it. A
 # DELIVERY target only: resolve_owner_chat / resolve_owner_chat_id are unchanged, because their non-alert callers

@@ -8,11 +8,11 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-autonomy-token-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-autonomy-token-test-'))
 const tokensOn = { value: '1' }
 
 vi.mock('../config.js', () => ({
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -58,7 +58,7 @@ describe('ensureAutonomySection: what a 403 on consume means for a sub-agent tok
     const block = level2(read('consume-sub'))
     // VOICETOKENLEAK1101 PR-A1: the recipe is the helper, which reads the agent's own token itself (PR-A0); no path
     expect(block).not.toContain('.dashboard-token')
-    expect(block).toContain('marveen-api.sh approval-consume <id> CATEGORY_KEY consume-sub')
+    expect(block).toContain('alfred-api.sh approval-consume <id> CATEGORY_KEY consume-sub')
     const line = block.split('\n').find((l) => l.startsWith('403 (agent-identity-binding)'))
     expect(line, block).toBeDefined()
     expect(line).toContain('for_agent')
@@ -81,7 +81,7 @@ describe('ensureAutonomySection: what a 403 on consume means for a sub-agent tok
     setup('consume-off', true)
     ensureAutonomySection('consume-off')
     const off = level2(read('consume-off'))
-    expect(off).toContain('marveen-api.sh approval-consume <id>')
+    expect(off).toContain('alfred-api.sh approval-consume <id>')
     expect(off).not.toContain('403 (agent-identity-binding)')
     tokensOn.value = '1'
     setup('consume-notoken', false)

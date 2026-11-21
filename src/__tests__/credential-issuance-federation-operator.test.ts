@@ -56,7 +56,7 @@ const addUser = (auth: RouteContext['auth'], username: string) => call(tryHandle
 const addPeer = (auth: RouteContext['auth'], id = 'teodor', headers: Record<string, string> = {}) =>
   call(tryHandleFederation, 'POST', '/api/federation/peers', auth, { id, baseUrl: 'https://teodor.example' }, headers)
 const putDoc = (auth: RouteContext['auth']) => call(tryHandleFederation, 'PUT', '/api/federation/peers', auth, {
-  enabled: false, systemId: 'marveen',
+  enabled: false, systemId: 'alfred',
   peers: [{ id: 'teodor', baseUrl: 'https://teodor.example', outboundToken: '', inboundToken: 'c'.repeat(64), trust: 'untrusted' }],
 })
 const rotate = (auth: RouteContext['auth']) => call(tryHandleFederation, 'POST', '/api/federation/peers/teodor/rotate-inbound-token', auth)
@@ -68,7 +68,7 @@ const listUsers = (auth: RouteContext['auth'], headers: Record<string, string> =
 
 function seedPeer(): void {
   writeFileSync(join(TMP, 'federation.json'), JSON.stringify({
-    enabled: false, systemId: 'marveen',
+    enabled: false, systemId: 'alfred',
     peers: [{ id: 'teodor', baseUrl: 'https://teodor.example', outboundToken: '', inboundToken: IN_TOKEN, trust: 'untrusted' }],
   }))
   reloadFederationForTest()
@@ -169,7 +169,7 @@ describe('once a login exists, the token cannot issue a peer token or widen the 
     expect((await patchPeer(DEVICE_AUTH, { baseUrl: 'https://attacker.example' })).status).toBe(403)
   })
 
-  it('switching federation on is refused, switching it off stays open (Marveen, #2175 review)', async () => {
+  it('switching federation on is refused, switching it off stays open (Alfred, #2175 review)', async () => {
     const on = await setEnabled(TOKEN_AUTH, true)
     expect(on.status).toBe(403)
     expect(on.json().code).toBe('owner_session_required')

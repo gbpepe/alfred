@@ -37,11 +37,11 @@ describe('resolveDashboardOrigin', () => {
   })
 
   it('uses the supplied public URL when set', () => {
-    expect(resolveDashboardOrigin('https://marveen.example.com', 3420)).toBe('https://marveen.example.com')
+    expect(resolveDashboardOrigin('https://alfred.example.com', 3420)).toBe('https://alfred.example.com')
   })
 
   it('strips a trailing slash from the public URL', () => {
-    expect(resolveDashboardOrigin('https://marveen.example.com/', 3420)).toBe('https://marveen.example.com')
+    expect(resolveDashboardOrigin('https://alfred.example.com/', 3420)).toBe('https://alfred.example.com')
   })
 
   it('strips a trailing slash from a localhost fallback (non-standard port)', () => {
@@ -52,11 +52,11 @@ describe('resolveDashboardOrigin', () => {
 
   it('does not strip a path prefix from the public URL', () => {
     // An operator might host the dashboard under a sub-path.
-    expect(resolveDashboardOrigin('https://example.com/marveen', 3420)).toBe('https://example.com/marveen')
+    expect(resolveDashboardOrigin('https://example.com/alfred', 3420)).toBe('https://example.com/alfred')
   })
 
   it('strips trailing slash even from a sub-path URL', () => {
-    expect(resolveDashboardOrigin('https://example.com/marveen/', 3420)).toBe('https://example.com/marveen')
+    expect(resolveDashboardOrigin('https://example.com/alfred/', 3420)).toBe('https://example.com/alfred')
   })
 
   it('accepts a non-default port in the public URL', () => {
@@ -74,12 +74,12 @@ describe('resolveDashboardOrigin', () => {
   it('REGRESSION GUARD: an empty agent origin changes nothing (old behaviour)', () => {
     // This is the test that protects existing k3s/distributed installs: with
     // the key unset, the resolver must behave exactly as before the key existed.
-    expect(resolveDashboardOrigin('https://marveen.example.com', 3420, '')).toBe('https://marveen.example.com')
+    expect(resolveDashboardOrigin('https://alfred.example.com', 3420, '')).toBe('https://alfred.example.com')
     expect(resolveDashboardOrigin('', 3420, '')).toBe('http://localhost:3420')
   })
 
   it('the agent origin wins over the public URL when both are set', () => {
-    expect(resolveDashboardOrigin('https://marveen.example.com', 3420, 'http://localhost:3420'))
+    expect(resolveDashboardOrigin('https://alfred.example.com', 3420, 'http://localhost:3420'))
       .toBe('http://localhost:3420')
   })
 
@@ -93,62 +93,62 @@ describe('resolveDashboardOrigin', () => {
   })
 
   it('supports an internal service name (k8s-style) as the agent origin', () => {
-    expect(resolveDashboardOrigin('https://marveen.example.com', 3420, 'http://marveen-dashboard.default.svc:3420'))
-      .toBe('http://marveen-dashboard.default.svc:3420')
+    expect(resolveDashboardOrigin('https://alfred.example.com', 3420, 'http://alfred-dashboard.default.svc:3420'))
+      .toBe('http://alfred-dashboard.default.svc:3420')
   })
 
   it('defaults the third argument, so two-argument callers keep working', () => {
     // Existing call sites and tests pass two arguments; that must stay valid.
-    expect(resolveDashboardOrigin('https://marveen.example.com', 3420)).toBe('https://marveen.example.com')
+    expect(resolveDashboardOrigin('https://alfred.example.com', 3420)).toBe('https://alfred.example.com')
   })
 
   // --- only an absolute http(s) URL counts -----------------------------------
-  // Measured 2026-11-16 on a live install: DASHBOARD_PUBLIC_URL was "marveen" (a name, no scheme). The resolver
-  // returned it unchanged, so every generated recipe read `curl ... marveen/api/messages`, a relative path: each call
+  // Measured 2026-11-16 on a live install: DASHBOARD_PUBLIC_URL was "alfred" (a name, no scheme). The resolver
+  // returned it unchanged, so every generated recipe read `curl ... alfred/api/messages`, a relative path: each call
   // failed and the agent had nothing to report. A value that cannot stand in front of "/api/..." is skipped.
 
   it('a public URL without a scheme is not used: the fallback is localhost', () => {
-    expect(resolveDashboardOrigin('marveen', 3420)).toBe('http://localhost:3420')
-    expect(resolveDashboardOrigin('marveen.example.com', 3420)).toBe('http://localhost:3420')
+    expect(resolveDashboardOrigin('alfred', 3420)).toBe('http://localhost:3420')
+    expect(resolveDashboardOrigin('alfred.example.com', 3420)).toBe('http://localhost:3420')
     expect(resolveDashboardOrigin('localhost:3420', 3420)).toBe('http://localhost:3420')
-    expect(resolveDashboardOrigin('//marveen.example.com', 3420)).toBe('http://localhost:3420')
+    expect(resolveDashboardOrigin('//alfred.example.com', 3420)).toBe('http://localhost:3420')
   })
 
   it('an agent origin without a scheme is skipped, and the valid public URL is used', () => {
-    expect(resolveDashboardOrigin('https://marveen.example.com', 3420, 'marveen')).toBe('https://marveen.example.com')
+    expect(resolveDashboardOrigin('https://alfred.example.com', 3420, 'alfred')).toBe('https://alfred.example.com')
   })
 
   it('both values unusable: localhost on the given port', () => {
-    expect(resolveDashboardOrigin('marveen', 4000, 'dashboard.internal:3420')).toBe('http://localhost:4000')
+    expect(resolveDashboardOrigin('alfred', 4000, 'dashboard.internal:3420')).toBe('http://localhost:4000')
   })
 
   it.each([
-    'ftp://marveen.example.com',
-    'file:///srv/marveen',
+    'ftp://alfred.example.com',
+    'file:///srv/alfred',
     'javascript:alert(1)',
-    'ws://marveen.example.com',
-    'http:marveen.example.com',
+    'ws://alfred.example.com',
+    'http:alfred.example.com',
     'http://',
     'https:///api',
   ])('a value with another scheme or no host is skipped: %s', (bad) => {
     expect(resolveDashboardOrigin(bad, 3420)).toBe('http://localhost:3420')
-    expect(resolveDashboardOrigin('https://marveen.example.com', 3420, bad)).toBe('https://marveen.example.com')
+    expect(resolveDashboardOrigin('https://alfred.example.com', 3420, bad)).toBe('https://alfred.example.com')
   })
 
   it('a value with whitespace in it is skipped (it would split the recipe into two words)', () => {
-    expect(resolveDashboardOrigin(' https://marveen.example.com', 3420)).toBe('http://localhost:3420')
-    expect(resolveDashboardOrigin('https://marveen.example.com ', 3420)).toBe('http://localhost:3420')
-    expect(resolveDashboardOrigin('https://marveen example.com', 3420)).toBe('http://localhost:3420')
+    expect(resolveDashboardOrigin(' https://alfred.example.com', 3420)).toBe('http://localhost:3420')
+    expect(resolveDashboardOrigin('https://alfred.example.com ', 3420)).toBe('http://localhost:3420')
+    expect(resolveDashboardOrigin('https://alfred example.com', 3420)).toBe('http://localhost:3420')
   })
 
   it('a valid agent origin still wins over an unusable public URL', () => {
-    expect(resolveDashboardOrigin('marveen', 3420, 'http://localhost:3420')).toBe('http://localhost:3420')
-    expect(resolveDashboardOrigin('marveen', 3420, 'http://dashboard.internal:8080/')).toBe('http://dashboard.internal:8080')
+    expect(resolveDashboardOrigin('alfred', 3420, 'http://localhost:3420')).toBe('http://localhost:3420')
+    expect(resolveDashboardOrigin('alfred', 3420, 'http://dashboard.internal:8080/')).toBe('http://dashboard.internal:8080')
   })
 
   it('REGRESSION GUARD: a valid value is returned as it was written (scheme case, path, port, IPv6)', () => {
-    expect(resolveDashboardOrigin('HTTPS://Marveen.Example.com', 3420)).toBe('HTTPS://Marveen.Example.com')
-    expect(resolveDashboardOrigin('https://example.com/marveen/', 3420)).toBe('https://example.com/marveen')
+    expect(resolveDashboardOrigin('HTTPS://Alfred.Example.com', 3420)).toBe('HTTPS://Alfred.Example.com')
+    expect(resolveDashboardOrigin('https://example.com/alfred/', 3420)).toBe('https://example.com/alfred')
     expect(resolveDashboardOrigin('', 3420, 'http://[::1]:3420')).toBe('http://[::1]:3420')
     expect(resolveDashboardOrigin('', 3420, 'http://10.0.0.5:3420')).toBe('http://10.0.0.5:3420')
   })
@@ -186,12 +186,12 @@ describe('resolveDashboardOrigin', () => {
     it('empty, blank and valid values log nothing', () => {
       resolveDashboardOrigin('', 3420, '')
       resolveDashboardOrigin('   ', 3420, '\t')
-      resolveDashboardOrigin('https://marveen.example.com', 3420, 'http://localhost:3420')
+      resolveDashboardOrigin('https://alfred.example.com', 3420, 'http://localhost:3420')
       expect(warned()).toHaveLength(0)
     })
 
     it('a blank value counts as not set: the next candidate applies', () => {
-      expect(resolveDashboardOrigin('https://marveen.example.com', 3420, '  ')).toBe('https://marveen.example.com')
+      expect(resolveDashboardOrigin('https://alfred.example.com', 3420, '  ')).toBe('https://alfred.example.com')
       expect(resolveDashboardOrigin('  ', 3420)).toBe('http://localhost:3420')
     })
 
@@ -290,9 +290,9 @@ describe('renderHeartbeatClaudeMd: respects dashboardOrigin', () => {
   }
 
   it('uses a public URL when dashboardOrigin is set to one', () => {
-    const id: HeartbeatIdentity = { ...BASE, dashboardOrigin: 'https://marveen.example.com' }
+    const id: HeartbeatIdentity = { ...BASE, dashboardOrigin: 'https://alfred.example.com' }
     const out = renderHeartbeatClaudeMd(id)
-    expect(out).toContain('https://marveen.example.com/api/messages')
+    expect(out).toContain('https://alfred.example.com/api/messages')
     expect(out).not.toContain('http://localhost:3420/api/messages')
   })
 
@@ -302,7 +302,7 @@ describe('renderHeartbeatClaudeMd: respects dashboardOrigin', () => {
   })
 
   it('emits no hardcoded hostname other than the dashboardOrigin host', () => {
-    const id: HeartbeatIdentity = { ...BASE, dashboardOrigin: 'https://marveen.example.com' }
+    const id: HeartbeatIdentity = { ...BASE, dashboardOrigin: 'https://alfred.example.com' }
     const out = renderHeartbeatClaudeMd(id)
     // The only host that should appear in the output is the one we supplied;
     // no stale 'localhost' sneaks in alongside it.

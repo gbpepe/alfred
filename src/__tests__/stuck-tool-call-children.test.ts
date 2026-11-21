@@ -39,10 +39,10 @@ vi.mock('../web/active-model.js', () => ({ readTranscriptMtimeAcrossConfigDirs: 
 vi.mock('../web/inbound-probe.js', () => ({ mainConfigRoots: () => [] }))
 vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'main-test', withoutMainAgent: (a: string[]) => a }))
 vi.mock('../web/channel-monitor.js', () => ({
-  resumeMarveenSession: h.resume,
+  resumeAlfredSession: h.resume,
   sendAlert: vi.fn(),
   lastMainRespawnAt: () => 0,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 120_000,
+  ALFRED_POST_RESPAWN_GRACE_MS: 120_000,
 }))
 vi.mock('../web/routine-alert.js', () => ({ sendRoutineAlert: vi.fn() }))
 
@@ -329,7 +329,7 @@ describe('wiring: the tool child guard', () => {
     const guardIdx = code.indexOf('if (toolChildRecentlyActive(toolChildState.get(session), Date.now())) {')
     const capIdx = code.indexOf('if (!childDeferExpired(next.stagnantSince, Date.now())) {')
     const gateIdx = code.indexOf('if (verdictStaleByTranscript(transcriptMtime, Date.now())) {')
-    const killIdx = code.indexOf('resumeMarveenSession()')
+    const killIdx = code.indexOf('resumeAlfredSession()')
     expect(cpuIdx).toBeGreaterThanOrEqual(0)
     expect(guardIdx).toBeGreaterThan(cpuIdx)
     expect(capIdx).toBeGreaterThan(guardIdx)

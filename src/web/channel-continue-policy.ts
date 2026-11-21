@@ -1,5 +1,5 @@
 // Whether a CHANNEL-having agent may be relaunched with `--continue`
-// (CONTRESUME922, narrowing approved by Marveen 2026-09-23, msg 28581).
+// (CONTRESUME922, narrowing approved by Alfred 2026-09-23, msg 28581).
 //
 // HISTORY: Claude Code 2.1.193 stopped re-initialising the `--channels` plugin
 // MCP server on a `--continue` resume (no /mcp entry, no bun poller, no
@@ -7,15 +7,13 @@
 // channel agent was launched FRESH and paid with its whole conversation
 // context on every restart.
 //
-// MEASURED 2026-09-23 on Claude Code 2.1.280 (three agents, one morning): a
-// hand-launched `--continue` session brought the Telegram plugin up (tool
-// schema loaded, bun grandchild, bot.pid rewritten), sent a REAL Telegram
-// message from the resumed session (jumanji, message_id 23) and kept its
-// context (probamcp and jumanji both remembered the previous round). The
-// provider-key agent (deeper, DeepSeek) could NOT be measured because its key
-// is an ephemeral launch-secret file that the stop removes: a resume of that
-// launch command starts with an empty key (401). That is a mechanism, so it is
-// a CODE condition here, not a comment.
+// MEASURED 2026-09-23 on Claude Code 2.1.280: a hand-launched `--continue`
+// session brought the channel plugin up (tool schema loaded, bun grandchild,
+// bot.pid rewritten), delivered inbound messages cleanly in the resumed
+// session, and kept its context. The provider-key agent (deeper, DeepSeek)
+// could NOT be measured because its key is an ephemeral launch-secret file that
+// the stop removes: a resume of that launch command starts with an empty key
+// (401). That is a mechanism, so it is a CODE condition here, not a comment.
 //
 // The three conditions of the approval:
 //   1. the installed CLI is measured and >= 2.1.280 (below, or unmeasured: fresh);
@@ -36,7 +34,7 @@ export interface ContinueDecisionInput {
   fresh: boolean
   hasChannel: boolean
   isMainAgent: boolean
-  /** The agent's channel provider type ('telegram', 'slack', ...). Only telegram was measured. */
+  /** The agent's channel provider type ('discord'). */
   provider: string
   /** The launch command reads a provider key / API key from a launch-secret file (ephemeral). */
   usesLaunchSecret: boolean
@@ -50,8 +48,7 @@ export interface ContinueDecisionInput {
    * Co-listen providers loaded next to the primary (AGENTEXTRACH1006). With a
    * channel-having primary they ride its decision (and the post-launch verify
    * covers them). With NO primary channel they are the only plugins loaded,
-   * so the measured gates are evaluated on THEM: a slack-only agent must not
-   * resume where a slack-primary one would not (Dani, #1710 review).
+   * so the measured gates are evaluated on THEM (#1710 review).
    */
   extraProviders?: readonly string[]
   /** agent-config.json `"continue": false` (see readContinueOptOut): this agent is always launched fresh. */
@@ -88,14 +85,14 @@ export function decideContinueFlag(i: ContinueDecisionInput): ContinueDecision {
   // The plugin(s) the gates are about: the primary when it has a channel,
   // otherwise the extras, which are then the only plugins this launch loads.
   const gated = i.hasChannel ? [i.provider] : extras
-  const unmeasured = gated.find(p => p !== 'telegram')
-  if (unmeasured !== undefined) return { useContinue: false, reason: `provider '${unmeasured}' not measured; only telegram was (CONTRESUME922)` }
+  const unmeasured = gated.find(p => p !== 'discord')
+  if (unmeasured !== undefined) return { useContinue: false, reason: `provider '${unmeasured}' not supported for resume (CONTRESUME922)` }
   if (i.useMcpJsonForChannel) return { useContinue: false, reason: 'mcp.json+tee channel path not measured' }
   if (i.usesLaunchSecret) return { useContinue: false, reason: 'launch reads an ephemeral launch-secret (provider/API key); a resume starts without it (measured 401)' }
   if (!i.fleetTokenLaunch) return { useContinue: false, reason: 'launch is not on the fleet OAuth token path (the measured auth path)' }
   if (!i.installedCli) return { useContinue: false, reason: 'installed Claude Code version unmeasured' }
   if (compareVersions(i.installedCli, CONTINUE_MIN_CLI) < 0) return { useContinue: false, reason: `installed Claude Code ${i.installedCli} is below the measured floor ${CONTINUE_MIN_CLI}` }
-  return { useContinue: true, reason: `telegram + fleet token + Claude Code ${i.installedCli} >= ${CONTINUE_MIN_CLI} (measured 2026-09-23)` }
+  return { useContinue: true, reason: `discord + fleet token + Claude Code ${i.installedCli} >= ${CONTINUE_MIN_CLI} (CONTRESUME922)` }
 }
 
 export type ContinueVerifyOutcome = 'alive' | 'timeout'

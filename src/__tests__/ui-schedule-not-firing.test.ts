@@ -33,7 +33,7 @@ function renderRow(task: Record<string, unknown>, lang: 'hu' | 'en' = 'en'): str
   const make = new Function(
     'document', 't', 'escapeHtml', 'scheduleAgents', 'mainAgentId', 'avatarBust', 'describeCron', 'pauseIcon', 'playIcon', 'trashIcon',
     `${SNIPPET}\nreturn makeScheduleRow`,
-  )(document, makeT(lang), escapeHtml, [], () => 'marveen', () => '', () => 'every day', () => '', () => '', () => '') as (t: unknown) => unknown
+  )(document, makeT(lang), escapeHtml, [], () => 'alfred', () => '', () => 'every day', () => '', () => '', () => '') as (t: unknown) => unknown
   make({ name: 'daily-digest', description: 'Daily digest', schedule: '0 8 * * *', enabled: true, ...task })
   return row.innerHTML
 }

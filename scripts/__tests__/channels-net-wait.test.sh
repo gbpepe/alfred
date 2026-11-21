@@ -32,12 +32,12 @@ hosts() { bash "$CHANNELS" --channel-wait-hosts "$@" 2>/dev/null | tr '\n' ' ' |
 echo "channels.sh network wait: which hosts"
 echo "====================================="
 eq "telegram primary alone"                     "api.telegram.org"           "$(hosts telegram)"
-eq "telegram + slack co-listen (our host)"      "api.telegram.org slack.com" "$(hosts telegram slack-channel@marveen-marketplace)"
+eq "telegram + slack co-listen (our host)"      "api.telegram.org slack.com" "$(hosts telegram slack-channel@alfred-marketplace)"
 eq "slack primary + telegram co-listen"         "slack.com api.telegram.org" "$(hosts slack telegram@claude-plugins-official)"
-eq "a host shared by primary and extra is waited for once" "slack.com" "$(hosts slack slack-channel@marveen-marketplace)"
+eq "a host shared by primary and extra is waited for once" "slack.com" "$(hosts slack slack-channel@alfred-marketplace)"
 eq "discord"                                    "discord.com"                "$(hosts discord)"
-eq "a provider with no known host is skipped"   "api.telegram.org"           "$(hosts telegram whatsapp@marveen-marketplace)"
-got="$(bash "$CHANNELS" --channel-wait-hosts telegram whatsapp@marveen-marketplace 2>&1 >/dev/null)"
+eq "a provider with no known host is skipped"   "api.telegram.org"           "$(hosts telegram whatsapp@alfred-marketplace)"
+got="$(bash "$CHANNELS" --channel-wait-hosts telegram whatsapp@alfred-marketplace 2>&1 >/dev/null)"
 case "$got" in *"no known host for provider 'whatsapp'"*) pass "...and the skip is said, not silent" ;; *) fail "...and the skip is said" "a log line" "$got" ;; esac
 
 echo ""

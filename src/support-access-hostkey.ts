@@ -1,4 +1,4 @@
-// Support access: this machine's SSH host key, told to marveen.io (SUPPORTKULCS1109;
+// Support access: this machine's SSH host key, told to alfred.io (SUPPORTKULCS1109;
 // Mira's frozen schema support-hostkey-v1, Samu 79773: the key comes from ssh-keyscan).
 //
 // The fleet host connects to this machine with ONE pinned host key and strict

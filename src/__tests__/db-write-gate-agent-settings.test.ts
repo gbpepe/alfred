@@ -160,11 +160,11 @@ describe('the hook end to end: the project dir comes from CLAUDE_PROJECT_DIR', (
 
 // Samu 67832: the user-level settings of a config dir. Every agent's agents/<name>/.claude-config/settings.json is on
 // the COMMON list (pattern); the CALLER's own <CLAUDE_CONFIG_DIR>/settings.json is on the sub-agent list per call, so a
-// worker (config dir ~/.marveen-worker{,-fast}/.claude-config) is covered as well. Claude Code's own /effort or /model
+// worker (config dir ~/.alfred-worker{,-fast}/.claude-config) is covered as well. Claude Code's own /effort or /model
 // write is not a tool call: this gate never sees it.
 describe('the user-level settings of a CLAUDE_CONFIG_DIR', () => {
   const cfg = () => join(agent, '.claude-config')
-  const workerCfg = () => join(base, 'home', '.marveen-worker', '.claude-config')
+  const workerCfg = () => join(base, 'home', '.alfred-worker', '.claude-config')
   beforeEach(() => {
     mkdirSync(cfg(), { recursive: true }); writeFileSync(join(cfg(), 'settings.json'), '{}')
     mkdirSync(join(other, '.claude-config'), { recursive: true }); writeFileSync(join(other, '.claude-config', 'settings.json'), '{}')
@@ -186,9 +186,9 @@ describe('the user-level settings of a CLAUDE_CONFIG_DIR', () => {
   it('a worker (its config dir outside the install): its own config settings.json is denied, per call', () => {
     const SUB = { deny: true, reason: 'subagent-file' }
     const w = { file_path: join(workerCfg(), 'settings.json'), content: '{"disableAllHooks": true}' }
-    expect(call('Write', w, { subAgent: true, configDir: workerCfg(), cwd: join(base, 'home', '.marveen-worker') })).toEqual(SUB)
+    expect(call('Write', w, { subAgent: true, configDir: workerCfg(), cwd: join(base, 'home', '.alfred-worker') })).toEqual(SUB)
     for (const op of ['>', '>|', '>>']) {
-      expect(call('Bash', { command: `echo x ${op} .claude-config/settings.json` }, { subAgent: true, configDir: workerCfg(), cwd: join(base, 'home', '.marveen-worker') })).toEqual(SUB)
+      expect(call('Bash', { command: `echo x ${op} .claude-config/settings.json` }, { subAgent: true, configDir: workerCfg(), cwd: join(base, 'home', '.alfred-worker') })).toEqual(SUB)
     }
   })
   it('two callers in one process: each gets its OWN config entry (the target cache is keyed by the config dir)', () => {
@@ -230,8 +230,8 @@ describe('the hook end to end: CLAUDE_CONFIG_DIR is read', () => {
     expect(r.status).toBe(0)
   })
   it('a worker may not write its own config settings.json', () => {
-    const cfg = join(base, 'home', '.marveen-worker', '.claude-config')
-    const r = run({ CLAUDE_PROJECT_DIR: join(base, 'home', '.marveen-worker'), CLAUDE_CONFIG_DIR: cfg }, { command: `echo '{"disableAllHooks": true}' > ${join(cfg, 'settings.json')}` })
+    const cfg = join(base, 'home', '.alfred-worker', '.claude-config')
+    const r = run({ CLAUDE_PROJECT_DIR: join(base, 'home', '.alfred-worker'), CLAUDE_CONFIG_DIR: cfg }, { command: `echo '{"disableAllHooks": true}' > ${join(cfg, 'settings.json')}` })
     expect(JSON.parse(r.stdout).hookSpecificOutput.permissionDecisionReason).toContain('ENVRELAXGATE1104')
   })
 })
@@ -262,7 +262,7 @@ describe('the shared ~/.claude user settings, through a symlink and straight (su
     }
   })
   it('the caller\'s own config settings.local.json (a real file, e.g. a worker\'s) is denied per call', () => {
-    const cfg = join(base, 'home', '.marveen-worker', '.claude-config')
+    const cfg = join(base, 'home', '.alfred-worker', '.claude-config')
     mkdirSync(cfg, { recursive: true }); writeFileSync(join(cfg, 'settings.local.json'), '{}')
     expect(call('Write', { file_path: join(cfg, 'settings.local.json'), content: '{}' }, true, cfg)).toEqual(SUB)
   })

@@ -2,7 +2,7 @@ import { statSync, readFileSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
 import { logger } from '../logger.js'
 import { BOT_NAME, MAIN_AGENT_ID, PROJECT_ROOT } from '../config.js'
-import { hardRestartMarveenChannels, lastMainRespawnAt, MARVEEN_POST_RESPAWN_GRACE_MS, markAgentRestartPending } from './channel-monitor.js'
+import { hardRestartAlfredChannels, lastMainRespawnAt, ALFRED_POST_RESPAWN_GRACE_MS, markAgentRestartPending } from './channel-monitor.js'
 import { shouldDeferForRecentRespawn } from './stuck-tool-call-watcher.js'
 import { listAgentNames, listAllAgentNames, agentDir, readAgentModel, readAgentRemoteHost, readAgentWorksourceChannel } from './agent-config.js'
 import { configDirFor } from './main-transcript-root.js'
@@ -735,11 +735,11 @@ export function resumePrompt(
     // the resume prompt itself -- it is the ONLY context the fresh session has.
     `KORLÁT: a futó prod fán (a repo fő checkoutján) NE válts ágat, NE commitolj és NE nyiss belőle PR-t ` +
     `-- ha repo-munka kell, használj worktree-t (git worktree add). ` +
-    // The main agent's channel is the OWNER's channel (Telegram), and session
+    // The main agent's channel is the OWNER's channel, and session
     // meta must never go there (standing owner preference; a 3am status
     // notice measured on 2026-08-05, review msg 14197). Sub-agents' channel
     // is the inter-agent queue. Owner request 2026-10-21: sub-agents with their
-    // own bot have the owner's Telegram as channel, so NO agent notifies a
+    // own bot share the owner's chat channel, so NO agent notifies a
     // channel about the fresh context; only a faulty handoff is reported, to
     // the main agent via the queue. This prompt is the fresh session's ONLY
     // rule set, so the rule must live here.
@@ -949,12 +949,12 @@ async function performRestart(name: string): Promise<void> {
     // four times and failed every time, and main was unreachable for ~2h until
     // a hand restart.
     //
-    // hardRestartMarveenChannels() is the existing helper the channel-monitor
+    // hardRestartAlfredChannels() is the existing helper the channel-monitor
     // down-cascade already uses: it keeps the launchd path for macOS installs
     // (and warns + falls back to a pane respawn if the plist is absent), uses
     // respawn-pane-FRESH on Linux -- fresh is exactly what the guard wants --
     // and writes the shared respawn stamp so the other respawners defer to us.
-    const res = hardRestartMarveenChannels()
+    const res = hardRestartAlfredChannels()
     if (!res.ok) throw new Error(res.error ?? 'main channels hard restart failed')
   } else {
     // DANICTXHUROK906: claim the reconcile grace window BEFORE the stop, so
@@ -1296,7 +1296,7 @@ async function checkAgent(name: string, nowMs: number): Promise<void> {
   // may have just restarted main for its own reasons.
   //
   // Same mechanism every other respawner already shares -- lastMainRespawnAt()
-  // plus MARVEEN_POST_RESPAWN_GRACE_MS -- so there is no new tunable and no new
+  // plus ALFRED_POST_RESPAWN_GRACE_MS -- so there is no new tunable and no new
   // number; see the identical gate in stuck-tool-call-watcher.ts. Main only: the
   // stamp describes the main channels session, and a sub-agent restart is
   // cheap and independently coordinated.
@@ -1312,7 +1312,7 @@ async function checkAgent(name: string, nowMs: number): Promise<void> {
     const lastRespawn = lastMainRespawnAt()
     if (shouldDeferForRecentRespawn(lastRespawn, nowMs)) {
       logger.info(
-        { name, sinceRespawnMs: lastRespawn ? nowMs - lastRespawn : null, graceMs: MARVEEN_POST_RESPAWN_GRACE_MS },
+        { name, sinceRespawnMs: lastRespawn ? nowMs - lastRespawn : null, graceMs: ALFRED_POST_RESPAWN_GRACE_MS },
         'context-guard: recent main respawn within grace, deferring restart (avoid restart loop / boot churn)',
       )
       guardStates.set(name, state)

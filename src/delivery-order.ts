@@ -4,7 +4,7 @@
 //
 // Card ad771121, review point 1 (#1808): a priority may only reorder PEER traffic. The in-process
 // system rows and the owner's own messages (the dashboard compose, the channel coordinator's
-// Telegram handoff, the voice channel) are stored as normal -- most of them never pass the POST
+// channel handoff, the voice channel) are stored as normal -- most of them never pass the POST
 // route that reads `priority`, and the coordinator inserts its rows directly -- so on the stored
 // value alone a peer's high row jumped ahead of a pending system notice or an owner message to the
 // same recipient. Their rank is therefore read from the SENDER, at read time, wherever the order is
@@ -33,7 +33,7 @@ import { OWNER_NAME, VOICE_CHANNEL_ID } from './config.js'
 // reads it too; null when the voice lane is off. It is read at CALL time, like OWNER_NAME below:
 // db.ts imports this module, and the many tests that mock config.js without the voice id must
 // still load db.ts. message-priority.test.ts pins both equal to the ingest.ts constants.
-export const COORDINATOR_SENDER_ID = 'telegram-coordinator'
+export const COORDINATOR_SENDER_ID = 'channel-coordinator'
 export function voiceChannelSenderId(): string | null {
   return VOICE_CHANNEL_ID
 }

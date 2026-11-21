@@ -15,7 +15,7 @@ for (const lang of ['hu', 'en'] as const) {
       status: 403, contentType: 'application/json',
       body: JSON.stringify({ error: `${SERVER_SENTENCE} The access token can do it only before the first login exists.`, code: 'owner_session_required' }),
     }))
-    await page.addInitScript((l) => { try { localStorage.setItem('marveen.lang', l) } catch { /* ignore */ } }, lang)
+    await page.addInitScript((l) => { try { localStorage.setItem('alfred.lang', l) } catch { /* ignore */ } }, lang)
     await page.goto('/index.html')
     await page.evaluate(() => {
       const host = document.createElement('div')

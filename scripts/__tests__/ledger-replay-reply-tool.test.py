@@ -65,13 +65,13 @@ import tempfile
 
 def replay_output(source):
     # A tmp install (<tmp>/scripts linked to the repo's): the hooks' ledger DB is
-    # <tmp>/store/claudeclaw.db; no environment variable picks it (ENVRELAXGATE1104).
+    # <tmp>/store/alfred.db; no environment variable picks it (ENVRELAXGATE1104).
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "store"))
         os.symlink(os.path.dirname(HOOKS), os.path.join(tmp, "scripts"))
         tmp_hooks = os.path.join(tmp, "scripts", "hooks")
         REPLAY = os.path.join(tmp_hooks, "ledger-replay.py")
-        env = dict(os.environ, MARVEEN_AGENT_ID="replay-e2e", MAIN_AGENT_ID="replay-e2e")
+        env = dict(os.environ, ALFRED_AGENT_ID="replay-e2e", MAIN_AGENT_ID="replay-e2e")
         env.pop("LEDGER_DB_PATH", None)
         seed = (
             "import sys; sys.path.insert(0, sys.argv[1]); import ledger_lib;"

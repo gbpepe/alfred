@@ -98,7 +98,7 @@ Memory has 3 layers (hot/warm/cold) + a daily log.
 ### NO MENTAL NOTES! If it needs remembering -> save it IMMEDIATELY:
 
 The dashboard's `/api/*` endpoints are protected by a Bearer token. The calls are made by the
-`scripts/marveen-api.sh` helper: it reads the token itself from the `store/.dashboard-token` file, so the token
+`scripts/alfred-api.sh` helper: it reads the token itself from the `store/.dashboard-token` file, so the token
 never lands on the command line (`ps` shows the argv to every local user). The exception is the `message` verb:
 it runs `agent-msg.sh`, and that one, for now, still puts both the token AND the message text into curl's argv
 (`-d "$BODY"`), so the text is visible in `ps` too. Write the text (memory,
@@ -108,21 +108,21 @@ stderr; 2 = bad call, nothing was sent; 3 = the dashboard is unreachable or did 
 seconds. After a timeout (3) the request may already have gone out: for writes, read back before retrying
 (e.g. `kanban-list`), otherwise you get a duplicate card or comment. For the `message` verb the
 `OK id=<n>` / `FAIL` output is what counts (it comes from `agent-msg.sh`, with its own exit codes).
-The list of verbs: `bash scripts/marveen-api.sh --help`.
+The list of verbs: `bash scripts/alfred-api.sh --help`.
 
 Saving a memory (`mem.txt` is the WHAT, CATEGORY is hot, warm, cold or shared):
 ```bash
-bash scripts/marveen-api.sh memory-save {{MAIN_AGENT_ID}} CATEGORY "keyword1, keyword2" mem.txt
+bash scripts/alfred-api.sh memory-save {{MAIN_AGENT_ID}} CATEGORY "keyword1, keyword2" mem.txt
 ```
 
 Daily log (append-only; the first line of `naplo.txt` is `## HH:MM -- Topic`, below it what happened and what the result was):
 ```bash
-bash scripts/marveen-api.sh daily-log {{MAIN_AGENT_ID}} naplo.txt
+bash scripts/alfred-api.sh daily-log {{MAIN_AGENT_ID}} naplo.txt
 ```
 
 Search (before you answer, check whether there is a relevant memory):
 ```bash
-bash scripts/marveen-api.sh memory-search {{MAIN_AGENT_ID}} KEYWORD --category warm   # the first output line is the X-Memory-Search label: READ IT TOO, it is not optional
+bash scripts/alfred-api.sh memory-search {{MAIN_AGENT_ID}} KEYWORD --category warm   # the first output line is the X-Memory-Search label: READ IT TOO, it is not optional
 ```
 
 The `X-Memory-Search` line is NOT decoration (if it says `MISSING`, the search did not run the way you asked). Search is LENIENT by default: if not one of your real words matches, it drops
@@ -141,7 +141,7 @@ memory. What the endpoint owes you is the LABEL, not strictness.
 
 ## Kanban board
 
-The kanban data lives in the `store/claudeclaw.db` SQLite file, but **do NOT touch it with the `sqlite3`
+The kanban data lives in the `store/alfred.db` SQLite file, but **do NOT touch it with the `sqlite3`
 command-line tool, and do not assume `jq` either**: neither is installed on an
 average Linux machine (the installer's dependencies: ffmpeg, git, tmux, lsof, curl, python3, pipx,
 unzip), and there the call dies with `exit 127`. The way to the board is the dashboard API: the same
@@ -149,17 +149,17 @@ helper as for memory. For filtering/counting, `python3` is always at hand.
 
 Listing cards (JSON array: id, title, status, assignee, priority, updated_at, archived_at):
 ```bash
-bash scripts/marveen-api.sh kanban-list
+bash scripts/alfred-api.sh kanban-list
 ```
 
 New card (`cim.txt` is the TITLE; the card goes into `planned` status, the priority is low, normal, high or urgent):
 ```bash
-bash scripts/marveen-api.sh kanban-create {{MAIN_AGENT_ID}} normal cim.txt
+bash scripts/alfred-api.sh kanban-create {{MAIN_AGENT_ID}} normal cim.txt
 ```
 
 Moving a card:
 ```bash
-bash scripts/marveen-api.sh kanban-move KARTYA_ID in_progress
+bash scripts/alfred-api.sh kanban-move KARTYA_ID in_progress
 ```
 
 If you know where you are moving it from (closing an assigned `in_progress` card to `done`/`waiting`/`testing`
@@ -168,7 +168,7 @@ if the card is STILL in that status. HTTP 409 (exit code 1, stderr shows `status
 and `current_status`, where it stands now) means the card moved on in the meantime: do NOT move it again unconditionally,
 and do NOT keep working on it.
 When closing to done, state what you checked (`bizonyitek.txt` is WHAT YOU MEASURED, WHAT THE RESULT WAS):
-`bash scripts/marveen-api.sh kanban-move KARTYA_ID done --expected-status in_progress --evidence-file bizonyitek.txt`.
+`bash scripts/alfred-api.sh kanban-move KARTYA_ID done --expected-status in_progress --evidence-file bizonyitek.txt`.
 As an agent, without evidence the card goes to `testing`, not `done`: in that case the response
 contains `"ok": false` and `"evidence_required": true` (the exit code is still 0), and the card is NOT closed.
 If the `done` happened without evidence (the move carried no agent name, no `--actor`), and
@@ -186,17 +186,17 @@ someone else holds it (stderr tells you who and until when), and then do NOT wor
 It is released automatically by `done`, `waiting` or `testing` status, by archiving, and when you reassign the card
 to someone else (so the new assignee can claim it):
 ```bash
-bash scripts/marveen-api.sh kanban-claim KARTYA_ID {{MAIN_AGENT_ID}}
+bash scripts/alfred-api.sh kanban-claim KARTYA_ID {{MAIN_AGENT_ID}}
 ```
 
 Releasing a claim if you leave the work unfinished (not `done`):
 ```bash
-bash scripts/marveen-api.sh kanban-release KARTYA_ID {{MAIN_AGENT_ID}}
+bash scripts/alfred-api.sh kanban-release KARTYA_ID {{MAIN_AGENT_ID}}
 ```
 
 Comment on the card (the result goes here, this is what shows on the dashboard; `komment.txt` is the RESULT IN SHORT):
 ```bash
-bash scripts/marveen-api.sh kanban-comment KARTYA_ID {{MAIN_AGENT_ID}} komment.txt
+bash scripts/alfred-api.sh kanban-comment KARTYA_ID {{MAIN_AGENT_ID}} komment.txt
 ```
 
 Archiving: `POST /api/kanban/KARTYA_ID/archive`, with an empty body.
@@ -247,13 +247,13 @@ The agents can message each other directly through a shared SQLite message queue
 If you want to delegate a task to another agent, use the API:
 
 ```bash
-bash scripts/marveen-api.sh message {{MAIN_AGENT_ID}} TARGET_AGENT uzenet.txt
+bash scripts/alfred-api.sh message {{MAIN_AGENT_ID}} TARGET_AGENT uzenet.txt
 ```
 
 **RELIABLE SENDING (verify + retry), MANDATORY:** the common `curl -s ... >/dev/null && echo sent` pattern is DANGEROUS: curl returns `0` even when the server REJECTED the request (401/400/5xx), so you get a SILENT send failure. The recipient never gets the message, and two agents can wait for each other forever. A message ONLY counts as sent if an `id` came back in the response (`{"id":<n>,"status":"pending",...}` with HTTP 200). The `message` verb checks this itself (it runs the `scripts/agent-msg.sh` helper: HTTP status + `id` check + 3 retries + error log), and its output is `OK id=<n>` or `FAIL`. Instead of `uzenet.txt`, `-` means stdin:
 
 ```bash
-bash scripts/marveen-api.sh message {{MAIN_AGENT_ID}} TARGET_AGENT uzenet.txt   # -> OK id=<n>  vagy  FAIL
+bash scripts/alfred-api.sh message {{MAIN_AGENT_ID}} TARGET_AGENT uzenet.txt   # -> OK id=<n>  vagy  FAIL
 ```
 
 The system automatically:
@@ -263,7 +263,7 @@ The system automatically:
 
 ### Important rules
 - You can only message a running agent (it needs a tmux session)
-- The list of available agents: `bash scripts/marveen-api.sh agents-list`
+- The list of available agents: `bash scripts/alfred-api.sh agents-list`
 
 ### Handling a sub-agent's unknown-sender ping (auto-approval, default-deny)
 
@@ -274,7 +274,7 @@ When a sub-agent sends you an inter-agent message in this form:
 1. **Allowlist check (your OWN paired allowlist):** check whether the `[ID]` is in your own channel's `allowFrom`:
    ```bash
    # YOUR OWN channel's config is in your working directory (<cwd>/.claude/channels/...: the project root for the main agent, the agents/<name> folder for a sub-agent).
-   # $HOME/.claude/channels is only a fallback: a Marveen install has no such file there, so a blind $HOME read gives a false "NEM" (no) or an error.
+   # $HOME/.claude/channels is only a fallback: a Alfred install has no such file there, so a blind $HOME read gives a false "NEM" (no) or an error.
    CH=".claude/channels/telegram/access.json"; [ -f "$CH" ] || CH="$HOME/.claude/channels/telegram/access.json"
    python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('IGEN' if sys.argv[2] in d.get('allowFrom',[]) else 'NEM')" "$CH" "[ID]"
    ```
@@ -321,7 +321,7 @@ description: When to use it, what it does. Be specific in the triggers.
 ## Verification
 - [How to validate the result]
 SKILLEOF
-bash scripts/marveen-api.sh skill-propose SKILL-NEV .claude/skill-javaslat/SKILL.md --reason-file .claude/skill-javaslat/indok.txt
+bash scripts/alfred-api.sh skill-propose SKILL-NEV .claude/skill-javaslat/SKILL.md --reason-file .claude/skill-javaslat/indok.txt
 ```
 
 The proposal (`POST /api/skills/propose`) is sent by the helper's `skill-propose` verb; depending on the quarantine switch, it goes live immediately or waits for approval.

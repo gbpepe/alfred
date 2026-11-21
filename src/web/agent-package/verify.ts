@@ -4,7 +4,7 @@
 // of the contract's B-side check (Sz-4.4) in order, and the first failure
 // stops it. The patterns and limits are the contract's, letter for letter
 // (Sz-3.1, Sz-4.5). The text rules are copied from the reference scanner of
-// the publishing side (marveen-io PR 371, head 4d9b9e99, package-scan.ts), and
+// the publishing side (alfred-io PR 371, head 4d9b9e99, package-scan.ts), and
 // the shared text vector pins both sides to the same bytes: a text rule exists
 // here only if the plan names it AND that vector has cases for it.
 //
@@ -265,7 +265,7 @@ export function scanManifestText(text: string, maxChars: number): { reason: Veri
 
 /** Sz-3.1 slug. The stricter shape (N9/a) is the installer's pre-download filter, not this module's. */
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,39}$/
-/** Sz-3.1 version and min_marveen_version. */
+/** Sz-3.1 version and min_alfred_version. */
 export const VERSION_RE = /^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})$/
 /** Sz-4.5 text path, the one-line form the contract names authoritative. */
 export const TEXT_PATH_RE =
@@ -394,7 +394,7 @@ export interface VerifiedConnector {
 interface VerifiedFields {
   slug: string
   version: string
-  minMarveenVersion: string
+  minAlfredVersion: string
   kid: string
   payloadSha256: string
   payloadBytes: Uint8Array
@@ -432,7 +432,7 @@ let mintVerifiedPackage: (f: VerifiedFields) => VerifiedPackage
 export class VerifiedPackage {
   readonly slug: string
   readonly version: string
-  readonly minMarveenVersion: string
+  readonly minAlfredVersion: string
   /** The kid that signed it. */
   readonly kid: string
   /** sha256 of the base64url-decoded JWS payload segment bytes (contract B5/S7). */
@@ -451,7 +451,7 @@ export class VerifiedPackage {
     if (token !== MINT_TOKEN) throw new TypeError('VerifiedPackage is created by verifyDelivery only')
     this.slug = f.slug
     this.version = f.version
-    this.minMarveenVersion = f.minMarveenVersion
+    this.minAlfredVersion = f.minAlfredVersion
     this.kid = f.kid
     this.payloadSha256 = f.payloadSha256
     this.#payloadBytes = Uint8Array.from(f.payloadBytes)
@@ -625,7 +625,7 @@ export function verifyDelivery(bytes: Uint8Array, requestedSlug: string, keys: r
 
   if (typeof payload.slug !== 'string' || !SLUG_RE.test(payload.slug)) return fail(2, 'bad_payload')
   if (typeof payload.version !== 'string' || !VERSION_RE.test(payload.version)) return fail(2, 'bad_payload')
-  if (typeof payload.min_marveen_version !== 'string' || !VERSION_RE.test(payload.min_marveen_version)) {
+  if (typeof payload.min_alfred_version !== 'string' || !VERSION_RE.test(payload.min_alfred_version)) {
     return fail(2, 'bad_payload')
   }
   if (typeof payload.title !== 'string' || typeof payload.description !== 'string') return fail(2, 'bad_payload')
@@ -747,7 +747,7 @@ export function verifyDelivery(bytes: Uint8Array, requestedSlug: string, keys: r
     pkg: mintVerifiedPackage({
       slug: payload.slug,
       version: payload.version,
-      minMarveenVersion: payload.min_marveen_version,
+      minAlfredVersion: payload.min_alfred_version,
       kid: key.kid,
       payloadSha256: sha256Hex(decoded.bytes),
       payloadBytes: decoded.bytes,
@@ -902,7 +902,7 @@ export function classifyVersion(installed: VersionedPackage, available: Versione
   return available.payloadSha256 === installed.payloadSha256 ? 'repair' : 'version_conflict'
 }
 
-/** Sz-4.4/7: the own Marveen version is at least the package's min_marveen_version. */
-export function meetsMinMarveenVersion(ownVersion: string, minMarveenVersion: string): boolean {
-  return compareVersions(ownVersion, minMarveenVersion) >= 0
+/** Sz-4.4/7: the own Alfred version is at least the package's min_alfred_version. */
+export function meetsMinAlfredVersion(ownVersion: string, minAlfredVersion: string): boolean {
+  return compareVersions(ownVersion, minAlfredVersion) >= 0
 }

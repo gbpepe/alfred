@@ -13,7 +13,7 @@ mkrepo() {
   local t; t="$(mktemp -d "${TMPDIR:-/tmp}/bk-stage.XXXXXX")"
   mkdir -p "$t/scripts" "$t/store/sub" "$t/home/.claude/skills/x" "$t/home/.claude/scheduled-tasks/y"
   echo s > "$t/home/.claude/skills/x/SKILL.md"; echo s > "$t/home/.claude/scheduled-tasks/y/SKILL.md"
-  if command -v sqlite3 >/dev/null 2>&1; then sqlite3 "$t/store/claudeclaw.db" 'CREATE TABLE t(x);'; else echo db > "$t/store/claudeclaw.db"; fi
+  if command -v sqlite3 >/dev/null 2>&1; then sqlite3 "$t/store/alfred.db" 'CREATE TABLE t(x);'; else echo db > "$t/store/alfred.db"; fi
   cp "$SRC" "$t/scripts/backup.sh"
   # backup.sh sources its literal archive-membership helper (card a8a92d55).
   mkdir -p "$t/scripts/lib" && cp "$(dirname "$SRC")/lib/archive-list-has.sh" "$t/scripts/lib/"

@@ -15,7 +15,7 @@ const STUB = `import { appendFileSync } from 'node:fs'
 export const cfgKindFromHelperMode = (m) => (m === 'explicit' || m === 'rotated') ? 'own-login' : m === 'token' ? 'plan-token' : m === 'isolated' ? 'isolated' : 'shared'
 export function prepareMainAuth(kind, dir) {
   console.log('a log line on stdout that must never reach the contract')
-  appendFileSync(process.env.STUB_LOG, JSON.stringify({ kind, dir, logLevel: process.env.LOG_LEVEL, noMigrate: process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION }) + '\\n')
+  appendFileSync(process.env.STUB_LOG, JSON.stringify({ kind, dir, logLevel: process.env.LOG_LEVEL, noMigrate: process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION }) + '\\n')
   if (process.env.STUB_THROW) throw new Error('vault unreadable')
   if (process.env.STUB_VAULT) { const e = new Error('main-auth: the vault is unreadable (Error)'); e.code = 'vault-unreadable'; throw e }
   return { decision: { configured: 'api', effective: 'api', conflict: null }, result: { failed: ['unstamp'] } }

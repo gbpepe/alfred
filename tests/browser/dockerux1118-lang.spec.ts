@@ -29,9 +29,9 @@ async function open(page: Page, srv: Srv, seed: { uiLang?: 'en' | 'hu'; pending?
   await page.addInitScript(([k, ui, pending]) => {
     try {
       if (!sessionStorage.getItem('lang-seeded')) {
-        localStorage.setItem('marveen-dashboard-token', k)
-        if (ui) localStorage.setItem('marveen.lang', ui)
-        if (pending) localStorage.setItem('marveen.onbLangPending', pending)
+        localStorage.setItem('alfred-dashboard-token', k)
+        if (ui) localStorage.setItem('alfred.lang', ui)
+        if (pending) localStorage.setItem('alfred.onbLangPending', pending)
         sessionStorage.setItem('lang-seeded', '1')
       }
     } catch { /* ignore */ }
@@ -70,7 +70,7 @@ test('container, not signed in: Magyar switches the wizard in this browser only,
   expect(await btn(page, 'hu').getAttribute('aria-pressed')).toBe('true')
   expect(await page.evaluate(() => document.documentElement.lang)).toBe('hu')
   expect(srv.posts).toEqual([])
-  expect(await stored(page, 'marveen.onbLangPending')).toBe('hu')
+  expect(await stored(page, 'alfred.onbLangPending')).toBe('hu')
   await page.screenshot({ path: 'test-results/dockerux1118-login-hu.png' })
   expect(errors).toEqual([])
 })
@@ -82,7 +82,7 @@ test('container, signed in after choosing Magyar: the remembered choice is sent 
   await expect.poll(() => srv.posts).toEqual(['hu'])
   await expect(page.locator('#onbMsg')).toContainText('CLAUDE.md')
   await expect(page.locator('#onbMsg')).toContainText('2')
-  expect(await stored(page, 'marveen.onbLangPending')).toBeNull()
+  expect(await stored(page, 'alfred.onbLangPending')).toBeNull()
   await page.screenshot({ path: 'test-results/dockerux1118-signed-in-hu.png' })
   expect(errors).toEqual([])
 })
@@ -95,7 +95,7 @@ test('container, signed in: a click switches the install; the wizard follows', a
   await expect.poll(() => srv.posts).toEqual(['hu'])
   await expect(page.locator('#onbIdentityBtn')).toHaveText('Mentés és tovább')
   await expect(page.locator('#onbMsg')).toContainText('testreszabtad')
-  expect(await stored(page, 'marveen.lang')).toBe('hu')
+  expect(await stored(page, 'alfred.lang')).toBe('hu')
   expect(errors).toEqual([])
 })
 

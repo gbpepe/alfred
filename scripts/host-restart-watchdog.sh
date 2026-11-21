@@ -11,7 +11,7 @@
 # silence is never mistaken for a CostOps/app crash.
 #
 # App/service crashes do NOT change btime and never trigger this script -- they
-# are reported separately by the OnFailure= drop-ins (marveen-notify@.service).
+# are reported separately by the OnFailure= drop-ins (alfred-notify@.service).
 # That split is the whole point: btime-change => host restart; OnFailure => app.
 #
 # Safe by construction: read-only except for the state file; Telegram send is
@@ -20,7 +20,7 @@
 
 set -uo pipefail
 
-STATE_DIR="${MARVEEN_STORE:-$HOME/marveen/store}"
+STATE_DIR="${ALFRED_STORE:-$HOME/alfred/store}"
 STATE_FILE="$STATE_DIR/.last-btime"
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # #915: main channel state is install-scoped once migrated; the legacy shared
@@ -34,8 +34,8 @@ ENV_FILE="${TELEGRAM_ENV:-$TG_CHAN_DIR/.env}"
 # Alert target chat-id -- MUST come from the install's own config; there is
 # deliberately NO hardcoded fallback (a hardcoded id would make every downstream
 # install send its host-stability alerts to that one private chat).
-CHAT_ID="${MARVEEN_ALERT_CHAT_ID:-}"
-# ZAKARFELUGY921 (kulso bejelentes, 2026-09-21): a MARVEEN_ALERT_CHAT_ID-t SEMMI
+CHAT_ID="${ALFRED_ALERT_CHAT_ID:-}"
+# ZAKARFELUGY921 (kulso bejelentes, 2026-09-21): a ALFRED_ALERT_CHAT_ID-t SEMMI
 # nem allitotta be -- se unit-sablon, se az install-linux.sh (merve: 0 elofordulas
 # mindkettoben) --, tehat ervenyes tokennel SEM ment ki semmi. Beegetni tilos, es a
 # unitba irni sem lehet: a telepito a unitokat a PAROSITAS ELOTT irja ki, amikor a
@@ -117,7 +117,7 @@ if (( last_alive > 0 )); then
   gap_txt="~${gap_min} perc (utolsó aktivitás ${last_txt} előtt)"
 fi
 
-msg="Marveen ${HOST_KIND} restarted.
+msg="Alfred ${HOST_KIND} restarted.
 Új boot: ${boot_local}
 Becsült kiesés: ${gap_txt}
 (Ez host/VM szintű restart, NEM app-crash. A dashboard/channels app-crash külön OnFailure-értesítést küld.)"
@@ -142,7 +142,7 @@ if [[ -n "$token" && -n "$CHAT_ID" ]]; then
     log "Telegram send FAILED -- baseline NOT stamped, will retry next run: ${send_err}"
   fi
 else
-  log "skipping Telegram (${HOST_KIND} restart still logged): missing${token:+}$( [[ -z "$token" ]] && echo ' TELEGRAM_BOT_TOKEN(via TELEGRAM_ENV)')$( [[ -z "$CHAT_ID" ]] && echo ' MARVEEN_ALERT_CHAT_ID')"
+  log "skipping Telegram (${HOST_KIND} restart still logged): missing${token:+}$( [[ -z "$token" ]] && echo ' TELEGRAM_BOT_TOKEN(via TELEGRAM_ENV)')$( [[ -z "$CHAT_ID" ]] && echo ' ALFRED_ALERT_CHAT_ID')"
 fi
 
 exit 0

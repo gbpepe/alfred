@@ -29,7 +29,7 @@ vi.mock('node:child_process', async (orig) => {
 })
 vi.mock('../config.js', async (orig) => ({
   ...(await orig() as object),
-  PROJECT_ROOT: '/opt/marveen root',
+  PROJECT_ROOT: '/opt/alfred root',
   STORE_DIR: '/nonexistent-store-for-test',
   TELEGRAM_BOT_TOKEN: '',
 }))
@@ -54,7 +54,7 @@ describe('runCommandTask placeholder binding', () => {
     expect(h.calls).toHaveLength(1)
     const [file, argv] = h.calls[0] as [string, string[]]
     expect(file).toBe('bash')
-    expect(argv).toEqual(['-lc', "python3 '/opt/marveen root'/scripts/usage-collect.py"])
+    expect(argv).toEqual(['-lc', "python3 '/opt/alfred root'/scripts/usage-collect.py"])
     expect(argv.join(' ')).not.toContain('{{')
   })
 })

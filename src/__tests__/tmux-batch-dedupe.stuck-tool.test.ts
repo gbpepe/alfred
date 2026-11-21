@@ -197,7 +197,7 @@ function containsAwait(root: ts.Node): boolean {
 }
 
 // R2: no agent start/stop/restart or prompt/keystroke send inside the region.
-const FORBIDDEN = ['restartAgentProcess', 'stopAgentProcess', 'startAgentProcess', 'sendPromptToSession', 'resumeMarveenSession']
+const FORBIDDEN = ['restartAgentProcess', 'stopAgentProcess', 'startAgentProcess', 'sendPromptToSession', 'resumeAlfredSession']
 function containsForbiddenCall(root: ts.Node): boolean {
   return containsNode(root, (n) => {
     if (ts.isCallExpression(n)) {

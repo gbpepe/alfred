@@ -95,7 +95,7 @@ describe('pane capture prefetch', () => {
     })
     const { args, opts } = calls[0]
     expect(args).toEqual([
-      'display-message', '-p', expect.stringMatching(/^__marveen_capture_[0-9a-f]{32}_0__$/), ';',
+      'display-message', '-p', expect.stringMatching(/^__alfred_capture_[0-9a-f]{32}_0__$/), ';',
       'capture-pane', '-t', '=a:', '-e', '-p', ';',
       'display-message', '-p', args[2].replace('_0__', '_1__'), ';',
       'capture-pane', '-t', '=b:', '-e', '-p',

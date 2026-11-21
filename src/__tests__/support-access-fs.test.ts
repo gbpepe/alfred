@@ -35,7 +35,7 @@ const GRANT = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
 const OTHER_GRANT = '9b2e7c1a-5d44-4e0b-8f3a-6c1d2e3f4a5b'
 const BRIDGE_UUID = '11111111-2222-4333-8444-555555555555'
 
-const DISPATCH = '/opt/marveen/scripts/support-dispatch.sh'
+const DISPATCH = '/opt/alfred/scripts/support-dispatch.sh'
 
 function supportLine(keyIndex: number, grantId = GRANT): string {
   return buildSupportLine({
@@ -71,7 +71,7 @@ function bridgeLine(): string {
     return b
   }
   const b64 = Buffer.concat([len(type.length), type, len(32), Buffer.alloc(32, 0x42)]).toString('base64')
-  return buildRestrictedLine(validatePublicKeyLine(`ssh-ed25519 ${b64} marveen-remote:${BRIDGE_UUID}`))
+  return buildRestrictedLine(validatePublicKeyLine(`ssh-ed25519 ${b64} alfred-remote:${BRIDGE_UUID}`))
 }
 
 const LINE1 = supportLine(0)

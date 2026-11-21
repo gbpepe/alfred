@@ -20,7 +20,7 @@ Ezek a fájlok a dashboard által kezelt, futásidőben módosuló konfiguráci�
 | `store/.vault-key` | nem | Vault visszafejtési kulcs (OS keychain-be migrált, ha elérhető) |
 | `store/schedule-last-run.json` | automatikus | Ütemezett feladatok utolsó futási időbélyege (crash-safe skip) |
 | `store/kanban-audit-state.json` | automatikus | Kanban audit utolsó futása |
-| `store/claudeclaw.db` | nem direktben | SQLite adatbázis -- memória, kanban, üzenetek, token-log, stb. |
+| `store/alfred.db` | nem direktben | SQLite adatbázis -- memória, kanban, üzenetek, token-log, stb. |
 | `store/custom-providers.json` | dashboard UI (Beállítások > Szolgáltatók) | Egyéni Anthropic Messages API-kompatibilis végpontok listája -- ld. docs/custom-providers.md |
 | `store/config-overrides.json` | dashboard UI | Beállítások-oldal által mentett felülbírálatok (plain értékek, sosem tartalmaz titkokat) |
 | `store/update.pid` | automatikus | Frissítési folyamat PID fájl (concurrency lock) |
@@ -256,9 +256,9 @@ tesz a plugin forrására:
 - a plugin utasítása és a `telegram-reply-directive.py` hook kéri az ügynököt, hogy a
   témát adja vissza.
 
-A Marveen saját válasz-útjai ugyanígy a témába mennek: a „Dolgozom rajta” helyőrző és
+A Alfred saját válasz-útjai ugyanígy a témába mennek: a „Dolgozom rajta” helyőrző és
 annak tartalék-küldései (`telegram_progress*.py`), a hookból megválaszolt parancsok
-(`marveen-commands.py`, a futás közbeni parancsok is), és a tartalék-poller
+(`alfred-commands.py`, a futás közbeni parancsok is), és a tartalék-poller
 (`channel-coordinator`) átadása.
 
 Téma nélküli üzenetnél minden hívás pontosan ugyanaz, mint kikapcsolva.
@@ -266,7 +266,7 @@ Téma nélküli üzenetnél minden hívás pontosan ugyanaz, mint kikapcsolva.
 **Közös plugin-cache.** A kiegészítés a plugin-cache-ben lévő forrást módosítja
 (`$CLAUDE_CONFIG_DIR/plugins/cache`, ennek hiányában `~/.claude/plugins/cache`), és ebből
 tölti a Telegram plugint minden Claude Code session, amely ugyanezt a cache-t használja, a
-Marveen-en kívüliek is. Azokban is megjelenik a `reply` tool opcionális `message_thread_id`
+Alfred-en kívüliek is. Azokban is megjelenik a `reply` tool opcionális `message_thread_id`
 paramétere és a témából jött üzenet tagjének attribútuma; amíg nem adják meg a paramétert,
 a viselkedésük változatlan.
 
@@ -381,10 +381,10 @@ alapból ki van kapcsolva; kikapcsolva a plugin forrása pontosan a mai, és a T
 indításkor visszaáll az alapértelmezett frissítés-típusokra. A csatorna következő indításakor lép
 életbe, a futó ügynököknél a session újraindításával.
 
-#### `DISCORD_PLUGIN_EXT`, `DISCORD_OWNER_USER_ID`, `DISCORD_BACKFILL`: a Marveen Discord-pluginja
+#### `DISCORD_PLUGIN_EXT`, `DISCORD_OWNER_USER_ID`, `DISCORD_BACKFILL`: a Alfred Discord-pluginja
 
 **Mire szolgál.** A csatorna-indítás (`scripts/patch-discord-plugin.py`) a hivatalos Discord plugin
-forrását a Marveen-változatra cseréli (`vendor/discord-plugin/<verzió>/overlay`, a különbség a
+forrását a Alfred-változatra cseréli (`vendor/discord-plugin/<verzió>/overlay`, a különbség a
 `VENDOR.md`-ben). Csak akkor, ha a telepített plugin pontosan az ismert verzió; plugin-frissítés
 után a hivatalos plugin fut változatlanul, és a `store/channels-failures.log` egy `LOUD:` sorban jelzi.
 
@@ -448,7 +448,7 @@ Válasz siker esetén: `{ "ok": true, "key": "KANBAN_WIP_WARN_PCT", "value": 75,
 
 Hiba esetén: `{ "error": "..." }` (400 validációs hiba, 403 titkos kulcs, 404 ismeretlen kulcs)
 
-**Hot-reload:** a POST sikeres mentés után a `/api/marveen` `kanbanWip` blokkja azonnal az új értékkel tér vissza (nincs szükség újraindításra, ha `requiresRestart: false`).
+**Hot-reload:** a POST sikeres mentés után a `/api/alfred` `kanbanWip` blokkja azonnal az új értékkel tér vissza (nincs szükség újraindításra, ha `requiresRestart: false`).
 
 **Change-log:** minden sikeres POST audit-sort ír a `config_change_log` SQLite táblába (kulcs, régi érték, új érték, actor, timestamp). Titkos kulcsoknál az érték `null`-ként kerül rögzítésre. UI nincs hozzá; a tábla közvetlenül lekérdezhető.
 
@@ -586,7 +586,7 @@ Minden sub-ágens mappája gitignore-olt (`agents/` mappa), így a titkos kulcso
   "memoryIsolation": false,
   "team": {
     "role": "member",
-    "reportsTo": "marveen",
+    "reportsTo": "alfred",
     "delegatesTo": [],
     "autoDelegation": false,
     "trustFrom": []
@@ -641,12 +641,12 @@ A profil beállítása az ágens `agent-config.json` `profileId` mezőjével tö
 
 Strict profilnál a Claude Code `dontAsk` módban fut: a parancs-behelyettesítést (`$(cat <token>)`)
 az engedélylista sosem illeszti, ezért egy ilyen ágens a tokenes `curl`-recepteket nem tudja
-futtatni (#2232). A dashboard-API-t a `scripts/marveen-api.sh` segéden éri el, amely maga olvassa
-a tokent, és minden szöveget fájlból vesz (az igéket a `bash scripts/marveen-api.sh --help`
+futtatni (#2232). A dashboard-API-t a `scripts/alfred-api.sh` segéden éri el, amely maga olvassa
+a tokent, és minden szöveget fájlból vesz (az igéket a `bash scripts/alfred-api.sh --help`
 sorolja fel). A segéd és a `scripts/agent-msg.sh` a `developer-junior.json` engedélylistáján áll,
 és a generált CLAUDE.md-blokkok strict ágensnél ezt a receptet adják; minden más ágensnél a
 `curl`-recept marad változatlanul. A segéd a tokent csak loopback címre, vagy pontosan az install `.env`-jében álló
-`AGENT_API_ORIGIN` / `DASHBOARD_PUBLIC_URL` címre küldi (`MARVEEN_API_BASE`), és csak `.dashboard-token` nevű fájlból olvassa.
+`AGENT_API_ORIGIN` / `DASHBOARD_PUBLIC_URL` címre küldi (`ALFRED_API_BASE`), és csak `.dashboard-token` nevű fájlból olvassa.
 
 ### toolDeny -- ágensenkénti eszköz-tiltás (kontextus-fogantyú)
 
@@ -707,7 +707,7 @@ Minden feladat egy önálló mappa, benne két fájl. Részletes leírás: [sche
 
 ## .mcp.json -- MCP szerverek
 
-Az MCP konfigurációk scope-olva vannak: az ágensek `agents/<name>/.mcp.json` fájljaikban csak a számukra releváns szervereket tartalmazzák. A projekt gyökerében lévő `.mcp.json` a főágensre (marveen/Jarvis) vonatkozik.
+Az MCP konfigurációk scope-olva vannak: az ágensek `agents/<name>/.mcp.json` fájljaikban csak a számukra releváns szervereket tartalmazzák. A projekt gyökerében lévő `.mcp.json` a főágensre (alfred/Jarvis) vonatkozik.
 
 ```json
 {
@@ -734,7 +734,7 @@ Az MCP konfigurációk scope-olva vannak: az ágensek `agents/<name>/.mcp.json` 
 
 ## Környezeti változók (.env / launchd plist)
 
-A főbb konfigurációs változók a launchd plist-ben (`~/Library/LaunchAgents/com.marveen.dashboard.plist`) vagy a `.env` fájlban élnek.
+A főbb konfigurációs változók a launchd plist-ben (`~/Library/LaunchAgents/com.alfred.dashboard.plist`) vagy a `.env` fájlban élnek.
 
 | Változó | Leírás |
 |---------|--------|
@@ -750,8 +750,8 @@ A főbb konfigurációs változók a launchd plist-ben (`~/Library/LaunchAgents/
 | `VOICE_TRANSCRIBE_INBOUND` | `1` = a text módú ügynököknél is átirat készül a bejövő hangüzenetről (alapból ki; az ügynökönkénti `voice.transcribeInbound` felülírja). Lásd `voice.md` |
 | `PERMISSION_ALERT_MARKS` | Mikor szóljon a figyelő egy megválaszolatlan engedélykérő dialógusról: vesszővel elválasztott időpontok a dialógus megjelenésétől (alapból `15m,30m,1h,2h,8h,24h`; egy al-ügynök kérdéséről a fő ügynök azonnal üzenetet kap, a gazda az első időponttól; `s`/`m`/`h`/`d`, a puszta szám perc). Az utolsó érték egyben az ismétlési idő; a `0` első értékként azonnali jelzés. Értelmezhetetlen értéknél az alapértelmezés marad, naplózva |
 | `WEB_ONLY` | `true` = minden háttér-szolgáltatás ki (ütemező, router, monitorok, worker-előindítás). **Csak a folyamat környezetéből hat** (`WEB_ONLY=true node dist/index.js`); a `.env`-be írva hatástalan, mert nincs dotenv |
-| `MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES` | Egy második példány (git worktree, ideiglenes mappában álló klón) WEB_ONLY nélkül sem futtat háttér-szolgáltatást, mert az ütemezője a globális ütemezett feladatokat az élő sessionökbe lőné. `1` = mégis fusson (szándékos teszt-példány), és ezt indításkor figyelmeztetésként naplózza. **Csak a folyamat környezetéből hat**, mint a `WEB_ONLY`. Második példánynak a git worktree és az ideiglenes mappában (`/tmp`, `/private/tmp`, `/var/folders`, az OS tmpdir) álló klón számít: egy ezeken KÍVÜLI sima `git clone` telepítésnek számít, ott a szolgáltatások futnak, tehát ott a `WEB_ONLY=true` a védelem |
-| `MXD_DASH_SOCK` | A marveen-mxd dash.sock útja. **Fordítva: csak a `.env` fájlból olvasódik** (hívásonként), a folyamat környezetéből nem; nélküle a platform-alapértelmezett, éles socket. Teszt-példánynál a saját `.env`-jébe írd |
+| `ALFRED_ALLOW_SECOND_INSTANCE_SERVICES` | Egy második példány (git worktree, ideiglenes mappában álló klón) WEB_ONLY nélkül sem futtat háttér-szolgáltatást, mert az ütemezője a globális ütemezett feladatokat az élő sessionökbe lőné. `1` = mégis fusson (szándékos teszt-példány), és ezt indításkor figyelmeztetésként naplózza. **Csak a folyamat környezetéből hat**, mint a `WEB_ONLY`. Második példánynak a git worktree és az ideiglenes mappában (`/tmp`, `/private/tmp`, `/var/folders`, az OS tmpdir) álló klón számít: egy ezeken KÍVÜLI sima `git clone` telepítésnek számít, ott a szolgáltatások futnak, tehát ott a `WEB_ONLY=true` a védelem |
+| `MXD_DASH_SOCK` | A alfred-mxd dash.sock útja. **Fordítva: csak a `.env` fájlból olvasódik** (hívásonként), a folyamat környezetéből nem; nélküle a platform-alapértelmezett, éles socket. Teszt-példánynál a saját `.env`-jébe írd |
 
 ---
 

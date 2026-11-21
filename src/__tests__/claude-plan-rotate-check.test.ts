@@ -43,7 +43,7 @@ const EMPTY_STATE: ClaudePlansState = { activePlanByAgent: {}, plans: {} }
 describe('decideAndRecord: preconditions (design 6.2)', () => {
   it('no-ops with fewer than 2 registered plans', () => {
     const result = decideAndRecord({
-      agentId: 'marveen',
+      agentId: 'alfred',
       plans: [plan()],
       state: EMPTY_STATE,
       usageCollectRaw: usageCollect(),
@@ -54,7 +54,7 @@ describe('decideAndRecord: preconditions (design 6.2)', () => {
 
   it('no-ops when the agent has no active plan recorded yet (bootstrap gap)', () => {
     const result = decideAndRecord({
-      agentId: 'marveen',
+      agentId: 'alfred',
       plans: [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })],
       state: EMPTY_STATE,
       usageCollectRaw: usageCollect(),
@@ -64,9 +64,9 @@ describe('decideAndRecord: preconditions (design 6.2)', () => {
   })
 
   it('no-ops when the recorded active plan id no longer resolves (deleted/renamed)', () => {
-    const state: ClaudePlansState = { activePlanByAgent: { marveen: 'gone' }, plans: {} }
+    const state: ClaudePlansState = { activePlanByAgent: { alfred: 'gone' }, plans: {} }
     const result = decideAndRecord({
-      agentId: 'marveen',
+      agentId: 'alfred',
       plans: [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })],
       state,
       usageCollectRaw: usageCollect(),
@@ -77,12 +77,12 @@ describe('decideAndRecord: preconditions (design 6.2)', () => {
 })
 
 describe('decideAndRecord: snapshot trust (fail open, mirrors quota-gate.ts)', () => {
-  const twoPlansState: ClaudePlansState = { activePlanByAgent: { marveen: 'pro' }, plans: {} }
+  const twoPlansState: ClaudePlansState = { activePlanByAgent: { alfred: 'pro' }, plans: {} }
   const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })]
 
   it('no-ops on an untrusted source (estimate)', () => {
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state: twoPlansState,
+      agentId: 'alfred', plans, state: twoPlansState,
       usageCollectRaw: usageCollect({ source: 'estimate', usedPercent: 99 }),
       nowMs: NOW,
     })
@@ -91,7 +91,7 @@ describe('decideAndRecord: snapshot trust (fail open, mirrors quota-gate.ts)', (
 
   it('no-ops on a snapshot with no claude section at all', () => {
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state: twoPlansState,
+      agentId: 'alfred', plans, state: twoPlansState,
       usageCollectRaw: { generated_at: new Date(NOW).toISOString() },
       nowMs: NOW,
     })
@@ -101,25 +101,25 @@ describe('decideAndRecord: snapshot trust (fail open, mirrors quota-gate.ts)', (
 
 describe('decideAndRecord: quiet ticks still record telemetry', () => {
   it('records the observation but prints nothing when under pressure', () => {
-    const state: ClaudePlansState = { activePlanByAgent: { marveen: 'pro' }, plans: {} }
+    const state: ClaudePlansState = { activePlanByAgent: { alfred: 'pro' }, plans: {} }
     const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })]
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state,
+      agentId: 'alfred', plans, state,
       usageCollectRaw: usageCollect({ usedPercent: 42 }),
       nowMs: NOW,
     })
     expect(result.printLine).toBeNull()
     expect(result.nextState).not.toBeNull()
-    expect(result.nextState?.activePlanByAgent.marveen).toBe('pro')
+    expect(result.nextState?.activePlanByAgent.alfred).toBe('pro')
     expect(result.nextState?.plans.pro.windows.five_hour.usedPercent).toBe(42)
     expect(result.nextState?.plans.pro.windows.seven_day?.usedPercent).toBe(20)
   })
 
   it('records telemetry but prints nothing when near reset', () => {
-    const state: ClaudePlansState = { activePlanByAgent: { marveen: 'pro' }, plans: {} }
+    const state: ClaudePlansState = { activePlanByAgent: { alfred: 'pro' }, plans: {} }
     const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })]
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state,
+      agentId: 'alfred', plans, state,
       usageCollectRaw: usageCollect({ usedPercent: 95, resetsAt: NOW_S + 10 * 60 }),
       nowMs: NOW,
     })
@@ -130,24 +130,24 @@ describe('decideAndRecord: quiet ticks still record telemetry', () => {
 
 describe('decideAndRecord: rotate and no-alternative print exactly one structured line', () => {
   it('prints a ROTATE line naming the target and current labels/pct', () => {
-    const state: ClaudePlansState = { activePlanByAgent: { marveen: 'pro' }, plans: {} }
+    const state: ClaudePlansState = { activePlanByAgent: { alfred: 'pro' }, plans: {} }
     const plans = [plan({ id: 'pro', label: 'Personal PRO' }), plan({ id: 'team', label: 'Team Seat' })]
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state,
+      agentId: 'alfred', plans, state,
       usageCollectRaw: usageCollect({ usedPercent: 95, resetsAt: NOW_S + 3600 }),
       nowMs: NOW,
     })
     expect(result.printLine).toBe(
-      'ROTATE agent=marveen target=team targetLabel=Team Seat currentLabel=Personal PRO currentPct=95 resetsInMin=60 trigger=5h sevenDayPct=20 sevenDayResetsInMin=8700',
+      'ROTATE agent=alfred target=team targetLabel=Team Seat currentLabel=Personal PRO currentPct=95 resetsInMin=60 trigger=5h sevenDayPct=20 sevenDayResetsInMin=8700',
     )
-    expect(result.nextState?.activePlanByAgent.marveen).toBe('pro') // rotation itself is applied by the caller, not here
+    expect(result.nextState?.activePlanByAgent.alfred).toBe('pro') // rotation itself is applied by the caller, not here
   })
 
   it('excludes a plan with channelsAllowed=false from candidacy', () => {
-    const state: ClaudePlansState = { activePlanByAgent: { marveen: 'pro' }, plans: {} }
+    const state: ClaudePlansState = { activePlanByAgent: { alfred: 'pro' }, plans: {} }
     const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team', channelsAllowed: false })]
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state,
+      agentId: 'alfred', plans, state,
       usageCollectRaw: usageCollect({ usedPercent: 95, resetsAt: NOW_S + 3600 }),
       nowMs: NOW,
     })
@@ -156,21 +156,21 @@ describe('decideAndRecord: rotate and no-alternative print exactly one structure
 
   it('prints a NO_ALTERNATIVE line when the only other plan is not channels-eligible', () => {
     const state: ClaudePlansState = {
-      activePlanByAgent: { marveen: 'pro' },
+      activePlanByAgent: { alfred: 'pro' },
       plans: { team: { observedAt: NOW - 1000, source: 'authoritative', windows: { five_hour: { usedPercent: 96, resetsAt: NOW_S + 100 } } } },
     }
     const plans = [plan({ id: 'pro', label: 'Personal PRO' }), plan({ id: 'team', label: 'Team Seat', channelsAllowed: false })]
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state,
+      agentId: 'alfred', plans, state,
       usageCollectRaw: usageCollect({ usedPercent: 95, resetsAt: NOW_S + 3600 }),
       nowMs: NOW,
     })
-    expect(result.printLine).toBe('NO_ALTERNATIVE agent=marveen currentLabel=Personal PRO currentPct=95 resetsInMin=60 trigger=5h sevenDayPct=20 sevenDayResetsInMin=8700')
+    expect(result.printLine).toBe('NO_ALTERNATIVE agent=alfred currentLabel=Personal PRO currentPct=95 resetsInMin=60 trigger=5h sevenDayPct=20 sevenDayResetsInMin=8700')
   })
 
   it('picks the plan with the most estimated free headroom among several candidates', () => {
     const state: ClaudePlansState = {
-      activePlanByAgent: { marveen: 'pro' },
+      activePlanByAgent: { alfred: 'pro' },
       plans: {
         team: { observedAt: NOW - 1000, source: 'authoritative', windows: { five_hour: { usedPercent: 80, resetsAt: NOW_S + 100 } } },
         third: { observedAt: NOW - 1000, source: 'authoritative', windows: { five_hour: { usedPercent: 10, resetsAt: NOW_S + 100 } } },
@@ -178,7 +178,7 @@ describe('decideAndRecord: rotate and no-alternative print exactly one structure
     }
     const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' }), plan({ id: 'third', label: 'Third' })]
     const result = decideAndRecord({
-      agentId: 'marveen', plans, state,
+      agentId: 'alfred', plans, state,
       usageCollectRaw: usageCollect({ usedPercent: 95, resetsAt: NOW_S + 3600 }),
       nowMs: NOW,
     })
@@ -194,46 +194,46 @@ describe('decideAndRecord: weekly (7d) window', () => {
   }
 
   it('rotates when the ACTIVE plan is 7d-exhausted though its 5h is calm, and says 7d triggered', () => {
-    const state: ClaudePlansState = { activePlanByAgent: { marveen: 'pro' }, plans: {} }
+    const state: ClaudePlansState = { activePlanByAgent: { alfred: 'pro' }, plans: {} }
     const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })]
-    const result = decideAndRecord({ agentId: 'marveen', plans, state, usageCollectRaw: usage7d(100), nowMs: NOW })
-    expect(result.printLine).toMatch(/^ROTATE agent=marveen target=team .* trigger=7d sevenDayPct=100 /)
+    const result = decideAndRecord({ agentId: 'alfred', plans, state, usageCollectRaw: usage7d(100), nowMs: NOW })
+    expect(result.printLine).toMatch(/^ROTATE agent=alfred target=team .* trigger=7d sevenDayPct=100 /)
   })
 
   it('never rotates onto a candidate whose own week is spent (not yet reset)', () => {
     const state: ClaudePlansState = {
-      activePlanByAgent: { marveen: 'pro' },
+      activePlanByAgent: { alfred: 'pro' },
       plans: {
         team: { observedAt: NOW - 1000, source: 'probe', windows: { seven_day: { usedPercent: 100, resetsAt: NOW_S + 24 * 3600, status: 'rejected' } } },
       },
     }
     const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })]
-    const result = decideAndRecord({ agentId: 'marveen', plans, state, usageCollectRaw: usage7d(95), nowMs: NOW })
+    const result = decideAndRecord({ agentId: 'alfred', plans, state, usageCollectRaw: usage7d(95), nowMs: NOW })
     expect(result.printLine).toMatch(/^NO_ALTERNATIVE .* trigger=7d/)
   })
 
   it('re-includes that candidate once its weekly reset has passed', () => {
     const state: ClaudePlansState = {
-      activePlanByAgent: { marveen: 'pro' },
+      activePlanByAgent: { alfred: 'pro' },
       plans: {
         team: { observedAt: NOW - 8 * 24 * 3600_000, source: 'probe', windows: { seven_day: { usedPercent: 100, resetsAt: NOW_S - 60, status: 'rejected' } } },
       },
     }
     const plans = [plan({ id: 'pro' }), plan({ id: 'team', label: 'Team' })]
-    const result = decideAndRecord({ agentId: 'marveen', plans, state, usageCollectRaw: usage7d(95), nowMs: NOW })
+    const result = decideAndRecord({ agentId: 'alfred', plans, state, usageCollectRaw: usage7d(95), nowMs: NOW })
     expect(result.printLine).toContain('target=team')
   })
 
   it('skips a candidate whose last probe said invalid_token, picks the next one', () => {
     const state: ClaudePlansState = {
-      activePlanByAgent: { marveen: 'pro' },
+      activePlanByAgent: { alfred: 'pro' },
       plans: {
         aaa: { observedAt: 0, source: 'probe', windows: {}, lastProbe: { at: NOW - 1000, ok: false, error: 'invalid_token', httpStatus: 401 } },
         zzz: { observedAt: NOW - 1000, source: 'probe', windows: { five_hour: { usedPercent: 50, resetsAt: NOW_S + 3600 } } },
       },
     }
     const plans = [plan({ id: 'pro' }), plan({ id: 'aaa', label: 'A' }), plan({ id: 'zzz', label: 'Z' })]
-    const result = decideAndRecord({ agentId: 'marveen', plans, state, usageCollectRaw: usage7d(95), nowMs: NOW })
+    const result = decideAndRecord({ agentId: 'alfred', plans, state, usageCollectRaw: usage7d(95), nowMs: NOW })
     expect(result.printLine).toContain('target=zzz')
   })
 })

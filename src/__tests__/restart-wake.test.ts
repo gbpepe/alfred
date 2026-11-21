@@ -349,30 +349,30 @@ describe('scheduleMainRestartWake: one fresh-restart wake for the main agent, on
   const seams = (mtime: number | null) => ({ send, now: () => NOW, mtimeMs: () => mtime })
 
   it('sends nothing during the boot grace, then exactly one wake with the fresh-restart text', async () => {
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', seams(NOW - 7 * 60_000))
-    expect(hasPendingRestartWake('marveen')).toBe(true)
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', seams(NOW - 7 * 60_000))
+    expect(hasPendingRestartWake('alfred')).toBe(true)
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS - 1)
     await flush()
     expect(send).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     await flush()
     expect(sent).toEqual([{
-      agent: 'marveen',
-      session: 'marveen-channels',
+      agent: 'alfred',
+      session: 'alfred-channels',
       text: mainRestartWakePrompt(MAIN_RESTART_WAKE_REASON, { path: '/srv/app/HANDOFF.md', mtimeMs: NOW - 7 * 60_000, ageMs: 7 * 60_000 }),
     }])
     expect(sent[0].text).toContain('/srv/app/HANDOFF.md atado friss (irva: 2026-11-15T17:53Z, 7 perce)')
-    expect(hasPendingRestartWake('marveen')).toBe(false)
+    expect(hasPendingRestartWake('alfred')).toBe(false)
     vi.advanceTimersByTime(10 * RESTART_WAKE_DELAY_MS)
     await flush()
     expect(send).toHaveBeenCalledTimes(1)
   })
 
   it('a stale handoff and a missing one end in the same text: the file is not mentioned (review C1)', async () => {
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', seams(NOW - MAIN_HANDOFF_FRESH_MS - 1))
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', seams(NOW - MAIN_HANDOFF_FRESH_MS - 1))
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS)
     await flush()
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', seams(null))
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', seams(null))
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS)
     await flush()
     expect(sent.map((x) => x.text)).toEqual([
@@ -386,7 +386,7 @@ describe('scheduleMainRestartWake: one fresh-restart wake for the main agent, on
     // no file when the restart is asked for; one is written during the boot grace
     let mtime: number | null = null
     let clock = NOW
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', { send, now: () => clock, mtimeMs: () => mtime })
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', { send, now: () => clock, mtimeMs: () => mtime })
     mtime = NOW + 10_000
     clock = NOW + RESTART_WAKE_DELAY_MS
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS)
@@ -398,7 +398,7 @@ describe('scheduleMainRestartWake: one fresh-restart wake for the main agent, on
     sent.length = 0
     clock = NOW
     mtime = NOW - MAIN_HANDOFF_FRESH_MS + 1_000
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', { send, now: () => clock, mtimeMs: () => mtime })
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', { send, now: () => clock, mtimeMs: () => mtime })
     clock = NOW + RESTART_WAKE_DELAY_MS
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS)
     await flush()
@@ -407,25 +407,25 @@ describe('scheduleMainRestartWake: one fresh-restart wake for the main agent, on
   })
 
   it('another restart of the main session drops the owed wake; a manual restart cancels first and schedules after (review C3)', async () => {
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', seams(null))
-    // a guard / recovery restart inside the grace: hardRestartMarveenChannels() cancels, nobody schedules
-    expect(cancelRestartWake('marveen')).toBe(true)
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', seams(null))
+    // a guard / recovery restart inside the grace: hardRestartAlfredChannels() cancels, nobody schedules
+    expect(cancelRestartWake('alfred')).toBe(true)
     vi.advanceTimersByTime(10 * RESTART_WAKE_DELAY_MS)
     await flush()
     expect(send).not.toHaveBeenCalled()
     // a second MANUAL restart: the same cancel, then the route schedules -> exactly one wake
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', seams(null))
-    expect(cancelRestartWake('marveen')).toBe(true)
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', seams(null))
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', seams(null))
+    expect(cancelRestartWake('alfred')).toBe(true)
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', seams(null))
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS)
     await flush()
     expect(send).toHaveBeenCalledTimes(1)
   })
 
   it('two manual restarts inside the grace end in one wake, after the last one', async () => {
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', { send })
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', { send })
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS - 5_000)
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md', { send })
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md', { send })
     vi.advanceTimersByTime(5_000)
     await flush()
     expect(send).not.toHaveBeenCalled()
@@ -435,13 +435,13 @@ describe('scheduleMainRestartWake: one fresh-restart wake for the main agent, on
   })
 
   it('the default sender is the same authenticated directive: waits for an idle pane, gives up on a busy one', async () => {
-    scheduleMainRestartWake('marveen', 'marveen-channels', '/srv/app/HANDOFF.md')
+    scheduleMainRestartWake('alfred', 'alfred-channels', '/srv/app/HANDOFF.md')
     vi.advanceTimersByTime(RESTART_WAKE_DELAY_MS)
     await flush()
     for (let i = 0; i < 20 && sendSystemDirective.mock.calls.length === 0; i++) await flush()
     expect(sendSystemDirective).toHaveBeenCalledTimes(1)
     const [agent, session, text, host, opts] = sendSystemDirective.mock.calls[0]
-    expect([agent, session, host]).toEqual(['marveen', 'marveen-channels', null])
+    expect([agent, session, host]).toEqual(['alfred', 'alfred-channels', null])
     // no seam here: the real reader finds no /srv/app/HANDOFF.md, so the file is not named
     expect(String(text)).toBe(mainRestartWakePrompt(MAIN_RESTART_WAKE_REASON, null))
     expect(opts).toEqual({ waitForIdle: true, onBusyTimeout: 'abort' })
@@ -491,12 +491,12 @@ describe('wiring: the fresh main wake is owed by the two manual restart routes o
   const CALL = 'if (wantsMainRestartWake('
   const SCHEDULE = "scheduleMainRestartWake(MAIN_AGENT_ID, MAIN_CHANNELS_SESSION, join(PROJECT_ROOT, 'HANDOFF.md'))"
 
-  it('POST /api/marveen/restart: scheduled after hardRestartMarveenChannels() and after its 500 exit, before the ok answer', () => {
-    const route = src('web/routes/marveen.ts')
-    const start = route.indexOf("path === '/api/marveen/restart' && method === 'POST'")
-    const end = route.indexOf("path === '/api/marveen/avatar'", start)
+  it('POST /api/alfred/restart: scheduled after hardRestartAlfredChannels() and after its 500 exit, before the ok answer', () => {
+    const route = src('web/routes/alfred.ts')
+    const start = route.indexOf("path === '/api/alfred/restart' && method === 'POST'")
+    const end = route.indexOf("path === '/api/alfred/avatar'", start)
     const body = route.slice(start, end)
-    const hard = body.indexOf('hardRestartMarveenChannels()')
+    const hard = body.indexOf('hardRestartAlfredChannels()')
     const failed = body.indexOf("if (!result.ok) { json(res, { error: result.error || 'Restart failed' }, 500); return true }")
     const wake = body.indexOf(CALL)
     const ok = body.indexOf('json(res, { ok: true })')
@@ -508,12 +508,12 @@ describe('wiring: the fresh main wake is owed by the two manual restart routes o
     expect(body.match(/scheduleMainRestartWake\(/g)).toHaveLength(1)
   })
 
-  it('POST /api/agents/:name/restart (main branch): scheduled only inside the ok branch of hardRestartMarveenChannels()', () => {
+  it('POST /api/agents/:name/restart (main branch): scheduled only inside the ok branch of hardRestartAlfredChannels()', () => {
     const route = src('web/routes/agents.ts')
     const start = route.indexOf('if (isMainChannelsAgent(name)) {', route.indexOf('restartMatch && method'))
     const end = route.indexOf('if (!existsSync(agentDir(name)))', start)
     const body = route.slice(start, end)
-    const hard = body.indexOf('hardRestartMarveenChannels()')
+    const hard = body.indexOf('hardRestartAlfredChannels()')
     const okBranch = body.indexOf('if (r.ok) {')
     const wake = body.indexOf(CALL)
     const failed = body.indexOf("json(res, { error: r.error || 'Restart failed' }, 500)")
@@ -525,15 +525,15 @@ describe('wiring: the fresh main wake is owed by the two manual restart routes o
     expect(body.match(/scheduleMainRestartWake\(/g)).toHaveLength(1)
   })
 
-  it('hardRestartMarveenChannels() drops a pending main wake FIRST, before any of its restart paths (review C3)', () => {
+  it('hardRestartAlfredChannels() drops a pending main wake FIRST, before any of its restart paths (review C3)', () => {
     const mon = src('web/channel-monitor.ts')
-    const start = mon.indexOf('export function hardRestartMarveenChannels(): { ok: boolean; error?: string } {')
+    const start = mon.indexOf('export function hardRestartAlfredChannels(): { ok: boolean; error?: string } {')
     expect(start).toBeGreaterThan(-1)
     const body = mon.slice(start, mon.indexOf('\nexport ', start + 1))
     const cancel = body.indexOf('cancelRestartWake(MAIN_AGENT_ID)')
     expect(cancel).toBeGreaterThan(-1)
     // before the first statement that can leave the function or restart anything
-    for (const later of ['return {', 'launchctl', 'respawnMarveenSessionFresh()', 'stampFableOverageConsentSharedRoots()']) {
+    for (const later of ['return {', 'launchctl', 'respawnAlfredSessionFresh()', 'stampFableOverageConsentSharedRoots()']) {
       expect(body.indexOf(later)).toBeGreaterThan(cancel)
     }
     expect(body.match(/cancelRestartWake\(/g)).toHaveLength(1)
@@ -542,16 +542,16 @@ describe('wiring: the fresh main wake is owed by the two manual restart routes o
     expect(body).not.toContain('scheduleMainRestartWake(')
   })
 
-  it('no other caller of hardRestartMarveenChannels() schedules it: the guard brings its own directive, the rest is recovery', () => {
+  it('no other caller of hardRestartAlfredChannels() schedules it: the guard brings its own directive, the rest is recovery', () => {
     const web = join(SRC, 'web')
     const files = (readdirSync(web, { recursive: true }) as string[])
       .map((f) => f.split('\\').join('/'))
       .filter((f) => f.endsWith('.ts') && !f.includes('__tests__'))
-    const hardCallers = files.filter((f) => readFileSync(join(web, f), 'utf8').includes('hardRestartMarveenChannels('))
+    const hardCallers = files.filter((f) => readFileSync(join(web, f), 'utf8').includes('hardRestartAlfredChannels('))
     const wakers = files.filter((f) => readFileSync(join(web, f), 'utf8').includes('scheduleMainRestartWake('))
     // Negative control for the scan itself: it does see the other callers.
     expect(hardCallers).toEqual(expect.arrayContaining(['context-guard-runner.ts', 'channel-monitor.ts']))
     expect(hardCallers.length).toBeGreaterThan(wakers.length)
-    expect(wakers.sort()).toEqual(['restart-wake.ts', 'routes/agents.ts', 'routes/marveen.ts'])
+    expect(wakers.sort()).toEqual(['restart-wake.ts', 'routes/agents.ts', 'routes/alfred.ts'])
   })
 })

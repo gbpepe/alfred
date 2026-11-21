@@ -15,7 +15,7 @@ vi.mock('../notify.js', () => ({
 vi.mock('../web/telegram.js', () => ({ sendTelegramMessage: async () => 42 }))
 vi.mock('../config.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../config.js')>()
-  return { ...real, MAIN_AGENT_ID: 'fo-agens', CHANNEL_PROVIDER: 'slack', DASHBOARD_PUBLIC_URL: 'https://marveen.example.com/' }
+  return { ...real, MAIN_AGENT_ID: 'fo-agens', CHANNEL_PROVIDER: 'slack', DASHBOARD_PUBLIC_URL: 'https://alfred.example.com/' }
 })
 
 const gromzoPosts: Array<[string, string]> = []

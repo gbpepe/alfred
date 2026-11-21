@@ -123,7 +123,7 @@ function sessionFile(agent: string): string {
 }
 
 function pendingFor(agent: string) {
-  return { id: 9100 + seq++, from_agent: 'marveen', to_agent: agent, content: 'queued behind a busy pane', status: 'pending', created_at: Math.floor(clock / 1000) }
+  return { id: 9100 + seq++, from_agent: 'alfred', to_agent: agent, content: 'queued behind a busy pane', status: 'pending', created_at: Math.floor(clock / 1000) }
 }
 
 function stuckAlerts(agent: string): string[] {

@@ -1,9 +1,9 @@
 #!/bin/sh
 # @@GENERATED_NOTE@@
 #
-# Marveen support access: the LAUNCHER (SUPPORTMENTOUT1114). The customer runs
+# Alfred support access: the LAUNCHER (SUPPORTMENTOUT1114). The customer runs
 #   ~/@@SUPPORT_DIR@@/@@KIT_DIR@@/@@LAUNCHER@@ [enable | disable]
-# when the Marveen service is down and support needs to get in. With no
+# when the Alfred service is down and support needs to get in. With no
 # argument it only LOOKS: it writes nothing and asks for no code.
 #
 # What it guarantees (plan v1.5, 3.2-3.5; Samu 32015, 32025, 32050; Dani 32034, 32045):
@@ -43,10 +43,10 @@ halt() {
   printf '%s\n' "$1" >&2
   exit "${2:-1}"
 }
-# Where the customer writes to us (the owner, 78568: the marveen.io address, never another domain).
-SUPPORT_MAIL=hello@marveen.io
+# Where the customer writes to us (the owner, 78568: the alfred.io address, never another domain).
+SUPPORT_MAIL=hello@alfred.io
 # Where the customer can always close: the Profile page (Mira 78449, final names).
-PROFILE_CLOSE="Lépj be a marveen.io Profil oldalára, és ott zárd le a hozzáférést a „Support-hozzáférés lezárása” gombbal (vagy véglegesen a „Gép eltávolítása a supportból” gombbal)."
+PROFILE_CLOSE="Lépj be a alfred.io Profil oldalára, és ott zárd le a hozzáférést a „Support-hozzáférés lezárása” gombbal (vagy véglegesen a „Gép eltávolítása a supportból” gombbal)."
 
 # The routine's refusal code (the last word of `enable: refused: <code>`) as a sentence (Bence 78442).
 enable_refusal() {
@@ -54,14 +54,14 @@ enable_refusal() {
     code_required|code_shape|code_rejected|license_key_not_accepted)
       echo "A kód nem érvényes vagy lejárt. Kérj újat a Profil oldalon a „Kód kérése” gombbal, és futtasd újra ezt a sort." ;;
     rate_limited) echo "Túl sok próbálkozás volt. Várj néhány percet, utána futtasd újra." ;;
-    service_unavailable|answer_unreadable) echo "A marveen.io most nem érhető el innen. Próbáld újra később; ha továbbra sem megy, írj nekünk ($SUPPORT_MAIL), és küldd el ezt a kódot: $1." ;;
-    consent_invalid) echo "A hozzájárulás verziója nem az, amit ez a Marveen ismer ($1). Frissítsd a Marveent, vagy írj nekünk ($SUPPORT_MAIL)." ;;
-    support_keys_unset|support_from_unset|support_pins_invalid) echo "Ez a Marveen-kiadás még nem tartalmazza a távoli segítség beállításait ($1). Frissítsd a Marveent." ;;
+    service_unavailable|answer_unreadable) echo "A alfred.io most nem érhető el innen. Próbáld újra később; ha továbbra sem megy, írj nekünk ($SUPPORT_MAIL), és küldd el ezt a kódot: $1." ;;
+    consent_invalid) echo "A hozzájárulás verziója nem az, amit ez a Alfred ismer ($1). Frissítsd a Alfredet, vagy írj nekünk ($SUPPORT_MAIL)." ;;
+    support_keys_unset|support_from_unset|support_pins_invalid) echo "Ez a Alfred-kiadás még nem tartalmazza a távoli segítség beállításait ($1). Frissítsd a Alfredet." ;;
     tunnel_permitted) echo "A géped SSH-beállítása legalább egy esetben hálózati alagutat enged (PermitTunnel). Amíg ez így van, a support-belépés nem kapcsolható be. A beállítást a gép rendszergazdája tudja kikapcsolni." ;;
     sshd_*|root_login_disabled|authorized_keys_path_unsupported|other_key_source|force_command_set|accept_env_too_wide)
       echo "A géped SSH-beállítása miatt a support-belépés nem kapcsolható be ($1). Ezt a gép rendszergazdája tudja rendezni; küldd el nekünk ezt a kódot ($SUPPORT_MAIL)." ;;
     host_key_missing|host_key_unverified) echo "A géped SSH-szerverének gépkulcsát nem tudtam egyértelműen megállapítani ($1), ezért a support-belépés nem kapcsolható be. A kódod nem fogyott el. Küldd el nekünk ezt a kódot ($SUPPORT_MAIL)." ;;
-    kit_*) echo "A support-készlet nincs rendben ($1). Frissítsd a Marveent, utána futtasd újra ezt a sort." ;;
+    kit_*) echo "A support-készlet nincs rendben ($1). Frissítsd a Alfredet, utána futtasd újra ezt a sort." ;;
     already_on) echo "A távoli segítség már be van kapcsolva ezen a gépen, vagy egy korábbi bekapcsolás félbemaradt ($1). Előbb kapcsold ki így: ~/@@SUPPORT_DIR@@/@@KIT_DIR@@/@@LAUNCHER@@ disable, utána futtasd újra ezt a sort. A kódod ettől nem fogy el." ;;
     enable_not_from_kit) echo "A bekapcsolás nem a support-készletből indult ($1). Futtasd pontosan a Profil oldalon látható sort." ;;
     keys_file_layout|enable_write_failed) echo "A géped kulcsfájlja nem írható a várt módon ($1). Küldd el nekünk ezt a kódot ($SUPPORT_MAIL)." ;;
@@ -89,7 +89,7 @@ case "$(uname -s 2>/dev/null)" in
 esac
 case "$HOMEDIR" in
   /*) ;;
-  *) stop "Ennél a felhasználónál nem találok Marveent. Azzal a felhasználóval futtasd, amelyik alatt fut." ;;
+  *) stop "Ennél a felhasználónál nem találok Alfredet. Azzal a felhasználóval futtasd, amelyik alatt fut." ;;
 esac
 case "$HOMEDIR" in
   *[!A-Za-z0-9._/-]*) stop "A felhasználó mappájának útja szokatlan karaktert tartalmaz; a mentő-út itt nem használható (kit_input_invalid)." ;;
@@ -102,13 +102,13 @@ MANIFEST="$KIT/@@MANIFEST@@"
 # --- K6: the two folders are real folders of this user (the routine checks more, below) ---
 for d in "$SUPPORT" "$KIT"; do
   if [ -L "$d" ]; then stop "A support-készlet mappája link; így nem futtatom (kit_link)."; fi
-  if [ ! -d "$d" ]; then stop "Ez a telepítés régebbi, mint a support-készenlét, vagy a készlet hiányzik (kit_missing). Frissítsd a Marveent, utána futtasd újra ezt a sort."; fi
+  if [ ! -d "$d" ]; then stop "Ez a telepítés régebbi, mint a support-készenlét, vagy a készlet hiányzik (kit_missing). Frissítsd a Alfredet, utána futtasd újra ezt a sort."; fi
   if [ ! -O "$d" ]; then stop "A support-készlet mappája nem a te felhasználódé; így nem futtatom (kit_foreign_owner)."; fi
 done
 
 # --- the manifest, read ONCE ---
 if [ -L "$MANIFEST" ] || [ ! -f "$MANIFEST" ]; then
-  stop "A készlet jegyzéke hiányzik vagy nem rendes fájl (kit_manifest_unreadable). Frissítsd a Marveent."
+  stop "A készlet jegyzéke hiányzik vagy nem rendes fájl (kit_manifest_unreadable). Frissítsd a Alfredet."
 fi
 MAN=$(head -c @@MANIFEST_READ_BYTES@@ "$MANIFEST" 2>/dev/null; rc=$?; printf 'x'; exit "$rc") || stop "A készlet jegyzéke nem olvasható (kit_manifest_unreadable)."
 MAN=${MAN%x}
@@ -131,7 +131,7 @@ function hex(s, n) { return length(s) == n && s ~ /^[0-9a-f]+$/ }
 { line[NR] = $0 }
 END {
   if (failed) exit 3
-  if (NR < 6 || line[1] != "marveen-support-kit 1") bad()
+  if (NR < 6 || line[1] != "alfred-support-kit 1") bad()
   i = 2; nfiles = 0; prev = ""
   while (i <= NR && substr(line[i], 1, 5) == "file ") {
     if (split(line[i], p, / /) != 3) bad()
@@ -152,7 +152,7 @@ END {
   if (split(line[i + 3], p, / /) != 2 || p[1] != "release" || length(p[2]) < 7 || length(p[2]) > 40 || p[2] !~ /^[0-9a-f]+$/) bad()
   if (!(want_l in files) || !(want_d in files) || !(want_r in files)) exit 4
   print root; print node; print nodemin; print files[want_r]
-}') || stop "A készlet jegyzéke nem a várt alakú, vagy hiányzik belőle egy fájl (kit_manifest_unreadable). Frissítsd a Marveent."
+}') || stop "A készlet jegyzéke nem a várt alakú, vagy hiányzik belőle egy fájl (kit_manifest_unreadable). Frissítsd a Alfredet."
 {
   IFS= read -r ROOT
   IFS= read -r MNODE
@@ -172,7 +172,7 @@ if [ -z "$NODE" ]; then
   c=$(PATH=$CALLER_PATH command -v node 2>/dev/null) || c=
   if [ -n "$c" ] && [ -f "$c" ] && [ -x "$c" ]; then NODE=$c; fi
 fi
-[ -n "$NODE" ] || stop "A Marveen futtatókörnyezete (Node.js) ezen a gépen nem található. Így a távoli segítség most nem kapcsolható be. Két lehetőséged van: (1) futtasd újra a Marveen telepítőjét; (2) írj nekünk ($SUPPORT_MAIL), és lépésenként megmondjuk, mit tegyél."
+[ -n "$NODE" ] || stop "A Alfred futtatókörnyezete (Node.js) ezen a gépen nem található. Így a távoli segítség most nem kapcsolható be. Két lehetőséged van: (1) futtasd újra a Alfred telepítőjét; (2) írj nekünk ($SUPPORT_MAIL), és lépésenként megmondjuk, mit tegyél."
 if [ "$NODE" != "$MNODE" ]; then
   # Resolved ONCE to its absolute path (links too), then only that path is used.
   ABS=$(env -i PATH=@@RUN_PATH@@ LC_ALL=C "$NODE" -e 'process.stdout.write(process.execPath)' 2>/dev/null) || ABS=
@@ -188,10 +188,10 @@ VER=$(env -i PATH=@@RUN_PATH@@ LC_ALL=C "$NODE" --version 2>/dev/null) || VER=
 MAJOR=${VER#v}
 MAJOR=${MAJOR%%.*}
 case "$MAJOR" in
-  ''|*[!0-9]*) stop "A Marveen futtatókörnyezete (Node.js) ezen a gépen nem indul (talált: ${VER:-nincs}, kell: legalább $NODEMIN). Futtasd újra a Marveen telepítőjét, vagy írj nekünk ($SUPPORT_MAIL)." ;;
+  ''|*[!0-9]*) stop "A Alfred futtatókörnyezete (Node.js) ezen a gépen nem indul (talált: ${VER:-nincs}, kell: legalább $NODEMIN). Futtasd újra a Alfred telepítőjét, vagy írj nekünk ($SUPPORT_MAIL)." ;;
 esac
-[ "$MAJOR" -ge "$NODEMIN" ] || stop "A Marveen futtatókörnyezete (Node.js) túl régi (talált: $VER, kell: legalább $NODEMIN). Futtasd újra a Marveen telepítőjét, vagy írj nekünk ($SUPPORT_MAIL)."
-[ -z "${NOTE_NODE:-}" ] || printf '%s\n' "A Marveen saját Node.js-e nem található; ezt használom: $NODE ($VER)."
+[ "$MAJOR" -ge "$NODEMIN" ] || stop "A Alfred futtatókörnyezete (Node.js) túl régi (talált: $VER, kell: legalább $NODEMIN). Futtasd újra a Alfred telepítőjét, vagy írj nekünk ($SUPPORT_MAIL)."
+[ -z "${NOTE_NODE:-}" ] || printf '%s\n' "A Alfred saját Node.js-e nem található; ezt használom: $NODE ($VER)."
 
 # --- one run of the KIT's routine through the loader (stdin: the caller's) ---
 run_kit() {
@@ -208,21 +208,21 @@ judge() {
   rc=$1; out=$2; what=$3
   case "$rc" in
     0) [ -n "$out" ] || stop "$what: a rutin nem válaszolt (kit_no_output)." ;;
-    @@LOADER_MISMATCH@@) stop "$what: a készlet rutinja nem az a fájl, amit a jegyzék megnevez (kit_mismatch). Frissítsd a Marveent." ;;
+    @@LOADER_MISMATCH@@) stop "$what: a készlet rutinja nem az a fájl, amit a jegyzék megnevez (kit_mismatch). Frissítsd a Alfredet." ;;
     @@LOADER_USAGE@@|@@LOADER_UNREADABLE@@|@@LOADER_FAILED@@) stop "$what: a rutin nem indult el (kit_run_failed, $rc)." ;;
   esac
 }
 
 if [ "$MODE" = disable ]; then
   if [ -L "$ROOT/@@TREE_ROUTINE@@" ] || [ ! -f "$ROOT/@@TREE_ROUTINE@@" ]; then
-    halt "A Marveen telepítésében a support-rutin hiányzik; a levétel így nem megy. $PROFILE_CLOSE"
+    halt "A Alfred telepítésében a support-rutin hiányzik; a levétel így nem megy. $PROFILE_CLOSE"
   fi
   ERRF=$(mktemp 2>/dev/null) || halt "Ideiglenes fájl nem hozható létre; a levétel nem indult. $PROFILE_CLOSE"
   OUT=$(run_tree disable </dev/null 2>"$ERRF"); rc=$?
   ERR=$(head -c 512 "$ERRF" 2>/dev/null); rm -f "$ERRF"
   case "$rc" in
     0) [ -n "$OUT" ] || halt "A levétel nem válaszolt; nem tudom, sikerült-e. $PROFILE_CLOSE" ;;
-    2) halt "Ez a Marveen-kiadás még nem tudja helyben levenni a support-hozzáférést. $PROFILE_CLOSE" ;;
+    2) halt "Ez a Alfred-kiadás még nem tudja helyben levenni a support-hozzáférést. $PROFILE_CLOSE" ;;
     *)
       [ -z "$OUT" ] || printf '%s\n' "$OUT"
       case "$ERR" in
@@ -233,7 +233,7 @@ if [ "$MODE" = disable ]; then
   esac
   printf '%s\n' "$OUT"
   # Dani 78558 via Bence 78639: the machine stays listed on the account until the Profile page removes it.
-  printf '%s\n' "A levétel kész ezen a gépen. A gép a marveen.io fiókodban addig látszik, amíg a Profil oldalon a „Gép eltávolítása a supportból” gombbal el nem távolítod."
+  printf '%s\n' "A levétel kész ezen a gépen. A gép a alfred.io fiókodban addig látszik, amíg a Profil oldalon a „Gép eltávolítása a supportból” gombbal el nem távolítod."
   exit 0
 fi
 
@@ -242,10 +242,10 @@ KV=$(run_kit verify-kit </dev/null); rc=$?
 judge "$rc" "$KV" "A készlet ellenőrzése"
 case "$rc" in
   0) ;;
-  2) stop "Ez a Marveen-kiadás még nem tudja ellenőrizni a support-készletet. Frissítsd a Marveent." ;;
+  2) stop "Ez a Alfred-kiadás még nem tudja ellenőrizni a support-készletet. Frissítsd a Alfredet." ;;
   *) stop "A készlet ellenőrzése nem sikerült ($rc)." ;;
 esac
-[ "$KV" = "kit=ok" ] || stop "A support-készlet nem az, amit a jegyzéke mond ($KV). Frissítsd a Marveent, utána futtasd újra ezt a sort."
+[ "$KV" = "kit=ok" ] || stop "A support-készlet nem az, amit a jegyzéke mond ($KV). Frissítsd a Alfredet, utána futtasd újra ezt a sort."
 
 ST=$(run_kit status </dev/null); rc=$?
 judge "$rc" "$ST" "Az állapot lekérdezése"
@@ -284,7 +284,7 @@ done <<EOF_STATUS
 $ST
 EOF_STATUS
 case "$CV" in
-  ''|*[!0-9]*) stop "Ez a Marveen-kiadás még nem tudja bekapcsolni a távoli segítséget (a hozzájárulás verzióját nem adja meg). Frissítsd a Marveent." ;;
+  ''|*[!0-9]*) stop "Ez a Alfred-kiadás még nem tudja bekapcsolni a távoli segítséget (a hozzájárulás verzióját nem adja meg). Frissítsd a Alfredet." ;;
 esac
 ERRF=$(mktemp 2>/dev/null) || stop "Ideiglenes fájl nem hozható létre; a hozzájárulás szövege nem kérhető le."
 CT=$(run_kit consent-text --consent "$CV" </dev/null 2>"$ERRF"); rc=$?
@@ -292,18 +292,18 @@ ERR=$(head -c 512 "$ERRF" 2>/dev/null); rm -f "$ERRF"
 judge "$rc" "$CT" "A hozzájárulás szövegének lekérdezése"
 case "$rc" in
   0) ;;
-  2) stop "Ez a Marveen-kiadás még nem tudja megmutatni a hozzájárulás szövegét. Frissítsd a Marveent." ;;
+  2) stop "Ez a Alfred-kiadás még nem tudja megmutatni a hozzájárulás szövegét. Frissítsd a Alfredet." ;;
   1)
     case "$ERR" in
-      "consent-text: refused: consent_text_unset") stop "Ez a Marveen-kiadás még nem tartalmazza a jóváhagyott hozzájárulás-szöveget, ezért a távoli segítség még nem kapcsolható be. Frissítsd a Marveent, vagy írj nekünk ($SUPPORT_MAIL)." ;;
-      "consent-text: refused: consent_invalid") stop "A hozzájárulás verziója nem az, amit ez a Marveen ismer (consent_invalid). Frissítsd a Marveent, vagy írj nekünk ($SUPPORT_MAIL)." ;;
+      "consent-text: refused: consent_text_unset") stop "Ez a Alfred-kiadás még nem tartalmazza a jóváhagyott hozzájárulás-szöveget, ezért a távoli segítség még nem kapcsolható be. Frissítsd a Alfredet, vagy írj nekünk ($SUPPORT_MAIL)." ;;
+      "consent-text: refused: consent_invalid") stop "A hozzájárulás verziója nem az, amit ez a Alfred ismer (consent_invalid). Frissítsd a Alfredet, vagy írj nekünk ($SUPPORT_MAIL)." ;;
       *) stop "A hozzájárulás szövege nem olvasható ki (1)." ;;
     esac
     ;;
   *) stop "A hozzájárulás szövege nem olvasható ki ($rc)." ;;
 esac
 printf '%s\n' "$CT"
-printf '%s' "Írd be a marveen.io Profil oldalán a „Kód kérése” gombbal kapott egyszeri kódot, és nyomj Entert: "
+printf '%s' "Írd be a alfred.io Profil oldalán a „Kód kérése” gombbal kapott egyszeri kódot, és nyomj Entert: "
 # Dani S1 (78485): the code is not shown while it is typed. On a terminal the echo goes off, and a
 # trap puts the terminal back whatever way the launcher ends (Enter, Ctrl+C, a signal).
 SAVED_TTY=
@@ -330,7 +330,7 @@ CODE=
 ERR=$(head -c 512 "$ERRF" 2>/dev/null); rm -f "$ERRF"
 case "$rc" in
   0) [ -n "$OUT" ] || halt "A bekapcsolás nem válaszolt (kit_no_output)." ;;
-  2) halt "Ez a Marveen-kiadás még nem tudja bekapcsolni a távoli segítséget. Frissítsd a Marveent." ;;
+  2) halt "Ez a Alfred-kiadás még nem tudja bekapcsolni a távoli segítséget. Frissítsd a Alfredet." ;;
   1)
     case "$ERR" in
       "enable: refused: "*) halt "$(enable_refusal "${ERR#enable: refused: }")" ;;

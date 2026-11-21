@@ -64,7 +64,7 @@ function verdict(name: string) {
 }
 
 function onceTask(name: string): void {
-  writeScheduledTask(name, { prompt: 'egyszer', schedule: '0 5 * * *', agent: 'marveen', enabled: true, type: 'task', once: true })
+  writeScheduledTask(name, { prompt: 'egyszer', schedule: '0 5 * * *', agent: 'alfred', enabled: true, type: 'task', once: true })
 }
 
 beforeEach(() => {
@@ -111,7 +111,7 @@ describe('server rewrite of a registered task (disableOnceTask)', () => {
   })
 
   it('no change, no registration: the write result is passed through', () => {
-    writeScheduledTask('nem-egyszeri', { prompt: 'x', schedule: '0 5 * * *', agent: 'marveen', enabled: true })
+    writeScheduledTask('nem-egyszeri', { prompt: 'x', schedule: '0 5 * * *', agent: 'alfred', enabled: true })
     registerScheduledTask('nem-egyszeri', 'api:create')
     expect(rewriteRegisteredTask('nem-egyszeri', 'server:once-disable', () => disableOnceTask('nem-egyszeri', Date.now()))).toBe(false)
     expect(verdict('nem-egyszeri')).toEqual({ ok: true })
@@ -137,7 +137,7 @@ describe('rotation heartbeat is registered', () => {
   })
 
   it('an existing, unregistered task of that name is not laundered by the toggle', () => {
-    writeScheduledTask(ROTATION_HEARTBEAT_TASK, { prompt: 'idegen', schedule: '* * * * *', agent: 'marveen', enabled: false })
+    writeScheduledTask(ROTATION_HEARTBEAT_TASK, { prompt: 'idegen', schedule: '* * * * *', agent: 'alfred', enabled: false })
     expect(syncRotationHeartbeatTask()).toBe('enabled')
     expect(verdict(ROTATION_HEARTBEAT_TASK)).toMatchObject({ ok: false, reason: 'unregistered' })
   })
@@ -148,7 +148,7 @@ describe('rotation heartbeat prompt upgrade keeps the registry honest', () => {
   const opts = { projectRoot: PROJECT_ROOT, webPort: WEB_PORT, chatId: CHANNEL_CHAT_ID }
   const v1Task = () => writeScheduledTask(ROTATION_HEARTBEAT_TASK, {
     description: ROTATION_HEARTBEAT_DESCRIPTION, prompt: buildRotationHeartbeatPromptV1(opts), schedule: '*/10 * * * *',
-    agent: 'marveen', enabled: true, type: 'heartbeat', skipIfBusy: true,
+    agent: 'alfred', enabled: true, type: 'heartbeat', skipIfBusy: true,
   })
 
   it('a registered, unedited V1 task is upgraded and stays trusted', () => {
@@ -173,7 +173,7 @@ describe('retireRotationHeartbeatTask (P5)', () => {
   const seeded = (prompt: string, enabled = true) => {
     writeScheduledTask(ROTATION_HEARTBEAT_TASK, {
       description: ROTATION_HEARTBEAT_DESCRIPTION, prompt, schedule: '*/10 * * * *',
-      agent: 'marveen', enabled, type: 'heartbeat', skipIfBusy: true,
+      agent: 'alfred', enabled, type: 'heartbeat', skipIfBusy: true,
     })
     registerScheduledTask(ROTATION_HEARTBEAT_TASK, 'server:rotation-heartbeat')
   }
@@ -257,7 +257,7 @@ describe('retireRotationHeartbeatTask (P5)', () => {
   })
 
   it('an edited task that was never trusted is switched off but not laundered into trust', async () => {
-    writeScheduledTask(ROTATION_HEARTBEAT_TASK, { prompt: 'planted', schedule: '* * * * *', agent: 'marveen', enabled: true })
+    writeScheduledTask(ROTATION_HEARTBEAT_TASK, { prompt: 'planted', schedule: '* * * * *', agent: 'alfred', enabled: true })
     const h = deps()
     expect((await retireRotationHeartbeatTask(h.d)).result).toBe('disabled')
     expect(verdict(ROTATION_HEARTBEAT_TASK)).toMatchObject({ ok: false, reason: 'unregistered' })

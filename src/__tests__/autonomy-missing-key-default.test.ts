@@ -1,4 +1,4 @@
-// MARVEENGAPS1020 (d): a missing autonomy config or key must not switch a task
+// ALFREDGAPS1020 (d): a missing autonomy config or key must not switch a task
 // to its MOST permissive level. The seed-config ships every category at level 1,
 // the email approval gate falls back to level 2, and the doc plus the shipped
 // kanban-audit prompt used to say "missing -> level 3 (the old behaviour)": a

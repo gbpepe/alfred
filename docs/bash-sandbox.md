@@ -135,7 +135,7 @@ Kliens-minta (Soma `render.py`-jához: sandboxban a végpont, azon kívül a ré
 
 ```python
 def html_to_pdf(html_path, pdf_path, agent, endpoint='http://127.0.0.1:3420/api/pdf/render',
-                token_file='/Users/gyuri/marveen/store/.dashboard-token'):
+                token_file='/Users/gyuri/alfred/store/.dashboard-token'):
     html_path, pdf_path = os.path.abspath(html_path), os.path.abspath(pdf_path)
     if not os.environ.get('SANDBOX_RUNTIME'):
         subprocess.run([CHROME, '--headless', '--disable-gpu', '--no-pdf-header-footer',

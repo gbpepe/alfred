@@ -70,7 +70,7 @@ add_msg() {
 # $1 = label, $2 = db, $3 = expected verdict, $4 = expected exit code
 expect_verdict() {
   local out rc verdict
-  out=$(MAIN_AGENT_ID=marveen bash "$OBSERVER" --check "$2" 2>&1); rc=$?
+  out=$(MAIN_AGENT_ID=alfred bash "$OBSERVER" --check "$2" 2>&1); rc=$?
   verdict=$(printf '%s' "$out" | sed -n 's/.*verdict=\([a-z]*\).*/\1/p')
   if [ "$verdict" = "$3" ] && [ "$rc" = "$4" ]; then
     pass "$1"
@@ -92,7 +92,7 @@ DB_EMPTY="$(make_db empty)"
 expect_verdict "empty queue is ok" "$DB_EMPTY" ok 0
 
 DB_FRESH="$(make_db fresh)"
-add_msg "$DB_FRESH" marveen pending 300
+add_msg "$DB_FRESH" alfred pending 300
 expect_verdict "a 5-minute-old pending row is ok (the in-process nudge still has time)" "$DB_FRESH" ok 0
 echo ""
 
@@ -101,10 +101,10 @@ echo ""
 # ---------------------------------------------------------------------------
 echo "(b) The stall this observer reports"
 DB_STALL="$(make_db stall)"
-add_msg "$DB_STALL" marveen pending 3600
+add_msg "$DB_STALL" alfred pending 3600
 expect_verdict "a 60-minute-old pending row to MAIN is stalled" "$DB_STALL" stalled 1
 
-out=$(MAIN_AGENT_ID=marveen bash "$OBSERVER" --check "$DB_STALL" 2>&1)
+out=$(MAIN_AGENT_ID=alfred bash "$OBSERVER" --check "$DB_STALL" 2>&1)
 case "$out" in
   *pending=1*) pass "the check line reports the pending count" ;;
   *) fail "the check line reports the pending count" "$out" ;;
@@ -117,9 +117,9 @@ else
 fi
 
 DB_TWO="$(make_db two)"
-add_msg "$DB_TWO" marveen pending 3600
-add_msg "$DB_TWO" marveen pending 60
-out=$(MAIN_AGENT_ID=marveen bash "$OBSERVER" --check "$DB_TWO" 2>&1)
+add_msg "$DB_TWO" alfred pending 3600
+add_msg "$DB_TWO" alfred pending 60
+out=$(MAIN_AGENT_ID=alfred bash "$OBSERVER" --check "$DB_TWO" 2>&1)
 age=$(printf '%s' "$out" | sed -n 's/.*oldest_age_s=\([0-9]*\).*/\1/p')
 if [ -n "$age" ] && [ "$age" -ge 3600 ]; then
   pass "the oldest row decides, not the newest"
@@ -134,13 +134,13 @@ echo ""
 #     SAME database has to read ok -- otherwise (b) proves nothing.
 # ---------------------------------------------------------------------------
 echo "(c) Positive control on the threshold"
-out=$(MAIN_AGENT_ID=marveen MAIN_INBOX_STALL_SECONDS=999999 bash "$OBSERVER" --check "$DB_STALL" 2>&1); rc=$?
+out=$(MAIN_AGENT_ID=alfred MAIN_INBOX_STALL_SECONDS=999999 bash "$OBSERVER" --check "$DB_STALL" 2>&1); rc=$?
 if printf '%s' "$out" | grep -q 'verdict=ok' && [ "$rc" = 0 ]; then
   pass "raising the threshold turns the same stalled db green (the age comparison is live)"
 else
   fail "raising the threshold turns the same stalled db green" "rc=$rc out: $out"
 fi
-out=$(MAIN_AGENT_ID=marveen MAIN_INBOX_STALL_SECONDS=60 bash "$OBSERVER" --check "$DB_FRESH" 2>&1); rc=$?
+out=$(MAIN_AGENT_ID=alfred MAIN_INBOX_STALL_SECONDS=60 bash "$OBSERVER" --check "$DB_FRESH" 2>&1); rc=$?
 if printf '%s' "$out" | grep -q 'verdict=stalled' && [ "$rc" = 1 ]; then
   pass "lowering the threshold turns the same healthy db red"
 else
@@ -157,12 +157,12 @@ add_msg "$DB_OTHER" sub-agent pending 7200
 expect_verdict "an aged row to a SUB-agent is not this observer's business" "$DB_OTHER" ok 0
 
 DB_FED="$(make_db fed)"
-add_msg "$DB_FED" "peer/marveen" pending 7200
-expect_verdict "a federated OUTBOUND row (peer/marveen) does not count as main-agent mail" "$DB_FED" ok 0
+add_msg "$DB_FED" "peer/alfred" pending 7200
+expect_verdict "a federated OUTBOUND row (peer/alfred) does not count as main-agent mail" "$DB_FED" ok 0
 
 for st in delivered done failed; do
   DB_ST="$(make_db "st_$st")"
-  add_msg "$DB_ST" marveen "$st" 7200
+  add_msg "$DB_ST" alfred "$st" 7200
   expect_verdict "an aged $st row is not pending" "$DB_ST" ok 0
 done
 
@@ -170,9 +170,9 @@ DB_ID="$(make_db otherid)"
 add_msg "$DB_ID" other-main pending 7200
 out=$(MAIN_AGENT_ID=other-main bash "$OBSERVER" --check "$DB_ID" 2>&1); rc=$?
 if printf '%s' "$out" | grep -q 'verdict=stalled' && [ "$rc" = 1 ]; then
-  pass "the main agent id is configuration, not the hardcoded 'marveen'"
+  pass "the main agent id is configuration, not the hardcoded 'alfred'"
 else
-  fail "the main agent id is configuration, not the hardcoded 'marveen'" "rc=$rc out: $out"
+  fail "the main agent id is configuration, not the hardcoded 'alfred'" "rc=$rc out: $out"
 fi
 echo ""
 
@@ -200,9 +200,9 @@ echo "(f) Full run: liveness stamp and alert cooldown"
 FIX="$TMP/install"
 mkdir -p "$FIX/scripts" "$FIX/store"
 cp "$OBSERVER" "$FIX/scripts/main-inbox-observer.sh"
-printf 'MAIN_AGENT_ID=marveen\n' > "$FIX/.env"
+printf 'MAIN_AGENT_ID=alfred\n' > "$FIX/.env"
 OBS="$FIX/scripts/main-inbox-observer.sh"
-FIXDB="$FIX/store/claudeclaw.db"
+FIXDB="$FIX/store/alfred.db"
 oracle_exec "$FIXDB" "$SCHEMA"
 
 MAIN_INBOX_OBSERVER_ALERT_DRYRUN=1 bash "$OBS" >"$TMP/run1.out" 2>&1
@@ -219,7 +219,7 @@ fi
 
 rm -f "$FIX/store/.main-inbox-observer"
 oracle_exec "$FIXDB" "INSERT INTO agent_messages (from_agent,to_agent,content,status,created_at)
-  VALUES ('sender-a','marveen','proba','pending', CAST(strftime('%s','now') AS INTEGER) - 3600);"
+  VALUES ('sender-a','alfred','proba','pending', CAST(strftime('%s','now') AS INTEGER) - 3600);"
 MAIN_INBOX_OBSERVER_ALERT_DRYRUN=1 bash "$OBS" >"$TMP/run2.out" 2>&1
 if grep -q 'ALERT_DRYRUN' "$TMP/run2.out"; then
   pass "a stalled queue alerts the owner"
@@ -244,7 +244,7 @@ fi
 oracle_exec "$FIXDB" "UPDATE agent_messages SET status='done';"
 MAIN_INBOX_OBSERVER_ALERT_DRYRUN=1 bash "$OBS" >/dev/null 2>&1
 oracle_exec "$FIXDB" "INSERT INTO agent_messages (from_agent,to_agent,content,status,created_at)
-  VALUES ('sender-a','marveen','masodik','pending', CAST(strftime('%s','now') AS INTEGER) - 3600);"
+  VALUES ('sender-a','alfred','masodik','pending', CAST(strftime('%s','now') AS INTEGER) - 3600);"
 MAIN_INBOX_OBSERVER_ALERT_DRYRUN=1 bash "$OBS" >"$TMP/run4.out" 2>&1
 if grep -q 'ALERT_DRYRUN' "$TMP/run4.out"; then
   pass "a NEW stall after the queue drained alerts again"
@@ -279,7 +279,7 @@ if [ -f "$SVC" ] && [ -f "$TMR" ]; then pass "the systemd twin ships too (the fi
 if [ -f "$INSTALLER" ]; then
   FAKEHOME="$TMP/home"
   mkdir -p "$FAKEHOME"
-  PLIST_OUT="$FAKEHOME/Library/LaunchAgents/com.marveen.main-inbox-observer.plist"
+  PLIST_OUT="$FAKEHOME/Library/LaunchAgents/com.alfred.main-inbox-observer.plist"
   # The installer refuses to run anywhere but Darwin (it writes a launchd plist,
   # and a plist nothing reads plus a zero exit is worse than a failure). That
   # guard is the right behaviour AND it would make this block untestable on a
@@ -357,7 +357,7 @@ rm -f "$WALDB" "$WALDB-wal" "$WALDB-shm"
 oracle_query "$WALDB" "PRAGMA journal_mode=wal;" >/dev/null
 oracle_exec "$WALDB" "$SCHEMA"
 oracle_exec "$WALDB" "INSERT INTO agent_messages (from_agent,to_agent,content,status,created_at)
-  VALUES ('sender-a','marveen','proba','pending', CAST(strftime('%s','now') AS INTEGER) - 3600);"
+  VALUES ('sender-a','alfred','proba','pending', CAST(strftime('%s','now') AS INTEGER) - 3600);"
 # The shape under test: journal_mode is wal, and neither side file is present.
 rm -f "$WALDB-wal" "$WALDB-shm"
 MODE="$(oracle_query "$WALDB" 'PRAGMA journal_mode;' 2>/dev/null)"
@@ -368,7 +368,7 @@ else
   fail "the fixture really is a WAL database" "journal_mode=$MODE"
 fi
 
-OUT="$(MAIN_AGENT_ID=marveen bash "$OBSERVER" --check "$WALDB" 2>&1)"; RC=$?
+OUT="$(MAIN_AGENT_ID=alfred bash "$OBSERVER" --check "$WALDB" 2>&1)"; RC=$?
 case "$OUT" in
   *"verdict=stalled"*) [ "$RC" = 1 ] && pass "a stalled row is SEEN on a WAL db with no -shm" \
                          || fail "a stalled row is seen on a WAL db with no -shm" "rc=$RC out: $OUT" ;;
@@ -395,7 +395,7 @@ else
   PREFIX_OBS="$TMP/observer-without-fallback.sh"
   grep -v '_READ_QUEUE_PY" query_only ' "$OBSERVER" > "$PREFIX_OBS"
   if [ "$(grep -c '_READ_QUEUE_PY" query_only ' "$PREFIX_OBS")" = 0 ] && [ -s "$PREFIX_OBS" ]; then
-    OUT="$(MAIN_AGENT_ID=marveen bash "$PREFIX_OBS" --check "$WALDB" 2>&1)"; RC=$?
+    OUT="$(MAIN_AGENT_ID=alfred bash "$PREFIX_OBS" --check "$WALDB" 2>&1)"; RC=$?
     case "$OUT" in
       *"verdict=unknown"*) [ "$RC" = 2 ] && pass "NEGATIVE CONTROL: without the fallback the same file reads as unknown (rc=2)" \
                              || fail "NEGATIVE CONTROL: without the fallback the same file reads as unknown" "rc=$RC out: $OUT" ;;
@@ -412,7 +412,7 @@ rm -f "$WALDB-wal" "$WALDB-shm"
 SUM_BEFORE="$(shasum -a 256 "$WALDB" | awk '{print $1}')"
 ROWS_BEFORE="$(oracle_query "$WALDB" 'SELECT COUNT(*) FROM agent_messages;')"
 rm -f "$WALDB-wal" "$WALDB-shm"
-MAIN_AGENT_ID=marveen bash "$OBSERVER" --check "$WALDB" >/dev/null 2>&1
+MAIN_AGENT_ID=alfred bash "$OBSERVER" --check "$WALDB" >/dev/null 2>&1
 SUM_AFTER="$(shasum -a 256 "$WALDB" | awk '{print $1}')"
 ROWS_AFTER="$(oracle_query "$WALDB" 'SELECT COUNT(*) FROM agent_messages;')"
 if [ "$SUM_BEFORE" = "$SUM_AFTER" ] && [ "$ROWS_BEFORE" = "$ROWS_AFTER" ]; then
@@ -424,8 +424,8 @@ fi
 # And the ordinary case must not have regressed: a journal_mode=delete database
 # still answers, through the -readonly path that works there.
 DB_PLAIN="$(make_db walplain)"
-add_msg "$DB_PLAIN" marveen pending 60
-OUT="$(MAIN_AGENT_ID=marveen bash "$OBSERVER" --check "$DB_PLAIN" 2>&1)"; RC=$?
+add_msg "$DB_PLAIN" alfred pending 60
+OUT="$(MAIN_AGENT_ID=alfred bash "$OBSERVER" --check "$DB_PLAIN" 2>&1)"; RC=$?
 case "$OUT" in
   *"verdict=ok"*) [ "$RC" = 0 ] && pass "a non-WAL database still answers as before" \
                     || fail "a non-WAL database still answers as before" "rc=$RC out: $OUT" ;;

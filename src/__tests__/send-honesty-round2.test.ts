@@ -164,9 +164,9 @@ describe('fleet-memory-gate.sh: cooldown stamp only after confirmed delivery', (
     const env = {
       MEMGATE_PROC_MEMINFO: meminfo,
       TELEGRAM_ENV: tgEnv,
-      MARVEEN_ALERT_CHAT_ID: '42',
+      ALFRED_ALERT_CHAT_ID: '42',
       MEMGATE_STATE_DIR: join(stage, 'store'),
-      MARVEEN_STORE: join(stage, 'store'),
+      ALFRED_STORE: join(stage, 'store'),
     }
     return { bin, env, stamp: join(stage, 'store', '.fleet-memgate-alert') }
   }

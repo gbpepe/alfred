@@ -1,4 +1,4 @@
-// SUPPORTKULCS1109, D5 (terv-v7 3.9): the support state of this machine (one folder, ~/.marveen/support) and the two
+// SUPPORTKULCS1109, D5 (terv-v7 3.9): the support state of this machine (one folder, ~/.alfred/support) and the two
 // support tables (support_consents, support_password_state) are written by the routine and the dashboard only, never
 // by a tool call of any agent, the main agent included. Reads stay free. HOME points at a temp dir.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -16,7 +16,7 @@ beforeEach(() => {
   base = realpathSync(mkdtempSync(join(tmpdir(), 'support-d5-')))
   home = join(base, 'home')
   root = join(base, 'Install')
-  mkdirSync(join(home, '.marveen', 'support', 'kit'), { recursive: true })
+  mkdirSync(join(home, '.alfred', 'support', 'kit'), { recursive: true })
   mkdirSync(join(root, 'store'), { recursive: true })
   savedHome = process.env.HOME
   process.env.HOME = home
@@ -30,24 +30,24 @@ afterEach(() => {
 const o = (subAgent: boolean) => ({ root, cwd: root, subAgent, projectDir: root, configDir: null })
 const bash = (c: string, subAgent = false) => gateDecision('Bash', { command: c }, o(subAgent))
 const write = (p: string, subAgent = false) => gateDecision('Write', { file_path: p, content: 'x' }, o(subAgent))
-const S = () => join(home, '.marveen', 'support')
+const S = () => join(home, '.alfred', 'support')
 
 describe('D5: the support tables are security tables', () => {
   it.each([
-    `sqlite3 store/claudeclaw.db "DELETE FROM support_consents"`,
-    `sqlite3 store/claudeclaw.db "UPDATE support_consents SET revoked_at = NULL"`,
-    `sqlite3 store/claudeclaw.db "INSERT INTO support_consents (grant_id) VALUES ('x')"`,
-    `sqlite3 store/claudeclaw.db "DELETE FROM support_password_state"`,
-    `sqlite3 store/claudeclaw.db "UPDATE main.support_password_state SET state = '{}'"`,
-    `python3 -c "import sqlite3; sqlite3.connect('store/claudeclaw.db').execute('DROP TABLE support_password_state')"`,
+    `sqlite3 store/alfred.db "DELETE FROM support_consents"`,
+    `sqlite3 store/alfred.db "UPDATE support_consents SET revoked_at = NULL"`,
+    `sqlite3 store/alfred.db "INSERT INTO support_consents (grant_id) VALUES ('x')"`,
+    `sqlite3 store/alfred.db "DELETE FROM support_password_state"`,
+    `sqlite3 store/alfred.db "UPDATE main.support_password_state SET state = '{}'"`,
+    `python3 -c "import sqlite3; sqlite3.connect('store/alfred.db').execute('DROP TABLE support_password_state')"`,
   ])('denies %s, for the main agent too', (c) => {
     expect(bash(c)).toMatchObject({ deny: true, reason: 'db' })
     expect(bash(c, true)).toMatchObject({ deny: true })
   })
 
   it('a read of them passes', () => {
-    expect(bash(`sqlite3 store/claudeclaw.db "SELECT * FROM support_consents"`)).toEqual({ deny: false })
-    expect(bash(`sqlite3 -readonly store/claudeclaw.db "SELECT state FROM support_password_state"`)).toEqual({ deny: false })
+    expect(bash(`sqlite3 store/alfred.db "SELECT * FROM support_consents"`)).toEqual({ deny: false })
+    expect(bash(`sqlite3 -readonly store/alfred.db "SELECT state FROM support_password_state"`)).toEqual({ deny: false })
   })
 })
 
@@ -67,8 +67,8 @@ describe('D5: the support folder is protected for every agent', () => {
     () => `rm -rf ${S()}`,
     () => `echo mst_x > ${S()}/support-access.token`,
     () => `cp /tmp/evil.sh ${S()}/kit/support-dispatch.sh`,
-    () => `rm -rf ~/.marveen/support`,
-    () => `mv ~/.marveen/support/kit ~/.marveen/support/kit.old`,
+    () => `rm -rf ~/.alfred/support`,
+    () => `mv ~/.alfred/support/kit ~/.alfred/support/kit.old`,
   ])('a shell write is denied: %s', (c) => {
     expect(bash(c())).toMatchObject({ deny: true })
   })
@@ -76,14 +76,14 @@ describe('D5: the support folder is protected for every agent', () => {
   it.each([
     () => `ls -la ${S()}`,
     () => `cat ${S()}/kit/manifest`,
-    () => `ls -d ~/.marveen/support 2>&1 | head -1`,
+    () => `ls -d ~/.alfred/support 2>&1 | head -1`,
     () => `grep -c evt ${S()}/support-access.spool/1.evt`,
   ])('a read passes: %s', (c) => {
     expect(bash(c())).toEqual({ deny: false })
   })
 
   it('another folder next to it stays free', () => {
-    expect(write(join(home, '.marveen', 'other', 'x.txt'))).toEqual({ deny: false })
-    expect(bash(`echo x > ${join(home, '.marveen', 'support-notes.txt')}`)).toEqual({ deny: false })
+    expect(write(join(home, '.alfred', 'other', 'x.txt'))).toEqual({ deny: false })
+    expect(bash(`echo x > ${join(home, '.alfred', 'support-notes.txt')}`)).toEqual({ deny: false })
   })
 })

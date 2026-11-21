@@ -39,7 +39,7 @@ export const SUPPORT_GROUP_RECORD_FILE = 'support-access.group'
 export const SUPPORT_SPOOL_DIR = 'support-access.spool'
 export const SUPPORT_RUN_DIR = 'support-access.run'
 
-const HEADER = 'marveen-support-group 1'
+const HEADER = 'alfred-support-group 1'
 const RECORD_MODE = 0o600
 export const GROUP_RECORD_MAX_BYTES = 2048
 

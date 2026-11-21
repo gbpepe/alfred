@@ -98,7 +98,7 @@ def alias_authorized(anchor: str):
     it wins, so a later rejection revokes the alias. A missing approvals DB is
     "no alias", not an error: the alias is an exception to a deny, and without
     the DB there is nothing that could grant it."""
-    db = os.path.join(cl.store_dir(), "claudeclaw.db")
+    db = os.path.join(cl.store_dir(), "alfred.db")
     if not os.path.exists(db):
         return False, "nincs jovahagyasi adatbazis"
     con = sqlite3.connect(db, timeout=5)

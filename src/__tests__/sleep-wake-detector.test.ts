@@ -223,7 +223,7 @@ describe('fix-revert guard: alert paths are sleep-aware', () => {
     expect(holdIdx).toBeGreaterThan(0)
     expect(holdIdx).toBeLessThan(sleptIdx)
     // ...while the respawn stays UNCONDITIONAL on sleep (self-healing keeps going).
-    const respawnIdx = fnBody.indexOf('respawnMarveenSessionFresh()')
+    const respawnIdx = fnBody.indexOf('respawnAlfredSessionFresh()')
     expect(respawnIdx).toBeGreaterThan(sleptIdx)
     const betweenGuardAndRespawn = fnBody.slice(fnBody.indexOf('if (!staleDueToSleep)'), respawnIdx)
     expect(betweenGuardAndRespawn).not.toMatch(/return/)

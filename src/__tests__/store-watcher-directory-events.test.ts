@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 
 const h = vi.hoisted(() => ({
-  dir: `${process.env.TMPDIR || '/tmp'}/marveen-store-watcher-dir-test-${process.pid}`,
+  dir: `${process.env.TMPDIR || '/tmp'}/alfred-store-watcher-dir-test-${process.pid}`,
   cb: null as null | ((eventType: string, filename: string | null) => void),
 }))
 

@@ -104,7 +104,7 @@ q='''SELECT name, status, COUNT(*), MIN(ts), MAX(ts) FROM task_runs
      WHERE ts > ?*1000 AND name != 'nap-zaro'
      GROUP BY name, status ORDER BY name, status'''
 hm=lambda ms: dt.datetime.fromtimestamp(ms/1000).strftime('%H:%M')
-for name, st, n, first, last in sqlite3.connect('{{INSTALL_DIR}}/store/claudeclaw.db').execute(q,(since,)):
+for name, st, n, first, last in sqlite3.connect('{{INSTALL_DIR}}/store/alfred.db').execute(q,(since,)):
     print('%-26s %-16s %4d  first %s, last %s' % (name, st, n, hm(first), hm(last)))" "$SINCE"
 ```
    This shows WHICH run ran in the window, even if it wrote nothing. One row

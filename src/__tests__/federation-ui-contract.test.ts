@@ -89,7 +89,7 @@ describe('federation UI wiring', () => {
     expect(fn).toContain("message: t('federation.confirm.apply'),")
     expect(fn).not.toMatch(/(^|[^.\w])confirm\(/)
     // Server-side apply endpoint -- NOT the client-agent-id-dependent restart
-    // (which 404'd when window._marveen was not loaded on the federation page).
+    // (which 404'd when window._alfred was not loaded on the federation page).
     expect(fn).toMatch(/fetch\('\/api\/federation\/apply'/)
     expect(fn).not.toMatch(/fetch\(`\/api\/agents\//)
     // Status auto-refreshes after config mutations (enable, peer add) instead

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Marveen - AI Team Setup
+# Alfred - AI Team Setup
 # Interactive installer for macOS
 
 set -e
@@ -305,7 +305,7 @@ root_npm_install_global() { # $1 = the package
 # Error-translation layer (NPMPERM1 kor): minden stderr egy log-fajlba is
 # megy, hogy hibanal a trap ne csak sorszamot mondjon, hanem le tudja
 # forditani az upstream hibat (explain_install_error, install-lang.sh).
-INSTALL_ERRLOG=$(mktemp "${TMPDIR:-/tmp}/marveen-install-stderr.XXXXXX")
+INSTALL_ERRLOG=$(mktemp "${TMPDIR:-/tmp}/alfred-install-stderr.XXXXXX")
 # INSTSTDERRTMP1104: the copy holds whatever a failing tool printed (a token in a
 # URL, a password a broken prompt echoed back), and it outlived every run in the
 # customer's TMPDIR. Only explain_install_error reads it, on the way out (fail()
@@ -355,7 +355,7 @@ offer_claude_fallback() {
   fi
   echo ""
   echo -e "${ORANGE}$(_t macos.claude_available)${NC}"
-  local prompt="Marveen installer failed at step \"${step}\". Error: ${err_msg}. Script: install.sh${line_info}. Repo: https://github.com/Szotasz/marveen. OS: macOS $(sw_vers -productVersion 2>/dev/null || echo unknown). Node: $(node -v 2>/dev/null || echo missing). Dir: ${INSTALL_DIR}. Your task: diagnose this Marveen installer failure. The install scripts are install.sh (macOS) and install-linux.sh. Read the relevant section, check for missing dependencies or permission issues, and suggest concrete shell commands to fix."
+  local prompt="Alfred installer failed at step \"${step}\". Error: ${err_msg}. Script: install.sh${line_info}. Repo: https://github.com/gbpepe/alfred. OS: macOS $(sw_vers -productVersion 2>/dev/null || echo unknown). Node: $(node -v 2>/dev/null || echo missing). Dir: ${INSTALL_DIR}. Your task: diagnose this Alfred installer failure. The install scripts are install.sh (macOS) and install-linux.sh. Read the relevant section, check for missing dependencies or permission issues, and suggest concrete shell commands to fix."
   if [ -t 0 ]; then
     read -rp "$(_t prompt_open_claude)" OPEN_CLAUDE
     OPEN_CLAUDE=${OPEN_CLAUDE:-n}
@@ -389,15 +389,15 @@ trap 'on_error $LINENO' ERR
 
 clear
 echo ""
-echo -e "${BOLD}  ▐▛███▜▌   Marveen${NC}"
-if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+echo -e "${BOLD}  ▐▛███▜▌   Alfred${NC}"
+if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
   echo -e "${BOLD} ▝▜█████▛▘  Your AI team, running while you sleep.${NC}"
 else
   echo -e "${BOLD} ▝▜█████▛▘  $(_t tagline)${NC}"
 fi
 echo -e "${DIM}   ▘▘ ▝▝${NC}"
 echo ""
-if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
   echo -e "${DIM}  Setup wizard - macOS${NC}"
 else
   echo -e "${DIM}$(_t macos.wizard_title)${NC}"
@@ -478,7 +478,7 @@ check_cmd() {
 # ha a binaris letezik -- ugyanaz a ket sor, amit a telepito ag a sajat
 # telepitese utan mar hasznal.
 # BREWPREFIXREST1107: a Homebrew in a custom prefix is in neither default place, so a non-interactive install
-# decided "no brew" and ran the Homebrew installer (measured: MEASURE-C). An explicit MARVEEN_BREW_PREFIX is honoured
+# decided "no brew" and ran the Homebrew installer (measured: MEASURE-C). An explicit ALFRED_BREW_PREFIX is honoured
 # first; after the defaults, the #2578 rule (scripts/channels.sh, src/platform.ts): the <prefix> of the first
 # <prefix>/opt/node@NN/bin entry on PATH that has an executable <prefix>/bin/brew.
 if ! command -v brew &>/dev/null; then
@@ -493,8 +493,8 @@ if ! command -v brew &>/dev/null; then
       break
     fi
   done <<< "${PATH:-}:"
-  if [ -n "${MARVEEN_BREW_PREFIX:-}" ] && [ -x "$MARVEEN_BREW_PREFIX/bin/brew" ]; then
-    eval "$("$MARVEEN_BREW_PREFIX/bin/brew" shellenv)"
+  if [ -n "${ALFRED_BREW_PREFIX:-}" ] && [ -x "$ALFRED_BREW_PREFIX/bin/brew" ]; then
+    eval "$("$ALFRED_BREW_PREFIX/bin/brew" shellenv)"
   elif [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
   elif [ -x /usr/local/bin/brew ]; then
@@ -883,7 +883,7 @@ probe_telegram_token() {
   _ptt_wh="$(curl -s --max-time 8 "https://api.telegram.org/bot${_ptt_t}/getWebhookInfo" 2>/dev/null)" || return 0
   case "$_ptt_wh" in
     *'"url":"http'*)
-      warn "A bot token ervenyes, de a bot WEBHOOKRA van kotve -- a Marveen poller igy nem tud ra csatlakozni."
+      warn "A bot token ervenyes, de a bot WEBHOOKRA van kotve -- a Alfred poller igy nem tud ra csatlakozni."
       echo -e "    ${DIM}Teendo: nyisd meg bongeszoben: https://api.telegram.org/bot<A-TOKENED>/deleteWebhook${NC}"
       echo -e "    ${DIM}vagy keszits uj botot a @BotFather-nel, es futtasd ujra a telepitot azzal.${NC}"
       return 0 ;;
@@ -963,10 +963,10 @@ elif [ "$CHANNEL_PROVIDER" = "discord" ]; then
     fi
   fi
 elif [ "$CHANNEL_PROVIDER" = "gromzo" ]; then
-  # GROMZONOPROVIDER1108: no bot, no token: the Gromzo channel is connected later from the Marveen Bridge.
+  # GROMZONOPROVIDER1108: no bot, no token: the Gromzo channel is connected later from the Alfred Bridge.
   echo ""
   echo -e "${DIM}  Az AI asszisztensed a Gromzo alkalmazason at kommunikal veled; bot-token nem kell.${NC}"
-  echo -e "${DIM}  A Gromzot a Marveen Bridge-ben kotod be a telepites utan.${NC}"
+  echo -e "${DIM}  A Gromzot a Alfred Bridge-ben kotod be a telepites utan.${NC}"
 else
   echo ""
   echo -e "${DIM}  Az AI asszisztensed Slack-en kommunikal veled.${NC}"
@@ -986,9 +986,9 @@ else
   # Managed settings: Claude Code requires allowedChannelPlugins at system level
   MANAGED_DIR="/Library/Application Support/ClaudeCode"
   MANAGED_FILE="$MANAGED_DIR/managed-settings.json"
-  SLACK_ENTRY='{"plugin":"slack-channel","marketplace":"marveen-marketplace"}'
+  SLACK_ENTRY='{"plugin":"slack-channel","marketplace":"alfred-marketplace"}'
   TELEGRAM_ENTRY='{"plugin":"telegram","marketplace":"claude-plugins-official"}'
-  TEAMS_ENTRY='{"plugin":"teams","marketplace":"marveen-marketplace"}'
+  TEAMS_ENTRY='{"plugin":"teams","marketplace":"alfred-marketplace"}'
   DISCORD_ENTRY='{"plugin":"discord","marketplace":"claude-plugins-official"}'
   REQUIRED_JSON="{\"allowedChannelPlugins\":[$SLACK_ENTRY,$TELEGRAM_ENTRY,$TEAMS_ENTRY,$DISCORD_ENTRY]}"
 
@@ -1001,8 +1001,8 @@ else
     # per-customer sudo-elimination: the installer (already sudo) allows teams
     # at install time, so no manual managed-settings edit is needed later.
     # Read as the user (MACROOTFROMCLONE1106): a file that already allows all four needs no password.
-    if ! managed_has "$MANAGED_FILE" slack-channel@marveen-marketplace telegram@claude-plugins-official \
-      teams@marveen-marketplace discord@claude-plugins-official; then
+    if ! managed_has "$MANAGED_FILE" slack-channel@alfred-marketplace telegram@claude-plugins-official \
+      teams@alfred-marketplace discord@claude-plugins-official; then
       echo -e "  ${ORANGE}⚠${NC} $(_t macos.managed_update)"
       # Additive merge through the shared writer (MANAGEDSETTINGSWRITE1103,
       # scripts/lib/managed-settings-write.py; same call as the Discord branch).
@@ -1013,9 +1013,9 @@ else
       # shape TRUNCATED the file even when the merge failed. Every other key and
       # the file mode stay; the write goes through a fresh mkstemp file.
       if managed_write "$MANAGED_FILE" \
-        --add-plugin slack-channel@marveen-marketplace \
+        --add-plugin slack-channel@alfred-marketplace \
         --add-plugin telegram@claude-plugins-official \
-        --add-plugin teams@marveen-marketplace \
+        --add-plugin teams@alfred-marketplace \
         --add-plugin discord@claude-plugins-official
       then
         echo -e "  ${GREEN}✓${NC} $(_t macos.managed_updated)"
@@ -1042,9 +1042,9 @@ else
     # unprivileged session cannot read, so it silently never takes effect. If a
     # file appeared meanwhile, --create merges into it instead of replacing it.
     if managed_write "$MANAGED_FILE" --create \
-      --add-plugin slack-channel@marveen-marketplace \
+      --add-plugin slack-channel@alfred-marketplace \
       --add-plugin telegram@claude-plugins-official \
-      --add-plugin teams@marveen-marketplace \
+      --add-plugin teams@alfred-marketplace \
       --add-plugin discord@claude-plugins-official
     then
       echo -e "  ${GREEN}✓${NC} $(_t macos.managed_created)"
@@ -1089,24 +1089,24 @@ fi
 # the sourced helpers, the clone's scripts), so first the sudo login goes and the password the Bridge passed
 # in (headless-sudo-macos.sh) is unset. `command` keeps this line out of the Bridge's sudo -> run_priv rewrite.
 command /usr/bin/sudo -K 2>/dev/null || true
-unset __MARVEEN_SUDO_PW
+unset __ALFRED_SUDO_PW
 unset -f run_priv
 
 read -rp "$(_t prompt_bot_name)" BOT_NAME
-BOT_NAME=${BOT_NAME:-"Marveen"}
+BOT_NAME=${BOT_NAME:-"Alfred"}
 
 # Derive the ASCII slug the backend uses everywhere (tmux sessions, plist
 # labels, DB agent_id, API routing). NFKD + ASCII + lowercase dashes, empty
-# fallback to "marveen" so we never end up with a blank identifier.
+# fallback to "alfred" so we never end up with a blank identifier.
 MAIN_AGENT_ID=$(python3 - "$BOT_NAME" <<'PYEOF'
 import sys, unicodedata, re
 s = sys.argv[1].strip()
 s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode()
 s = re.sub(r'[^a-zA-Z0-9]+', '-', s).strip('-').lower()
-print(s or 'marveen')
+print(s or 'alfred')
 PYEOF
 )
-if [ "$MAIN_AGENT_ID" != "marveen" ]; then
+if [ "$MAIN_AGENT_ID" != "alfred" ]; then
   echo -e "  ${DIM}$(_t macos.agent_id_info)${MAIN_AGENT_ID}${NC}"
 fi
 
@@ -1192,7 +1192,7 @@ resolve_service_node
 #
 # INSTALLDIRTYTREE1103: `npm ci` first, as install-linux.sh and update.sh do.
 # A plain `npm install` rewrites package-lock.json into npm's canonical form
-# (marveen2, 11-03: +1 line, better-sqlite3 "hasInstallScript"), and a tracked
+# (alfred2, 11-03: +1 line, better-sqlite3 "hasInstallScript"), and a tracked
 # file changed by the installer sends every later update down the stash path.
 # `npm install` stays as the fallback for a genuine lockfile desync; the lock
 # it may rewrite is restored afterwards, because node_modules is what the
@@ -1364,7 +1364,7 @@ if [ -n "${MACOS_OAUTH_TOKEN_INPUT:-}" ]; then
     # Keychain OAuth session -- which periodically expires and 401s the bot
     # into a parked TUI that the router reads as busy, so the channel goes
     # silent with no error (the confirmed root cause of the 2026-07-23
-    # marveen-channels outage). The setting existed but nothing ever turned
+    # alfred-channels outage). The setting existed but nothing ever turned
     # it on, so every default install was wired to that failure mode.
     #
     # Only in THIS branch, i.e. only when the installer just captured the
@@ -1478,7 +1478,7 @@ fi
 
 # Scaffold default scheduled tasks into ~/.claude/scheduled-tasks/. Templates
 # carry {{MAIN_AGENT_ID}} placeholders so tasks target the user's chosen agent
-# slug rather than hardcoded "marveen". Skip task dirs that already exist --
+# slug rather than hardcoded "alfred". Skip task dirs that already exist --
 # never overwrite user customizations.
 SCHED_TPL_DIR="$INSTALL_DIR/templates/scheduled-tasks"
 SCHED_TARGET_DIR="$HOME/.claude/scheduled-tasks"
@@ -1574,8 +1574,8 @@ elif [ "$CHANNEL_PROVIDER" = "discord" ]; then
   PLUGIN_ID="discord@claude-plugins-official"
   PLUGIN_SHORT="discord"
 else
-  PLUGIN_MARKETPLACE="Szotasz/marveen-marketplace"
-  PLUGIN_ID="slack-channel@marveen-marketplace"
+  PLUGIN_MARKETPLACE="gbpepe/alfred-marketplace"
+  PLUGIN_ID="slack-channel@alfred-marketplace"
   PLUGIN_SHORT="slack-channel"
 fi
 
@@ -1602,7 +1602,7 @@ fi
 
 # INSTALLDIRTYTREE1103: NO `claude plugin enable --scope project` here. That
 # call rewrote the TRACKED .claude/settings.json (the whole file reformatted, ~500
-# lines, plus a wrong "<provider>@marveen-marketplace" key for Telegram/Discord),
+# lines, plus a wrong "<provider>@alfred-marketplace" key for Telegram/Discord),
 # so every fresh install left a dirty tree and every later update had to stash.
 # channels.sh enables the primary plugin for the main session through its
 # launch-time --settings file (store/.main-extra-plugins.settings.json), which
@@ -2392,7 +2392,7 @@ fi
 # run whose main units are not running does not exit 0 -- so a scripted install
 # can tell (scripts/start.sh already exits 1 in the same situation). 3, not 1:
 # 1 is what fail() and the ERR trap use for a build that aborted.
-# EXCEPT in the machine progress mode (MARVEEN_JSON_PROGRESS=1, the Bridge
+# EXCEPT in the machine progress mode (ALFRED_JSON_PROGRESS=1, the Bridge
 # installer): its derived script appends the final emit_result AFTER this line,
 # so an exit here would turn a finished install into "the install stopped
 # before finishing" on the customer's screen.
@@ -2403,7 +2403,7 @@ if [ "${SERVICES_STATE:-unknown}" = "down" ]; then
   if [ -z "${CHANNELS_PID:-}" ]; then echo -e "    ${DIM}  - ${CHANNELS_PLIST}: nem fut${NC}"; fi
   print_services_remedy
   echo ""
-  if [ "${MARVEEN_JSON_PROGRESS:-0}" != "1" ]; then
+  if [ "${ALFRED_JSON_PROGRESS:-0}" != "1" ]; then
     exit 3
   fi
 fi

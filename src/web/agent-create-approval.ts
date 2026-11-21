@@ -9,7 +9,7 @@
 //      written on the spec row; anything but "created" also goes to the main agent as an alert.
 //   3. sweepAgentCreateOnStart: an approval decided while the server was down, or a crash between the consume and
 //      the outcome, is never lost silently: the first is consumed now, the second is alerted.
-// The channel adapters that ask the owner and decide (Teams, Telegram, Slack, Gromzo) come in PR-3.
+// The channel adapters that ask the owner and decide come in follow-ups.
 import { createHash, randomUUID } from 'node:crypto'
 import { getSecret } from './vault.js'
 import { applyAgentTeam, issueAgentChannelInvite, setupAgentChannel } from './routes/agents.js'

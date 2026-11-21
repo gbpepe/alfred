@@ -4,7 +4,7 @@
 // documented path. The flag must resolve from the install .env as well --
 // process.env still wins when set, so operator/test overrides keep working.
 //
-// env.ts pins PROJECT_ROOT at import time (CLAUDECLAW_ENV_DIR is its test
+// env.ts pins PROJECT_ROOT at import time (ALFRED_ENV_DIR is its test
 // seam), so each case re-imports the module after pointing the seam at a
 // temporary .env.
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest'
@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 const saved = {
-  dir: process.env.CLAUDECLAW_ENV_DIR,
+  dir: process.env.ALFRED_ENV_DIR,
   agents: process.env.ROUTER_BATCH_INJECT_AGENTS,
   max: process.env.ROUTER_BATCH_INJECT_MAX,
 }
@@ -21,7 +21,7 @@ const saved = {
 async function loadWithEnvFile(content: string) {
   const dir = mkdtempSync(join(tmpdir(), 'b1f-env-'))
   writeFileSync(join(dir, '.env'), content)
-  process.env.CLAUDECLAW_ENV_DIR = dir
+  process.env.ALFRED_ENV_DIR = dir
   vi.resetModules()
   return await import('../web/batch-inject.js')
 }
@@ -33,7 +33,7 @@ describe('ROUTER_BATCH_INJECT_* resolves from the install .env, not only from pr
   })
   afterAll(() => {
     for (const [k, v] of [
-      ['CLAUDECLAW_ENV_DIR', saved.dir],
+      ['ALFRED_ENV_DIR', saved.dir],
       ['ROUTER_BATCH_INJECT_AGENTS', saved.agents],
       ['ROUTER_BATCH_INJECT_MAX', saved.max],
     ] as const) {
@@ -66,7 +66,7 @@ describe('ROUTER_BATCH_INJECT_* resolves from the install .env, not only from pr
   it('the .env is read fresh on each call: editing it takes effect without a restart', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'b1f-env-'))
     writeFileSync(join(dir, '.env'), 'WEB_PORT=3420\n')
-    process.env.CLAUDECLAW_ENV_DIR = dir
+    process.env.ALFRED_ENV_DIR = dir
     vi.resetModules()
     const m = await import('../web/batch-inject.js')
     expect(m.batchInjectCapFor('samu')).toBe(0)

@@ -16,7 +16,7 @@ const h = vi.hoisted(() => ({
   exec: [] as string[][],
   // A held peer message waits on a person by design (no keystrokes sent), so
   // the watcher must use the owner-action alert, never the gated routine one
-  // (Szotasz/marveen#2353 review) -- hence routineUnused staying empty below.
+  // (gbpepe/alfred#2353 review) -- hence routineUnused staying empty below.
   ownerAction: vi.fn(),
   routineUnused: vi.fn(),
   alert: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('node:child_process', () => ({
 }))
 vi.mock('../logger.js', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
 vi.mock('../platform.js', () => ({ resolveFromPath: () => '/usr/bin/tmux' }))
-vi.mock('../config.js', () => ({ PROJECT_ROOT: '/nonexistent-project-root', STORE_DIR: '/nonexistent-store-dir', BOT_NAME: 'Marveen', MAIN_AGENT_ID: 'marveen' }))
+vi.mock('../config.js', () => ({ PROJECT_ROOT: '/nonexistent-project-root', STORE_DIR: '/nonexistent-store-dir', BOT_NAME: 'Alfred', MAIN_AGENT_ID: 'alfred' }))
 vi.mock('../web/agent-process.js', () => ({ withTmuxBatch: (fn: () => unknown) => fn(),  capturePane: (session: string) => { h.captured.push(session); return h.pane }, isAgentRunning: () => false, agentSessionName: (a: string) => a, agentHasChannel: () => true }))
 vi.mock('../web/agent-config.js', () => ({ listAgentNames: () => [], readAgentRemoteHost: () => null }))
 vi.mock('../web/state-observer.js', () => ({ STATE_OBSERVER_STATE_DIR: '/nonexistent-state-dir' }))
@@ -38,10 +38,10 @@ vi.mock('../web/active-model.js', () => ({ readTranscriptMtimeAcrossConfigDirs: 
 vi.mock('../web/inbound-probe.js', () => ({ mainConfigRoots: () => [] }))
 vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'main-test', withoutMainAgent: (a: string[]) => a }))
 vi.mock('../web/channel-monitor.js', () => ({
-  resumeMarveenSession: vi.fn(async () => true),
+  resumeAlfredSession: vi.fn(async () => true),
   sendAlert: h.alert,
   lastMainRespawnAt: () => 0,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 120_000,
+  ALFRED_POST_RESPAWN_GRACE_MS: 120_000,
 }))
 vi.mock('../web/routine-alert.js', () => ({ sendRoutineAlert: h.routineUnused, sendOwnerActionAlert: h.ownerAction }))
 
@@ -102,12 +102,12 @@ describe('the main session holding a peer message', () => {
     expect(alertsBeforePoll[6]).toBe(0)          // nothing through poll 5 (185 s)
     expect(h.ownerAction).toHaveBeenCalledTimes(1)   // poll 6 (215 s)
     const [key, text] = h.ownerAction.mock.calls[0]
-    expect(key).toBe('agent-wait:marveen')
-    expect(text).toContain('Marveen')
+    expect(key).toBe('agent-wait:alfred')
+    expect(text).toContain('Alfred')
     expect(text).toContain('másik sessionből')
     expect(text).toContain('tmux attach -t main-test')
     expect(h.alert).not.toHaveBeenCalled()
-    expect(h.routineUnused).not.toHaveBeenCalled()   // never the gated path (Szotasz/marveen#2353 review)
+    expect(h.routineUnused).not.toHaveBeenCalled()   // never the gated path (gbpepe/alfred#2353 review)
     expect(sentKeys()).toEqual([])
     // The pane read is the main channels session's: with any other session the
     // alert would go silent while the canned pane kept this test green (#2079 review, K7).

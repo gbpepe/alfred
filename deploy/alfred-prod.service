@@ -1,0 +1,34 @@
+[Unit]
+Description=Alfred Multi-Agent Core (Production)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alfred
+Group=alfred
+WorkingDirectory=/opt/alfred-prod
+EnvironmentFile=/opt/alfred-prod/.env
+Environment=NODE_ENV=production
+Environment=ALFRED_ENV=production
+Environment=ALFRED_DB_PATH=store/alfred-prod.db
+Environment=NODE_OPTIONS=--max-old-space-size=384
+ExecStart=/usr/bin/node /opt/alfred-prod/dist/alfred/run.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+
+# Sized for 2 GB RAM VPS alongside alfred-ops (256M) and on-demand alfred-test (512M)
+MemoryHigh=512M
+MemoryMax=768M
+CPUQuota=75%
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/alfred-prod/store /opt/alfred-prod/workspaces /opt/alfred-prod/.claude
+SyslogIdentifier=alfred-prod
+
+[Install]
+WantedBy=multi-user.target

@@ -59,7 +59,7 @@ export function purgeFromMcpListCache(name: string): boolean {
 let mcpListWorkingDir: string | null = null
 function getMcpListWorkingDir(): string {
   if (mcpListWorkingDir && existsSync(mcpListWorkingDir)) return mcpListWorkingDir
-  mcpListWorkingDir = mkdtempSync(join(tmpdir(), 'marveen-mcp-list-'))
+  mcpListWorkingDir = mkdtempSync(join(tmpdir(), 'alfred-mcp-list-'))
   return mcpListWorkingDir
 }
 
@@ -167,8 +167,8 @@ export function refreshMcpListCache(): Promise<McpListCache> {
 
 export function startMcpListChecker(): void {
   // Delayed first run so the main main-channels tmux session has time to
-  // claim the telegram poller token before `claude mcp list` tries to
+  // claim the channel poller token before `claude mcp list` tries to
   // health-check the plugin. No periodic auto-refresh: every run spawns
-  // the telegram plugin for a health check, which can race the live bot.
+  // the channel plugin for a health check, which can contend with the live bot.
   setTimeout(() => { refreshMcpListCache().catch(() => {}) }, 30_000)
 }

@@ -1,9 +1,9 @@
 // 8c338dc4: the opt-in "continue" variant of the main agent's plan rotation
 // (POST /api/claude-plans/rotate with "continue": true).
 //
-// The default rotation restarts the main session FRESH (hardRestartMarveenChannels).
+// The default rotation restarts the main session FRESH (hardRestartAlfredChannels).
 // The continue variant restarts it through the existing --continue path
-// (resumeMarveenSession: respawn-pane, the two reaps, the first-run-picker guard,
+// (resumeAlfredSession: respawn-pane, the two reaps, the first-run-picker guard,
 // the resume-summary modal, the identity and plugin follow-ups, the post-resume
 // plugin guard), so the agent picks up the SAME conversation. The new plan's
 // credentials still apply: the respawn command resolves CLAUDE_CONFIG_DIR and the
@@ -66,7 +66,7 @@ export type ContinueRestartResult =
 /**
  * The restart itself, with its steps injected so it can be tested without tmux
  * (channel-monitor.ts binds the real ones: restartMainForRotationContinue).
- * The consent stamp first, as hardRestartMarveenChannels does (FABLEFALL1): the
+ * The consent stamp first, as hardRestartAlfredChannels does (FABLEFALL1): the
  * respawned claude boots from the same shared roots either way. When the resume
  * fails (e.g. the pane is gone) the fresh hard restart is the fallback: it still
  * lands on the new plan, only the conversation is not kept, and the result says so.
@@ -77,7 +77,7 @@ export async function runMainContinueRestart(steps: {
   fresh: () => { ok: boolean; error?: string }
   warn: (message: string) => void
 }): Promise<ContinueRestartResult> {
-  try { steps.stampConsent() } catch { /* backstop handlers remain, as in hardRestartMarveenChannels */ }
+  try { steps.stampConsent() } catch { /* backstop handlers remain, as in hardRestartAlfredChannels */ }
   if (await steps.resume()) return { ok: true, mode: 'continue' }
   steps.warn('Claude plan rotation: the --continue resume failed, falling back to a fresh restart (the new plan still applies)')
   const r = steps.fresh()

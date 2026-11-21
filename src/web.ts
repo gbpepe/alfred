@@ -28,23 +28,18 @@ import { detectLanIp } from './web/network-info.js'
 import { AGENTS_BASE_DIR, listAgentNames, listAllAgentNames } from './web/agent-config.js'
 import { forEachAgentIsolated } from './web/agent-seed-loop.js'
 import { retireRotationHeartbeatTask } from './web/claude-rotation-heartbeat.js'
-import { ensureAgentHooks, ensureProjectRootInClaudeMd, ensureAgentStalenessHook, ensureAgentProvenanceHook, ensureEgressGate, ensureBashEgressDeny, ensureBashEgressParser, ensureMainScopeBashEgressParser, ensureGovernanceGateCommands, ensureTelegramCopyGate, ensureChildClaudeGuard, ensureWebSearchEnvelope, ensureExtraHookEntries, ensureMainScopeExtraHookEntries, extraHooksConfigPath, ensureQuarantineReader, watchEgressAllowlistForReaderRender, ensureDefaultScheduledTasks, agentSettingsPath, ensureAutonomySection, ensureSkillsPathTrapSection, ensureSystemDirectiveAuthSection, ensureAgentIdHeaderSection, ensureMemorySearchLabelSection, ensureMemoryFactChangeSection, ensureFleetAuthSection, ensureEvidenceSection, ensureMcpListChannelSection, ensureMessageCloseSection, ensureApiHelperSection, ensureBackgroundCheckpointSection, ensurePaneAtEscapeSection } from './web/agent-scaffold.js'
+import { ensureAgentHooks, ensureProjectRootInClaudeMd, ensureAgentStalenessHook, ensureAgentProvenanceHook, ensureEgressGate, ensureBashEgressDeny, ensureBashEgressParser, ensureMainScopeBashEgressParser, ensureGovernanceGateCommands, ensureChildClaudeGuard, ensureWebSearchEnvelope, ensureExtraHookEntries, ensureMainScopeExtraHookEntries, extraHooksConfigPath, ensureQuarantineReader, watchEgressAllowlistForReaderRender, ensureDefaultScheduledTasks, agentSettingsPath, ensureAutonomySection, ensureSkillsPathTrapSection, ensureSystemDirectiveAuthSection, ensureAgentIdHeaderSection, ensureMemorySearchLabelSection, ensureMemoryFactChangeSection, ensureFleetAuthSection, ensureEvidenceSection, ensureMcpListChannelSection, ensureMessageCloseSection, ensureApiHelperSection, ensureBackgroundCheckpointSection, ensurePaneAtEscapeSection } from './web/agent-scaffold.js'
 import { shouldRegisterHooks, shouldRunBackgroundServices, ALLOW_SECOND_INSTANCE_SERVICES_KEY, pruneStaleHooksFromSettingsFile } from './web/hook-registration-guard.js'
 import { extraHookScriptNames } from './web/extra-hook-entries.js'
 import { mainAgentConfigDirIfSeparate } from './web/agent-process.js'
-import { refreshMarveenBotUsername } from './web/telegram.js'
 import { startMessageRouter } from './web/message-router.js'
 import { countDashboardUsers, createAgentMessage } from './db.js'
-import { setOwnerChatMissingSink, setOwnerRelayLang, setOwnerRelaySink } from './notify.js'
-import { approvalTextLang } from './web/agent-text-lang.js'
+import { setOwnerChatMissingSink } from './notify.js'
 import { startUpdateChecker } from './web/update-checker.js'
 import { startScheduleRunner, startHeartbeatGapGuard } from './web/schedule-runner.js'
 import { startChannelPluginMonitor } from './web/channel-monitor.js'
 import { startInboundProber } from './web/inbound-probe.js'
 import { startChannelHealthMonitor } from './web/channel-health-monitor.js'
-import { startChannelIntakeMonitor } from './web/channel-intake-monitor.js'
-import { startTelegramInboundReplay } from './web/telegram-inbound-replay.js'
-import { startTeamsCredentialMonitor } from './web/teams-credential-monitor.js'
 import { startStuckInputWatcher } from './web/stuck-input-watcher.js'
 import { startMessageSeenSweep } from './web/message-seen-sweep.js'
 import { startMidTurnCommandWatcher } from './web/midturn-commands.js'
@@ -68,8 +63,6 @@ import { tryHandleMessages } from './web/routes/messages.js'
 import { tryHandleFederation } from './web/routes/federation.js'
 import { startFederationPoller } from './web/federation/poller.js'
 import { registerBuiltinCommands } from './web/builtin-commands.js'
-import { registerTopicCommands } from './web/topic-commands.js'
-import { telegramTopicsEnabled } from './web/telegram-topics.js'
 import { tryHandleCommands } from './web/routes/commands.js'
 import { initCustomCommands } from './web/custom-commands.js'
 import { sweepModelHold, armHoldExpiryFromFile } from './web/main-model.js'
@@ -104,7 +97,7 @@ import { tryHandleReviewAction } from './web/routes/review-action.js'
 import { tryHandleAgents } from './web/routes/agents.js'
 import { tryHandleClaudePlans } from './web/routes/claude-plans.js'
 import { tryHandleClaudePlansLogin } from './web/routes/claude-plans-login.js'
-import { tryHandleMarveen } from './web/routes/marveen.js'
+import { tryHandleAlfred } from './web/routes/alfred.js'
 import { tryHandleRecall } from './web/routes/recall.js'
 import { tryHandleBackgroundTasks, sweepOrphanedBackgroundTasks } from './web/routes/background-tasks.js'
 import { tryHandleOverview } from './web/routes/overview.js'
@@ -112,12 +105,10 @@ import { tryHandleUpdates } from './web/routes/updates.js'
 import { tryHandleOnboarding } from './web/routes/onboarding.js'
 import { tryHandleStatus } from './web/routes/status.js'
 import { tryHandleAutonomy } from './web/routes/autonomy.js'
-import { tryHandleApprovals, startApprovalTimeoutSweeper, startApprovalReactionSweeper } from './web/routes/approvals.js'
+import { tryHandleApprovals, startApprovalTimeoutSweeper } from './web/routes/approvals.js'
 import { registerAgentCreateConsumer, sweepAgentCreateOnStart } from './web/agent-create-approval.js'
-import { startGromzoDecisionWatch } from './web/agent-create-gromzo.js'
 import { tryHandleDesktopLock, sweepExpiredDesktopLock } from './web/routes/desktop-lock.js'
 import { tryHandleFleetFreeze } from './web/routes/fleet-freeze.js'
-import { initGromzoConsentWatch, tryHandleGromzo } from './web/routes/gromzo.js'
 import { tryHandleTokenUsage } from './web/routes/token-usage.js'
 import { tryHandleCosts, startCostsSyncTask } from './web/routes/costs.js'
 import { tryHandleIdeas } from './web/routes/ideas.js'
@@ -293,7 +284,7 @@ export function startWebServer(port = 3420): http.Server {
       if (await tryHandleAgents(routeCtx, WEB_DIR)) return
       if (await tryHandleClaudePlansLogin(routeCtx)) return
       if (await tryHandleClaudePlans(routeCtx)) return
-      if (await tryHandleMarveen(routeCtx, WEB_DIR)) return
+      if (await tryHandleAlfred(routeCtx, WEB_DIR)) return
       if (await tryHandleBackgroundTasks(routeCtx)) return
       if (await tryHandleRecall(routeCtx)) return
       if (await tryHandleOverview(routeCtx)) return
@@ -306,7 +297,6 @@ export function startWebServer(port = 3420): http.Server {
       if (await tryHandleApprovals(routeCtx)) return
       if (await tryHandleDesktopLock(routeCtx)) return
       if (await tryHandleFleetFreeze(routeCtx)) return
-      if (await tryHandleGromzo(routeCtx)) return
       if (await tryHandleTokenUsage(routeCtx)) return
       if (await tryHandleCosts(routeCtx)) return
       if (await tryHandleIdeas(routeCtx)) return
@@ -413,7 +403,7 @@ export function startWebServer(port = 3420): http.Server {
 
   // DOCKERHTTPS1119: the public listener (public-access.ts). Same handler; each of its requests is marked public
   // first, so the gate accepts only browser cookies on it. Only when WEB_PUBLIC_PORT is set (first-boot, with
-  // MARVEEN_DOMAIN); the compose file never publishes this port to the host, Caddy reaches it on the compose network.
+  // ALFRED_DOMAIN); the compose file never publishes this port to the host, Caddy reaches it on the compose network.
   const publicPort = publicListenerPort({ WEB_PUBLIC_PORT })
   if (publicPort !== null && publicPort !== port) {
     const publicServer = http.createServer((req, res) => {
@@ -429,7 +419,7 @@ export function startWebServer(port = 3420): http.Server {
         const code = issueSetupCode()
         const site = DASHBOARD_PUBLIC_URL || 'your HTTPS address'
         process.stdout.write(
-          `\n  Marveen setup code (one use, valid ${SETUP_CODE_TTL_MS / 3600000} hours): ${code}\n` +
+          `\n  Alfred setup code (one use, valid ${SETUP_CODE_TTL_MS / 3600000} hours): ${code}\n` +
           `  Open ${site} and enter it to set the dashboard password. Restart the container for a new code.\n\n`,
         )
       }
@@ -490,7 +480,7 @@ export function startWebServer(port = 3420): http.Server {
 
   // WEB_ONLY=true disables all background services (scheduler, pollers, monitors).
   // Used for staging preview instances that must not conflict with the live fleet
-  // (duplicate schedule execution, Telegram 409, tmux manipulation, etc.).
+  // (duplicate schedule execution, poller contention, tmux manipulation, etc.).
   const webOnly = process.env['WEB_ONLY'] === 'true'
   if (webOnly) {
     logger.info('[staging] WEB_ONLY mode: background services disabled')
@@ -506,36 +496,11 @@ export function startWebServer(port = 3420): http.Server {
   if (servicesOff && !webOnly) logger.warn({ reason: services.reason }, 'Second instance: background services disabled (start it with ' + ALLOW_SECOND_INSTANCE_SERVICES_KEY + '=1 in the environment to run them)')
   if (services.override) logger.warn({ reason: services.reason }, 'Second instance with ' + ALLOW_SECOND_INSTANCE_SERVICES_KEY + '=1: background services RUN (schedule runner included)')
 
-  // GROMZOBRIDGEWIZARD1107 D1: a pending Gromzo approval comes back after a restart; the server checks it on its own only
-  // with the background services on (finishing a switch restarts a live session).
-  initGromzoConsentWatch({ watch: !servicesOff })
-
   const routerInterval = servicesOff ? undefined : startMessageRouter()
   if (!servicesOff) logger.info('Agent message router started (5s poll)')
   // Card 3ed09d25: an alert whose owner chat cannot be resolved reaches the main
   // agent's inbox (once an hour) instead of vanishing; the log line fires every time.
   if (!servicesOff) setOwnerChatMissingSink((text) => { createAgentMessage('system', MAIN_AGENT_ID, text) })
-  // GROMZONOPROVIDER1108: on a gromzo install every owner alert goes to the main agent, which relays it over Gromzo.
-  if (!servicesOff) setOwnerRelaySink((text) => { createAgentMessage('system', MAIN_AGENT_ID, text) })
-  setOwnerRelayLang(() => approvalTextLang())
-  // GROMZONOPROVIDER1108: update.sh's provider migration leaves a marker; the owner hears it once, through the main
-  // agent (the install now talks through Gromzo). The marker is renamed after the notice, so it is said once.
-  if (!servicesOff) {
-    const marker = join(STORE_DIR, 'gromzo-provider-migrated.json')
-    if (existsSync(marker)) {
-      try {
-        createAgentMessage('system', MAIN_AGENT_ID, approvalTextLang() === 'en'
-          ? '[owner-notice] Tell the owner over Gromzo, in one sentence: Marveen\'s channel is Gromzo from now on (it was a ' +
-            'Telegram setting with no token, so the main session kept restarting). To undo: CHANNEL_PROVIDER_PREV in the install settings.'
-          : '[owner-notice] Tájékoztasd a tulajdonost a Gromzón, egy mondatban: a Marveen csatornája mostantól a Gromzo ' +
-            '(korábban egy Telegram-beállítás volt token nélkül, ezért a fő munkamenet újra és újra elindult). ' +
-            'Visszaállítás: CHANNEL_PROVIDER_PREV a telepítés beállításaiban.')
-        renameSync(marker, `${marker}.notified`)
-      } catch (err) {
-        logger.warn({ err }, 'gromzo provider migration notice could not be queued')
-      }
-    }
-  }
 
   const scheduleInterval = servicesOff ? undefined : startScheduleRunner()
   if (!servicesOff) logger.info('Schedule runner started (60s poll)')
@@ -546,7 +511,7 @@ export function startWebServer(port = 3420): http.Server {
   // heartbeat / scheduled generation after boot does not pay the cold-boot
   // latency. runViaWorker still lazy-starts + restarts it on demand, so this is
   // a warm-up, not a hard dependency. Skipped on the SDK rollback backend.
-  if (!servicesOff && (process.env.MARVEEN_AGENT_BACKEND || 'worker').toLowerCase() !== 'sdk') {
+  if (!servicesOff && (process.env.ALFRED_AGENT_BACKEND || 'worker').toLowerCase() !== 'sdk') {
     import('./web/agent-worker.js')
       .then(m => { m.startWorkerSession(); logger.info('Interactive agent worker pre-started') })
       .catch(err => logger.warn({ err }, 'Failed to pre-start agent worker (will lazy-start on first use)'))
@@ -563,7 +528,7 @@ export function startWebServer(port = 3420): http.Server {
   // event loop alive, so that is not just a leak: the process would never exit.
   // The other monitors are synchronous calls and cannot hit this.
   let workerLivenessCancelled = false
-  if (!servicesOff && (process.env.MARVEEN_AGENT_BACKEND || 'worker').toLowerCase() !== 'sdk') {
+  if (!servicesOff && (process.env.ALFRED_AGENT_BACKEND || 'worker').toLowerCase() !== 'sdk') {
     import('./web/worker-liveness.js')
       .then(m => {
         if (workerLivenessCancelled) return
@@ -593,18 +558,6 @@ export function startWebServer(port = 3420): http.Server {
 
   const channelHealthInterval = servicesOff ? undefined : startChannelHealthMonitor()
   if (!servicesOff) logger.info('Channel MCP health monitor started (60s poll, 45s offset)')
-
-  // The pane-grep above only sees a channel that SAYS it failed. This one asks
-  // Telegram whether anyone is still fetching the agent's updates, which is the
-  // only signal a silently deaf poller leaves behind.
-  const channelIntakeInterval = servicesOff ? undefined : startChannelIntakeMonitor(PROJECT_ROOT)
-  if (!servicesOff) logger.info('Channel intake monitor started (5min poll, 100s offset)')
-  // A message that reaches a sub-agent's Telegram plugin before Claude Code has registered its channel handler (the
-  // first seconds after every restart) is dropped silently; this re-delivers it from the plugin's own inbound log.
-  const stopTelegramInboundReplay = servicesOff ? undefined : startTelegramInboundReplay()
-  if (!servicesOff) logger.info('Telegram inbound replay started (60s poll, 90s offset)')
-  const teamsCredentialInterval = servicesOff ? undefined : startTeamsCredentialMonitor()
-  if (!servicesOff) logger.info('Teams credential monitor started (daily, 5min offset)')
 
   // CostOps: reflect the local config's fixed costs into the ledger once at boot + every
   // 10 minutes. Deliberately NOT done inside the GET /api/costs/summary handler -- a read
@@ -673,12 +626,9 @@ export function startWebServer(port = 3420): http.Server {
   // token estimates stay fresh without requiring a manual dashboard visit.
   // Sweep timed-out pending approvals every minute
   const approvalTimeoutInterval = startApprovalTimeoutSweeper()
-  const approvalReactionInterval = startApprovalReactionSweeper()
   // AGENTCREATEPR2-1119: the agent_create consumer, and the start-up sweep of requests decided while it could not run
   registerAgentCreateConsumer()
   void sweepAgentCreateOnStart().catch((err) => logger.error({ err }, 'agent_create start-up sweep failed'))
-  // AGENTCREATEPR3-1119: the owner's Gromzo answers to agent_create rows, read from mxd every 15 s
-  if (!servicesOff) startGromzoDecisionWatch()
 // Desktop-lock TTL sweeper. Independent of the schedule gate on purpose: an
 // abandoned lock must expire (and be reported) even on a day when no
 // desktop-driving round happens to be due.
@@ -711,22 +661,17 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
   // NOTE: startMcpListChecker() is intentionally NOT called here.
   //
   // Root cause: calling `claude mcp list` at boot time (30s delay) spawns the
-  // Telegram plugin for a health check. The plugin claims the bot-token poller
-  // slot, which 409-kills the live session-bridge process that already holds
-  // the same token. On every deploy this caused the Telegram channel to go
+  // channel plugin for a health check. The plugin claims the bot-token poller
+  // slot, which disrupts the live session-bridge process that already holds
+  // the same token. On every deploy this caused the channel to go
   // offline within 33s of startup (3/3 observed deploys, 2026-06-04).
   //
   // The Connectors page already has a manual "Refresh" button that calls
   // refreshMcpListCache() on demand. The cache starts empty; users see their
   // connectors after the first manual refresh.
   //
-  // Related: PR #269 fixed a DIFFERENT 409 source (runtime poller-flapping /
-  // channel-coordinator 409 cooldown hysteresis). That fix and this one are
-  // complementary -- both 409 vectors must be addressed.
-
-  // Warm the Marveen bot username cache so /api/marveen returns @username on
-  // the first dashboard load. Re-fetched lazily otherwise.
-  refreshMarveenBotUsername().catch(() => {})
+  // Related: PR #269 fixed a DIFFERENT source of contention (runtime poller-
+  // flapping / cooldown hysteresis). Both vectors must be addressed.
 
   // Reconcile the federation onboarding block in the main agent's CLAUDE.md
   // EARLY (before the channels session may read the file) and only on live
@@ -746,7 +691,7 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
     ensureEvidenceSection(MAIN_AGENT_ID)
     ensureMcpListChannelSection(MAIN_AGENT_ID)
     ensureMessageCloseSection(MAIN_AGENT_ID)
-    // VOICETOKENLEAK1101 PR-A2 (Samu 65192, Marveen 65196): the helper recipes as a marker block only; the body is untouched.
+    // VOICETOKENLEAK1101 PR-A2 (Samu 65192, Alfred 65196): the helper recipes as a marker block only; the body is untouched.
     ensureApiHelperSection(MAIN_AGENT_ID)
     ensureBackgroundCheckpointSection(MAIN_AGENT_ID)
     // ENVATLEAK1114: the backslash the delivery layer puts before an at-sign, explained to the reader.
@@ -754,11 +699,9 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
   }
 
   // Owner slash commands (CMD920, spec D-4): the registry the main session's
-  // UserPromptSubmit hook (scripts/hooks/marveen-commands.py) dispatches into
+  // UserPromptSubmit hook (scripts/hooks/alfred-commands.py) dispatches into
   // through POST /api/commands/dispatch, answered without a main-session turn.
   registerBuiltinCommands()
-  // /topic exists only with the topics switch on (topic-commands.ts header).
-  if (telegramTopicsEnabled()) registerTopicCommands()
   if (!servicesOff) {
     initCustomCommands()
     // The /model hold revert: a one-shot timer at the exact expiry (re-armed
@@ -791,7 +734,6 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
       const bashEgressUncovered: string[] = []
       const bashParserPatched: string[] = []
       const govPatched: string[] = []
-      const copyGatePatched: string[] = []
       const childGuardPatched: string[] = []
       const envelopePatched: string[] = []
       const extraHooksPatched: string[] = []
@@ -803,7 +745,7 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
       // The main agent's install-local extras (store/extra-hooks.json, "scope": "main") into the same file.
       if (ensureMainScopeExtraHookEntries()) logger.info({ path: '.claude/settings.local.json' }, 'main-scope extra hook entries (store/extra-hooks.json) synced')
       // Include the main agent (MAIN_AGENT_ID) so the voice hook is also seeded
-      // into ~/.claude/settings.json alongside existing hooks (e.g. telegram_progress.py).
+      // into ~/.claude/settings.json alongside existing hooks.
       // listALLAgentNames, not listAgentNames (HBGATEWIRE826): the
       // .hidden-from-dashboard sentinel is a UI concern, but this loop used it
       // to skip hook-seeding too -- the heartbeat agent therefore ran with
@@ -836,7 +778,6 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
         else if (ensureBashEgressDeny(agentName, bashDenyDir)) bashEgressPatched.push(agentName)
         if (ensureBashEgressParser(agentName)) bashParserPatched.push(agentName)
         if (ensureGovernanceGateCommands(agentName)) govPatched.push(agentName)
-        if (ensureTelegramCopyGate(agentName)) copyGatePatched.push(agentName)
         if (ensureChildClaudeGuard(agentName)) childGuardPatched.push(agentName)
         if (ensureWebSearchEnvelope(agentName)) envelopePatched.push(agentName)
         // Install-local extras (store/extra-hooks.json) LAST: after every
@@ -868,9 +809,8 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
         'Bash egress deny NOT applied to the main agent: it runs on the shared user config root, which is also the operator\'s own shell. Give it a config dir of its own (MAIN_AGENT_ISOLATED_CONFIG / MAIN_AGENT_CONFIG_DIR) to cover it without covering the operator.')
       if (bashParserPatched.length) logger.info({ patched: bashParserPatched }, 'bash-egress-parser Bash hook backfilled into agent settings.json (EGRESSPARSER923)')
       if (govPatched.length) logger.info({ patched: govPatched }, 'governance gate hook commands upgraded to absolute node path in agent settings.json')
-      if (copyGatePatched.length) logger.info({ patched: copyGatePatched }, 'outgoing-copy-gate wired onto the Telegram send tools in agent settings.json (GATECOPY828)')
       if (childGuardPatched.length) logger.info({ patched: childGuardPatched }, 'child-claude channel guard wired onto Bash in agent settings.json (CHILDCLAUDEPOLLER1010)')
-      if (envelopePatched.length) logger.info({ patched: envelopePatched }, 'WebSearch untrusted-content envelope wired as PostToolUse in agent settings.json (MARVEENGAPS1020)')
+      if (envelopePatched.length) logger.info({ patched: envelopePatched }, 'WebSearch untrusted-content envelope wired as PostToolUse in agent settings.json (ALFREDGAPS1020)')
       if (extraHooksPatched.length) logger.info({ patched: extraHooksPatched }, 'install-local extra hook entries (store/extra-hooks.json) synced into agent settings.json')
     } catch (err) {
       logger.warn({ err }, 'Agent hook backfill skipped')
@@ -927,9 +867,6 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
     workerLivenessCancelled = true
     if (workerLivenessInterval) clearInterval(workerLivenessInterval)
     clearInterval(channelHealthInterval)
-    if (channelIntakeInterval) clearInterval(channelIntakeInterval)
-    if (stopTelegramInboundReplay) stopTelegramInboundReplay()
-    if (teamsCredentialInterval) clearInterval(teamsCredentialInterval)
     if (costsSyncInterval) clearInterval(costsSyncInterval)
     clearInterval(stuckInputInterval)
     if (messageSeenInterval) clearInterval(messageSeenInterval)
@@ -942,7 +879,6 @@ setInterval(() => { try { sweepExpiredDesktopLock() } catch { /* never kill the 
     clearInterval(kanbanArchiveInterval)
     clearInterval(contextGuardInterval)
     clearInterval(approvalTimeoutInterval)
-    clearInterval(approvalReactionInterval)
     clearInterval(authSessionSweepInterval)
     eventLoopLag.stop()
     clearInterval(updateCheckerInterval)

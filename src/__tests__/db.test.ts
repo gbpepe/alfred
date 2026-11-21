@@ -33,7 +33,7 @@ import { DB_FILENAME } from '../config.js'
 
 beforeAll(() => {
   // Teszt adatbázis inicializálás -- in-memory, hogy a teszt SOHA ne irjon a
-  // valodi store/claudeclaw.db-be (kulonben a sessions/memories/pending-task
+  // valodi store/alfred.db-be (kulonben a sessions/memories/pending-task
   // insertek -- pl. "Szeretem a kavet" -- prod junk-memoriakent landolnak).
   process.env.NODE_ENV = 'test'
   initDatabase(':memory:')
@@ -302,7 +302,7 @@ describe('pending task retries', () => {
 
 describe('database file permissions', () => {
   // Run the whole tightening check against a throwaway DB in the OS temp dir,
-  // never the real store/claudeclaw.db. initDatabase() now applies pre-create
+  // never the real store/alfred.db. initDatabase() now applies pre-create
   // + tightenDbPermissions to any on-disk override path (only ':memory:' is
   // exempt), so a temp file exercises the exact prod tightening logic without
   // a single touch to the prod store.
@@ -318,7 +318,7 @@ describe('database file permissions', () => {
   beforeAll(async () => {
     const { mkdtempSync, chmodSync } = await import('node:fs')
     const { tmpdir } = await import('node:os')
-    tmpDir = mkdtempSync(join(tmpdir(), 'claudeclaw-perm-'))
+    tmpDir = mkdtempSync(join(tmpdir(), 'alfred-perm-'))
     tmpDbPath = join(tmpDir, DB_FILENAME)
     // First init creates the file + sidecars (already tightened).
     initDatabase(tmpDbPath)

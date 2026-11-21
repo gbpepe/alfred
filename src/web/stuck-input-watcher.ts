@@ -27,7 +27,7 @@ import { whileNotFrozen } from './fleet-freeze.js'
 export function parkedGiveUpAlertText(label: string, isMain: boolean): string {
   const head = `⚠️ A(z) ${label} agens bemenete beragadt és az auto-recovery (Enter + clear/re-inject) nem szabadította ki.`
   if (isMain) {
-    return `${head} Valószínűleg kézi restart kell: a dashboardon a restart gomb (foglalt panelnél rákérdez, és megerősítés után kényszerítve indít), vagy POST /api/marveen/restart {"force": true}. A kényszerített restart megszakítja a futó kört.`
+    return `${head} Valószínűleg kézi restart kell: a dashboardon a restart gomb (foglalt panelnél rákérdez, és megerősítés után kényszerítve indít), vagy POST /api/alfred/restart {"force": true}. A kényszerített restart megszakítja a futó kört.`
   }
   return `${head} Valószínűleg kézi restart kell: POST /api/agents/${label}/restart vagy a dashboardon.`
 }
@@ -69,7 +69,7 @@ export function shouldAlertParkedGiveUp(opts: {
 }
 
 // Backstop recovery for a swallowed Enter on the channel-notification
-// path. Inbound Telegram/Slack messages are delivered into the session by
+// path. Inbound channel messages are delivered into the session by
 // the channel plugin, NOT by sendPromptToSession, so the post-send
 // Enter-retry budget there cannot cover them. After a long thinking turn
 // the closing Enter is occasionally dropped and the user's message is
@@ -245,7 +245,7 @@ function bareEnterRecovery(label: string, session: string, host: string | null):
 // that is sub-agent-spawn-only) would otherwise be re-typed + submitted as a
 // forged message (the 2026-06-26 phantom-injection class). With FALSE, MAIN
 // still gets the fast clear+re-inject of a COMPLETE parked <channel> block
-// (its real goal -- a stranded Telegram message; that path is independent of
+// (its real goal -- a stranded channel message; that path is independent of
 // this flag), only the ghost-risky plain-text branch is closed. Local
 // sub-agents pass TRUE: the env-var strips their ghost at the source, so their
 // plain re-inject (an inter-agent message the TUI failed to submit) is safe.

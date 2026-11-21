@@ -60,7 +60,7 @@ describe('every fleet launch path disables the Agent view', () => {
       pluginId: 'telegram@claude-plugins-official',
       model: 'claude-opus-4-8[1m]',
       config: mainConfigDecisionForTest(),
-      channelStateEnv: { name: 'TELEGRAM_STATE_DIR', dir: '/opt/marveen/.claude/channels/telegram' },
+      channelStateEnv: { name: 'TELEGRAM_STATE_DIR', dir: '/opt/alfred/.claude/channels/telegram' },
       continueSession: false,
     })
     expect(cmd).toContain(`export ${FLAG}`)

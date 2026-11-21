@@ -51,11 +51,11 @@ describe('render_persona_file', () => {
   it('renders the real CLAUDE.md template literally with /, &, \\ and a newline in both names', () => {
     const f = install()
     try {
-      const r = bash([`. ${q(LIB)}`, `OWNER_NAME=${q(OWNER)}; BOT_NAME=${q(BOT)}; MAIN_AGENT_ID=marveen; INSTALL_DIR=${q(f.dir)}; WEB_PORT=3421`,
+      const r = bash([`. ${q(LIB)}`, `OWNER_NAME=${q(OWNER)}; BOT_NAME=${q(BOT)}; MAIN_AGENT_ID=alfred; INSTALL_DIR=${q(f.dir)}; WEB_PORT=3421`,
         `RENDER_CHAT_ID=4242 RENDER_TIMEZONE=${TZ} render_persona_file templates/CLAUDE.md.template CLAUDE.md; echo rc=$?`].join('\n'), f.dir)
       expect(r.out).toBe('rc=0\n')
       expect(readFileSync(join(f.dir, 'CLAUDE.md'), 'utf-8')).toBe(lit(HU_CLAUDE,
-        { OWNER_NAME: OWNER, BOT_NAME: BOT, MAIN_AGENT_ID: 'marveen', INSTALL_DIR: f.dir, WEB_PORT: '3421', CHAT_ID: '4242', TIMEZONE: TZ }))
+        { OWNER_NAME: OWNER, BOT_NAME: BOT, MAIN_AGENT_ID: 'alfred', INSTALL_DIR: f.dir, WEB_PORT: '3421', CHAT_ID: '4242', TIMEZONE: TZ }))
       expect(tempLeft(f.dir)).toEqual([])
     } finally { rmSync(f.base, { recursive: true, force: true }) }
   })
@@ -93,7 +93,7 @@ const PATHS: Array<{ name: string; block: () => string; prelude: (d: string) => 
     prelude: (d) => `GREEN=""; NC=""; RED=""; REGEN_CLAUDEMD=1; CLAUDE_MD=${q(join(d, 'CLAUDE.md'))}; . ${q(LIB)}` },
   { name: 'docker/first-boot.sh', soul: true, chat: '0',
     block: () => between(read('docker/first-boot.sh'), '# DOCKERSEEDREFRESH1108 / PERSONARENDERLITERAL1108', '\n# PERSONAESC1107 seed A: the seeds'),
-    prelude: () => 'say() { echo "first-boot: $*"; }; AGENT_ID=marveen' },
+    prelude: () => 'say() { echo "first-boot: $*"; }; AGENT_ID=alfred' },
 ]
 
 describe('every persona render path writes the names literally and never leaves CLAUDE.md empty', () => {
@@ -101,12 +101,12 @@ describe('every persona render path writes the names literally and never leaves 
     it(`${p.name}: /, &, \\ and a newline in the owner's and the bot's name`, () => {
       const f = install()
       try {
-        const script = ['set -u', `cd ${q(f.dir)}`, `INSTALL_DIR=${q(f.dir)}`, `OWNER_NAME=${q(OWNER)}; BOT_NAME=${q(BOT)}; MAIN_AGENT_ID=marveen; WEB_PORT=3421`,
+        const script = ['set -u', `cd ${q(f.dir)}`, `INSTALL_DIR=${q(f.dir)}`, `OWNER_NAME=${q(OWNER)}; BOT_NAME=${q(BOT)}; MAIN_AGENT_ID=alfred; WEB_PORT=3421`,
           p.prelude(f.dir), p.block(), 'echo "end rc=$?"'].join('\n')
         const r = bash(script, f.dir)
         expect(r.out, r.out).toContain('end rc=0')
         expect(readFileSync(join(f.dir, 'CLAUDE.md'), 'utf-8')).toBe(lit(HU_CLAUDE,
-          { OWNER_NAME: OWNER, BOT_NAME: BOT, MAIN_AGENT_ID: 'marveen', INSTALL_DIR: f.dir, WEB_PORT: '3421', CHAT_ID: p.chat, TIMEZONE: TZ }))
+          { OWNER_NAME: OWNER, BOT_NAME: BOT, MAIN_AGENT_ID: 'alfred', INSTALL_DIR: f.dir, WEB_PORT: '3421', CHAT_ID: p.chat, TIMEZONE: TZ }))
         if (p.soul) expect(readFileSync(join(f.dir, 'SOUL.md'), 'utf-8')).toBe(lit(HU_SOUL, { OWNER_NAME: OWNER, BOT_NAME: BOT }))
         expect(tempLeft(f.dir)).toEqual([])
       } finally { rmSync(f.base, { recursive: true, force: true }) }
@@ -117,7 +117,7 @@ describe('every persona render path writes the names literally and never leaves 
       try {
         if (p.name.startsWith('update.sh')) writeFileSync(join(f.dir, 'CLAUDE.md'), 'OLD instructions\n')
         chmodSync(join(f.dir, 'templates', 'CLAUDE.md.template'), 0o000)
-        const script = ['set -u', `cd ${q(f.dir)}`, `INSTALL_DIR=${q(f.dir)}`, `OWNER_NAME=${q(OWNER)}; BOT_NAME=${q(BOT)}; MAIN_AGENT_ID=marveen; WEB_PORT=3421`,
+        const script = ['set -u', `cd ${q(f.dir)}`, `INSTALL_DIR=${q(f.dir)}`, `OWNER_NAME=${q(OWNER)}; BOT_NAME=${q(BOT)}; MAIN_AGENT_ID=alfred; WEB_PORT=3421`,
           p.prelude(f.dir), p.block(), 'echo "end rc=$?"'].join('\n')
         const r = bash(script, f.dir)
         chmodSync(join(f.dir, 'templates', 'CLAUDE.md.template'), 0o644)

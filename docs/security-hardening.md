@@ -1,6 +1,6 @@
 # Git force-push guard
 
-Marveen agents run autonomously, often with shell access and the ability to push
+Alfred agents run autonomously, often with shell access and the ability to push
 to git, so a prompt-injected or simply mistaken agent can rewrite shared history.
 This guard reduces that blast radius without changing how the fleet works.
 
@@ -434,7 +434,7 @@ brings the outside world into an agent's context is outside both:
 
 - **`WebSearch`** -- result snippets are external text; no allowlist decided
   which sites they came from. The envelope hook below now frames them on the
-  way in (wired by default since MARVEENGAPS1020, on WebSearch and WebFetch);
+  way in (wired by default since ALFREDGAPS1020, on WebSearch and WebFetch);
   nothing filters them.
 - **Any MCP server that fetches** -- a browser server (playwright, chrome), a
   docs server, an API connector. The agent's own `curl` is denied by
@@ -487,7 +487,7 @@ is kept; both files are mode 0600, a symlinked log path or lock file
 (`browser-content.log.lock`) is refused, and a line that cannot be written
 leaves a note in `store/hook-errors.log`.
 
-Since MARVEENGAPS1020 (c) it is **wired by default for `WebSearch` and `WebFetch`**
+Since ALFREDGAPS1020 (c) it is **wired by default for `WebSearch` and `WebFetch`**
 (for WebFetch too because the allowlist decides which host is reached, not
 whether its content can be trusted): in the
 repo-shipped `.claude/settings.json` for the main agent, and by the scaffold

@@ -31,7 +31,7 @@ export const PRETTY_OPTIONS = { colorize: true, translateTime: 'SYS:standard' } 
 // No external dependency: all layers are plain regex/paths in this file.
 //
 // Known limits (a redactor is a safety net, not a guarantee; keep secrets out of log calls):
-//  - Free text is matched by shape and by an explicit name list. Other token shapes (cloud access keys, Slack/Stripe/npm
+//  - Free text is matched by shape and by an explicit name list. Other token shapes (cloud access keys, workspace/Stripe/npm
 //    tokens, Google API keys) and other Authorization schemes (Digest, Negotiate, AWS4-HMAC) are not recognised; `Basic`
 //    is masked only in the `Authorization: Basic <base64>` header shape.
 //  - A `name=value` value stops at whitespace, `&` `#` quotes, brackets, comma and semicolon, so a password containing
@@ -104,7 +104,7 @@ const JSON_FIELD_RX = new RegExp(`("(?:${SECRET_NAMES_RX})"\\s*:\\s*")(?:[^"\\\\
  *    comma or semicolon; `max_tokens=`, `next_page_token=` and a bare `token=` with no value stay)
  *  - the same names as JSON string fields: `"token":"..."`
  *  - known token SHAPES even when unadorned: `sk-ant-...`, GitHub (`ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`,
- *    `github_pat_...`), a Telegram bot token (`123456789:AA...`), a JWT (`eyJ...`.`...`.`...`), an agent package
+ *    `github_pat_...`), a colon-prefixed bot token (`123456789:AA...`), a JWT (`eyJ...`.`...`.`...`), an agent package
  *    device token (`mdt_...`)
  * Unmatched text is returned byte-for-byte unchanged.
  */
@@ -125,7 +125,7 @@ export function redactLogMessage(msg: string): string {
   // Agent package device token (MIOAGENTINSTALL1114, M15): `mdt_` + 43 base64url characters; a safety net, the
   // token is never a logger argument. 8+ so a cut-off token is masked too.
   out = out.replace(/(?<![A-Za-z0-9])mdt_[A-Za-z0-9_-]{8,}/g, REDACTED)
-  // Telegram bot token: 8-10 digits, a colon, 35 token characters (also inside `.../bot<token>/sendMessage`).
+  // Colon-prefixed bot token: 8-10 digits, a colon, 35 token characters (also inside `.../bot<token>/sendMessage`).
   out = out.replace(/(?<!\d)\d{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g, REDACTED)
   // JWT: three base64url segments, the first starting with the `{"` header prefix `eyJ`.
   out = out.replace(/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])/g, REDACTED)

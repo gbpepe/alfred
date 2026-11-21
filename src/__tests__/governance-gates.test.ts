@@ -350,7 +350,7 @@ describe('self-pace-gate compound-command false-positives', () => {
   // word), not a denylist of subcommands.
   it('does NOT deny a launchd job LABEL appearing in prose (no subcommand follows)', () => {
     expect(selfPaceDecision('Bash', { command: 'echo hello; launchctl com.jarvis.channels PID 555' }).deny).toBe(false)
-    expect(selfPaceDecision('Bash', { command: 'launchctl com.marveen.dashboard is up' }).deny).toBe(false)
+    expect(selfPaceDecision('Bash', { command: 'launchctl com.alfred.dashboard is up' }).deny).toBe(false)
   })
   it('STILL denies every real launchctl form after that narrowing', () => {
     // a subcommand word follows -> real invocation
@@ -982,19 +982,19 @@ describe('self-pace-gate schedule surface: registry tool, database, token files,
 
   it('denies file-level writes to the database file and SQL writes on schedule tables', () => {
     for (const c of [
-      'cp /tmp/x.db store/claudeclaw.db',
-      'echo x > store/claudeclaw.db-wal',
-      'tee store/claudeclaw.db-shm < /tmp/x',
-      `sqlite3 store/claudeclaw.db ".restore /tmp/x.db"`,
-      `sqlite3 store/claudeclaw.db "INSERT INTO scheduled_task_registry VALUES (1)"`,
-      `python3 -c "import sqlite3; sqlite3.connect('store/claudeclaw.db').execute('UPDATE scheduled_tasks SET enabled=1')"`,
-      `sqlite3 /tmp/a.db "ATTACH 'store/claudeclaw.db' AS m; DELETE FROM m.scheduled_task_registry"`,
+      'cp /tmp/x.db store/alfred.db',
+      'echo x > store/alfred.db-wal',
+      'tee store/alfred.db-shm < /tmp/x',
+      `sqlite3 store/alfred.db ".restore /tmp/x.db"`,
+      `sqlite3 store/alfred.db "INSERT INTO scheduled_task_registry VALUES (1)"`,
+      `python3 -c "import sqlite3; sqlite3.connect('store/alfred.db').execute('UPDATE scheduled_tasks SET enabled=1')"`,
+      `sqlite3 /tmp/a.db "ATTACH 'store/alfred.db' AS m; DELETE FROM m.scheduled_task_registry"`,
     ]) expect(deny(c), c).toBe(true)
     // reads of the database stay allowed (a worker reads the board this way)
     for (const c of [
-      `sqlite3 store/claudeclaw.db "SELECT id, status FROM kanban_cards" | while read l; do echo "$l"; done`,
-      `python3 -c "import sqlite3; print(sqlite3.connect('store/claudeclaw.db').execute('select 1').fetchall())"`,
-      'ls -la store/claudeclaw.db',
+      `sqlite3 store/alfred.db "SELECT id, status FROM kanban_cards" | while read l; do echo "$l"; done`,
+      `python3 -c "import sqlite3; print(sqlite3.connect('store/alfred.db').execute('select 1').fetchall())"`,
+      'ls -la store/alfred.db',
       `grep -n "INSERT INTO scheduled_tasks" src/db.ts`,
     ]) expect(deny(c), c).toBe(false)
   })

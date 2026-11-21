@@ -2,12 +2,12 @@
 // update preflight. Up to v1.46.0 a fresh install dirtied three tracked files itself
 // (the reformatted .claude/settings.json, the Bridge's headless installer, the
 // npm lock line), so the "update now" button always met a dirty tree and the
-// update went down the stash path (marveen2, 11-03: the stash pop conflicted
+// update went down the stash path (alfred2, 11-03: the stash pop conflicted
 // inside settings.json). The script restores ONLY provably install-generated
 // changes; anything else stays and the preflight reports it as before.
 //
 // The dashboard only ASKS (--dry-run) and writes nothing (Samu 67345 (A)): a
-// restore here, with the services still running, could flip a live Slack
+// restore here, with the services still running, could flip a live channel
 // primary's enabledPlugins and, if the preflight then stopped for any other
 // reason, leave the restored file without the restart that makes it consistent.
 // The preflight ignores exactly the paths the dry run classifies as "restore";
@@ -37,7 +37,7 @@ export interface DriftRepairOutcome {
 export interface DriftRepairOptions {
   /** Decide and report only; the script writes nothing. */
   dryRun?: boolean
-  /** Where overwritten files are copied first; default ~/.marveen-repair/backup-<UTC ts>. */
+  /** Where overwritten files are copied first; default ~/.alfred-repair/backup-<UTC ts>. */
   backupDir?: string
 }
 

@@ -3,12 +3,12 @@
  *
  * A resumed (--continue) launch is only kept when every channel plugin comes
  * back; otherwise the agent is relaunched fresh (channel-continue-policy.ts,
- * condition 3). For the extras this needs a STRICTER probe than
- * probeChannelPluginLiveness: for slack (and discord) that probe also accepts
- * ANY matching poller anywhere on the host, which is right for a reparented
- * plugin but wrong here -- the main agent co-listens on Slack too, so its
- * poller would make every sub-agent's dead extra look alive. Here only the
- * resumed claude's own process tree counts.
+ * condition 3). For extra listeners this needs a STRICTER probe than
+ * probeChannelPluginLiveness: that probe also accepts ANY matching poller
+ * anywhere on the host, which is right for a reparented plugin but wrong here
+ * if multiple sessions share a provider on the host (a sibling session's
+ * poller would make a dead extra look alive). Here only the resumed claude's
+ * own process tree counts.
  */
 import { execFileSync } from 'node:child_process'
 import type { ChannelProviderType } from '../channel-provider.js'

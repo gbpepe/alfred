@@ -6,7 +6,7 @@
 # agree. An install without the key (every install from before this) is Hungarian, byte-for-byte as before.
 #
 #   agent_text_lang <dir>          the key, or hu without it
-#   agent_text_lang_decide <dir>   the key if set; else, on a FIRST render (no CLAUDE.md yet), decide from MARVEEN_LANG or
+#   agent_text_lang_decide <dir>   the key if set; else, on a FIRST render (no CLAUDE.md yet), decide from ALFRED_LANG or
 #                                  the install's .lang (en only with the English template there), write the key into
 #                                  .env, and print it; an existing install without the key stays hu (nothing written)
 #   persona_template <dir> <name> [decide]
@@ -66,7 +66,7 @@ agent_text_lang_decide() {
     fi
     return 0
   fi
-  lang="${MARVEEN_LANG:-}"
+  lang="${ALFRED_LANG:-}"
   [ -n "$lang" ] || lang="$(head -1 "$dir/.lang" 2>/dev/null | tr -d '[:space:]')"
   if [ "$lang" = en ] && [ -f "$dir/templates/en/CLAUDE.md.template" ]; then lang=en; else lang=hu; fi
   if [ -f "$dir/.env" ]; then

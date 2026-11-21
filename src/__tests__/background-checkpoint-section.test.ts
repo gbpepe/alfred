@@ -14,10 +14,10 @@ import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-bgcheckpoint-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-bgcheckpoint-test-'))
 
 vi.mock('../config.js', () => ({
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',

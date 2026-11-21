@@ -73,9 +73,9 @@ MAX_ESCAPES=4                                  # ensure_modal_closed bound
 # Discord or Gromzo install came back on the Telegram plugin.
 _smg_provider="$(grep -E '^CHANNEL_PROVIDER=' "$INSTALL_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'"'"'\r ')"
 case "$_smg_provider" in
-  slack)    _smg_default="plugin:slack-channel@marveen-marketplace" ;;
-  whatsapp) _smg_default="plugin:whatsapp@marveen-marketplace" ;;
-  teams)    _smg_default="plugin:teams@marveen-marketplace" ;;
+  slack)    _smg_default="plugin:slack-channel@alfred-marketplace" ;;
+  whatsapp) _smg_default="plugin:whatsapp@alfred-marketplace" ;;
+  teams)    _smg_default="plugin:teams@alfred-marketplace" ;;
   discord)  _smg_default="plugin:discord@claude-plugins-official" ;;
   gromzo)   _smg_default="plugin:gromzo-channel@gromzo-local" ;;
   *)        _smg_default="plugin:telegram@claude-plugins-official" ;;

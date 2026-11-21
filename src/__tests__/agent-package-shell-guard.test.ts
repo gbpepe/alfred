@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 
 const REPO = join(__dirname, '..', '..')
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-agent-package-shell-guard-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-agent-package-shell-guard-'))
 vi.mock('../config.js', async (importOriginal) => ({ ...(await importOriginal<object>()), PROJECT_ROOT: tmpRoot, STORE_DIR: join(tmpRoot, 'store') }))
 
 const M = await import('../web/agent-package/marker.js')
@@ -116,7 +116,7 @@ describe('the start guard: file types (Dani C3, C6; mutants 22, 44)', () => {
 describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
   it('a package agent: a REAL CLAUDE.md with both layers\' text, 0600 in a 0700 folder, plus a LOCAL.md link', () => {
     const d = agent({ 'CLAUDE.md': `${P}\nFLEET-BASE-RULES-CANARY\n`, 'PACKAGE.md': 'PACKAGE-CANARY\n', 'LOCAL.md': 'LOCAL-CANARY\n' })
-    const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       expect(I.prepareFallbackClaudeMd('a1', d, fb)).toBe('expanded')
       const p = join(fb, 'CLAUDE.md')
@@ -137,7 +137,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
   })
   it('a missing or empty package layer: refused, nothing written, a fallback_refused notice', () => {
     for (const files of [{ 'CLAUDE.md': P }, { 'CLAUDE.md': P, 'PACKAGE.md': ' \n' }] as Array<Record<string, string>>) {
-      const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+      const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
       try {
         expect(I.prepareFallbackClaudeMd('a1', agent(files), fb)).toBe('refused')
         expect(existsSync(join(fb, 'CLAUDE.md'))).toBe(false)
@@ -152,8 +152,8 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
       .map((f) => JSON.parse(readFileSync(join(I.pendingNoticesDir(), f), 'utf8')))
       .filter((n) => n.kind === 'fallback_scan_finding')
     const before = notices().length
-    const clean = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
-    const dirty = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const clean = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
+    const dirty = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       const shell = I.packageShellText('a1', '')
       expect(I.prepareFallbackClaudeMd('a1', agent({ 'CLAUDE.md': shell, 'PACKAGE.md': '# Package\n', 'LOCAL.md': 'notes\n' }), clean)).toBe('expanded')
@@ -174,7 +174,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
     const shell = I.packageShellText('dedup1', '')
     const d = agent({ 'CLAUDE.md': shell, 'PACKAGE.md': '# Package\n', 'LOCAL.md': 'run !`id` now\n' })
     const start = (): void => {
-      const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+      const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
       try { expect(I.prepareFallbackClaudeMd('dedup1', d, fb)).toBe('expanded') } finally { rmSync(fb, { recursive: true, force: true }) }
     }
     const before = count()
@@ -202,7 +202,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
     I.reportPackageLayersAtStart('both1', d)
     expect(kinds('both1')).toEqual(['start_scan_finding'])
     // the fallback after a normal start: the same finding is not told again
-    const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try { expect(I.prepareFallbackClaudeMd('both1', d, fb)).toBe('expanded') } finally { rmSync(fb, { recursive: true, force: true }) }
     expect(kinds('both1')).toEqual(['start_scan_finding'])
     // a clean start resets; the finding coming back is told again
@@ -234,7 +234,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
     // .. is reported even when it resolves back inside the folder (the rule is on the path, not only where it lands)
     expect(run('out6', '@notes/../team.md\n', { 'team.md': 'x\n' }).told).toBe(1)
     // reported: a symlink inside the folder that points out, to a file and through a folder
-    const outside = mkdtempSync(join(tmpdir(), 'marveen-local-import-out-'))
+    const outside = mkdtempSync(join(tmpdir(), 'alfred-local-import-out-'))
     try {
       writeFileSync(join(outside, 'secret.md'), 'x\n')
       const f = agent({ 'CLAUDE.md': I.packageShellText('lnk1', ''), 'PACKAGE.md': '# Package\n', 'LOCAL.md': '@notes.md\n' })
@@ -299,8 +299,8 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
     expect(claude).toMatch(/\s@/)
     expect(M.startsWithPackageShell(Buffer.from(claude))).toBe(true)
     const before = notices()
-    const fb1 = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
-    const fb2 = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb1 = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
+    const fb2 = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       expect(I.prepareFallbackClaudeMd(name, started, fb1)).toBe('expanded')
       expect(notices()).toBe(before)
@@ -319,7 +319,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
     const plain = agent({ 'CLAUDE.md': '# hand-made\n', ...files })
     const partial = agent({ 'CLAUDE.md': '# hand-made\n', '.claude/settings.json': SET })
     for (const [d, want] of [[pkgAgent, 'expanded'], [plain, 'linked']] as const) {
-      const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+      const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
       try {
         expect(I.prepareFallbackClaudeMd(d.split('/').pop()!, d, fb)).toBe(want)
         expect(statSync(join(fb, '.claude')).mode & 0o777).toBe(0o700)
@@ -336,7 +336,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
       expect(readFileSync(join(d, '.claude', 'settings.json'), 'utf8')).toBe(SET)
       expect(existsSync(join(d, '.claude', 'skills', 'canary', 'SKILL.md'))).toBe(true)
     }
-    const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       expect(I.prepareFallbackClaudeMd(partial.split('/').pop()!, partial, fb)).toBe('linked')
       expect(lstatSync(join(fb, '.claude', 'settings.json')).isSymbolicLink()).toBe(true)
@@ -349,7 +349,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
   })
   it('a settings file that exists but cannot be linked refuses the fallback start (fail closed)', () => {
     const d = agent({ 'CLAUDE.md': '# hand-made\n', '.claude/settings.json': '{"hooks":{}}\n' })
-    const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       mkdirSync(join(fb, '.claude'), { mode: 0o700 })
       writeFileSync(join(fb, '.claude', 'settings.json'), 'squatter')
@@ -372,7 +372,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
     for (const [label, files, cmd, want] of cases) {
       const settingsFile = label.includes('settings.local.json') ? '.claude/settings.local.json' : '.claude/settings.json'
       const d = agent({ 'CLAUDE.md': '# hand-made\n', ...files, [settingsFile]: hookSet(cmd) })
-      const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+      const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
       try {
         expect(I.prepareFallbackClaudeMd(d.split('/').pop()!, d, fb), label).toBe(want.length > 0 ? 'refused' : 'linked')
         expect(I.unresolvedProjectDirHookPaths(d, fb), label).toEqual(want)
@@ -383,7 +383,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
   })
   it('a hooks folder that exists but cannot be linked refuses the fallback start (fail closed)', () => {
     const d = agent({ 'CLAUDE.md': '# hand-made\n', '.claude/hooks/gate.sh': '#!/bin/sh\n' })
-    const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       mkdirSync(join(fb, '.claude', 'hooks'), { recursive: true, mode: 0o700 })
       expect(I.prepareFallbackClaudeMd(d.split('/').pop()!, d, fb)).toBe('refused')
@@ -392,7 +392,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
     }
   })
   it('a missing LOCAL.md is an empty local layer, not a refusal', () => {
-    const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       expect(I.prepareFallbackClaudeMd('a1', agent({ 'CLAUDE.md': P, 'PACKAGE.md': 'PACKAGE-CANARY\n' }), fb)).toBe('expanded')
       expect(readFileSync(join(fb, 'CLAUDE.md'), 'utf8')).toContain('PACKAGE-CANARY')
@@ -402,7 +402,7 @@ describe('the EPERM fallback (plan 4.4; mutant 33)', () => {
   })
   it('a hand-made agent: the link it always got (N13), byte for byte the old branch', () => {
     const d = agent({ 'CLAUDE.md': '# hand-made\n' })
-    const fb = mkdtempSync(join(tmpdir(), 'marveen-fallback-test-'))
+    const fb = mkdtempSync(join(tmpdir(), 'alfred-fallback-test-'))
     try {
       expect(I.prepareFallbackClaudeMd('a1', d, fb)).toBe('linked')
       expect(readlinkSync(join(fb, 'CLAUDE.md'))).toBe(join(d, 'CLAUDE.md'))

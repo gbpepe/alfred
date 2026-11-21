@@ -45,7 +45,7 @@ function fingerprintFromPubKey(authorizedKeyLine: string): string {
 }
 
 export async function generateSshKeyPair(comment: string): Promise<{ privateKey: string; publicKey: string; fingerprint: string }> {
-  const tmpDir = mkdtempSync(join(tmpdir(), 'marveen-ssh-'))
+  const tmpDir = mkdtempSync(join(tmpdir(), 'alfred-ssh-'))
   const keyPath = join(tmpDir, 'key')
   try {
     await sshKeygen(['-t', 'ed25519', '-f', keyPath, '-N', '', '-C', comment])
@@ -60,7 +60,7 @@ export async function generateSshKeyPair(comment: string): Promise<{ privateKey:
 export async function extractPublicKeyFromVault(vaultKeyId: string): Promise<string | null> {
   const privateKeyPem = getSecret(vaultKeyId)
   if (!privateKeyPem) return null
-  const tmpDir = mkdtempSync(join(tmpdir(), 'marveen-ssh-'))
+  const tmpDir = mkdtempSync(join(tmpdir(), 'alfred-ssh-'))
   const keyPath = join(tmpDir, 'key')
   try {
     writeFileSync(keyPath, privateKeyPem, { mode: 0o600 })
@@ -174,7 +174,7 @@ export async function tryHandleVaultSshKeys(ctx: RouteContext): Promise<boolean>
       const privateKey = rawPrivateKey.endsWith('\n') ? rawPrivateKey : rawPrivateKey + '\n'
 
       // Validate key and extract public key via ssh-keygen -y (same pattern as extractPublicKeyFromVault)
-      const tmpDir = mkdtempSync(join(tmpdir(), 'marveen-ssh-'))
+      const tmpDir = mkdtempSync(join(tmpdir(), 'alfred-ssh-'))
       const keyPath = join(tmpDir, 'key')
       let publicKey: string
       try {

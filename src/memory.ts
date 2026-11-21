@@ -19,7 +19,7 @@ import { MAIN_AGENT_ID } from './config.js'
 import { wrapUntrusted, UNTRUSTED_PREAMBLE } from './prompt-safety.js'
 
 // Dedicated cwd for the daily-digest sub-agent. We can't reuse PROJECT_ROOT
-// here -- the Marveen Telegram channels session runs claude --continue in
+// here -- the Alfred channels session runs claude --continue in
 // PROJECT_ROOT, and the SDK's per-cwd session/lock state collides with it
 // when two Claude Code processes share the same project dir, dropping the
 // channels plugin every night at 23:00. A throwaway dir under the user's
@@ -29,7 +29,7 @@ import { wrapUntrusted, UNTRUSTED_PREAMBLE } from './prompt-safety.js'
 // We honor TMPDIR via os.tmpdir() as a last-resort fallback so a hardened
 // host with a read-only home still has somewhere to land.
 function ensureDigestCwd(): string {
-  const candidates = [join(homedir(), '.claude', 'tmp', 'marveen-digest'), join(tmpdir(), 'marveen-digest')]
+  const candidates = [join(homedir(), '.claude', 'tmp', 'alfred-digest'), join(tmpdir(), 'alfred-digest')]
   for (const dir of candidates) {
     try {
       mkdirSync(dir, { recursive: true })
@@ -37,25 +37,24 @@ function ensureDigestCwd(): string {
     } catch { /* try next */ }
   }
   // Last resort: tmpdir itself. Worst case we share with whatever else is
-  // in /tmp, but that still doesn't collide with the Marveen project dir.
+  // in /tmp, but that still doesn't collide with the Alfred project dir.
   return tmpdir()
 }
 
 // The daily digest sub-agent inherits the host's CLAUDE_CONFIG_DIR
 // (~/.claude/) by default, which means it loads the user's globally
-// enabled plugins -- including telegram@claude-plugins-official. The
-// Telegram Bot API only allows ONE active getUpdates connection per
-// token, so the sub-agent's plugin steals the connection from the
-// long-running marveen-channels session, which then logs as
-// "plugin lecsatlakozott" at 23:00 every night when runDailyDigest
+// enabled plugins -- including the channel plugin. One
+// active poller per bot token can run at a time, so the sub-agent's plugin
+// steals the connection from the long-running alfred-channels session, which
+// then logs as "plugin lecsatlakozott" at 23:00 every night when runDailyDigest
 // fires. Workaround: hand the sub-agent a private CLAUDE_CONFIG_DIR
-// with `enabledPlugins: {}` so it never spawns the Telegram MCP. The
+// with `enabledPlugins: {}` so it never spawns the channel MCP. The
 // dir is created idempotently on first use; the settings.json is
 // written only if missing so the user can edit it later if needed.
 function ensureDigestConfigDir(): string {
   const candidates = [
-    join(homedir(), '.claude', 'tmp', 'marveen-digest-config'),
-    join(tmpdir(), 'marveen-digest-config'),
+    join(homedir(), '.claude', 'tmp', 'alfred-digest-config'),
+    join(tmpdir(), 'alfred-digest-config'),
   ]
   for (const dir of candidates) {
     try {
@@ -80,7 +79,7 @@ const SKIP_PATTERN = /^(ok|igen|nem|koszi|kosz|hello|szia|hi|hey|thx|thanks|jo|o
 // buildMemoryContext used to live here: 3 FTS hits + 5 recent rows as a
 // [Memoria kontextus] block. It never had a caller, from the first release
 // (f24eacc8) on, and it did not read the agent tiers at all: it filtered on
-// chat_id (the old Telegram-chat rows) and bumped salience on every hit. Removed
+// chat_id (the legacy per-chat rows) and bumped salience on every hit. Removed
 // rather than wired (HOTMEMHAMIS925). Whether an agent's hot/warm memory should
 // load on its own is a product decision; if yes, it needs a new loader keyed on
 // agent_id + category with a size cap, not this function.
@@ -152,7 +151,7 @@ export async function runDailyDigest(chatId: string): Promise<string | null> {
   }
 
   // Each memory is wrapped individually: the stored content originated in
-  // Telegram messages that could have come through the assistant from a third
+  // chat messages that could have come through the assistant from a third
   // party (a forwarded message, a quoted email). Treat every record as data.
   const memoryLines = todayMemories
     .map((m) => `- ${wrapUntrusted('memory-record', m.content.slice(0, 200))}`)

@@ -88,7 +88,7 @@ async function clickSchedule(action: 'toggle' | 'delete' | 'run', reply: Reply, 
     'document', 'fetch', 't', 'showToast', 'loadSchedules', 'confirmDialog', 'scheduleAgents', 'mainAgentId', 'avatarBust',
     'escapeHtml', 'describeCron', 'pauseIcon', 'playIcon', 'trashIcon', 'openEditSchedule', 'openScheduleRunHistory',
     `${HELPERS}\n${SCHEDULE_ROW}\nreturn makeScheduleRow`,
-  )(document, fetch, makeT(lang), (m: string) => { toasts.push(m) }, () => { reloads++ }, async () => true, [], () => 'marveen', () => '',
+  )(document, fetch, makeT(lang), (m: string) => { toasts.push(m) }, () => { reloads++ }, async () => true, [], () => 'alfred', () => '',
     (s: string) => s, () => '', () => '', () => '', () => '', () => {}, () => {}) as (t: unknown) => unknown
   make({ name: 'daily-digest', description: 'Daily digest', schedule: '0 8 * * *', enabled: true, ...task })
   await handlers[action]({ stopPropagation() {} })
@@ -155,7 +155,7 @@ async function saveMemory(reply: Reply, opts: { editId?: string; lang?: 'hu' | '
     memContent: { value: '  Egy rövid mondat.  ', focus: () => events.push('focus') },
     memEditId: { value: opts.editId ?? '' },
     memTier: { value: 'warm' },
-    memAgent: { value: 'marveen' },
+    memAgent: { value: 'alfred' },
     memKeywords: { value: 'a, b' },
   }
   const document = { getElementById: (id: string) => fields[id] }

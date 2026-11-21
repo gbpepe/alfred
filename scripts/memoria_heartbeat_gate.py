@@ -65,7 +65,7 @@ delivered INTO an already-running turn never reaches conversation_log at all,
 so there is nothing for the conservative watermark to keep in front of:
 
   - the inbound writer is scripts/hooks/ledger-capture.py, bound to
-    UserPromptSubmit (marveen/.claude/settings.json). No prompt is submitted
+    UserPromptSubmit (alfred/.claude/settings.json). No prompt is submitted
     mid-turn, so the hook never fires for that message.
   - the outbound writer (ledger-outbound.py) is bound to PostToolUse, which
     DOES fire mid-turn. Hence the asymmetry in the evidence.
@@ -138,10 +138,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-MARVEEN_DIR = Path(__file__).resolve().parents[1]
-DB_PATH = MARVEEN_DIR / "store" / "claudeclaw.db"
-TOKEN_FILE = MARVEEN_DIR / "store" / ".dashboard-token"
-MARKER_FILE = MARVEEN_DIR / "store" / "memoria-heartbeat-gate-last.txt"
+ALFRED_DIR = Path(__file__).resolve().parents[1]
+DB_PATH = ALFRED_DIR / "store" / "alfred.db"
+TOKEN_FILE = ALFRED_DIR / "store" / ".dashboard-token"
+MARKER_FILE = ALFRED_DIR / "store" / "memoria-heartbeat-gate-last.txt"
 MESSAGES_URL = "http://localhost:3420/api/messages"
 
 # The whitespace set of JavaScript's String.prototype.trim() (ECMA-262 WhiteSpace plus
@@ -163,10 +163,10 @@ def main_agent_id() -> str:
     failure -- the dashboard rejects the POST with 403 and the gate's alert is
     lost, or worse, it is accepted into a mailbox nobody reads.
 
-    The fallback is "marveen" ON PURPOSE, and it is not the old defect coming
+    The fallback is "alfred" ON PURPOSE, and it is not the old defect coming
     back: src/config.ts resolves MAIN_AGENT_ID exactly this way
-    (`env['MAIN_AGENT_ID'] ?? 'marveen'`) so that an older install upgrading in
-    place keeps working. On such an install "marveen" IS the registered main
+    (`env['MAIN_AGENT_ID'] ?? 'alfred'`) so that an older install upgrading in
+    place keeps working. On such an install "alfred" IS the registered main
     agent, so the POST is accepted. The defect was never "there is a default" --
     it was a name written into this script that had nothing to do with the
     install it runs on. Resolving it the same way the product does is the fix.
@@ -197,7 +197,7 @@ def main_agent_id() -> str:
       - "trim" is JavaScript's trim set, see _JS_TRIM: it includes U+FEFF, so a UTF-8 BOM in
         front of the first key is trimmed away like in the product
     """
-    env = MARVEEN_DIR / ".env"
+    env = ALFRED_DIR / ".env"
     talalt: str | None = None
     try:
         for line in env.read_bytes().decode("utf-8", errors="replace").split("\n"):
@@ -218,7 +218,7 @@ def main_agent_id() -> str:
             talalt = ertek
     except OSError:
         pass
-    return "marveen" if talalt is None else talalt
+    return "alfred" if talalt is None else talalt
 # Resolved once at import: AGENT is not only the message recipient, it is
 # also the SQL filter in the activity queries below. A None here does not
 # fail -- it silently matches no rows, so the gate would report "no
@@ -259,7 +259,7 @@ WAKE_MESSAGE = (
     "NE oraban merd az ablakot -- a jelolo szabja meg, nem az eltelt ido. Ha a "
     "legutobbi fordulo elszallt vagy kimaradt, ez az ablak tobb orat is atfoghat.\n\n"
     "AZ UTOLSO LEPESED, a fordulo vegen, KOTELEZOEN, PONTOSAN igy:\n"
-    f"  python3 {MARVEEN_DIR}/scripts/memoria_heartbeat_gate.py "
+    f"  python3 {ALFRED_DIR}/scripts/memoria_heartbeat_gate.py "
     "--mark-seen --conv-upto {conv_max}\n"
     "A {conv_max} a FENTI ablak vege, ne ird at a pillanatnyi max-ra. A ket jelolo "
     "szandekosan NEM egyformán lep: a tool_call_log a pillanatnyi max-ra megy (az a te "

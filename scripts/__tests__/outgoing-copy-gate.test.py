@@ -364,7 +364,7 @@ def main():
         check("discord reply with a bad name blocks (exit 2)", code, 2)
 
         # --- COPYGATEENT914: HTML-ENTITAS NEM KERULHETI MEG A GONDOLATJEL-TILTAST ---
-        # Marveen merese 2026-09-14, egy VALODI vevo-levelen: a hook a TAGEKET
+        # Alfred merese 2026-09-14, egy VALODI vevo-levelen: a hook a TAGEKET
         # szedte ki, de az entitast sehol nem dekodolta, igy a `&mdash;` atment
         # es a cimzettnel gondolatjelkent renderelt. A kapu zoldet mondott arra,
         # amit tilt. Merve MIND A HAROM alakon, nem csak a bejelentettre.
@@ -414,7 +414,7 @@ def main():
         check("...es a GONDOLATJEL indokkal", "GONDOLATJEL" in (err or ""), True)
 
         # --- C67F5F34: A GOMBFELIRATOK IS KIMENO SZOVEG ----------------------
-        # A Telegram reply eszkoz buttons mezoje (a plugin Marveen-foltja) egy
+        # A Telegram reply eszkoz buttons mezoje (a plugin Alfred-foltja) egy
         # koppintassal valaszolhato gombokat tesz a kerdes ala; a felirat az, amit
         # a cimzett lat es visszakuld. A SZOVEG SZANDEKOSAN TISZTA (teljesen
         # ekezetes, gondolatjel nelkul), hogy a tiltas CSAK a feliratbol johessen

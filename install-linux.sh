@@ -1,5 +1,5 @@
 #!/bin/bash
-# Marveen - AI Team Setup
+# Alfred - AI Team Setup
 # Interactive installer for Linux (Ubuntu/Debian)
 
 set -e
@@ -22,7 +22,7 @@ ok() { echo -e "  ${GREEN}✓${NC} $*"; }
 warn() { echo -e "  ${ORANGE}!${NC} $*"; }
 
 # INSTNONINTER1118: --non-interactive (docs/install-non-interactive.md). On only with the flag, never from the
-# environment: the Bridge's derived payload runs this script with MARVEEN_NONINTERACTIVE=1 and its own presets, and
+# environment: the Bridge's derived payload runs this script with ALFRED_NONINTERACTIVE=1 and its own presets, and
 # that path stays as it is. Every prompt keeps its `read -rp` line byte for byte (the Bridge derives its headless
 # script from those lines); the line above it answers instead when the mode is on:
 #   ni_answer VAR KIND [ENV] [DEFAULT] ||
@@ -52,14 +52,14 @@ INSTALL_STEP="init"
 #     that only root can change (a sticky dir like /tmp counts as safe: others cannot swap root's file);
 #   - an install-lang.sh next to it is held to the same rule, or not used;
 #   - the gate and its writer are ALWAYS fetched fresh from the official source (never the checkout);
-#   - MARVEEN_RAW_BASE is refused, MARVEEN_REF must be a plain ref name.
+#   - ALFRED_RAW_BASE is refused, ALFRED_REF must be a plain ref name.
 # The safe way to run it is printed by admin_prereq_cmd: download from the fixed URL into a fresh
 # root-owned temp dir and run from there.
-MARVEEN_OFFICIAL_RAW="https://raw.githubusercontent.com/Szotasz/marveen"
-admin_prereq_cmd() { # $1 = the user Marveen will run as
-  # MARVEEN_REF goes along: the fetched script then takes install-lang.sh and the gate from the SAME ref
+ALFRED_OFFICIAL_RAW="https://raw.githubusercontent.com/gbpepe/alfred"
+admin_prereq_cmd() { # $1 = the user Alfred will run as
+  # ALFRED_REF goes along: the fetched script then takes install-lang.sh and the gate from the SAME ref
   # (measured live: without it the script came from the branch and its texts from main, raw keys).
-  echo "sudo bash -c 'd=\$(mktemp -d) && curl -fsSL ${MARVEEN_OFFICIAL_RAW}/${MARVEEN_REF:-main}/install-linux.sh -o \"\$d/install-linux.sh\" && MARVEEN_REF=${MARVEEN_REF:-main} bash \"\$d/install-linux.sh\" --admin-prereq --user ${1}'"
+  echo "sudo bash -c 'd=\$(mktemp -d) && curl -fsSL ${ALFRED_OFFICIAL_RAW}/${ALFRED_REF:-main}/install-linux.sh -o \"\$d/install-linux.sh\" && ALFRED_REF=${ALFRED_REF:-main} bash \"\$d/install-linux.sh\" --admin-prereq --user ${1}'"
 }
 root_only_path() { # $1 = file; 0 = root-owned, not g/o-writable, and every parent dir likewise (or sticky)
   local p="$1" m
@@ -82,12 +82,12 @@ __ADMIN_MODE=0
 for __a in "$@"; do [ "$__a" = --admin-prereq ] && __ADMIN_MODE=1; done
 if [ "$__ADMIN_MODE" = 1 ] && [ "$(id -u)" -eq 0 ]; then
   __self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
-  if [ -n "${MARVEEN_RAW_BASE:-}" ]; then
-    echo "Hiba / Error: --admin-prereq does not accept MARVEEN_RAW_BASE (it runs as root; only the official source)." >&2
+  if [ -n "${ALFRED_RAW_BASE:-}" ]; then
+    echo "Hiba / Error: --admin-prereq does not accept ALFRED_RAW_BASE (it runs as root; only the official source)." >&2
     exit 1
   fi
-  case "${MARVEEN_REF:-main}" in
-    *[!A-Za-z0-9._/-]*|-*|*..*) echo "Hiba / Error: --admin-prereq: invalid MARVEEN_REF." >&2; exit 1 ;;
+  case "${ALFRED_REF:-main}" in
+    *[!A-Za-z0-9._/-]*|-*|*..*) echo "Hiba / Error: --admin-prereq: invalid ALFRED_REF." >&2; exit 1 ;;
   esac
   __who="${SUDO_USER:-<user>}"
   if ! root_only_path "$__self"; then
@@ -104,19 +104,19 @@ if [ "$__ADMIN_MODE" = 1 ] && [ "$(id -u)" -eq 0 ]; then
 fi
 
 # shellcheck source=install-lang.sh
-# MARVEENLANG1763: the README's one-liner (curl ... install-linux.sh -o install.sh &&
-# bash install.sh) and the Windows/WSL wrapper (/tmp/marveen-install.sh) run this
+# ALFREDLANG1763: the README's one-liner (curl ... install-linux.sh -o install.sh &&
+# bash install.sh) and the Windows/WSL wrapper (/tmp/alfred-install.sh) run this
 # script ON ITS OWN, before the repo is cloned, so install-lang.sh is not next to it.
 # Next to it (a checkout, the Bridge) -> sourced from there, exactly as before.
-# Missing -> fetched from the same ref the repo is cloned from below (MARVEEN_REF,
+# Missing -> fetched from the same ref the repo is cloned from below (ALFRED_REF,
 # default main), checked (non-empty, defines _t), sourced from a mktemp file.
 # Unreachable -> a plain bilingual stop with the manual way, before any install step.
-MARVEEN_REF="${MARVEEN_REF:-main}"
+ALFRED_REF="${ALFRED_REF:-main}"
 if [ -f "$(dirname "$0")/install-lang.sh" ]; then
   source "$(dirname "$0")/install-lang.sh"
 else
-  _lang_url="${MARVEEN_RAW_BASE:-https://raw.githubusercontent.com/Szotasz/marveen}/${MARVEEN_REF}/install-lang.sh"
-  _lang_tmp="$(mktemp "${TMPDIR:-/tmp}/marveen-install-lang.XXXXXX")"
+  _lang_url="${ALFRED_RAW_BASE:-https://raw.githubusercontent.com/gbpepe/alfred}/${ALFRED_REF}/install-lang.sh"
+  _lang_tmp="$(mktemp "${TMPDIR:-/tmp}/alfred-install-lang.XXXXXX")"
   _lang_ok=0
   if command -v curl >/dev/null 2>&1; then
     curl -fsSL "$_lang_url" -o "$_lang_tmp" 2>/dev/null && _lang_ok=1
@@ -130,12 +130,12 @@ else
     rm -f "$_lang_tmp"
     echo "Hiba: a telepito nyelvi fajlja (install-lang.sh) nem toltheto le: $_lang_url" >&2
     echo "Error: the installer's language file (install-lang.sh) could not be downloaded: $_lang_url" >&2
-    echo "  Kezzel / manually: git clone --branch ${MARVEEN_REF} https://github.com/Szotasz/marveen.git ~/marveen && bash ~/marveen/install-linux.sh" >&2
+    echo "  Kezzel / manually: git clone --branch ${ALFRED_REF} https://github.com/gbpepe/alfred.git ~/alfred && bash ~/alfred/install-linux.sh" >&2
     exit 1
   fi
   unset _lang_url _lang_tmp _lang_ok
 fi
-# end of the install-lang loader (MARVEENLANG1763)
+# end of the install-lang loader (ALFREDLANG1763)
 
 # #1874: the managed-settings.json writes below are machine-wide (org-policy layer)
 # and need root. Say what is written and why, ONCE, before the first of them asks
@@ -158,7 +158,7 @@ offer_claude_fallback() {
   fi
   echo ""
   echo -e "${ORANGE}Claude Code elerheto a gepen.${NC}"
-  local prompt="Marveen installer failed at step \"${step}\". Error: ${err_msg}. Script: install-linux.sh${line_info}. Repo: https://github.com/Szotasz/marveen. OS: $(lsb_release -ds 2>/dev/null || cat /etc/os-release 2>/dev/null | head -1 || echo Linux). Node: $(node -v 2>/dev/null || echo missing). Dir: ${INSTALL_DIR}. Your task: diagnose this Marveen installer failure. The install scripts are install.sh (macOS) and install-linux.sh. Read the relevant section, check for missing dependencies or permission issues, and suggest concrete shell commands to fix."
+  local prompt="Alfred installer failed at step \"${step}\". Error: ${err_msg}. Script: install-linux.sh${line_info}. Repo: https://github.com/gbpepe/alfred. OS: $(lsb_release -ds 2>/dev/null || cat /etc/os-release 2>/dev/null | head -1 || echo Linux). Node: $(node -v 2>/dev/null || echo missing). Dir: ${INSTALL_DIR}. Your task: diagnose this Alfred installer failure. The install scripts are install.sh (macOS) and install-linux.sh. Read the relevant section, check for missing dependencies or permission issues, and suggest concrete shell commands to fix."
   if [ -t 0 ]; then
     ni_answer OPEN_CLAUDE fixed "" n ||
     read -rp "$(_t prompt_open_claude)" OPEN_CLAUDE
@@ -249,7 +249,7 @@ remove_secret_export_from_rc() {
 ensure_secret_reader_in_rc() {
   local var="$1" file="$2" kind="$3" q marker line
   q="'$(printf '%s' "$file" | sed "s/'/'\\\\''/g")'"
-  marker="# marveen: ${var} from the install's 0600 file"
+  marker="# alfred: ${var} from the install's 0600 file"
   if [ "$kind" = "env" ]; then
     line="${marker}"$'\n'"_mv=\"\$(grep -m1 '^${var}=' ${q} 2>/dev/null | cut -d= -f2-)\"; [ -n \"\$_mv\" ] && export ${var}=\"\$_mv\"; unset _mv"
   else
@@ -314,7 +314,7 @@ while [[ $# -gt 0 ]]; do
       INSTALL_NONINTERACTIVE=1; shift ;;
     --user)
       if [[ -z "${2:-}" || "${2}" == --* ]]; then
-        echo "Error: --user requires a user name (with --admin-prereq: the user Marveen will run as)" >&2; exit 1
+        echo "Error: --user requires a user name (with --admin-prereq: the user Alfred will run as)" >&2; exit 1
       fi
       ADMIN_USER="$2"; shift 2 ;;
     --help|-h)
@@ -324,9 +324,9 @@ while [[ $# -gt 0 ]]; do
       echo "                   prerequisites (packages, Node.js >= 20, the managed-settings channel gate)"
       echo "                   so a user without sudo can then run this installer. No clone, no dashboard,"
       echo "                   no services. Safe to run again."
-      echo "  --user <name>    With --admin-prereq: the user Marveen will run as. Its user services"
+      echo "  --user <name>    With --admin-prereq: the user Alfred will run as. Its user services"
       echo "                   are allowed to keep running (loginctl linger), which only root can set."
-      echo "  --non-interactive  No questions: every answer from a MARVEEN_* env variable or a documented"
+      echo "  --non-interactive  No questions: every answer from a ALFRED_* env variable or a documented"
       echo "                   default, secrets only from files. See docs/install-non-interactive.md."
       exit 0 ;;
     *) echo "Unknown option: $1 (use --help for usage)" >&2; exit 1 ;;
@@ -339,7 +339,7 @@ ADMIN_PREREQ="${ADMIN_PREREQ:-0}"
 
 # EE2392D3 (measured 2026-11-10 on a throwaway Ubuntu 24.04): run as root from `sudo -i` or `sudo bash`, Claude Code's
 # official installer refuses ("do not run this installer with sudo", it reads SUDO_USER) and this install stopped at
-# [2/7] after three tries. Its refusal is not worked around (Samu 75472, Marveen 75473): the install stops here, at
+# [2/7] after three tries. Its refusal is not worked around (Samu 75472, Alfred 75473): the install stops here, at
 # once, and names the two ways that work. A direct root login (the Bridge's SSH) has no SUDO_USER and goes on;
 # --admin-prereq is run with sudo on purpose (admin_prereq_cmd) and is exempt.
 if [ "$ADMIN_PREREQ" != 1 ] && [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
@@ -366,27 +366,27 @@ fi
 # store/.claude-oauth-token (service_auth_present); the run asks nothing about it.
 if ni_on; then
   ni_stop() { echo -e "${RED}$(_t ni.stop)${NC} $*" >&2; exit 1; }
-  for __s in MARVEEN_TELEGRAM_TOKEN MARVEEN_BOT_TOKEN MARVEEN_SLACK_BOT_TOKEN MARVEEN_SLACK_APP_TOKEN \
-    MARVEEN_DISCORD_BOT_TOKEN MARVEEN_TEAMS_BOT_APP_PASSWORD MARVEEN_API_KEY MARVEEN_OAUTH_TOKEN; do
+  for __s in ALFRED_TELEGRAM_TOKEN ALFRED_BOT_TOKEN ALFRED_SLACK_BOT_TOKEN ALFRED_SLACK_APP_TOKEN \
+    ALFRED_DISCORD_BOT_TOKEN ALFRED_TEAMS_BOT_APP_PASSWORD ALFRED_API_KEY ALFRED_OAUTH_TOKEN; do
     [ -z "${!__s:-}" ] || ni_stop "$(_t ni.secret_env) $__s"
   done
-  for __s in MARVEEN_SWAP MARVEEN_WHISPER; do
+  for __s in ALFRED_SWAP ALFRED_WHISPER; do
     case "${!__s:-}" in ""|i|y|n) ;; *) ni_stop "$(_t ni.bad_value) $__s (i|y|n)" ;; esac
   done
   if [ "$ADMIN_PREREQ" != 1 ]; then
     [ -f "$INSTALL_DIR/package.json" ] || ni_stop "$(_t ni.no_checkout) $INSTALL_DIR"
     service_auth_present || ni_stop "$(_t ni.no_auth) $INSTALL_DIR/store/.claude-oauth-token"
-    __need=(MARVEEN_OWNER_NAME MARVEEN_BOT_NAME) __files=()
-    case "${MARVEEN_CHANNEL:-}" in
-      telegram) NI_PROVIDER_CHOICE=1; __files=(MARVEEN_TELEGRAM_TOKEN_FILE) ;;
-      slack) NI_PROVIDER_CHOICE=2; __files=(MARVEEN_SLACK_BOT_TOKEN_FILE MARVEEN_SLACK_APP_TOKEN_FILE) ;;
-      discord) NI_PROVIDER_CHOICE=3; __files=(MARVEEN_DISCORD_BOT_TOKEN_FILE)
-        __need+=(MARVEEN_DISCORD_CHANNEL_ID MARVEEN_DISCORD_USER_ID) ;;
+    __need=(ALFRED_OWNER_NAME ALFRED_BOT_NAME) __files=()
+    case "${ALFRED_CHANNEL:-}" in
+      telegram) NI_PROVIDER_CHOICE=1; __files=(ALFRED_TELEGRAM_TOKEN_FILE) ;;
+      slack) NI_PROVIDER_CHOICE=2; __files=(ALFRED_SLACK_BOT_TOKEN_FILE ALFRED_SLACK_APP_TOKEN_FILE) ;;
+      discord) NI_PROVIDER_CHOICE=3; __files=(ALFRED_DISCORD_BOT_TOKEN_FILE)
+        __need+=(ALFRED_DISCORD_CHANNEL_ID ALFRED_DISCORD_USER_ID) ;;
       gromzo) NI_PROVIDER_CHOICE=4 ;;
-      teams) NI_PROVIDER_CHOICE=5; __files=(MARVEEN_TEAMS_BOT_APP_PASSWORD_FILE)
-        __need+=(MARVEEN_TEAMS_BOT_APP_ID MARVEEN_TEAMS_BOT_TENANT_ID) ;;
-      "") ni_stop "$(_t ni.missing) MARVEEN_CHANNEL" ;;
-      *) ni_stop "$(_t ni.bad_value) MARVEEN_CHANNEL (telegram|slack|discord|gromzo|teams)" ;;
+      teams) NI_PROVIDER_CHOICE=5; __files=(ALFRED_TEAMS_BOT_APP_PASSWORD_FILE)
+        __need+=(ALFRED_TEAMS_BOT_APP_ID ALFRED_TEAMS_BOT_TENANT_ID) ;;
+      "") ni_stop "$(_t ni.missing) ALFRED_CHANNEL" ;;
+      *) ni_stop "$(_t ni.bad_value) ALFRED_CHANNEL (telegram|slack|discord|gromzo|teams)" ;;
     esac
     for __s in "${__need[@]}" "${__files[@]}"; do
       [ -n "${!__s:-}" ] || ni_stop "$(_t ni.missing) $__s"
@@ -408,8 +408,8 @@ fi
 
 clear
 echo ""
-echo -e "${BOLD}  ▐▛███▜▌   Marveen${NC}"
-if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+echo -e "${BOLD}  ▐▛███▜▌   Alfred${NC}"
+if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
   echo -e "${BOLD} ▝▜█████▛▘  Your AI team, running while you sleep.${NC}"
 else
   echo -e "${BOLD} ▝▜█████▛▘  $(_t tagline)${NC}"
@@ -432,8 +432,8 @@ case "$INSTALL_DIR" in
     echo -e "  A /mnt/ alatti mappakon a git es az npm jogosultsag-muveletei nem mukodnek (WSL/drvfs) -- a telepites itt elhalna."
     echo -e "  ${DIM}Kiut: klonozd a Linux home-ba, es onnan futtasd (masold az alabbi sorokat):${NC}"
     echo "    cd ~"
-    echo "    git clone --branch main https://github.com/Szotasz/marveen.git"
-    echo "    cd marveen && ./install.sh"
+    echo "    git clone --branch main https://github.com/gbpepe/alfred.git"
+    echo "    cd alfred && ./install.sh"
     exit 1
     ;;
 esac
@@ -483,7 +483,7 @@ APT_OPTS="-o DPkg::Lock::Timeout=180"
 # 2026-08-02, eles gepen merve: az elso VALODI elso-telepitesnel a
 #   sudo apt-get install -y nodejs
 # elakadt egy whiptail ablakon ("Pending kernel upgrade"), amit a needrestart
-# apt-hookja nyitott (apt-pinvoke -m u). A telepito a Marveen appbol fut, ahol
+# apt-hookja nyitott (apt-pinvoke -m u). A telepito a Alfred appbol fut, ahol
 # nincs terminal es nincs stdin -- a dialogus tehat nem elnyomhato, a telepites
 # ott all, amig valaki kezzel ki nem lovi. A naplo elso jele: "dpkg-preconfigure:
 # unable to re-open stdin". Eddig azert nem jott elo, mert a teszt-gepeken a node
@@ -615,7 +615,7 @@ if command -v free &>/dev/null; then
     warn "$(_t linux.low_ram_prefix) ${TOTAL_RAM_MB} MB RAM + ${TOTAL_SWAP_MB} MB swap = ${TOTAL_AVAIL} MB"
     echo -e "  ${ORANGE}Az npm build legalabb 2 GB memoriat igenyel.${NC}"
     if [ "$TOTAL_SWAP_MB" -lt 1024 ]; then
-      ni_answer CREATE_SWAP yn MARVEEN_SWAP i ||
+      ni_answer CREATE_SWAP yn ALFRED_SWAP i ||
       read -rp "$(_t prompt_swap)" CREATE_SWAP
       CREATE_SWAP=${CREATE_SWAP:-i}
       if [ "$CREATE_SWAP" = "i" ]; then
@@ -841,12 +841,12 @@ ok "zstd $(zstd --version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 if [ "$ADMIN_PREREQ" = 1 ]; then
   # ADMINPREREQTRUST1104: never the checkout's copy (the non-admin user can write it). The gate AND
   # the writer it calls (scripts/lib/managed-settings-write.py, found next to the gate) come from the
-  # official source at MARVEEN_REF, into a fresh root-owned temp tree.
+  # official source at ALFRED_REF, into a fresh root-owned temp tree.
   {
-    GATE_DIR="$(mktemp -d /tmp/marveen-channels-gate.XXXXXX)"
+    GATE_DIR="$(mktemp -d /tmp/alfred-channels-gate.XXXXXX)"
     mkdir -p "$GATE_DIR/lib"
     GATE_SCRIPT="$GATE_DIR/ensure-managed-channels-enabled.sh"
-    _raw="${MARVEEN_OFFICIAL_RAW}/${MARVEEN_REF}/scripts"
+    _raw="${ALFRED_OFFICIAL_RAW}/${ALFRED_REF}/scripts"
     # The writer is optional here: an older ref's gate does not call it (main before the
     # writer landed), and a gate that needs it and misses it reports the manual step itself.
     curl -fsSL "$_raw/ensure-managed-channels-enabled.sh" -o "$GATE_SCRIPT" 2>/dev/null || : > "$GATE_SCRIPT"
@@ -855,7 +855,7 @@ if [ "$ADMIN_PREREQ" = 1 ]; then
   }
   GATE_OUT=""
   [ -s "$GATE_SCRIPT" ] && GATE_OUT="$(bash "$GATE_SCRIPT" 2>&1 || true)"
-  case "$GATE_OUT" in *MARVEEN_CHANNELS_GATE=ok*) GATE_RESULT=ok ;; *) GATE_RESULT=manual ;; esac
+  case "$GATE_OUT" in *ALFRED_CHANNELS_GATE=ok*) GATE_RESULT=ok ;; *) GATE_RESULT=manual ;; esac
   LINGER_RESULT=nouser
   if ! command -v loginctl >/dev/null 2>&1 || [ ! -d "${LINGER_SYSTEMD_DIR:-/run/systemd/system}" ]; then LINGER_RESULT=na
   elif [ -n "$ADMIN_USER" ]; then
@@ -868,7 +868,7 @@ if [ "$ADMIN_PREREQ" = 1 ]; then
   if [ "$GATE_RESULT" = ok ]; then ok "$(_t linux.adminprereq_gate_ok)"; else
     warn "$(_t linux.adminprereq_gate_manual)"
     # the gate's own human lines (its reason); the machine verdict line stays out
-    [ -n "$GATE_OUT" ] && printf '%s\n' "$GATE_OUT" | grep -v 'MARVEEN_CHANNELS_GATE=' | sed 's/^/    /'
+    [ -n "$GATE_OUT" ] && printf '%s\n' "$GATE_OUT" | grep -v 'ALFRED_CHANNELS_GATE=' | sed 's/^/    /'
   fi
   case "$LINGER_RESULT" in
     ok) ok "$(_t linux.adminprereq_linger_ok) ${ADMIN_USER}" ;;
@@ -893,7 +893,7 @@ fi
 # git itt mar garantaltan telepitve van (lasd fentebb a [1/7] lepest).
 if [ ! -f "$INSTALL_DIR/package.json" ]; then
   warn "A telepito a repon kivulrol fut (nincs package.json itt: $INSTALL_DIR)."
-  TARGET_DIR="$HOME/marveen"
+  TARGET_DIR="$HOME/alfred"
   if [ -f "$TARGET_DIR/package.json" ]; then
     ok "Meglevo checkout: $TARGET_DIR -- frissites..."
     git -C "$TARGET_DIR" pull --ff-only 2>/dev/null || warn "git pull kihagyva (helyi valtozasok lehetnek)."
@@ -901,9 +901,9 @@ if [ ! -f "$INSTALL_DIR/package.json" ]; then
     echo -e "  Repo klonozasa -> ${TARGET_DIR} ..."
     # A repo default branch-e a develop, de a publikus telepito main-rol fut
     # (a Windows/WSL wrapper is main-rol fetcheli a scriptet) -> pineljuk a main-t.
-    # MARVEENLANG1763: the same ref the language file came from (default main).
-    git clone --depth 1 --branch "$MARVEEN_REF" https://github.com/Szotasz/marveen.git "$TARGET_DIR" \
-      || fail "git clone sikertelen: https://github.com/Szotasz/marveen.git (${MARVEEN_REF} branch)"
+    # ALFREDLANG1763: the same ref the language file came from (default main).
+    git clone --depth 1 --branch "$ALFRED_REF" https://github.com/gbpepe/alfred.git "$TARGET_DIR" \
+      || fail "git clone sikertelen: https://github.com/gbpepe/alfred.git (${ALFRED_REF} branch)"
     ok "Repo klonozva: $TARGET_DIR"
   fi
   echo -e "  Telepito ujrainditasa a checkoutbol..."
@@ -1173,14 +1173,14 @@ fi
 # XDG_RUNTIME_DIR + DBUS: headless szerveren automatikusan beallitjuk
 # (detektalas: nincs DISPLAY es nincs WAYLAND_DISPLAY)
 if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
-  XDG_BLOCK='# marveen-user-bus: XDG_RUNTIME_DIR + DBUS headless szerveren
+  XDG_BLOCK='# alfred-user-bus: XDG_RUNTIME_DIR + DBUS headless szerveren
 if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ]; then
   export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 fi
 if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ] && [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
   export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi'
-  ensure_block_in_rc 'marveen-user-bus' "$XDG_BLOCK"
+  ensure_block_in_rc 'alfred-user-bus' "$XDG_BLOCK"
   # Aktivaljuk az aktualis sessionban is
   if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ]; then
     export XDG_RUNTIME_DIR="/run/user/$(id -u)"
@@ -1422,7 +1422,7 @@ INSTALL_STEP="personal-info"
 # ─────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}$(_t section_4_linux)${NC}"
-ni_answer OWNER_NAME value MARVEEN_OWNER_NAME ||
+ni_answer OWNER_NAME value ALFRED_OWNER_NAME ||
 read -rp "$(_t prompt_your_name)" OWNER_NAME
 # Chat ID is NOT asked here -- the user doesn't know it yet.
 # It will be set automatically during the Telegram pairing flow.
@@ -1517,7 +1517,7 @@ probe_telegram_token() {
   _ptt_wh="$(printf 'url = "%s"\n' "https://api.telegram.org/bot${_ptt_t}/getWebhookInfo" | curl -s --max-time 8 -K - 2>/dev/null)" || return 0
   case "$_ptt_wh" in
     *'"url":"http'*)
-      warn "A bot token ervenyes, de a bot WEBHOOKRA van kotve -- a Marveen poller igy nem tud ra csatlakozni."
+      warn "A bot token ervenyes, de a bot WEBHOOKRA van kotve -- a Alfred poller igy nem tud ra csatlakozni."
       echo -e "    ${DIM}Teendo: nyisd meg bongeszoben: https://api.telegram.org/bot<A-TOKENED>/deleteWebhook${NC}"
       echo -e "    ${DIM}vagy keszits uj botot a @BotFather-nel, es futtasd ujra a telepitot azzal.${NC}"
       return 0 ;;
@@ -1550,7 +1550,7 @@ if [ "$CHANNEL_PROVIDER" = "telegram" ]; then
   echo -e "${DIM}  3. Adj nevet a botodnak${NC}"
   echo -e "${DIM}  4. Masold ide a kapott tokent:${NC}"
   echo ""
-  ni_answer BOT_TOKEN file MARVEEN_TELEGRAM_TOKEN_FILE ||
+  ni_answer BOT_TOKEN file ALFRED_TELEGRAM_TOKEN_FILE ||
   read -rp "$(_t prompt_telegram_token)" BOT_TOKEN
   probe_telegram_token "$BOT_TOKEN"
 elif [ "$CHANNEL_PROVIDER" = "discord" ]; then
@@ -1563,14 +1563,14 @@ elif [ "$CHANNEL_PROVIDER" = "discord" ]; then
   echo -e "${DIM}  5. Masold ki a csatorna ID-jet (Developer Mode > jobb klikk > Copy Channel ID)${NC}"
   echo -e "${DIM}  6. Sajat (operator) user ID: jobb klikk a nevedre > Copy User ID${NC}"
   echo ""
-  ni_answer DISCORD_BOT_TOKEN file MARVEEN_DISCORD_BOT_TOKEN_FILE ||
+  ni_answer DISCORD_BOT_TOKEN file ALFRED_DISCORD_BOT_TOKEN_FILE ||
   read -rp "$(_t prompt_discord_bot_token)" DISCORD_BOT_TOKEN
-  ni_answer DISCORD_CHANNEL_ID value MARVEEN_DISCORD_CHANNEL_ID ||
+  ni_answer DISCORD_CHANNEL_ID value ALFRED_DISCORD_CHANNEL_ID ||
   read -rp "$(_t prompt_discord_channel_id)" DISCORD_CHANNEL_ID
   echo ""
   echo -e "${DIM}  Az operator user ID-re a parositashoz kell: amikor egy uj felhasznalo${NC}"
   echo -e "${DIM}  DM-et ir a botnak, a bot ezen az ID-n ertesit teged jovahagyasert.${NC}"
-  ni_answer OPERATOR_DISCORD_USER_ID value MARVEEN_DISCORD_USER_ID ||
+  ni_answer OPERATOR_DISCORD_USER_ID value ALFRED_DISCORD_USER_ID ||
   read -rp "$(_t prompt_discord_user_id)" OPERATOR_DISCORD_USER_ID
 elif [ "$CHANNEL_PROVIDER" = "teams" ]; then
   # EE2392D3: the three keys of the Azure Bot's Entra app (the names the Teams plugin and the dashboard read:
@@ -1583,11 +1583,11 @@ elif [ "$CHANNEL_PROVIDER" = "teams" ]; then
   echo -e "${DIM}  Ha meg nincs: hagyd uresen, a bot a telepites utan a Teams-bovitmeny${NC}"
   echo -e "${DIM}  setup-azure-bot.sh szkriptjevel hozhato letre (Teams-bekotesi sugo).${NC}"
   echo ""
-  ni_answer TEAMS_BOT_APP_ID value MARVEEN_TEAMS_BOT_APP_ID ||
+  ni_answer TEAMS_BOT_APP_ID value ALFRED_TEAMS_BOT_APP_ID ||
   read -rp "$(_t prompt_teams_app_id)" TEAMS_BOT_APP_ID
   TEAMS_BOT_APP_ID="$(_teams_clean "$TEAMS_BOT_APP_ID")"
   if [ -n "$TEAMS_BOT_APP_ID" ]; then
-    ni_answer TEAMS_BOT_TENANT_ID value MARVEEN_TEAMS_BOT_TENANT_ID ||
+    ni_answer TEAMS_BOT_TENANT_ID value ALFRED_TEAMS_BOT_TENANT_ID ||
     read -rp "$(_t prompt_teams_tenant_id)" TEAMS_BOT_TENANT_ID
     TEAMS_BOT_TENANT_ID="$(_teams_clean "$TEAMS_BOT_TENANT_ID")"
     # Echo off only on a terminal, and back on every way out of the read: Ctrl+C and TERM restore it and stop
@@ -1604,7 +1604,7 @@ elif [ "$CHANNEL_PROVIDER" = "teams" ]; then
       trap 'stty echo 2>/dev/null || true; eval "$_teams_prev_exit"' EXIT
       stty -echo 2>/dev/null || true
     fi
-    ni_answer TEAMS_BOT_APP_PASSWORD file MARVEEN_TEAMS_BOT_APP_PASSWORD_FILE ||
+    ni_answer TEAMS_BOT_APP_PASSWORD file ALFRED_TEAMS_BOT_APP_PASSWORD_FILE ||
     read -rp "$(_t prompt_teams_app_password)" TEAMS_BOT_APP_PASSWORD
     if _teams_tty; then
       stty echo 2>/dev/null || true
@@ -1619,11 +1619,11 @@ elif [ "$CHANNEL_PROVIDER" = "teams" ]; then
     [ -n "$TEAMS_BOT_APP_PASSWORD" ] || warn "A titkos kulcs ures: a bot igy nem tud valaszolni. Kesobb a setup-azure-bot.sh --env-file potolja."
   fi
 elif [ "$CHANNEL_PROVIDER" = "gromzo" ]; then
-  # GROMZONOPROVIDER1108: no bot, no token: the Gromzo channel is connected later from the Marveen Bridge (Gromzo
-  # wizard), through the local marveen-mxd.
+  # GROMZONOPROVIDER1108: no bot, no token: the Gromzo channel is connected later from the Alfred Bridge (Gromzo
+  # wizard), through the local alfred-mxd.
   echo ""
   echo -e "${DIM}  Az AI asszisztensed a Gromzo alkalmazason at kommunikal veled; bot-token nem kell.${NC}"
-  echo -e "${DIM}  A Gromzot a Marveen Bridge-ben kotod be a telepites utan.${NC}"
+  echo -e "${DIM}  A Gromzot a Alfred Bridge-ben kotod be a telepites utan.${NC}"
 else
   echo ""
   echo -e "${DIM}  Az AI asszisztensed Slack-en kommunikal veled.${NC}"
@@ -1637,28 +1637,28 @@ else
   echo -e "${DIM}     app_mention, message.channels, message.groups, message.im${NC}"
   echo -e "${DIM}  5. Installald a workspace-be${NC}"
   echo ""
-  ni_answer SLACK_BOT_TOKEN file MARVEEN_SLACK_BOT_TOKEN_FILE ||
+  ni_answer SLACK_BOT_TOKEN file ALFRED_SLACK_BOT_TOKEN_FILE ||
   read -rp "$(_t prompt_slack_bot_token)" SLACK_BOT_TOKEN
-  ni_answer SLACK_APP_TOKEN file MARVEEN_SLACK_APP_TOKEN_FILE ||
+  ni_answer SLACK_APP_TOKEN file ALFRED_SLACK_APP_TOKEN_FILE ||
   read -rp "$(_t prompt_slack_app_token)" SLACK_APP_TOKEN
 fi
 
-ni_answer BOT_NAME value MARVEEN_BOT_NAME ||
+ni_answer BOT_NAME value ALFRED_BOT_NAME ||
 read -rp "$(_t prompt_bot_name)" BOT_NAME
-BOT_NAME=${BOT_NAME:-"Marveen"}
+BOT_NAME=${BOT_NAME:-"Alfred"}
 
 # Derive the ASCII slug the backend uses everywhere (tmux sessions, systemd
 # unit labels, DB agent_id, API routing). NFKD + ASCII + lowercase dashes,
-# empty fallback to "marveen" so we never end up with a blank identifier.
+# empty fallback to "alfred" so we never end up with a blank identifier.
 MAIN_AGENT_ID=$(python3 - "$BOT_NAME" <<'PYEOF'
 import sys, unicodedata, re
 s = sys.argv[1].strip()
 s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode()
 s = re.sub(r'[^a-zA-Z0-9]+', '-', s).strip('-').lower()
-print(s or 'marveen')
+print(s or 'alfred')
 PYEOF
 )
-if [ "$MAIN_AGENT_ID" != "marveen" ]; then
+if [ "$MAIN_AGENT_ID" != "alfred" ]; then
   echo -e "  ${DIM}$(_t macos.agent_id_info)${MAIN_AGENT_ID}${NC}"
 fi
 
@@ -1673,7 +1673,7 @@ SERVICE_ID="$MAIN_AGENT_ID"
 
 INSTALL_STEP="bun-install"
 # GROMZONOPROVIDER1108: Bun only for a channel plugin that runs on it (telegram, discord). Slack runs on Node, Gromzo
-# on Node through marveen-mxd: those installs never download Bun, so they cannot fail on it (the owner's 11-08 Gromzo
+# on Node through alfred-mxd: those installs never download Bun, so they cannot fail on it (the owner's 11-08 Gromzo
 # install failed exactly on the Bun download). A Bun channel added later installs it then (release B).
 case "$CHANNEL_PROVIDER" in
   # EE2392D3: teams too: the Teams plugin's .mcp.json starts its server with `bun run ... start`.
@@ -1893,7 +1893,7 @@ if [ -n "${OAUTH_TOKEN_INPUT:-}" ] && printf '%s' "$OAUTH_TOKEN_INPUT" | grep -E
   # authenticates from whatever refreshes that root -- on Linux the shared
   # ~/.claude/.credentials.json -- which periodically expires and 401s the bot
   # into a parked TUI that the router reads as busy, so the channel goes silent
-  # with no error (the confirmed root cause of the 2026-07-23 marveen-channels
+  # with no error (the confirmed root cause of the 2026-07-23 alfred-channels
   # outage). The setting existed but nothing ever turned it on, so every
   # default install was wired to that failure mode.
   #
@@ -2013,7 +2013,7 @@ fi
 
 # Default scheduled tasks scaffoldolasa ~/.claude/scheduled-tasks/ ala. A
 # template-ek {{MAIN_AGENT_ID}} placeholdert hasznalnak, igy a felhasznalo
-# valasztott agent slugja kerul be a hardcoded "marveen" helyett. Letezo task
+# valasztott agent slugja kerul be a hardcoded "alfred" helyett. Letezo task
 # konyvtarakat soha nem irjuk felul.
 SCHED_TPL_DIR="$INSTALL_DIR/templates/scheduled-tasks"
 SCHED_TARGET_DIR="$HOME/.claude/scheduled-tasks"
@@ -2217,7 +2217,7 @@ fi
 # as on macOS: once the list exists it REPLACES the built-in one, so a teams-only entry would mute a Telegram or
 # Discord agent on this host. Root as for the channelsEnabled write above; asked first as the user, so a file
 # that already allows all four needs no privilege.
-TEAMS_ALLOWLIST_PLUGINS="slack-channel@marveen-marketplace telegram@claude-plugins-official teams@marveen-marketplace discord@claude-plugins-official"
+TEAMS_ALLOWLIST_PLUGINS="slack-channel@alfred-marketplace telegram@claude-plugins-official teams@alfred-marketplace discord@claude-plugins-official"
 managed_allows_all() { # $1 = the managed file, then NAME@MARKET...; 0 only when every one is listed
   python3 -I -S - "$@" 2>/dev/null <<'MAA_PY'
 import json, sys
@@ -2263,7 +2263,7 @@ fi
 
 # Channel plugin install
 # GROMZONOPROVIDER1108: on gromzo there is no channel plugin to install here; the Gromzo plugin comes with the Bridge's
-# Gromzo step (marveen-mxd's payload).
+# Gromzo step (alfred-mxd's payload).
 if [ "$CHANNEL_PROVIDER" = "gromzo" ]; then
   PLUGIN_ID=""
   ok "Gromzo: a csatorna-plugint a Bridge Gromzo-lepese hozza (itt nincs mit telepiteni)"
@@ -2276,12 +2276,12 @@ elif [ "$CHANNEL_PROVIDER" = "discord" ]; then
   PLUGIN_ID="discord@claude-plugins-official"
   PLUGIN_SHORT="discord"
 elif [ "$CHANNEL_PROVIDER" = "teams" ]; then
-  PLUGIN_MARKETPLACE="Szotasz/marveen-marketplace"
-  PLUGIN_ID="teams@marveen-marketplace"
+  PLUGIN_MARKETPLACE="gbpepe/alfred-marketplace"
+  PLUGIN_ID="teams@alfred-marketplace"
   PLUGIN_SHORT="teams"
 else
-  PLUGIN_MARKETPLACE="Szotasz/marveen-marketplace"
-  PLUGIN_ID="slack-channel@marveen-marketplace"
+  PLUGIN_MARKETPLACE="gbpepe/alfred-marketplace"
+  PLUGIN_ID="slack-channel@alfred-marketplace"
   PLUGIN_SHORT="slack-channel"
 fi
 
@@ -2309,7 +2309,7 @@ fi
 
 # INSTALLDIRTYTREE1103: NO `claude plugin enable --scope project` here. That
 # call rewrote the TRACKED .claude/settings.json (the whole file reformatted, ~500
-# lines, plus a wrong "<provider>@marveen-marketplace" key for Telegram/Discord),
+# lines, plus a wrong "<provider>@alfred-marketplace" key for Telegram/Discord),
 # so every fresh install left a dirty tree and every later update had to stash.
 # channels.sh enables the primary plugin for the main session through its
 # launch-time --settings file (store/.main-extra-plugins.settings.json), which
@@ -2475,7 +2475,7 @@ echo -e "  Whisper telepites (beszed -> szoveg leirat, opcionalis)..."
 if command -v whisper &>/dev/null; then
   ok "whisper mar telepitve"
 else
-  ni_answer DO_WHISPER yn MARVEEN_WHISPER n ||
+  ni_answer DO_WHISPER yn ALFRED_WHISPER n ||
   read -rp "$(_t prompt_whisper)" DO_WHISPER
   DO_WHISPER=${DO_WHISPER:-n}
   if [ "$DO_WHISPER" = "i" ]; then
@@ -2846,7 +2846,7 @@ AccuracySec=30s
 WantedBy=timers.target
 EOF
 
-# marveen-host-watchdog.service -- host/WSL-VM restart detector (btime-based).
+# alfred-host-watchdog.service -- host/WSL-VM restart detector (btime-based).
 # Distinguishes a whole-VM restart (all units down at once, NOT an app crash)
 # from a service crash, and Telegrams it. See scripts/host-restart-watchdog.sh.
 cat >"$SYSTEMD_DIR/${SERVICE_ID}-host-watchdog.service" <<EOF
@@ -2858,7 +2858,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=$INSTALL_DIR/scripts/host-restart-watchdog.sh
-Environment=MARVEEN_STORE=$INSTALL_DIR/store
+Environment=ALFRED_STORE=$INSTALL_DIR/store
 Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=HOME=$HOME
 ${TZ_LINE}
@@ -2869,7 +2869,7 @@ StandardError=journal
 WantedBy=default.target
 EOF
 
-# marveen-notify@.service -- templated app-crash notifier, fired by OnFailure=
+# alfred-notify@.service -- templated app-crash notifier, fired by OnFailure=
 # drop-ins on the dashboard/channels units. OnFailure => app crash (vs the
 # host-watchdog's btime-change => host restart).
 cat >"$SYSTEMD_DIR/${SERVICE_ID}-notify@.service" <<EOF
@@ -3010,7 +3010,7 @@ else
     # Without systemd nothing restarts the services after a WSL restart, and
     # the installer used to stop at the one-line warning above.
     echo ""
-    echo -e "  ${ORANGE}WSL-en a systemd nincs bekapcsolva, ezert a Marveen a WSL ujraindulasa utan nem indul el magatol.${NC}"
+    echo -e "  ${ORANGE}WSL-en a systemd nincs bekapcsolva, ezert a Alfred a WSL ujraindulasa utan nem indul el magatol.${NC}"
     echo -e "  ${DIM}Bekapcsolas: ird be az /etc/wsl.conf fajlba (sudo):${NC}"
     echo "    [boot]"
     echo "    systemd=true"
@@ -3029,7 +3029,7 @@ if [ "$IS_WSL" = "true" ]; then
   [ -n "$_winprofile" ] && _wslcfg="$(wslpath -u "$_winprofile" 2>/dev/null)/.wslconfig"
   if [ -z "$_wslcfg" ] || ! grep -Eqi '^[[:space:]]*vmIdleTimeout[[:space:]]*=[[:space:]]*-1' "$_wslcfg" 2>/dev/null; then
     echo ""
-    echo -e "  ${ORANGE}WSL: ha bezarod az utolso Ubuntu ablakot, a Windows par perc mulva leallitja a WSL-t, es vele a Marveent is.${NC}"
+    echo -e "  ${ORANGE}WSL: ha bezarod az utolso Ubuntu ablakot, a Windows par perc mulva leallitja a WSL-t, es vele a Alfredet is.${NC}"
     echo -e "  ${DIM}Javitas Windowson: a %UserProfile%\\.wslconfig fajlba ird be:${NC}"
     echo "    [wsl2]"
     echo "    vmIdleTimeout=-1"

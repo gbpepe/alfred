@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest'
 import { decideHasPluginAlive, parseEtimeSeconds, pollersStartedSince } from '../channel-coordinator/liveness.js'
 import { stateDirPluginPollerPids } from '../web/channel-poller-reap.js'
 
-const CHAN_DIR = '/Users/u/projects/marveen/agents/argos/.claude/channels/telegram'
+const CHAN_DIR = '/Users/u/projects/alfred/agents/argos/.claude/channels/telegram'
 const TG_ROOT = '/Users/u/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6'
 const ALIVE = () => true
 const DEAD = () => false
@@ -67,13 +67,13 @@ describe('the state-dir env scan finds a poller whose wrapper has exited', () =>
   })
 
   it('another agent\'s poller, and a sibling dir with the same prefix, do not count', () => {
-    const other = '/Users/u/projects/marveen/agents/wozniak/.claude/channels/telegram'
+    const other = '/Users/u/projects/alfred/agents/wozniak/.claude/channels/telegram'
     expect(decide(envRow(49722, '/Users/u/.bun/bin/bun server.ts', { TELEGRAM_STATE_DIR: other, CLAUDE_PLUGIN_ROOT: TG_ROOT }))).toBe(false)
     expect(decide(envRow(49723, '/Users/u/.bun/bin/bun server.ts', { TELEGRAM_STATE_DIR: `${CHAN_DIR}-old`, CLAUDE_PLUGIN_ROOT: TG_ROOT }))).toBe(false)
   })
 
   it('another provider\'s plugin with this state dir does not make telegram alive', () => {
-    const slackRoot = '/Users/u/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0'
+    const slackRoot = '/Users/u/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0'
     expect(decide(envRow(71100, 'node server.ts', { TELEGRAM_STATE_DIR: CHAN_DIR, CLAUDE_PLUGIN_ROOT: slackRoot }))).toBe(false)
   })
 

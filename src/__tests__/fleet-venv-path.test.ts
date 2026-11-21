@@ -60,7 +60,7 @@ describe('fleetVenvPathPrefix', () => {
 
 describe('FLEETVENV923 wiring (source-level)', () => {
   it('config.ts resolves FLEET_PYTHON_VENV through fleet-venv.ts (the function channels.sh shares)', () => {
-    expect(CONFIG).toContain('export const FLEET_PYTHON_VENV = resolveFleetVenvDir(PROJECT_ROOT, homedir(), process.env.CLAUDECLAW_ENV_DIR ?? PROJECT_ROOT)')
+    expect(CONFIG).toContain('export const FLEET_PYTHON_VENV = resolveFleetVenvDir(PROJECT_ROOT, homedir(), process.env.ALFRED_ENV_DIR ?? PROJECT_ROOT)')
   })
 
   it('the config registry documents the key as a restart-requiring system string, OFF by default', () => {

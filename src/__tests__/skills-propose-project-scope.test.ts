@@ -1,4 +1,4 @@
-// SKILLPROPOSESCOPE1104 (Marveen 68194, Samu 68195): a proposal of a name that lives in the PROJECT root's
+// SKILLPROPOSESCOPE1104 (Alfred 68194, Samu 68195): a proposal of a name that lives in the PROJECT root's
 // .claude/skills replaces it THERE (same hash binding, its scripts/ and references/ kept), never as a second, global
 // copy; a name that lives in both roots is refused (409). A new name still goes to the global root.
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'

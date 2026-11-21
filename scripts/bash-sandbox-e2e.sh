@@ -20,7 +20,7 @@ DENY="${3:-example.com}"
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude)}"
 # The fleet token, as the agents get it; overridable for a worktree that has no store/.
-TOKEN_FILE="${MARVEEN_OAUTH_TOKEN_FILE:-$INSTALL_DIR/store/.claude-oauth-token}"
+TOKEN_FILE="${ALFRED_OAUTH_TOKEN_FILE:-$INSTALL_DIR/store/.claude-oauth-token}"
 [ -f "$SETTINGS" ] || { echo "no such settings file: $SETTINGS" >&2; exit 2; }
 [ -s "$TOKEN_FILE" ] || { echo "no fleet token at $TOKEN_FILE" >&2; exit 2; }
 
@@ -32,7 +32,7 @@ cat > "$WORK/cwd/probe.py" <<'PY'
 import json, sys, urllib.request
 def get(url):
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "marveen-sandbox-e2e/1"}), timeout=15) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "alfred-sandbox-e2e/1"}), timeout=15) as r:
             return f"HTTP {r.status}"
     except urllib.error.HTTPError as e:
         return f"HTTP {e.code}"

@@ -14,10 +14,10 @@ import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-msgclose-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-msgclose-test-'))
 
 vi.mock('../config.js', () => ({
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -65,7 +65,7 @@ describe('message-close section: what it says (ACKONCLOSE927)', () => {
   })
 
   it('the example closes without the ack through the helper (VOICETOKENLEAK1101 PR-A1)', () => {
-    expect(body).toMatch(/marveen-api\.sh message-close <id> --no-notify/)
+    expect(body).toMatch(/alfred-api\.sh message-close <id> --no-notify/)
     expect(body).toMatch(/--result-file \S+api-eredmeny\.txt/)
     expect(body).not.toContain('$(cat')
     expect(body).not.toContain('Authorization')

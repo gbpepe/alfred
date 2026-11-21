@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # unit-fail-notify.sh <unit-name>
 #
-# Called by marveen-notify@.service via `OnFailure=marveen-notify@%n.service`
-# drop-ins on marveen-dashboard.service / marveen-channels.service. Sends ONE
+# Called by alfred-notify@.service via `OnFailure=alfred-notify@%n.service`
+# drop-ins on alfred-dashboard.service / alfred-channels.service. Sends ONE
 # Telegram notice that a specific APP/service unit failed -- as opposed to a
 # host/WSL-VM restart, which is reported by host-restart-watchdog.sh. Keeping
 # the two paths separate is what lets a fleet-wide silence be classified.
@@ -24,8 +24,8 @@ ENV_FILE="${TELEGRAM_ENV:-$TG_CHAN_DIR/.env}"
 # Alert target chat-id -- MUST be provided by the install's own config; there is
 # deliberately NO hardcoded fallback (a hardcoded id would make every downstream
 # install send its alerts to that one private chat via its own bot token).
-CHAT_ID="${MARVEEN_ALERT_CHAT_ID:-}"
-# ZAKARFELUGY921 (kulso bejelentes, 2026-09-21): a MARVEEN_ALERT_CHAT_ID-t SEMMI
+CHAT_ID="${ALFRED_ALERT_CHAT_ID:-}"
+# ZAKARFELUGY921 (kulso bejelentes, 2026-09-21): a ALFRED_ALERT_CHAT_ID-t SEMMI
 # nem allitotta be -- se unit-sablon, se az install-linux.sh (merve: 0 elofordulas
 # mindkettoben) --, tehat ervenyes tokennel SEM ment ki semmi. Beegetni tilos, es a
 # unitba irni sem lehet: a telepito a unitokat a PAROSITAS ELOTT irja ki, amikor a
@@ -48,7 +48,7 @@ fi
 [ "$CHAT_ID" = "0" ] && CHAT_ID=""
 
 now_local="$(date '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || echo now)"
-msg="Marveen app-crash: a(z) ${UNIT} unit FAILED állapotba került (${now_local}).
+msg="Alfred app-crash: a(z) ${UNIT} unit FAILED állapotba került (${now_local}).
 (Ez alkalmazás/service szintű hiba, NEM host/VM restart. A host-restartot a host-restart-watchdog jelzi külön.)"
 
 token=""
@@ -68,7 +68,7 @@ if [[ -n "$token" && -n "$CHAT_ID" ]]; then
   fi
 else
   # Not silent: name the missing piece so a misconfigured install is diagnosable.
-  miss=""; [[ -z "$token" ]] && miss+=" TELEGRAM_BOT_TOKEN(via TELEGRAM_ENV=$ENV_FILE)"; [[ -z "$CHAT_ID" ]] && miss+=" MARVEEN_ALERT_CHAT_ID"
+  miss=""; [[ -z "$token" ]] && miss+=" TELEGRAM_BOT_TOKEN(via TELEGRAM_ENV=$ENV_FILE)"; [[ -z "$CHAT_ID" ]] && miss+=" ALFRED_ALERT_CHAT_ID"
   echo "[unit-fail-notify] ${UNIT} FAILED but no Telegram sent -- missing:${miss}" >&2
 fi
 exit 0

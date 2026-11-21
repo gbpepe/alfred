@@ -21,10 +21,10 @@ trap 'rm -rf "$TMP"' EXIT
 awk '/^# LINUXINSTPREREQ1104: the non-admin pre-check\./{on=1} on{print} /^ADMIN_INSTALLED="\$MISSING_PKGS"$/{on=0}' "$REPO/install-linux.sh" > "$TMP/pre.sh"
 assert_contains "the pre-check was cut from the real script" "$(cat "$TMP/pre.sh")" 'admin_group_member'
 # the helper definitions of the early root guard (admin_prereq_cmd, root_only_path)
-awk '/^MARVEEN_OFFICIAL_RAW=/{on=1} /^__ADMIN_MODE=0$/{on=0} on' "$REPO/install-linux.sh" > "$TMP/defs.sh"
+awk '/^ALFRED_OFFICIAL_RAW=/{on=1} /^__ADMIN_MODE=0$/{on=0} on' "$REPO/install-linux.sh" > "$TMP/defs.sh"
 assert_contains "the guard helpers were cut" "$(cat "$TMP/defs.sh")" 'admin_prereq_cmd()'
 # the whole guard block, up to the install-lang loader
-awk '/^MARVEEN_OFFICIAL_RAW=/{on=1} /^# shellcheck source=install-lang.sh$/{on=0} on' "$REPO/install-linux.sh" > "$TMP/guard.sh"
+awk '/^ALFRED_OFFICIAL_RAW=/{on=1} /^# shellcheck source=install-lang.sh$/{on=0} on' "$REPO/install-linux.sh" > "$TMP/guard.sh"
 assert_contains "the guard was cut" "$(cat "$TMP/guard.sh")" 'root_only_path "$__self"'
 
 # run_pre <groups> <sudo -n ok 1/0> <uid> <missing pkgs> <node major> <gate json or ''> [linger yes|no|na]
@@ -66,9 +66,9 @@ assert_contains "lists the packages" "$OUT" "ffmpeg nodejs"
 assert_contains "names the Node version" "$OUT" "18"
 assert_contains "the gate is reported missing" "$OUT" "/etc/claude-code"
 assert_contains "the stated limit (ollama, bumblebee)" "$OUT" "ollama"
-assert_contains "the admin command fetches the official script" "$OUT" 'raw.githubusercontent.com/Szotasz/marveen/main/install-linux.sh'
+assert_contains "the admin command fetches the official script" "$OUT" 'raw.githubusercontent.com/gbpepe/alfred/main/install-linux.sh'
 assert_contains "the admin command names this user" "$OUT" '--admin-prereq --user qauser'
-assert_contains "the admin command carries the ref to the fetched script" "$OUT" 'MARVEEN_REF=main bash'
+assert_contains "the admin command carries the ref to the fetched script" "$OUT" 'ALFRED_REF=main bash'
 assert_not_contains "the admin command never points at a user path" "$OUT" '/home/'
 
 echo "1b. non-admin, no node at all -> says 'not installed', not 'version 0'"
@@ -127,9 +127,9 @@ assert_contains "reaches the package step" "$OUT" "REACHED-PACKAGE-STEP"
 echo "7. --admin-prereq without root, --help"
 # Only as non-root: as root this would be the real admin run (packages installed on the runner).
 if [ "$(id -u)" -ne 0 ]; then
-  OUT="$(MARVEEN_LANG=en /bin/bash "$REPO/install-linux.sh" --admin-prereq 2>&1 </dev/null)"; RC=$?
+  OUT="$(ALFRED_LANG=en /bin/bash "$REPO/install-linux.sh" --admin-prereq 2>&1 </dev/null)"; RC=$?
   assert_eq "non-root --admin-prereq: rc" 1 "$RC"
-  assert_contains "non-root: names the official command" "$OUT" "raw.githubusercontent.com/Szotasz/marveen/main/install-linux.sh"
+  assert_contains "non-root: names the official command" "$OUT" "raw.githubusercontent.com/gbpepe/alfred/main/install-linux.sh"
   assert_not_contains "non-root: no step ran" "$OUT" "[1/7]"
 fi
 OUT="$(/bin/bash "$REPO/install-linux.sh" --help 2>&1)"
@@ -163,7 +163,7 @@ g() { # env... ; runs the guard copy in $GD as "root" with --admin-prereq
 GD="$TMP/g1"; mk_guard "$GD"; chmod 755 "$GD"
 g FAKE_UID=1000
 assert_eq "a user-owned script: rc" 1 "$RC"
-assert_contains "a user-owned script: refused, with the official command" "$OUT" "raw.githubusercontent.com/Szotasz/marveen/main/install-linux.sh"
+assert_contains "a user-owned script: refused, with the official command" "$OUT" "raw.githubusercontent.com/gbpepe/alfred/main/install-linux.sh"
 assert_not_contains "a user-owned script: nothing ran" "$OUT" "GUARD-PASSED"
 g FAKE_UID=0
 assert_contains "root-owned, 644, safe dirs: passes" "$OUT" "GUARD-PASSED"
@@ -177,10 +177,10 @@ assert_not_contains "a world-writable, non-sticky parent dir: refused" "$OUT" "G
 chmod 1777 "$TMP/w"; g FAKE_UID=0
 assert_contains "a sticky world-writable parent (/tmp-like): passes" "$OUT" "GUARD-PASSED"
 chmod 755 "$TMP/w"
-GD="$TMP/g1"; g FAKE_UID=0 MARVEEN_RAW_BASE=https://example.invalid
-assert_not_contains "MARVEEN_RAW_BASE: refused" "$OUT" "GUARD-PASSED"
-g FAKE_UID=0 MARVEEN_REF='main;id'
-assert_not_contains "a non-plain MARVEEN_REF: refused" "$OUT" "GUARD-PASSED"
+GD="$TMP/g1"; g FAKE_UID=0 ALFRED_RAW_BASE=https://example.invalid
+assert_not_contains "ALFRED_RAW_BASE: refused" "$OUT" "GUARD-PASSED"
+g FAKE_UID=0 ALFRED_REF='main;id'
+assert_not_contains "a non-plain ALFRED_REF: refused" "$OUT" "GUARD-PASSED"
 printf 'echo LANG-SOURCED\n' > "$GD/install-lang.sh"; chmod 666 "$GD/install-lang.sh"; g FAKE_UID=0
 assert_not_contains "a writable install-lang.sh next to it: refused" "$OUT" "GUARD-PASSED"
 rm -f "$GD/install-lang.sh"
@@ -189,7 +189,7 @@ assert_contains "not root: the guard does not apply" "$OUT" "GUARD-PASSED"
 
 echo "7c. the admin branch takes the gate only from the official source, never the checkout"
 ADMIN_BLOCK="$(awk '/--admin-prereq stops here/{on=1} on{print} /^# Repo bootstrap/{exit}' "$REPO/install-linux.sh")"
-assert_contains "the gate comes from the official raw URL" "$ADMIN_BLOCK" '_raw="${MARVEEN_OFFICIAL_RAW}/${MARVEEN_REF}/scripts"'
+assert_contains "the gate comes from the official raw URL" "$ADMIN_BLOCK" '_raw="${ALFRED_OFFICIAL_RAW}/${ALFRED_REF}/scripts"'
 GATE_REFS="$(printf '%s\n' "$ADMIN_BLOCK" | grep -v '^\s*#' | grep 'ensure-managed-channels-enabled.sh' | grep -v '\$_raw/ensure-managed-channels-enabled.sh' | grep -v 'GATE_SCRIPT="\$GATE_DIR/ensure-managed-channels-enabled.sh"')"
 assert_eq "no other gate path in the admin branch" "" "$GATE_REFS"
 
@@ -201,7 +201,7 @@ assert_contains "and it exits 0" "$(awk '/--admin-prereq stops here/{on=1} on{pr
 
 echo "9. every new text key resolves in both languages"
 for lang in hu en; do
-  OUT="$(MARVEEN_LANG=$lang /bin/bash -c ". '$REPO/install-lang.sh'; for k in adminprereq_need_root nonadmin_head nonadmin_pkgs nonadmin_node nonadmin_node_missing nonadmin_gate_ok nonadmin_gate_missing nonadmin_gate_unknown nonadmin_cmd_lead nonadmin_sudo_hint adminprereq_done_head adminprereq_pkgs_installed adminprereq_pkgs_present adminprereq_gate_ok adminprereq_gate_manual adminprereq_next_lead nonadmin_linger nonadmin_skips adminprereq_next_same adminprereq_user_needs_flag adminprereq_user_unknown adminprereq_linger_ok adminprereq_linger_na adminprereq_linger_fail adminprereq_linger_nouser; do _t linux.\$k; done")"
+  OUT="$(ALFRED_LANG=$lang /bin/bash -c ". '$REPO/install-lang.sh'; for k in adminprereq_need_root nonadmin_head nonadmin_pkgs nonadmin_node nonadmin_node_missing nonadmin_gate_ok nonadmin_gate_missing nonadmin_gate_unknown nonadmin_cmd_lead nonadmin_sudo_hint adminprereq_done_head adminprereq_pkgs_installed adminprereq_pkgs_present adminprereq_gate_ok adminprereq_gate_manual adminprereq_next_lead nonadmin_linger nonadmin_skips adminprereq_next_same adminprereq_user_needs_flag adminprereq_user_unknown adminprereq_linger_ok adminprereq_linger_na adminprereq_linger_fail adminprereq_linger_nouser; do _t linux.\$k; done")"
   assert_not_contains "$lang: no raw key" "$OUT" "linux."
 done
 

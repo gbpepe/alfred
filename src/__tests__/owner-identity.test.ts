@@ -155,7 +155,7 @@ describe('the mid-turn path', () => {
   })
 })
 
-describe('the marveen-commands.py hook names the owner the same way (or leaves it to the dashboard)', () => {
+describe('the alfred-commands.py hook names the owner the same way (or leaves it to the dashboard)', () => {
   const hookOwner = (dotenv: string, overrides: unknown): string => {
     const root = mkdtempSync(join(tmpdir(), 'owner-identity-hook-'))
     try {
@@ -166,8 +166,8 @@ describe('the marveen-commands.py hook names the owner the same way (or leaves i
       }
       const py = ['import importlib.util, sys', 'spec = importlib.util.spec_from_file_location("mc", sys.argv[1])',
         'm = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)', 'print(m.owner_chat_id() or "")'].join('\n')
-      return execFileSync('python3', ['-c', py, join(REPO, 'scripts', 'hooks', 'marveen-commands.py')],
-        { encoding: 'utf-8', env: { ...process.env, MARVEEN_INSTALL_DIR: root } }).trim()
+      return execFileSync('python3', ['-c', py, join(REPO, 'scripts', 'hooks', 'alfred-commands.py')],
+        { encoding: 'utf-8', env: { ...process.env, ALFRED_INSTALL_DIR: root } }).trim()
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

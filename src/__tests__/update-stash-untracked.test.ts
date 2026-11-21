@@ -106,7 +106,7 @@ function blobInStore(wc: string, content: string): boolean {
 const DURING = [
   'printf "during_file=%s\\n" "$( [ -f models/weights.bin ] && echo yes || echo no )"',
   'printf "during_third=%s\\n" "$(git rev-parse -q --verify "stash@{0}^3" >/dev/null 2>&1 && echo yes || echo no)"',
-  'printf "during_stash=%s\\n" "$(git stash list | grep -c marveen-update-auto-stash)"',
+  'printf "during_stash=%s\\n" "$(git stash list | grep -c alfred-update-auto-stash)"',
 ].join('\n')
 
 describe('update.sh auto-stash: tracked changes only (#2835)', () => {
@@ -114,7 +114,7 @@ describe('update.sh auto-stash: tracked changes only (#2835)', () => {
     const line = pushBlock().split('\n').find((l) => l.includes('git stash push'))
     expect(line, 'git stash push line not found').toBeDefined()
     expect(line).not.toMatch(/\s(-u|-a|--include-untracked|--all)(\s|$)/)
-    expect(line).toContain('marveen-update-auto-stash')
+    expect(line).toContain('alfred-update-auto-stash')
   })
 
   it('clean pop: the tracked edit comes back, the untracked folder never leaves the disk, .git/objects gets no blob of it', () => {
@@ -141,7 +141,7 @@ describe('update.sh auto-stash: tracked changes only (#2835)', () => {
     expect(r.out).toContain('pop_rc=1')
     // The existing conflict handling (ANETTUPDATESTASH1102) is unchanged.
     expect(readFileSync(join(wc, 'conf.txt'), 'utf-8')).toBe('upstream\n')
-    expect(git(wc, 'stash list').out).toContain('marveen-update-auto-stash')
+    expect(git(wc, 'stash list').out).toContain('alfred-update-auto-stash')
     expect(git(wc, 'show stash@{0}:conf.txt').out).toBe('local\n')
     expect(r.warn).toContain('conf.txt')
     expect(readFileSync(join(wc, 'models', 'weights.bin'), 'utf-8')).toBe(BIG)
@@ -196,7 +196,7 @@ describe('update.sh auto-stash: tracked changes only (#2835)', () => {
     writeFileSync(join(wc, 'new.txt'), 'my local notes\n')
     upstreamCommit(up, 'new.txt', 'upstream new\n')
     const out = join(wc, '..')
-    const r = runUpdate(wc, { between: 'MARVEEN_LANG=en' })
+    const r = runUpdate(wc, { between: 'ALFRED_LANG=en' })
     expect(r.code).toBe(5)
     expect(r.msg).toContain('Nothing was overwritten')
     expect(r.msg).toContain('new.txt')

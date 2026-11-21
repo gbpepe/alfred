@@ -34,7 +34,7 @@ export interface SupportKeyPin {
 
 /**
  * Pinned support keys, from the key ceremony of 2026-11-15 (two YubiKeys, ed25519-sk, resident,
- * verify-required, application ssh:marveen-support). Changed only by a release.
+ * verify-required, application ssh:alfred-support). Changed only by a release.
  */
 export const SUPPORT_KEYS: readonly SupportKeyPin[] = [
   {

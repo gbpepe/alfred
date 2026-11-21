@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agent-msg.sh -- reliable inter-agent message send for the Marveen fleet.
+# agent-msg.sh -- reliable inter-agent message send for the Alfred fleet.
 #
 # WHY: the common `curl -s ... >/dev/null && echo sent` pattern is DANGEROUS -- curl exits 0 even when
 # the server REJECTED the request (401/400/5xx), producing a SILENT send failure: the recipient never
@@ -23,7 +23,7 @@
 #   then exactly "OK id=<n>" as before.
 #   A stopped target: "OK id=<n> ... (queued: target not running,
 #   delivered when it starts)" -- the row is PENDING, do NOT re-send.
-#   At MARVEEN_QUEUE_WARN_AT (default 3) or more waiting, a stderr notice says so
+#   At ALFRED_QUEUE_WARN_AT (default 3) or more waiting, a stderr notice says so
 #   at the moment the sender decides whether to send the next one.
 #   --priority (card ad771121): "high" puts the row ahead of the recipient's normal rows; absent means
 #     "normal" (FIFO, the server default). Any other value fails here, before anything is sent. A sender
@@ -38,7 +38,7 @@
 #     gets a 400 from the server. It is never inferred from the text. The switch goes FIRST, before
 #     --priority and <from>; anywhere else it fails here, before anything is sent.
 #     The server requires the same key as urgent delivery: a FULL device key listed in
-#     MESSAGE_URGENT_DEVICE_IDS. Point MARVEEN_TOKEN_FILE at that key's file; the shared dashboard
+#     MESSAGE_URGENT_DEVICE_IDS. Point ALFRED_TOKEN_FILE at that key's file; the shared dashboard
 #     token gets a 403 and nothing is stored.
 #
 # LOG FORMAT, store/agent-msg-failures.log (tab-separated, one line per failure):
@@ -49,11 +49,11 @@
 # server. A parser written against the pre-2026-09 format sees one extra field;
 # parse by the `key=` names, not by position.
 # Env:
-#   MARVEEN_API_BASE   full base URL, e.g. https://marveen.example.com (overrides host+port)
-#   MARVEEN_WEB_PORT   port for the default localhost base (default 3420)
-#   MARVEEN_TOKEN_FILE bearer token file (default <repo>/store/.dashboard-token)
-#   MARVEEN_HOMOGLYPH_BIN  the checker (default <repo>/scripts/lib/homoglyph.py)
-#   MARVEEN_QUEUE_WARN_AT  queue depth that triggers the stderr notice (default 3, 0 = off)
+#   ALFRED_API_BASE   full base URL, e.g. https://alfred.example.com (overrides host+port)
+#   ALFRED_WEB_PORT   port for the default localhost base (default 3420)
+#   ALFRED_TOKEN_FILE bearer token file (default <repo>/store/.dashboard-token)
+#   ALFRED_HOMOGLYPH_BIN  the checker (default <repo>/scripts/lib/homoglyph.py)
+#   ALFRED_QUEUE_WARN_AT  queue depth that triggers the stderr notice (default 3, 0 = off)
 # MEASURED 2026-09-13: a remote agent runs this helper OUTSIDE this repo, where localhost:3420
 # does not exist -- it had to fall back to raw curl, i.e. exactly the unchecked pattern this file was
 # written to eliminate. A hardcoded base URL silently un-installs the helper for everyone not on this
@@ -62,15 +62,15 @@ set -uo pipefail
 
 # base dir = the parent of this script's dir (scripts/..), so it works from any CWD / any install
 BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Dashboard port, the doctor.sh chain: MARVEEN_WEB_PORT, then WEB_PORT from the
+# Dashboard port, the doctor.sh chain: ALFRED_WEB_PORT, then WEB_PORT from the
 # environment, then WEB_PORT from this install's .env, then 3420. An agent's tmux
 # session sets neither variable, so on an install with a non-default WEB_PORT the
 # env-only lookup sent every message to 3420 (#1869).
-PORT="${MARVEEN_WEB_PORT:-${WEB_PORT:-$(sed -n 's/^WEB_PORT=//p' "$BASE/.env" 2>/dev/null | head -1 | tr -d ' "'"'"''; true)}}"
+PORT="${ALFRED_WEB_PORT:-${WEB_PORT:-$(sed -n 's/^WEB_PORT=//p' "$BASE/.env" 2>/dev/null | head -1 | tr -d ' "'"'"''; true)}}"
 PORT="${PORT:-3420}"
-API_BASE="${MARVEEN_API_BASE:-http://localhost:${PORT}}"
+API_BASE="${ALFRED_API_BASE:-http://localhost:${PORT}}"
 API_BASE="${API_BASE%/}"
-TOKEN_FILE="${MARVEEN_TOKEN_FILE:-$BASE/store/.dashboard-token}"
+TOKEN_FILE="${ALFRED_TOKEN_FILE:-$BASE/store/.dashboard-token}"
 URL="${API_BASE}/api/messages"
 LOG="$BASE/store/agent-msg-failures.log"
 
@@ -133,7 +133,7 @@ export -n TOKEN
 # and say so. Contaminated text with the checker PRESENT is refused, which is
 # where the closed direction belongs.
 # Overridable so the suite can measure the missing-checker branch too.
-HG="${MARVEEN_HOMOGLYPH_BIN:-$BASE/scripts/lib/homoglyph.py}"
+HG="${ALFRED_HOMOGLYPH_BIN:-$BASE/scripts/lib/homoglyph.py}"
 if [ -r "$HG" ] && command -v python3 >/dev/null 2>&1; then
   # THE CHECKER IS A VERDICT, NOT A FILTER: what goes out is the text the
   # sender typed, never the checker's stdout. Measured in the 2026-09-24 review
@@ -151,7 +151,7 @@ if [ -r "$HG" ] && command -v python3 >/dev/null 2>&1; then
     3) echo "FAIL: homoglyph gate refused the message; nothing was sent." >&2
        exit 3 ;;
     *) echo "FAIL: homoglyph checker CRASHED (rc=$HG_RC) at $HG; nothing was sent." >&2
-       echo "  This is not a verdict on the text -- fix or unset MARVEEN_HOMOGLYPH_BIN." >&2
+       echo "  This is not a verdict on the text -- fix or unset ALFRED_HOMOGLYPH_BIN." >&2
        exit 4 ;;
   esac
 else
@@ -228,7 +228,7 @@ EOF
     # sent by the time they read it. Say it on stderr, at the moment the next
     # send is being decided. Not a refusal -- an urgent message must still get
     # through.
-    WARN_AT="${MARVEEN_QUEUE_WARN_AT:-3}"
+    WARN_AT="${ALFRED_QUEUE_WARN_AT:-3}"
     case "$WARN_AT" in ''|*[!0-9]*) WARN_AT=3 ;; esac
     if [ -n "${DEPTH:-}" ] && [ "$WARN_AT" -gt 0 ] && [ "$DEPTH" -ge "$WARN_AT" ]; then
       echo "NOTICE: $DEPTH message(s) are waiting for $TO${MINS:+, measured delay ~${MINS} min}." >&2

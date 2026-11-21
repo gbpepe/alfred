@@ -136,7 +136,7 @@ class MioOrszemPrecheck(unittest.TestCase):
         import json
         proc, _ = run(state=STATE_OK, query_json=ZERO)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertEqual(json.loads(proc.vault_argv), ['--value', 'MARVEEN-CONNECTORS-PAT'])
+        self.assertEqual(json.loads(proc.vault_argv), ['--value', 'ALFRED-CONNECTORS-PAT'])
 
     def test_pat_never_on_stdout(self):
         secret = 'sbp-SECRET-MARKER-000000000000000000000000000'

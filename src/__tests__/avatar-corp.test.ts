@@ -20,14 +20,14 @@ vi.mock('../config.js', async (importOriginal) => ({
   PROJECT_ROOT: tmpRoot,
 }))
 
-const { tryHandleMarveen } = await import('../web/routes/marveen.js')
+const { tryHandleAlfred } = await import('../web/routes/alfred.js')
 
 afterAll(() => rmSync(tmpRoot, { recursive: true, force: true }))
 
 async function get(path: string, headers: Record<string, string> = {}) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', 'http://localhost')
-    const handled = await tryHandleMarveen({ req, res, path: url.pathname, method: req.method || 'GET', url } as never, WEB)
+    const handled = await tryHandleAlfred({ req, res, path: url.pathname, method: req.method || 'GET', url } as never, WEB)
     if (!handled) { res.writeHead(599); res.end() }
   })
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
@@ -42,13 +42,13 @@ async function get(path: string, headers: Record<string, string> = {}) {
 }
 
 const ROUTES = [
-  { path: '/api/marveen/owner-avatar', file: () => join(STORE, 'owner-avatar.png') },
-  { path: '/api/marveen/avatar', file: () => join(STORE, 'marveen-avatar.png') },
+  { path: '/api/alfred/owner-avatar', file: () => join(STORE, 'owner-avatar.png') },
+  { path: '/api/alfred/avatar', file: () => join(STORE, 'alfred-avatar.png') },
 ]
 
 describe('avatar GETs refuse cross-origin embedding (Cross-Origin-Resource-Policy)', () => {
   beforeEach(() => {
-    for (const n of ['owner-avatar', 'marveen-avatar']) {
+    for (const n of ['owner-avatar', 'alfred-avatar']) {
       for (const ext of ['.png', '.jpg', '.jpeg', '.webp']) rmSync(join(STORE, `${n}${ext}`), { force: true })
     }
     rmSync(join(WEB, 'avatars', '01_robot.png'), { force: true })
@@ -72,9 +72,9 @@ describe('avatar GETs refuse cross-origin embedding (Cross-Origin-Resource-Polic
     })
   }
 
-  it('/api/marveen/avatar: the gallery fallback carries it as well', async () => {
+  it('/api/alfred/avatar: the gallery fallback carries it as well', async () => {
     writeFileSync(join(WEB, 'avatars', '01_robot.png'), 'robot')
-    const r = await get('/api/marveen/avatar')
+    const r = await get('/api/alfred/avatar')
     expect(r.status).toBe(200)
     expect(r.corp).toBe('same-origin')
   })

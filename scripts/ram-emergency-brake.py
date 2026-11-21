@@ -122,16 +122,16 @@ NEVER_ARGV_SUBSTR = (
     "@anthropic-ai/claude-code",
     "claude-plugins-official",         # channel plugins (bun)
     "scripts/channels.sh",
-    "marveen-channels",
-    "marveen-dashboard",
+    "alfred-channels",
+    "alfred-dashboard",
     "ram-emergency-brake.py",          # this brake
     "heavy-job-gate.py",               # the gate process and its scope probe (the job is killable)
     "/usr/lib/systemd/",
 )
 NEVER_CGROUP_SUBSTR = (
-    "/marveen-dashboard.service",
-    "/marveen-channels.service",
-    "/marveen-ram-emergency-brake.service",
+    "/alfred-dashboard.service",
+    "/alfred-channels.service",
+    "/alfred-ram-emergency-brake.service",
     "/init.scope",
     "/dbus.service",
 )
@@ -1039,7 +1039,7 @@ class Brake:
         # notify.sh sends Telegram with parse_mode=HTML, and Slack needs the same three
         # escapes: a process name with "<" or "&" must not get the alert rejected
         acts = acts.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        return ("Marveen RAM-vészfék: a szabad memória %d MB-ra esett (%d MB-ból, a küszöb %d MB). "
+        return ("Alfred RAM-vészfék: a szabad memória %d MB-ra esett (%d MB-ból, a küszöb %d MB). "
                 "Tett: %s. A vészfék figyel tovább, a napló: store/ram-emergency-brake-log.jsonl"
                 % (self.alert_min_mb if self.alert_min_mb is not None else avail,
                    total, CRIT_MB, acts))

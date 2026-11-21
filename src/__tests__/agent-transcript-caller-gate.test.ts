@@ -51,7 +51,7 @@ describe('transcript route: caller gate (named principals only)', () => {
     // Belt and braces: the federation token is already scoped to two wire
     // endpoints, so it cannot reach here -- but a transcript must never be
     // reachable by a peer even if that scoping is ever widened.
-    const { ctx, out } = fakeCtx(TRANSCRIPT, { kind: 'federation', peer: 'marveen-wevent' })
+    const { ctx, out } = fakeCtx(TRANSCRIPT, { kind: 'federation', peer: 'alfred-wevent' })
     expect(await tryHandleAgents(ctx, WEB_DIR)).toBe(true)
     expect(out.status).toBe(403)
     expect(out.body).toEqual({ error: CRED_403 })

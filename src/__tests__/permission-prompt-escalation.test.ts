@@ -193,7 +193,7 @@ describe('wiring in channel-monitor.ts', () => {
     const branch = src.slice(src.indexOf('detectsPermissionDialog(paneNow)'), src.indexOf("'Session parked in a blocking interactive menu -- sending Escape to recover'"))
     expect(branch).toMatch(/runPermissionPromptPass\(label, t\.session, paneNow, \{/)
     expect(branch).toMatch(/escalation: permPromptState,/)
-    expect(branch).toMatch(/isMainAgent: t\.isMarveen,/)
+    expect(branch).toMatch(/isMainAgent: t\.isAlfred,/)
     expect(branch).toMatch(/messageMainAgent: \(text\) => \{ createAgentMessage\('system', MAIN_AGENT_ID, text\) \}/)
     expect(branch.match(/sendAlert\(/g) ?? []).toHaveLength(1)
     expect(branch).toMatch(/send: \(text, meta\) => sendAlert\(text, meta\)/)

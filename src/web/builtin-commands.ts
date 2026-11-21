@@ -60,7 +60,7 @@ function clip(s: string, n: number): string {
 
 // ---- /status ----------------------------------------------------------------
 
-async function statusText(channel?: 'telegram' | 'discord'): Promise<string> {
+async function statusText(channel?: 'discord'): Promise<string> {
   // The external lookup runs in parallel and never blocks the local rows.
   const [system, anthropic] = await Promise.all([
     getSystemStatus({ channel }),
@@ -134,7 +134,7 @@ export function measuredModelLines(
 // ---- /model: the owner's view (owner feedback 2026-09-24) -------------------
 //
 // The detailed view (model ids, config sources, measurement times) read like a
-// debug dump on Telegram: "Most fut: nem mérhető (nincs assistant-sor ...)",
+// debug dump in chat: "Most fut: nem mérhető (nincs assistant-sor ...)",
 // "(.env MAIN_AGENT_MODEL)", "visszamérni nem tudjuk". This view says what
 // runs, for how long, and what to type; the old text is /model details.
 
@@ -474,7 +474,7 @@ export function usageDayText(arg: string, now = Date.now(), tz: string = APP_TZ)
 
 const STATUSES: KanbanCard['status'][] = ['planned', 'in_progress', 'testing', 'waiting', 'done']
 
-// Telegram lines are narrow (owner screenshot 2026-09-24: every /board line
+// Chat lines are narrow (2026-09-24: every /board line
 // wrapped in two; "#36" became a hashtag link). A line is "41) title", the
 // status sits in the group header, the assignee only when it is not the owner,
 // and a child says whose it is (↑64) -- the owner archived three children as
@@ -561,10 +561,10 @@ export function boardAllText(cards: KanbanCard[], owner: string = OWNER_NAME): s
 
 // ---- /board filters: status letter and/or whose (owner request 2026-09-24) ----
 //
-// "/board w", "/board p me", "/board marveen": short enough to type on a phone.
+// "/board w", "/board p me", "/board alfred": short enough to type on a phone.
 // The main agent's name is NOT hard-coded: its aliases come from BOT_NAME and
-// MAIN_AGENT_ID ("Marveen TEST" / "marveen-test" on the test instance), and the
-// assignee field is free text ("Marveen" and "marveen" on the same live board),
+// MAIN_AGENT_ID ("Alfred TEST" / "alfred-test" on the test instance), and the
+// assignee field is free text ("Alfred" and "alfred" on the same live board),
 // so every name match is case-insensitive.
 
 const STATUS_ALIASES: Record<string, KanbanCard['status']> = {
@@ -623,7 +623,7 @@ export function boardHints(): string {
   return 'Szűrők és példák: /board ?'
 }
 
-// "Marveennél", "Edithnél", "Samunál": -nál/-nél by the last vowel (the name
+// "Alfrednél", "Edithnél", "Samunál": -nál/-nél by the last vowel (the name
 // comes from BOT_NAME, so it cannot be spelled out once).
 export function nalNel(name: string): string {
   const v = name.toLocaleLowerCase('hu').match(/[aáeéiíoóöőuúüű]/g)
@@ -812,8 +812,7 @@ export function registerBuiltinCommands(): void {
     },
   })
   registerCommand({ name: 'commands', kind: 'read', description: 'a saját parancsaid, az érvénytelenek külön', run: ctx => reply(ctx, customCommandsText()) })
-  // Owner request 2026-11-15: the Discord channel's switches, read-only. Discord only: on Telegram (and on an install
-  // without Discord) /options is not a command, not in /help or the menu, and goes to the model as it did before.
+  // Owner request 2026-11-15: the Discord channel's switches, read-only.
   registerCommand({
     name: 'options', kind: 'read', description: 'a Discord-csatorna kapcsolói, értékkel és az állítás helyével',
     channels: ['discord'], run: ctx => reply(ctx, discordOptionsText()),

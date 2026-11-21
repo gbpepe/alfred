@@ -10,7 +10,7 @@ export const TOTP_STEP_S = 30
 export const TOTP_DIGITS = 6
 /** Steps accepted on each side of the current one: +-1 (one 30 s step of clock drift either way). */
 export const TOTP_WINDOW = 1
-export const TOTP_ISSUER = 'Marveen'
+export const TOTP_ISSUER = 'Alfred'
 export const BACKUP_CODE_COUNT = 10
 
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'

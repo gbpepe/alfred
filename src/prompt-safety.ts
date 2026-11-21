@@ -217,7 +217,7 @@ export function wrapScheduledTaskByReference(
 }
 
 // Channel-inbound: a relayed real user message from a channel-coordinator
-// process (e.g. the Telegram backfill coordinator). Unlike wrapUntrusted, this
+// process. Unlike wrapUntrusted, this
 // does NOT add an <untrusted> wrapper -- it returns the content VERBATIM so the
 // embedded native-style `<channel source="..." chat_id="...">...</channel>`
 // block reaches the agent exactly as the in-TUI plugin would deliver it. The

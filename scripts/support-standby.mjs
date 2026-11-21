@@ -337,7 +337,7 @@ function checkDarwinDaemon(evidence) {
 import { isIP as isIP2 } from "node:net";
 
 // src/support-access-line.ts
-var SUPPORT_COMMENT_PREFIX = "marveen-support:";
+var SUPPORT_COMMENT_PREFIX = "alfred-support:";
 var SUPPORT_MIN_SSHD = { major: 8, minor: 4 };
 var SupportLineError = class extends Error {
   code;
@@ -892,7 +892,7 @@ function createSshdProbeDeps(user = currentLoginUser()) {
     }),
     user,
     interfaceAddresses: () => Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((a) => ({ address: a.address, internal: a.internal }))),
-    makePrivateDir: () => mkdtempSync(join(tmpdir(), "marveen-sshd-probe-")),
+    makePrivateDir: () => mkdtempSync(join(tmpdir(), "alfred-sshd-probe-")),
     removeDir: (path) => {
       try {
         rmSync(path, { recursive: true, force: true });
@@ -969,7 +969,7 @@ function assertSafeSshDir(sshDir, operation) {
   if (!isTestRun()) return;
   if (!isRealSshDir(sshDir)) return;
   throw new SshDirGuardError(
-    `ENROLL813: refusing to ${operation} the REAL ${realSshDir()}/${AUTH_KEYS_NAME} from a test run (${describeTestRunSignal()}). Pass a scratch sshDir (the suite sets MARVEEN_SSH_DIR per worker in src/__tests__/setup/default-ssh-dir-seam.ts). This guard exists because a route test silently enrolled real keys for weeks.`
+    `ENROLL813: refusing to ${operation} the REAL ${realSshDir()}/${AUTH_KEYS_NAME} from a test run (${describeTestRunSignal()}). Pass a scratch sshDir (the suite sets ALFRED_SSH_DIR per worker in src/__tests__/setup/default-ssh-dir-seam.ts). This guard exists because a route test silently enrolled real keys for weeks.`
   );
 }
 function isRealSshDir(sshDir) {
@@ -1509,7 +1509,7 @@ function removeSupportToken(dir) {
 
 // src/support-access-redeem.ts
 var SUPPORT_CODE_SHAPE = /^msc_[A-Za-z0-9_-]{32}$/;
-var SUPPORT_SERVICE_ORIGIN = "https://api.marveen.io";
+var SUPPORT_SERVICE_ORIGIN = "https://api.alfred.io";
 var SUPPORT_REDEEM_PATH = "/support/v1/code-redeem";
 var SUPPORT_REDEEM_TIMEOUT_MS = 1e4;
 var SUPPORT_REDEEM_MAX_BODY_BYTES = 1024;
@@ -1631,7 +1631,7 @@ import {
 import { join as join6 } from "node:path";
 var SUPPORT_GROUP_RECORD_FILE = "support-access.group";
 var SUPPORT_RUN_DIR = "support-access.run";
-var HEADER = "marveen-support-group 1";
+var HEADER = "alfred-support-group 1";
 var RECORD_MODE = 384;
 var GROUP_RECORD_MAX_BYTES = 2048;
 var GRANT_ID2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -1818,7 +1818,7 @@ import { join as join7, resolve as resolve2 } from "node:path";
 var KIT_SUBFOLDER = "kit";
 var KIT_MANIFEST_NAME = "manifest";
 var KIT_LOCK_NAME = "kit.lock";
-var KIT_MANIFEST_HEADER = "marveen-support-kit 1";
+var KIT_MANIFEST_HEADER = "alfred-support-kit 1";
 var KIT_MANIFEST_MAX_BYTES = 4096;
 var KIT_MAX_FILES = 16;
 var KitError = class extends Error {
@@ -2342,8 +2342,8 @@ var SUPPORT_CONSENT_LAUNCHER_LANG = "hu";
 var SUPPORT_CONSENT_TEXTS = {
   1: null,
   2: {
-    hu: "Mit tehet\xFCnk a g\xE9peden\nA bel\xE9p\xE9s alatt a Marveen csapata, munkat\xE1rsaink \xE9s AI-\xFCgyn\xF6keink, mindent megtehetnek a g\xE9peden, ami a hiba felt\xE1r\xE1s\xE1hoz \xE9s kijav\xEDt\xE1s\xE1hoz sz\xFCks\xE9ges: parancsokat futtathatnak, f\xE1jlokat \xE9s be\xE1ll\xEDt\xE1sokat olvashatnak \xE9s m\xF3dos\xEDthatnak, \xE9s \xFAjraind\xEDthatj\xE1k a Marveent \xE9s a szolg\xE1ltat\xE1sait. Azzal a felhaszn\xE1l\xF3val dolgozunk, amelyikkel a Marveened fut; enn\xE9l t\xF6bb jogot nem szerz\xFCnk. Ha a Marveened rendszergazdak\xE9nt (root) fut, mi is \xEDgy l\xE9p\xFCnk be. A g\xE9peden futtatott parancsokkal csak a hib\xE1t keress\xFCk \xE9s jav\xEDtjuk; a helyi h\xE1l\xF3zatodon l\xE9v\u0151 m\xE1s eszk\xF6z\xF6kh\xF6z nem ny\xFAlunk.\nEgy kapcsolaton legfeljebb 60 percig adhatunk ki parancsot; ut\xE1na \xFAjat csak egy munkat\xE1rsunk nyithat, a saj\xE1t fizikai kulcs\xE1val.\nMit l\xE1tunk\nMindent, amit a jav\xEDt\xE1shoz meg kell n\xE9zn\xFCnk a g\xE9peden: a Marveen napl\xF3it, be\xE1ll\xEDt\xE1sait \xE9s adatait, ha kell, a t\xE1rolt hozz\xE1f\xE9r\xE9si kulcsokat \xE9s a besz\xE9lget\xE9seid r\xE9szleteit is, azt is, amit te vagy a partnereid a csatorn\xE1idra \xEDrtatok.\nAmit a jav\xEDt\xE1s k\xF6zben l\xE1tunk, kitakarva t\xE1roljuk: a munka r\xE9szletes lefoly\xE1s\xE1t legfeljebb 30 napig.\nNyom \xE9s ellen\u0151rz\xE9s\nMinden lefuttatott parancs napl\xF3z\xF3dik a g\xE9peden. A bel\xE9p\xE9sekr\u0151l sz\xF3l\xF3 napl\xF3t 12 h\xF3napig \u0151rizz\xFCk. Az engedett bel\xE9p\xE9sekr\u0151l e-mailt kapsz.\nA hozz\xE1f\xE9r\xE9st a Profil oldaladon egy kattint\xE1ssal b\xE1rmikor lez\xE1rhatod; az \xE9ppen fut\xF3 m\u0171velet ezut\xE1n m\xE9g befejez\u0151dhet, \xFAjat nem ind\xEDthatunk.",
-    en: "What we can do on your machine\nWhile we are signed in, the Marveen team, our staff and our AI agents, can do whatever is needed on your machine to find and fix the problem: run commands, read and change files and settings, and restart Marveen and its services. We work as the user your Marveen runs as; we do not gain any further rights. If your Marveen runs as the system administrator (root), we sign in that way too. We use the commands on your machine only to find and fix the problem; we do not touch other devices on your local network.\nOn one connection we can issue commands for at most 60 minutes; after that only a staff member can open a new one, with their own physical key.\nWhat we see\nWhatever we need to look at on your machine to fix the problem: Marveen's logs, settings and data, and if needed the stored access keys and the details of your conversations, including what you or your partners wrote on your channels.\nWhat we see while fixing is stored with secrets masked: the detailed record of the work for at most 30 days.\nRecord and control\nEvery command we run is logged on your machine. We keep the record of sign-ins for 12 months. You get an e-mail about allowed sign-ins.\nYou can lock access with one click on your Profile page at any time; an operation already running may still finish, but we cannot start a new one."
+    hu: "Mit tehet\xFCnk a g\xE9peden\nA bel\xE9p\xE9s alatt a Alfred csapata, munkat\xE1rsaink \xE9s AI-\xFCgyn\xF6keink, mindent megtehetnek a g\xE9peden, ami a hiba felt\xE1r\xE1s\xE1hoz \xE9s kijav\xEDt\xE1s\xE1hoz sz\xFCks\xE9ges: parancsokat futtathatnak, f\xE1jlokat \xE9s be\xE1ll\xEDt\xE1sokat olvashatnak \xE9s m\xF3dos\xEDthatnak, \xE9s \xFAjraind\xEDthatj\xE1k a Alfredet \xE9s a szolg\xE1ltat\xE1sait. Azzal a felhaszn\xE1l\xF3val dolgozunk, amelyikkel a Alfreded fut; enn\xE9l t\xF6bb jogot nem szerz\xFCnk. Ha a Alfreded rendszergazdak\xE9nt (root) fut, mi is \xEDgy l\xE9p\xFCnk be. A g\xE9peden futtatott parancsokkal csak a hib\xE1t keress\xFCk \xE9s jav\xEDtjuk; a helyi h\xE1l\xF3zatodon l\xE9v\u0151 m\xE1s eszk\xF6z\xF6kh\xF6z nem ny\xFAlunk.\nEgy kapcsolaton legfeljebb 60 percig adhatunk ki parancsot; ut\xE1na \xFAjat csak egy munkat\xE1rsunk nyithat, a saj\xE1t fizikai kulcs\xE1val.\nMit l\xE1tunk\nMindent, amit a jav\xEDt\xE1shoz meg kell n\xE9zn\xFCnk a g\xE9peden: a Alfred napl\xF3it, be\xE1ll\xEDt\xE1sait \xE9s adatait, ha kell, a t\xE1rolt hozz\xE1f\xE9r\xE9si kulcsokat \xE9s a besz\xE9lget\xE9seid r\xE9szleteit is, azt is, amit te vagy a partnereid a csatorn\xE1idra \xEDrtatok.\nAmit a jav\xEDt\xE1s k\xF6zben l\xE1tunk, kitakarva t\xE1roljuk: a munka r\xE9szletes lefoly\xE1s\xE1t legfeljebb 30 napig.\nNyom \xE9s ellen\u0151rz\xE9s\nMinden lefuttatott parancs napl\xF3z\xF3dik a g\xE9peden. A bel\xE9p\xE9sekr\u0151l sz\xF3l\xF3 napl\xF3t 12 h\xF3napig \u0151rizz\xFCk. Az engedett bel\xE9p\xE9sekr\u0151l e-mailt kapsz.\nA hozz\xE1f\xE9r\xE9st a Profil oldaladon egy kattint\xE1ssal b\xE1rmikor lez\xE1rhatod; az \xE9ppen fut\xF3 m\u0171velet ezut\xE1n m\xE9g befejez\u0151dhet, \xFAjat nem ind\xEDthatunk.",
+    en: "What we can do on your machine\nWhile we are signed in, the Alfred team, our staff and our AI agents, can do whatever is needed on your machine to find and fix the problem: run commands, read and change files and settings, and restart Alfred and its services. We work as the user your Alfred runs as; we do not gain any further rights. If your Alfred runs as the system administrator (root), we sign in that way too. We use the commands on your machine only to find and fix the problem; we do not touch other devices on your local network.\nOn one connection we can issue commands for at most 60 minutes; after that only a staff member can open a new one, with their own physical key.\nWhat we see\nWhatever we need to look at on your machine to fix the problem: Alfred's logs, settings and data, and if needed the stored access keys and the details of your conversations, including what you or your partners wrote on your channels.\nWhat we see while fixing is stored with secrets masked: the detailed record of the work for at most 30 days.\nRecord and control\nEvery command we run is logged on your machine. We keep the record of sign-ins for 12 months. You get an e-mail about allowed sign-ins.\nYou can lock access with one click on your Profile page at any time; an operation already running may still finish, but we cannot start a new one."
   }
 };
 function approved(version, lang) {
@@ -2438,7 +2438,7 @@ function formatSupportStatus(report) {
 // src/support-kit-install.ts
 import { accessSync, constants as constants6, closeSync as closeSync7, fstatSync as fstatSync6, lstatSync as lstatSync6, openSync as openSync7, readSync as readSync6, statSync as statSync5 } from "node:fs";
 import { join as join9 } from "node:path";
-var SUPPORT_DIR_IN_HOME = ".marveen/support";
+var SUPPORT_DIR_IN_HOME = ".alfred/support";
 var KIT_SOURCE_MAX_BYTES = KIT_FILE_MAX_BYTES;
 var HASHES_MAX_BYTES = 4096;
 var SAFE_ABSOLUTE_PATH4 = /^\/[A-Za-z0-9._/-]+$/;

@@ -4,7 +4,7 @@
 // Governance control (Szabi 2026-06-25, after the Boni incident: a sub-agent
 // autonomously emailed a fabricated address asking for money in Szabi's name).
 // Sub-agents may NOT send outbound email; any email must be routed through the
-// main agent (Marveen) for approval -- only Marveen retains email-send.
+// main agent (Alfred) for approval -- only Alfred retains email-send.
 //
 // STATED LIMIT (msg 14298): this gate catches the ACCIDENTAL send, not a
 // determined evader. Static analysis of arbitrary interpreter code is
@@ -1987,7 +1987,7 @@ function nodeScriptOperand(prog, rest) {
   return words[0] ?? null
 }
 
-// COPYSUBST1116 (Marveen 4114): a recipient value the gate cannot read as text (a substitution, also the flattened
+// COPYSUBST1116 (Alfred 4114): a recipient value the gate cannot read as text (a substitution, also the flattened
 // $__SUBST__ word, a variable, an ANSI-C $'..' string, a backtick) may be any address; see the python twin
 const nonliteralValue = (val) => val.includes('$') || val.includes('`')
 // argparse takes any unambiguous prefix of a long option, so `--bc x@y` is --bcc to the program
@@ -3397,7 +3397,7 @@ export function buildLedgerUnavailableMsg(err) {
 
 // Pure builder for the deny message, so the brand/owner substitution is
 // provable without spawning the hook. With the stock defaults (botName
-// 'Marveen', ownerName 'Szabolcs') the wording is byte-identical to before.
+// 'Alfred', ownerName 'Szabolcs') the wording is byte-identical to before.
 export function buildGateMsg(botName, ownerName) {
   return (
     'Email-kuldes sub-agentkent tiltott (governance hard-gate). ' +
@@ -3413,7 +3413,7 @@ export function buildGateMsg(botName, ownerName) {
 // Any failure falls back to the stock defaults, so the gate never breaks and a
 // bare install keeps the original wording.
 export function readBrandEnv(readFile = (p) => readFileSync(p, 'utf-8')) {
-  const fallback = { botName: 'Marveen', ownerName: 'Szabolcs' }
+  const fallback = { botName: 'Alfred', ownerName: 'Szabolcs' }
   try {
     const envPath = join(dirname(fileURLToPath(import.meta.url)), '..', '.env')
     const raw = readFile(envPath)

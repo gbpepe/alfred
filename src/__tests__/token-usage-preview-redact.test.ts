@@ -15,9 +15,9 @@ const { FIXTURE, HOME, PROJECT_ROOT } = vi.hoisted(() => {
   const { tmpdir } = require('node:os') as typeof import('node:os')
   const { join } = require('node:path') as typeof import('node:path')
   const FIXTURE = mkdtempSync(join(tmpdir(), 'token-usage-redact-'))
-  return { FIXTURE, HOME: join(FIXTURE, 'home'), PROJECT_ROOT: '/Users/x/marveen' }
+  return { FIXTURE, HOME: join(FIXTURE, 'home'), PROJECT_ROOT: '/Users/x/alfred' }
 })
-const MAIN_DIR = join(HOME, '.claude', 'projects', '-Users-x-marveen')
+const MAIN_DIR = join(HOME, '.claude', 'projects', '-Users-x-alfred')
 const SECRET = 'fakeTokenValue123456'
 
 vi.mock('node:os', async () => {
@@ -26,7 +26,7 @@ vi.mock('node:os', async () => {
 })
 vi.mock('../config.js', async () => {
   const actual = await vi.importActual<typeof import('../config.js')>('../config.js')
-  return { ...actual, MAIN_AGENT_ID: 'marveen', PROJECT_ROOT }
+  return { ...actual, MAIN_AGENT_ID: 'alfred', PROJECT_ROOT }
 })
 vi.mock('../logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },

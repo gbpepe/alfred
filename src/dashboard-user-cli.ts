@@ -2,7 +2,7 @@
 // Dashboard browser-login user administration (break-glass + scripting).
 //
 // DOCKERHTTPS1119: here in src/ so tsc compiles it to dist/dashboard-user-cli.js; a Docker install has no tsx (the
-// image prunes dev dependencies) and runs `docker compose exec marveen node dist/dashboard-user-cli.js <command>`.
+// image prunes dev dependencies) and runs `docker compose exec alfred node dist/dashboard-user-cli.js <command>`.
 // scripts/dashboard-user.ts imports this file, so `npm run dashboard-user` is unchanged on a native install.
 //
 //   npm run dashboard-user -- add <username> [--password-stdin]

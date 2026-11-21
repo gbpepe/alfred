@@ -39,7 +39,7 @@ describe('enable and disable support standby', () => {
     const routine = Buffer.from('export async function main() { return 0 }\n')
     const files = [{ name: KIT_ROUTINE_NAME, content: routine, sha256: sha(routine), executable: false }]
     if (withDispatcher) files.unshift({ name: KIT_DISPATCHER_NAME, content: dispatcher, sha256: sha(dispatcher), executable: false })
-    await writeKit({ supportDir, files, installRoot: '/opt/marveen', nodePath: '/usr/bin/node', nodeMin: 20, release: '37c85a884', sleep: noSleep })
+    await writeKit({ supportDir, files, installRoot: '/opt/alfred', nodePath: '/usr/bin/node', nodeMin: 20, release: '37c85a884', sleep: noSleep })
   }
 
   function deps(over: Partial<StandbyDeps> = {}): StandbyDeps {
@@ -81,7 +81,7 @@ describe('enable and disable support standby', () => {
 
   beforeEach(async () => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-enable-')))
-    supportDir = join(root, 'home', '.marveen', 'support')
+    supportDir = join(root, 'home', '.alfred', 'support')
     sshDir = join(root, 'home', '.ssh')
     mkdirSync(sshDir, { recursive: true, mode: 0o700 })
     writeFileSync(join(sshDir, 'authorized_keys'), OWN_LINE + '\n', { mode: 0o600 })

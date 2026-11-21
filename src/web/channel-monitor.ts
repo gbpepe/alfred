@@ -48,8 +48,7 @@ import { resolveMainConfigDecision, type MainConfigDecision } from './main-confi
 import { cfgKindFromDecision, mainAuthConflictText, prepareMainAuth } from './main-auth.js'
 import { runMainContinueRestart, type ContinueRestartResult } from './main-rotation-continue.js'
 import { withSessionSendLock } from './session-send-lock.js'
-import { reapChannelOrphans, reapDetachedChannelClaudes, collectPollerEvidence, reapForeignMainPollers, reapGromzoOrphans, scheduleGromzoOrphanReap } from './channel-poller-reap.js'
-import { probeTelegramConflict } from './channel-conflict-probe.js'
+import { reapChannelOrphans, reapDetachedChannelClaudes, collectPollerEvidence } from './channel-poller-reap.js'
 import { schedulePluginUnlockAfterRespawn, wasPluginConfirmedAbsent, clearPluginAbsent } from './channel-plugin-unlock.js'
 import { getInjectedPrompt, matchesInjectedPrompt } from './injected-prompt-registry.js'
 import {
@@ -89,10 +88,7 @@ import { ROOT_SANDBOX_ENV } from './root-sandbox-env.js'
 import { exactTmuxTarget } from '../tmux-target.js'
 import { beginMainRespawn } from './main-respawn-hold.js'
 import { whileNotFrozen } from './fleet-freeze.js'
-import { filterMainGromzoIds, mainGromzoPrimaryReady, mainGromzoSlug, MAIN_GROMZO_PLUGIN_ID } from './main-gromzo-launch.js'
 import { mainChannelUnconfigured, mainSessionRunsUnconfigured } from './main-channel-configured.js'
-import { flushGromzoPendingOwnerAlerts, setGromzoMainLive } from '../notify.js'
-import { gromzoTokenExport, gromzoTokenFile } from './agent-extra-channels.js'
 
 // Lazily resolved (see makeLazyBinResolver): a module-level `resolveFromPath`
 // const throws at IMPORT time, so any environment where the binary is not
@@ -119,19 +115,6 @@ export const PANE_AUTH_PATH = join(PROJECT_ROOT, 'store', '.channels-pane-auth')
 // MAINAUTH1107: sourced right AFTER the config branch (api: the token unset, subscription: the key unset), so neither
 // CFG_ENV nor the tmux global env can add the other credential back. Written by main-auth.ts for every launch.
 export const PANE_AUTH_POST_PATH = join(PROJECT_ROOT, 'store', '.channels-pane-auth-post')
-
-/** GROMZONEEDSAUTH1109 (Samu 74033, 74110; Dani 74108): the step of a respawn command that takes Claude Code's cached
- *  needs-auth entry for the Gromzo server out of the config dir the respawned claude will read, with the same helper as
- *  channels.sh (why, and what it never touches: gromzo-needs-auth.ts). It runs IN the pane, right before claude: after
- *  respawn-pane -k killed the old claude (so that one cannot write the entry back) and after the command's own exports,
- *  so "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" is exactly the dir this claude reads. The line goes to channels-failures.log;
- *  a missing helper or a failure never stops the respawn. The same group as gromzo_needs_auth_pane_step in
- *  scripts/gromzo-needs-auth-pane.sh (a test keeps the two equal). */
-export function gromzoNeedsAuthPaneStep(projectRoot: string = PROJECT_ROOT): string {
-  const helper = shSingleQuote(join(projectRoot, 'scripts', 'gromzo-needs-auth-clear.mjs'))
-  const log = shSingleQuote(join(projectRoot, 'store', 'channels-failures.log'))
-  return `{ [ ! -f ${helper} ] || node ${helper} "\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}" 2>>${log} || true; }`
-}
 
 /** MAINAUTH1107: the config decision of a dashboard respawn, with the main agent's credential decided and written for
  *  it first (pane-auth file, post-file, key approval). A respawn-pane does not run channels.sh, so without this a
@@ -178,7 +161,7 @@ async function getProcessAgeMsAsync(pid: number): Promise<number> {
 
 function resolveAgentProvider(name: string): ChannelProviderType {
   const perAgent = readAgentChannelProvider(name)
-  if (perAgent === 'slack' || perAgent === 'telegram' || perAgent === 'discord') return perAgent
+  if (perAgent === 'discord') return perAgent
   return CHANNEL_PROVIDER
 }
 
@@ -398,7 +381,7 @@ const MAIN_STUCK_THRESHOLDS: StuckInputThresholds = {
 // main channel input is STILL parked, the TUI is hard-wedged: a paste
 // placeholder that Enter only expands (never submits), or a state where
 // keystrokes no longer register. Soft recovery cannot win there; the only fix
-// is a fresh claude process. Escalate to hardRestartMarveenChannels()
+// is a fresh claude process. Escalate to hardRestartAlfredChannels()
 // (respawn-pane on Linux -- replaces ONLY the main pane's claude, the tmux
 // server + every other agent session stay intact). Rate-limited + capped so a
 // wedge a restart cannot clear never becomes a restart loop.
@@ -883,7 +866,7 @@ async function performStuckInputAction(
 
 // Periodic detached-channel-claude reap (CB6CF755 durable fix). The pane-
 // attribution reaper (reapDetachedChannelClaudes) already runs at RESPAWN time
-// (resumeMarveenSession + agent (re)start), but orphans that accumulate BETWEEN
+// (resumeAlfredSession + agent (re)start), but orphans that accumulate BETWEEN
 // respawns -- a --continue respawn that failed to tear down its predecessor --
 // linger until the next respawn happens to fire (the "5 orphans over 13 days"
 // leak). Running the same reaper on a slow cadence here closes that gap. The
@@ -933,10 +916,10 @@ const MENU_RECOVER_CLEAR_MS = 2 * 60 * 1000
 // the paneMenuState entry, so a prompt answered in between never escalates.
 const permPromptState: Map<string, PermPromptEscalationState> = new Map()
 
-export type MarveenRecoveryStage = 'soft' | 'save' | 'resume' | 'hard' | 'gave_up'
-interface MarveenDownState {
+export type AlfredRecoveryStage = 'soft' | 'save' | 'resume' | 'hard' | 'gave_up'
+interface AlfredDownState {
   downSince: number
-  stage: MarveenRecoveryStage
+  stage: AlfredRecoveryStage
   lastAlertAt: number
   softAttempts: number
   stageStartedAt?: number
@@ -946,18 +929,18 @@ interface MarveenDownState {
 }
 
 const SAVE_WINDOW_MS = 60_000
-const MARVEEN_DOWN_CONFIRM_MS = 120_000
-let marveenSuspectFirstSeen: number | null = null
-let marveenDownState: MarveenDownState | null = null
+const ALFRED_DOWN_CONFIRM_MS = 120_000
+let alfredSuspectFirstSeen: number | null = null
+let alfredDownState: AlfredDownState | null = null
 // An outage that was open when the vanished main session was recreated. The
-// recreate restarts the down cascade from scratch (marveenDownState = null), but
+// recreate restarts the down cascade from scratch (alfredDownState = null), but
 // the outage itself is not over until the plugin is seen alive again, so its
-// start and stage are kept here for the closing message in handleMarveenUp.
-let marveenRecreatedOutage: CarriedOutage | null = null
+// start and stage are kept here for the closing message in handleAlfredUp.
+let alfredRecreatedOutage: CarriedOutage | null = null
 
 export interface CarriedOutage {
   downSince: number
-  stage: MarveenRecoveryStage
+  stage: AlfredRecoveryStage
 }
 
 // Pure. What survives a session recreate: the earliest known start of the
@@ -965,7 +948,7 @@ export interface CarriedOutage {
 // carried yet stays null (a recreate of a session that was never reported
 // down has nothing to close).
 export function carryOutageAcrossRecreate(
-  state: { downSince: number; stage: MarveenRecoveryStage } | null,
+  state: { downSince: number; stage: AlfredRecoveryStage } | null,
   carried: CarriedOutage | null,
 ): CarriedOutage | null {
   if (!state) return carried
@@ -973,9 +956,9 @@ export function carryOutageAcrossRecreate(
   return { downSince: Math.min(carried.downSince, state.downSince), stage: state.stage }
 }
 
-export interface MarveenRecoveryReport {
+export interface AlfredRecoveryReport {
   downedForSec: number
-  stage: MarveenRecoveryStage | 'recreated'
+  stage: AlfredRecoveryStage | 'recreated'
   notify: boolean
 }
 
@@ -984,16 +967,16 @@ export interface MarveenRecoveryReport {
 // there is nothing open. A recreate rebuilt the session (the conversation is
 // gone), so it is disruptive like a resume and is always reported; otherwise
 // short soft/save blips stay quiet unless they lasted 180s or more.
-export function decideMarveenRecoveryReport(
-  state: { downSince: number; stage: MarveenRecoveryStage } | null,
+export function decideAlfredRecoveryReport(
+  state: { downSince: number; stage: AlfredRecoveryStage } | null,
   carried: CarriedOutage | null,
   now: number,
-): MarveenRecoveryReport | null {
+): AlfredRecoveryReport | null {
   if (!state && !carried) return null
   const downSince = Math.min(state?.downSince ?? Infinity, carried?.downSince ?? Infinity)
   const downedForSec = Math.round((now - downSince) / 1000)
   const stateDisruptive = state != null && state.stage !== 'soft' && state.stage !== 'save'
-  const stage: MarveenRecoveryStage | 'recreated' = stateDisruptive ? state.stage : carried ? 'recreated' : state!.stage
+  const stage: AlfredRecoveryStage | 'recreated' = stateDisruptive ? state.stage : carried ? 'recreated' : state!.stage
   const disruptive = stateDisruptive || carried != null
   return { downedForSec, stage, notify: disruptive || downedForSec >= 180 }
 }
@@ -1009,11 +992,11 @@ function getMainAgentProvider(): ChannelProviderType {
   return CHANNEL_PROVIDER
 }
 
-function softReconnectMarveen(): boolean {
+function softReconnectAlfred(): boolean {
   return attemptChannelMcpReconnect(MAIN_AGENT_ID).ok
 }
 
-async function triggerMarveenMemorySave(): Promise<void> {
+async function triggerAlfredMemorySave(): Promise<void> {
   const prompt = [
     '[SYSTEM: channels recovery] A csatorna plugin nem reagal, kb 60 masodperc',
     `mulva hard restart lesz a ${MAIN_CHANNELS_SESSION} session-on (a beszelgetes elveszik).`,
@@ -1114,21 +1097,13 @@ export function readConfiguredMainModel(projectRoot: string = PROJECT_ROOT): str
 // Since BOOTSTAGGER1007 (b) the co-listen plugins are probed too
 // (checkMainColistenChannels / main-colisten-health.ts).
 export function readExtraChannelPluginIds(projectRoot: string = PROJECT_ROOT): string[] {
-  // GROMZOMAINAGENT1106: the main agent's gromzo-channel id stays only with a usable agent.sock and a valid
-  // mxd slug, exactly as scripts/main-gromzo-launch.sh filters it for the shell launchers. Every caller (the
-  // three respawns, the isolated main config) then sees the same list as channels.sh.
-  return filterMainGromzoIds(readMainAgentIdRaw(projectRoot), readEnvValue(projectRoot, 'CHANNEL_PLUGINS_EXTRA').split(/\s+/).filter(Boolean))
-}
-
-/** The .env MAIN_AGENT_ID as written (the shell launchers read the same raw value for MXD_AGENT). */
-export function readMainAgentIdRaw(projectRoot: string = PROJECT_ROOT): string {
-  return readEnvValue(projectRoot, 'MAIN_AGENT_ID')
+  return readEnvValue(projectRoot, 'CHANNEL_PLUGINS_EXTRA').split(/\s+/).filter(Boolean)
 }
 
 // Build the claude command used to (re)spawn the main channels session via
 // `tmux respawn-pane`. Pure + exported so the contract test can LOCK the
 // presence of the `$HOME/.bun/bin` PATH export (without it the respawned bun
-// telegram bridge can't be found and the session comes up channel-less). The
+// channel bridge can't be found and the session comes up channel-less). The
 // PATH and flags mirror scripts/channels.sh. `continueSession` resumes the
 // prior conversation (stage-3 recovery) vs a clean start (hard restart).
 //
@@ -1181,30 +1156,20 @@ export function buildMainSessionRespawnCmd(opts: {
    * mainChannelStateEnv(). REQUIRED: since #915 the main agent's bot token
    * lives in the install-scoped dir, and a plugin launched without
    * *_STATE_DIR falls back to ~/.claude/channels/<provider>/, finds no .env
-   * and exits ("TELEGRAM_BOT_TOKEN required") -- every in-process respawn came
+   * and exits ("DISCORD_BOT_TOKEN required") -- every in-process respawn came
    * up channel-deaf (measured 2026-09-24, 21:04 and 22:03 CEST). channels.sh
    * and channel-watchdog.sh already export it; this is the third launcher.
    */
   channelStateEnv: { name: string; dir: string }
   /**
-   * SLACKDMVESZT1006: the --settings file that ENABLES the extras for this
-   * session only (writeMainExtraPluginsSettings). Without it a recovery
-   * respawn lists the extras on --channels while the project scope keeps them
-   * disabled, and the extra bot comes up deaf. INSTALLDIRTYTREE1103: it carries
-   * the PRIMARY plugin too -- the tracked project settings.json is no longer
-   * written at launch, and it ships slack-channel false. null/absent = no flag.
+   * The --settings file that ENABLES the extras for this session only
+   * (writeMainExtraPluginsSettings). Without it a recovery respawn lists the
+   * extras on --channels while the project scope keeps them disabled, and the
+   * extra bot comes up deaf. INSTALLDIRTYTREE1103: it carries the PRIMARY plugin
+   * too -- the tracked project settings.json is no longer written at launch.
+   * null/absent = no flag.
    */
   extraSettingsPath?: string | null
-  /**
-   * GROMZOMAINAGENT1106: the .env MAIN_AGENT_ID (readMainAgentIdRaw). When `extraPluginIds` carries the
-   * gromzo-channel id, the respawn exports MXD_AGENT=<this slug> and MXD_SCOPE=both for the plugin, in
-   * this command only (never a settings file). Absent: the boot-time MAIN_AGENT_ID.
-   */
-  mainAgentId?: string
-  /** MXDAGENTSOCKID1106: the main agent's token file (gromzoTokenFile); absent: looked up for the slug. */
-  gromzoTokenFile?: string | null
-  /** GROMZONOPROVIDER1108: test seam for mainGromzoPrimaryReady when the primary is the Gromzo plugin. */
-  gromzoPrimaryReady?: boolean
   /**
    * CHANNELUNCONF1110: false when the primary is a token provider with no token (mainPrimaryConfigured): the respawn
    * then comes back WITHOUT the primary channel, exactly as channels.sh, channel-watchdog.sh and stuck-modal-guard.sh
@@ -1212,20 +1177,9 @@ export function buildMainSessionRespawnCmd(opts: {
    */
   channelConfigured?: boolean
 }): string {
-  // GROMZONOPROVIDER1108: on a gromzo install the Gromzo plugin is the PRIMARY (never also an extra). It comes back only
-  // when the main agent can take it (mainGromzoPrimaryReady); otherwise this respawn is a gromzo-pending session with
-  // no Gromzo channel, exactly as channels.sh, stuck-modal-guard.sh and channel-watchdog.sh launch it.
-  const primaryIsGromzo = opts.pluginId === MAIN_GROMZO_PLUGIN_ID
-  const extras = (opts.extraPluginIds ?? []).filter((p) => !(primaryIsGromzo && p === MAIN_GROMZO_PLUGIN_ID))
-  const primaryReady = primaryIsGromzo
-    ? (opts.gromzoPrimaryReady ?? mainGromzoPrimaryReady(opts.mainAgentId ?? MAIN_AGENT_ID))
-    : (opts.channelConfigured ?? true)
-  const primary = primaryReady ? opts.pluginId : null
-  const gromzoSlug = (primaryIsGromzo && primaryReady) || extras.includes(MAIN_GROMZO_PLUGIN_ID)
-    ? mainGromzoSlug(opts.mainAgentId ?? MAIN_AGENT_ID)
-    : null
+  const extras = opts.extraPluginIds ?? []
+  const primary = (opts.channelConfigured ?? true) ? opts.pluginId : null
   const channelsList = [...(primary ? [`plugin:${primary}`] : []), ...extras.map((p) => `plugin:${p}`)]
-  const gromzoToken = gromzoSlug ? gromzoTokenExport(opts.gromzoTokenFile !== undefined ? opts.gromzoTokenFile : gromzoTokenFile(gromzoSlug)) : ''
   return [
     // FLEETVENV923: same venv-first PATH as startAgentProcess and channels.sh.
     `export PATH="${fleetVenvPathPrefix()}/opt/homebrew/bin:$HOME/.bun/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"`,
@@ -1284,12 +1238,6 @@ export function buildMainSessionRespawnCmd(opts: {
         : []),
     // MAINAUTH1107: the post-file right AFTER the config branch (a static piece: no mode logic in this builder).
     `&& { [ ! -f ${shSingleQuote(PANE_AUTH_POST_PATH)} ] || . ${shSingleQuote(PANE_AUTH_POST_PATH)}; }`,
-    // GROMZOMAINAGENT1106: the plugin names itself with MXD_AGENT (main-gromzo-launch.ts).
-    // MXDAGENTSOCKID1106: and its token file, so a protected main agent's hello is not refused.
-    ...(gromzoSlug ? [`&& export MXD_AGENT="${gromzoSlug}" MXD_SCOPE="both"`] : []),
-    ...(gromzoToken ? [`&& ${gromzoToken.replace(/ && $/, '')}`] : []),
-    // GROMZONEEDSAUTH1109: in the pane, after the kill and the exports, right before claude (gromzoNeedsAuthPaneStep).
-    ...(channelsList.includes(`plugin:${MAIN_GROMZO_PLUGIN_ID}`) ? [`&& ${gromzoNeedsAuthPaneStep()}`] : []),
     '&&', opts.claudePath,
     ...(opts.continueSession ? ['--continue'] : []),
     '--dangerously-skip-permissions',
@@ -1344,7 +1292,7 @@ export function relaunchGoneMainSession(
 // this the main agent's nightly restart threw ENOENT on every due tick and had
 // NEVER run -- silently, because the only symptom was a log line.
 //
-// Deliberately NOT resumeMarveenSession() with a flag: that path is built around
+// Deliberately NOT resumeAlfredSession() with a flag: that path is built around
 // --continue (resume-summary modal dismissal, post-resume plugin guard) and none
 // of it applies to a fresh start. What IS shared -- the two reaps, the onboarding
 // re-seed, the respawn command builder, the identity + plugin-unlock follow-ups --
@@ -1374,7 +1322,6 @@ export function respawnMainSessionFresh(): void {
       claudePath: claudeBin(),
       pluginId: provider.pluginId,
       extraPluginIds: readExtraChannelPluginIds(),
-      mainAgentId: readMainAgentIdRaw(),
       channelConfigured: mainPrimaryConfigured(provider.type),
       extraSettingsPath: writeMainExtraPluginsSettings(PROJECT_ROOT, mainLaunchPluginIds(provider)),
       channelStateEnv: mainChannelStateEnv(provider.type),
@@ -1397,8 +1344,6 @@ export function respawnMainSessionFresh(): void {
     // that is a success for our purposes (something IS coming up), not a failure to retry.
     if (mainChannelsSessionExists()) {
       execFileSync(tmuxBin(), ['respawn-pane', '-k', '-t', exactTmuxTarget(MAIN_CHANNELS_SESSION), claudeCmd], { timeout: 15000 })
-      // MXDAGENTSOCKID1106 (b): the old claude's gromzo plugin outlives it (it ignores a closed stdin); sweep it once the respawn landed.
-      scheduleGromzoOrphanReap('main-respawn', tmuxBin())
     } else {
       // A fresh session starts its own claude: the respawn-specific follow-ups below
       // (identity, plugin unlock) are channels.sh's job on this path, not ours.
@@ -1443,7 +1388,7 @@ let monitorMainRespawnAt = 0
 // kicked ([exited]) -- the #248 user-visible crash. It also runs the
 // pane-attribution detached-claude reap first, breaking the orphan->409->freeze
 // doom-loop that the launchctl path (channels.sh env-grep reap) never cleaned.
-export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): Promise<boolean> {
+export async function resumeAlfredSession(opts: { byMonitor?: boolean } = {}): Promise<boolean> {
   const provider = getProvider(getMainAgentProvider())
   // #1954: mark the respawn for the schedule-runner from the START, not the
   // end (see main-respawn-hold.ts); the finally clears it on every exit.
@@ -1457,7 +1402,7 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
     try {
       reapChannelOrphans(provider.type, PROJECT_ROOT, { tmuxPath: tmuxBin() })
     } catch (err) {
-      logger.warn({ err }, 'resumeMarveenSession: pre-respawn reap failed (continuing)')
+      logger.warn({ err }, 'resumeAlfredSession: pre-respawn reap failed (continuing)')
     }
 
     // Also reap DETACHED main-session claudes. reapChannelOrphans (env-scan)
@@ -1471,7 +1416,7 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
     try {
       reapDetachedChannelClaudes({ tmuxPath: tmuxBin() })
     } catch (err) {
-      logger.warn({ err }, 'resumeMarveenSession: detached-claude reap failed (continuing)')
+      logger.warn({ err }, 'resumeAlfredSession: detached-claude reap failed (continuing)')
     }
 
     // A respawn onto the shared ~/.claude parks on the first-run "Select login
@@ -1483,9 +1428,8 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
       claudePath: claudeBin(),
       pluginId: provider.pluginId,
       extraPluginIds: readExtraChannelPluginIds(),
-      mainAgentId: readMainAgentIdRaw(),
-    channelConfigured: mainPrimaryConfigured(provider.type),
-    extraSettingsPath: writeMainExtraPluginsSettings(PROJECT_ROOT, mainLaunchPluginIds(provider)),
+      channelConfigured: mainPrimaryConfigured(provider.type),
+      extraSettingsPath: writeMainExtraPluginsSettings(PROJECT_ROOT, mainLaunchPluginIds(provider)),
       channelStateEnv: mainChannelStateEnv(provider.type),
       model: readConfiguredMainModel(),
       continueSession: true,
@@ -1497,8 +1441,6 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
     })
     if (opts.byMonitor) monitorMainRespawnAt = Date.now()
     execFileSync(tmuxBin(), ['respawn-pane', '-k', '-t', exactTmuxTarget(MAIN_CHANNELS_SESSION), claudeCmd], { timeout: 15000 })
-    // MXDAGENTSOCKID1106 (b): the old claude's gromzo plugin outlives it (it ignores a closed stdin); sweep it once the respawn landed.
-    scheduleGromzoOrphanReap('main-respawn', tmuxBin())
 
     // --continue replays the last conversation. When the prior session is large
     // (>200k tokens) Claude Code opens with a "Resume from summary" modal that
@@ -1509,7 +1451,7 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
       await delay(2000)
       await dismissResumeSummaryModalIfPresent(MAIN_CHANNELS_SESSION)
     } catch (err) {
-      logger.warn({ err }, 'resumeMarveenSession: post-respawn modal dismiss failed (continuing)')
+      logger.warn({ err }, 'resumeAlfredSession: post-respawn modal dismiss failed (continuing)')
     }
 
     // --continue replays the last conversation. When the prior session is
@@ -1522,10 +1464,10 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
       await delay(2000)
       await dismissResumeSummaryModalIfPresent(MAIN_CHANNELS_SESSION)
     } catch (err) {
-      logger.warn({ err }, 'resumeMarveenSession: post-respawn modal dismiss failed (continuing)')
+      logger.warn({ err }, 'resumeAlfredSession: post-respawn modal dismiss failed (continuing)')
     }
 
-    logger.warn({ provider: provider.type }, 'Marveen session respawned with --continue')
+    logger.warn({ provider: provider.type }, 'Alfred session respawned with --continue')
     // Re-establish /rename on the brand-new claude process (the prior session's
     // identity is gone after respawn-pane; channels.sh sets it on a normal
     // start). /remote-control was dropped (the operator no longer uses it).
@@ -1555,7 +1497,7 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
     writeRespawnStamp()
     return true
   } catch (err) {
-    logger.error({ err }, 'Marveen session respawn failed')
+    logger.error({ err }, 'Alfred session respawn failed')
     return false
   } finally {
     endRespawn()
@@ -1564,14 +1506,14 @@ export async function resumeMarveenSession(opts: { byMonitor?: boolean } = {}): 
 
 // Grace history: 90s -> 150s -> 240s.
 // 2026-06-01 16:31 incident: with the reap+modal-dismiss path landed,
-// resumeMarveenSession respawned cleanly, but a >200k-token --continue
+// resumeAlfredSession respawned cleanly, but a >200k-token --continue
 // session-load + plugin re-handshake exceeded the 150s window and stage 4
 // fired anyway (context lost). Bumped to 240s so the slowest realistic
 // large-context resume completes inside the window. The monitor polls every
 // 60s, so the effective resolution rounds up to the next poll - 240s gives
-// 3-4 polls' worth of slack before the hard restart escalates.
+// 3-4 polls' worth of leeway before the hard restart escalates.
 const RESUME_GRACE_MS = 240_000
-let marveenLastHardRestart = 0
+let alfredLastHardRestart = 0
 // Post-respawn cold-start grace. After ANY main-session respawn (keepalive
 // fresh-respawn, stage-3 resume, or stage-4 hard restart) the new claude needs
 // minutes to load its large context and complete the channel-plugin handshake.
@@ -1583,7 +1525,7 @@ let marveenLastHardRestart = 0
 // keepalive-staleness net, so a session that is genuinely dead after a respawn
 // is still caught by another path. Exported so the stuck-tool-call-watcher
 // shares the same post-respawn grace (single source of truth).
-export const MARVEEN_POST_RESPAWN_GRACE_MS = 360_000
+export const ALFRED_POST_RESPAWN_GRACE_MS = 360_000
 
 /**
  * B2 fix: shared cross-path grace accessor.
@@ -1593,14 +1535,14 @@ export const MARVEEN_POST_RESPAWN_GRACE_MS = 360_000
  * KEEPALIVE_RESPAWN_GRACE_MS of each other.
  */
 export function lastMainRespawnAt(): number {
-  return Math.max(marveenLastKeepaliveRespawn, marveenLastHardRestart, fileRespawnStampMs())
+  return Math.max(alfredLastKeepaliveRespawn, alfredLastHardRestart, fileRespawnStampMs())
 }
 
 // Cross-LAYER coordination with the independent systemd-timer watchdog
 // (scripts/channel-watchdog.sh). That timer writes RESPAWN_STAMP_FILE (epoch
 // SECONDS) when IT respawns; reading it here means an out-of-process respawn
 // also suppresses this in-process watchdog for the grace window. Symmetrically,
-// hardRestartMarveenChannels writes the same file so the timer defers to us.
+// hardRestartAlfredChannels writes the same file so the timer defers to us.
 // Best-effort: 0 if absent/garbage.
 const RESPAWN_STAMP_FILE = join(PROJECT_ROOT, 'store', '.channel-last-respawn')
 function fileRespawnStampMs(): number {
@@ -1667,8 +1609,8 @@ function checkExternalMainRespawn(): void {
   const verdict = classifyRespawnStampAdvance({
     stampMs,
     lastSeenStampMs: lastSeenRespawnStampMs,
-    lastSelfRespawnMs: Math.max(marveenLastHardRestart, marveenLastKeepaliveRespawn, marveenLastSessionCreate, lastSelfStampWriteMs),
-    graceMs: MARVEEN_POST_RESPAWN_GRACE_MS,
+    lastSelfRespawnMs: Math.max(alfredLastHardRestart, alfredLastKeepaliveRespawn, alfredLastSessionCreate, lastSelfStampWriteMs),
+    graceMs: ALFRED_POST_RESPAWN_GRACE_MS,
   })
   if (verdict === 'none') return
   lastSeenRespawnStampMs = stampMs
@@ -1682,12 +1624,12 @@ function checkExternalMainRespawn(): void {
 
 // --- Vanished-session recovery (self-healing main session) ---
 //
-// The down-cascade (handleMarveenDown) recovers a main session whose claude
+// The down-cascade (handleAlfredDown) recovers a main session whose claude
 // process is alive but whose channel plugin died, by replacing the claude
 // process in the EXISTING pane via `tmux respawn-pane`. respawn-pane needs a
 // live pane: it cannot bring back a session that has disappeared entirely
 // (crash, self-update mid-restart, OOM kill, host reboot). On a deployment
-// where nothing supervises the session -- marveen-channels.service disabled,
+// where nothing supervises the session -- alfred-channels.service disabled,
 // or any pure-tmux install -- a vanished session stays gone, and because the
 // scheduler skips every task whose target tmux session is missing
 // (schedule-runner !sessionExists branch), ALL main-agent scheduled jobs
@@ -1702,7 +1644,7 @@ const CHANNELS_SCRIPT = join(PROJECT_ROOT, 'scripts', 'channels.sh')
 // Throttle relaunches so a session that is still booting is not torn down and
 // recreated on the next 60s poll.
 const MAIN_SESSION_CREATE_GRACE_MS = 360_000
-let marveenLastSessionCreate = 0
+let alfredLastSessionCreate = 0
 // CHANNELSDUP1023 follow-up: how long the recreate path has been waiting on a running supervisor.
 let supervisorWait: SupervisorWait | null = null
 
@@ -1728,7 +1670,7 @@ export type MainSessionCreateResult = 'started' | 'grace' | 'script-missing' | '
 
 export function createMainChannelsSession(): MainSessionCreateResult {
   const now = Date.now()
-  if (marveenLastSessionCreate && now - marveenLastSessionCreate < MAIN_SESSION_CREATE_GRACE_MS) {
+  if (alfredLastSessionCreate && now - alfredLastSessionCreate < MAIN_SESSION_CREATE_GRACE_MS) {
     return 'grace'
   }
   if (!existsSync(CHANNELS_SCRIPT)) {
@@ -1764,7 +1706,7 @@ export function createMainChannelsSession(): MainSessionCreateResult {
       cwd: PROJECT_ROOT,
     })
     child.unref()
-    marveenLastSessionCreate = now
+    alfredLastSessionCreate = now
     // Fold into the shared cold-start grace so the down-cascade defers to this
     // boot instead of stacking a respawn on a session that is still coming up.
     writeRespawnStamp()
@@ -1778,41 +1720,38 @@ export function createMainChannelsSession(): MainSessionCreateResult {
 }
 
 // Hard-restart fallback when there is no systemd unit to bounce: respawn the
-// tmux pane with a FRESH claude (no --continue). Mirrors resumeMarveenSession
+// tmux pane with a FRESH claude (no --continue). Mirrors resumeAlfredSession
 // but starts a clean session -- exactly what scripts/channels.sh does -- so a
 // wedged plugin gets a brand-new process even on pure-tmux installs. Distinct
 // from the stage-3 resume (which keeps --continue) by clearing session state.
-function respawnMarveenSessionFresh(): boolean {
+function respawnAlfredSessionFresh(): boolean {
   const provider = getProvider(getMainAgentProvider())
   // #1954: mark the respawn for the schedule-runner from the START, not the
   // end (see main-respawn-hold.ts); the finally clears it on every exit.
   const endRespawn = beginMainRespawn()
   try {
-    // Same first-run-picker guard as resumeMarveenSession.
+    // Same first-run-picker guard as resumeAlfredSession.
     ensureSharedClaudeOnboarded()
     const claudeCmd = buildMainSessionRespawnCmd({
       claudePath: claudeBin(),
       pluginId: provider.pluginId,
       extraPluginIds: readExtraChannelPluginIds(),
-      mainAgentId: readMainAgentIdRaw(),
-    channelConfigured: mainPrimaryConfigured(provider.type),
-    extraSettingsPath: writeMainExtraPluginsSettings(PROJECT_ROOT, mainLaunchPluginIds(provider)),
+      channelConfigured: mainPrimaryConfigured(provider.type),
+      extraSettingsPath: writeMainExtraPluginsSettings(PROJECT_ROOT, mainLaunchPluginIds(provider)),
       channelStateEnv: mainChannelStateEnv(provider.type),
       model: readConfiguredMainModel(),
       continueSession: false,
-      // Same channels.sh-bypass concern as resumeMarveenSession: this fresh
+      // Same channels.sh-bypass concern as resumeAlfredSession: this fresh
       // respawn also skips channels.sh, so it must carry the isolated config
       // itself or it 401s on the rotating macOS Keychain. null when off/no token.
       config: mainRespawnConfigWithAuth(),
     })
     execFileSync(tmuxBin(), ['respawn-pane', '-k', '-t', exactTmuxTarget(MAIN_CHANNELS_SESSION), claudeCmd], { timeout: 15000 })
-    // MXDAGENTSOCKID1106 (b): the old claude's gromzo plugin outlives it (it ignores a closed stdin); sweep it once the respawn landed.
-    scheduleGromzoOrphanReap('main-respawn', tmuxBin())
-    logger.warn({ provider: provider.type }, 'Hard restart: marveen session respawned fresh (no --continue)')
-    // Re-establish /rename on the fresh process (see note in resumeMarveenSession).
+    logger.warn({ provider: provider.type }, 'Hard restart: alfred session respawned fresh (no --continue)')
+    // Re-establish /rename on the fresh process (see note in resumeAlfredSession).
     // scheduleIdentitySetup only schedules delayed timers -> fire-and-forget.
     void scheduleIdentitySetup(MAIN_CHANNELS_SESSION, BOT_NAME)
-    // Same channels.sh-bypass concern as in resumeMarveenSession: this respawn
+    // Same channels.sh-bypass concern as in resumeAlfredSession: this respawn
     // path does NOT invoke channels.sh, so the post-init plugin unlock probe
     // (#231/#232) never runs. Wire it in-process so the keep-alive-watchdog
     // fresh-respawn path also revives a Failed/disabled plugin instead of
@@ -1869,7 +1808,7 @@ export function shouldEscalateAfterResume(f: { claudePid: number | null; pluginA
 // channels plugin attached, the resume succeeded and the conversation context
 // is preserved -- nothing to do. If it did not (CC 2.1.193: --continue does not
 // re-init the plugin MCP server), escalate to a FRESH respawn so the main
-// channel becomes reachable again. respawnMarveenSessionFresh() writes the
+// channel becomes reachable again. respawnAlfredSessionFresh() writes the
 // respawn stamp, so lastMainRespawnAt() suppresses the down-cascade's redundant
 // stage-4 hard restart during the ensuing cold boot.
 function schedulePostResumePluginGuard(provider: ChannelProviderType): void {
@@ -1883,7 +1822,7 @@ function schedulePostResumePluginGuard(provider: ChannelProviderType): void {
       }
       logger.warn({ provider }, 'Post-resume guard: --continue resume came up WITHOUT the channels plugin (CC 2.1.193) -- escalating to fresh respawn (context dropped, memory persists)')
       sendRoutineAlert('post-resume-fresh-respawn', `⚠️ A --continue resume süketen jött fel (nincs channel plugin). Fresh respawn most a ${MAIN_CHANNELS_SESSION} session-on (a beszélgetés elveszik, memória marad).`)
-      respawnMarveenSessionFresh()
+      respawnAlfredSessionFresh()
     } catch (err) {
       logger.warn({ err }, 'Post-resume guard probe failed (leaving recovery to the down-cascade)')
     }
@@ -1964,7 +1903,7 @@ function verifyHardRestartLater(): void {
   )
 }
 
-export function hardRestartMarveenChannels(): { ok: boolean; error?: string } {
+export function hardRestartAlfredChannels(): { ok: boolean; error?: string } {
   // MAINRESTARTWAKE1115 (review C3): a manual restart may have left a wake pending for the main
   // session. Any restart of that session drops it here; the two manual routes schedule their own
   // AFTER this call, so a guard or recovery restart inside the grace gets its own directive only.
@@ -2001,9 +1940,9 @@ export function hardRestartMarveenChannels(): { ok: boolean; error?: string } {
     }
     if (launchdRestartTookEffect(pidBefore, pidAfter)) {
       logger.warn({ pidBefore, pidAfter }, `Hard restart: launchctl reload of com.${SERVICE_ID}.channels`)
-      marveenLastHardRestart = Date.now()
+      alfredLastHardRestart = Date.now()
       writeRespawnStamp() // coordinate with the systemd-timer watchdog
-      noteOwnHardRestartStamp(marveenLastHardRestart)
+      noteOwnHardRestartStamp(alfredLastHardRestart)
       verifyHardRestartLater()
       return { ok: true }
     }
@@ -2015,9 +1954,9 @@ export function hardRestartMarveenChannels(): { ok: boolean; error?: string } {
       const fresh = freshSupervisor(runningChannelsSupervisors(CHANNELS_SCRIPT), reloadWindowSec(reloadAt, Date.now()))
       if (launchdReloadVerdict(pidBefore, pidAfter, fresh?.pid ?? null) === 'rebuilding') {
         logger.warn({ pidBefore, supervisor: fresh }, `Hard restart: launchctl reload of com.${SERVICE_ID}.channels -- a fresh channels.sh is rebuilding the session (the pane is not readable yet)`)
-        marveenLastHardRestart = Date.now()
+        alfredLastHardRestart = Date.now()
         writeRespawnStamp() // coordinate with the systemd-timer watchdog
-        noteOwnHardRestartStamp(marveenLastHardRestart)
+        noteOwnHardRestartStamp(alfredLastHardRestart)
         verifyHardRestartLater()
         return { ok: true }
       }
@@ -2036,14 +1975,14 @@ export function hardRestartMarveenChannels(): { ok: boolean; error?: string } {
   }
 
   // Linux: respawn-pane ONLY -- NEVER `systemctl --user restart`. The channels
-  // unit (e.g. marveen-channels.service) runs with KillMode=control-group and
+  // unit (e.g. alfred-channels.service) runs with KillMode=control-group and
   // the shared tmux SERVER lives in its cgroup, so restarting the unit kills the
   // tmux server and with it EVERY agent session, not just the main one.
   // respawn-pane replaces only the claude process in the main channels pane,
   // leaving the server and all other sessions intact.
-  if (respawnMarveenSessionFresh()) {
-    marveenLastHardRestart = Date.now()
-    noteOwnHardRestartStamp(marveenLastHardRestart) // respawnMarveenSessionFresh wrote the stamp
+  if (respawnAlfredSessionFresh()) {
+    alfredLastHardRestart = Date.now()
+    noteOwnHardRestartStamp(alfredLastHardRestart) // respawnAlfredSessionFresh wrote the stamp
     verifyHardRestartLater()
     return { ok: true }
   }
@@ -2051,13 +1990,13 @@ export function hardRestartMarveenChannels(): { ok: boolean; error?: string } {
 }
 
 // 8c338dc4: the plan rotation's opt-in continue restart (POST /api/claude-plans/rotate with
-// "continue": true): resumeMarveenSession's --continue respawn instead of the fresh one above,
+// "continue": true): resumeAlfredSession's --continue respawn instead of the fresh one above,
 // with the fresh one as the fallback. The steps and their order live in main-rotation-continue.ts.
 export function restartMainForRotationContinue(): Promise<ContinueRestartResult> {
   return runMainContinueRestart({
     stampConsent: stampFableOverageConsentSharedRoots,
-    resume: resumeMarveenSession,
-    fresh: hardRestartMarveenChannels,
+    resume: resumeAlfredSession,
+    fresh: hardRestartAlfredChannels,
     warn: (message) => logger.warn(message),
   })
 }
@@ -2142,7 +2081,7 @@ function maybeRestartWedgedMainChannel(state: StuckInputState): void {
     return
   }
   logger.warn({ session: MAIN_CHANNELS_SESSION, attempts: state.attempts, restart: stuckLadder.count() + 1 }, 'Stuck main channel input survived soft recovery -- escalating to hard restart (respawn-pane)')
-  const r = hardRestartMarveenChannels()
+  const r = hardRestartAlfredChannels()
   lastStuckRestartAt = Date.now()
   monitorMainRespawnAt = lastStuckRestartAt
   if (r.ok) {
@@ -2277,7 +2216,7 @@ const KEEPALIVE_RESPAWN_GRACE_MS = 15 * 60 * 1000 // let a respawned session re-
 // it never re-introduces idle false-positives, while bounding a silent deafness
 // to under an hour instead of days.
 const KEEPALIVE_LIVENESS_TRUST_CEILING_MS = 45 * 60 * 1000
-let marveenLastKeepaliveRespawn = 0
+let alfredLastKeepaliveRespawn = 0
 
 // LOOP BREAKER (KEEPALIVELOOP923). Measured 2026-09-23: the keepalive producer
 // (launchd probe) hung, the file stayed stale from ~01:34 with a LIVE poller,
@@ -2506,8 +2445,8 @@ function checkMainKeepaliveStaleness(): void {
   }
 
   // GROUND-TRUTH SHORTCUT (2026-06-01 21:18 incident): if the channel
-  // plugin's bun poller is ALIVE under Marveen's claude pid, the channel
-  // is healthy by definition -- Telegram traffic CAN reach us. A stale
+  // plugin's poller is ALIVE under Alfred's claude pid, the channel
+  // is healthy by definition -- inbound traffic CAN reach us. A stale
   // keepalive file with a live poller is just a quiet conversation, NOT
   // deafness. Respawning here would kill the session for nothing (Szabi
   // got "channel keep-alive 18 perce nem frissült" alerts every 30 min
@@ -2577,7 +2516,7 @@ function checkMainKeepaliveStaleness(): void {
     if (loop.decision === 'hold-and-alert') {
       const fix = keepaliveProducerRemedy(process.platform, SERVICE_ID, process.getuid ? process.getuid() : 0, homedir())
       logger.warn({ ageMs, uselessRespawns: loop.state.uselessRespawns, producerMtimeMs, runMtimeMs, holdReason }, 'Keepalive loop breaker: the keepalive producer did not produce since our respawns while the poller is alive -- holding further respawns (KEEPALIVELOOP923, ISSUE1891)')
-      const head = `⚠️ A fő channel keep-alive ${ageMin} perce nem frissül, de a Telegram-poller él, és ${loop.state.uselessRespawns} újraindítás óta a jelző (szonda) nem frissítette. További újraindítást NEM csinálok (csak a beszélgetést vinné el). A jelző: ${fix.job}.`
+      const head = `⚠️ A fő channel keep-alive ${ageMin} perce nem frissül, de a csatorna-poller él, és ${loop.state.uselessRespawns} újraindítás óta a jelző (szonda) nem frissítette. További újraindítást NEM csinálok (csak a beszélgetést vinné el). A jelző: ${fix.job}.`
       sendAlert(holdReason === 'not-running'
         ? `${head} A job nem fut. Indítsd el: ${fix.command} (macOS-en a GUI-bejelentkezés egy terminaljából). Ha a jelző újra termel, a figyelő magától visszaáll, és szólok.`
         : `${head} A job fut, de nem termel (elakad vagy nem találja a pollert). Nézd meg a naplóját: store/channel-keepalive-probe.log. Ha a jelző újra termel, a figyelő magától visszaáll, és szólok.`)
@@ -2588,7 +2527,7 @@ function checkMainKeepaliveStaleness(): void {
   // because the machine was asleep is not deafness -- every writer of that
   // file was suspended right along with the poller. The respawn below still
   // runs (harmless self-healing, it re-establishes the keepalive), but the
-  // Telegram alert is suppressed: waking the machine should not ping the owner
+  // owner alert is suppressed: waking the machine should not ping the owner
   // about an "outage" they caused by closing the lid. The staleness window is
   // exactly [mtime, now], so a sleep gap overlapping it explains the age.
   // Genuine wedge-while-running has no sleep gap in that window and alerts
@@ -2599,12 +2538,12 @@ function checkMainKeepaliveStaleness(): void {
   if (!staleDueToSleep) {
     sendRoutineAlert('keepalive-respawn', `⚠️ A fő channel keep-alive ${ageMin} perce nem frissült -- respawn-pane a ${MAIN_CHANNELS_SESSION} session-on (a beszélgetés elveszik, memória marad).`)
   }
-  if (respawnMarveenSessionFresh()) {
-    marveenLastKeepaliveRespawn = now
+  if (respawnAlfredSessionFresh()) {
+    alfredLastKeepaliveRespawn = now
     monitorMainRespawnAt = Date.now()
     // Suppress the process-down handler during the respawn window (reuses the
     // existing hard-restart grace) so the two recovery paths don't collide.
-    marveenLastHardRestart = now
+    alfredLastHardRestart = now
   }
 }
 
@@ -2622,119 +2561,66 @@ function sendGaveUpReloadIfIdle(): 'sent' | 'not-idle' {
   return 'sent'
 }
 
-async function handleMarveenDown(): Promise<void> {
+async function handleAlfredDown(): Promise<void> {
   const now = Date.now()
   const providerLabel = getMainAgentProvider()
   // Cold-start guard: defer the ENTIRE down cascade while a recent respawn
   // (from any recovery path -- keepalive fresh-respawn, stage-3 resume, stage-4
   // hard restart, or the external watchdog's file stamp) is still inside its
   // boot window. lastMainRespawnAt() folds all three timestamps together, so a
-  // keepalive respawn that did NOT touch marveenLastHardRestart still suppresses
+  // keepalive respawn that did NOT touch alfredLastHardRestart still suppresses
   // escalation. This is what stops the restart-on-restart stacking that caused
-  // the 2026-06-01 480s outage (see MARVEEN_POST_RESPAWN_GRACE_MS).
+  // the 2026-06-01 480s outage (see ALFRED_POST_RESPAWN_GRACE_MS).
   const lastRespawn = lastMainRespawnAt()
-  if (lastRespawn && now - lastRespawn < MARVEEN_POST_RESPAWN_GRACE_MS) {
+  if (lastRespawn && now - lastRespawn < ALFRED_POST_RESPAWN_GRACE_MS) {
     return
   }
-  if (!marveenDownState) {
-    marveenDownState = { downSince: now, stage: 'soft', lastAlertAt: now, softAttempts: 0 }
-    logger.warn({ provider: providerLabel }, 'Marveen channel plugin down -- stage 1 (soft /mcp reconnect, silent)')
-    // Diagnostic 409 probe (Telegram only). Fire-and-forget so the sync
-    // check-loop is not blocked on a network call. Logs explicitly when the
-    // upstream returns the orphan-poller's "terminated by other getUpdates
-    // request" message, so dashboard.log carries hard evidence of the real
-    // cause instead of leaving the operator to infer it from a pane scan.
-    if (providerLabel === 'telegram' && !marveenDownState.conflictProbed) {
-      marveenDownState.conflictProbed = true
-      // Main-agent token lives at the HOME-default state dir
-      // (~/.claude/channels/<provider>/.env), NOT under PROJECT_ROOT -- every
-      // other main-agent channelStateDir() callsite omits the agentDir arg.
-      // Passing PROJECT_ROOT here pointed at a nonexistent .env, so
-      // readChannelToken returned null and this 409 conflict probe never ran
-      // (the very evidence log that would have named the orphan-poller cause).
-      const tokenPath = join(channelStateDir(providerLabel), '.env')
-      const tok = readChannelToken(providerLabel, tokenPath)
-      if (tok) {
-        probeTelegramConflict(tok)
-          .then(r => {
-            if (r.conflicted) {
-              logger.warn(
-                { status: r.status, description: r.description },
-                'Telegram getUpdates 409 Conflict confirmed -- orphan poller is contending for the bot token. Recovery will reap and respawn.',
-              )
-            } else if (r.status > 0) {
-              logger.info(
-                { status: r.status, description: r.description },
-                'Telegram getUpdates returned non-409 status on diagnostic probe -- the down state has a different cause than orphan poller contention',
-              )
-            }
-          })
-          .catch(err => {
-            logger.warn({ err }, 'Telegram conflict probe failed to complete')
-          })
-      }
-    }
-    // Before any reconnect/respawn: kill a THIEF poller contending for the
-    // MAIN bot token. The 2026-07-18 "half-afternoon silence" was a
-    // local-agent-mode claude (project settings auto-load the telegram plugin)
-    // grabbing the default-state-dir token and 409-racing the live poller. The
-    // existing recovery restarts the VICTIM, not the thief -- so remove the
-    // thief here and the LIVE poller resumes getUpdates with no respawn. This
-    // reaper is fail-safe: it spares the legit poller (its owning claude is the
-    // channels pane leader) and does nothing when the session can't be resolved.
-    if (providerLabel === 'telegram') {
-      try {
-        const killed = reapForeignMainPollers({ provider: 'telegram', mainSession: MAIN_CHANNELS_SESSION, tmuxPath: tmuxBin() })
-        if (killed.length > 0) {
-          logger.warn({ killed }, 'Marveen down: reaped foreign main-token poller(s) -- live poller should recover without respawn')
-        }
-      } catch (err) {
-        logger.warn({ err }, 'foreign-main poller reap failed (continuing to soft reconnect)')
-      }
-    }
-    if (softReconnectMarveen()) marveenDownState.softAttempts += 1
+  if (!alfredDownState) {
+    alfredDownState = { downSince: now, stage: 'soft', lastAlertAt: now, softAttempts: 0 }
+    logger.warn({ provider: providerLabel }, 'Alfred channel plugin down -- stage 1 (soft /mcp reconnect, silent)')
+    if (softReconnectAlfred()) alfredDownState.softAttempts += 1
     return
   }
-  if (marveenDownState.stage === 'soft') {
-    if (marveenDownState.softAttempts < 3 && softReconnectMarveen()) {
-      marveenDownState.softAttempts += 1
-      marveenDownState.lastAlertAt = now
+  if (alfredDownState.stage === 'soft') {
+    if (alfredDownState.softAttempts < 3 && softReconnectAlfred()) {
+      alfredDownState.softAttempts += 1
+      alfredDownState.lastAlertAt = now
       return
     }
-    marveenDownState.stage = 'save'
-    marveenDownState.stageStartedAt = now
-    marveenDownState.lastAlertAt = now
-    logger.warn({ provider: providerLabel }, 'Marveen channel plugin still down -- stage 2 (memory save)')
-    await triggerMarveenMemorySave()
+    alfredDownState.stage = 'save'
+    alfredDownState.stageStartedAt = now
+    alfredDownState.lastAlertAt = now
+    logger.warn({ provider: providerLabel }, 'Alfred channel plugin still down -- stage 2 (memory save)')
+    await triggerAlfredMemorySave()
     return
   }
-  if (marveenDownState.stage === 'save') {
-    const saveStartedAt = marveenDownState.stageStartedAt ?? marveenDownState.downSince
+  if (alfredDownState.stage === 'save') {
+    const saveStartedAt = alfredDownState.stageStartedAt ?? alfredDownState.downSince
     if (now - saveStartedAt < SAVE_WINDOW_MS) return
-    marveenDownState.stage = 'resume'
-    marveenDownState.stageStartedAt = now
-    marveenDownState.lastAlertAt = now
-    logger.warn({ provider: providerLabel }, 'Marveen channel plugin still down -- stage 3 (session resume)')
-    await resumeMarveenSession({ byMonitor: true })
+    alfredDownState.stage = 'resume'
+    alfredDownState.stageStartedAt = now
+    alfredDownState.lastAlertAt = now
+    logger.warn({ provider: providerLabel }, 'Alfred channel plugin still down -- stage 3 (session resume)')
+    await resumeAlfredSession({ byMonitor: true })
     return
   }
-  if (marveenDownState.stage === 'resume') {
-    const resumeStartedAt = marveenDownState.stageStartedAt ?? marveenDownState.downSince
+  if (alfredDownState.stage === 'resume') {
+    const resumeStartedAt = alfredDownState.stageStartedAt ?? alfredDownState.downSince
     if (now - resumeStartedAt < RESUME_GRACE_MS) return
-    marveenDownState.stage = 'hard'
-    marveenDownState.stageStartedAt = now
-    marveenDownState.lastAlertAt = now
-    logger.warn({ provider: providerLabel }, 'Marveen channel plugin still down -- stage 4 (hard restart)')
+    alfredDownState.stage = 'hard'
+    alfredDownState.stageStartedAt = now
+    alfredDownState.lastAlertAt = now
+    logger.warn({ provider: providerLabel }, 'Alfred channel plugin still down -- stage 4 (hard restart)')
     const svcName = process.platform === 'linux' ? 'systemctl' : 'launchctl'
-    const r = hardRestartMarveenChannels()
+    const r = hardRestartAlfredChannels()
     monitorMainRespawnAt = Date.now()
     if (!r.ok) logger.error({ provider: providerLabel, err: r.error }, 'Stage-4 hard restart failed')
     sendAlert(hardRestartStageAlertText(svcName, MAIN_CHANNELS_SESSION, r))
     return
   }
-  if (marveenDownState.stage === 'hard') {
-    marveenDownState.stage = 'gave_up'
-    marveenDownState.lastAlertAt = now
+  if (alfredDownState.stage === 'hard') {
+    alfredDownState.stage = 'gave_up'
+    alfredDownState.lastAlertAt = now
     // GAVEUPRELOAD1033: the independent channel-watchdog that takes over after
     // tryReleaseOwnRespawnStamp below only respawns channels.sh -- it never
     // sends /reload-plugins, which is the one thing measured to actually bring
@@ -2763,7 +2649,7 @@ async function handleMarveenDown(): Promise<void> {
     } catch (err) {
       logger.warn({ site: 'channel-monitor.gaveUpReloadPlugins', err, session: MAIN_CHANNELS_SESSION, tmux: tmuxStderr(err), provider: providerLabel }, 'channel-monitor: giving-up stage failed to send /reload-plugins (GAVEUPRELOAD1033)')
     }
-    logger.error({ provider: providerLabel }, 'Marveen channel plugin still down after hard restart -- giving up auto-recovery')
+    logger.error({ provider: providerLabel }, 'Alfred channel plugin still down after hard restart -- giving up auto-recovery')
     const serviceCmd = process.platform === 'linux'
       ? `\`systemctl --user status ${SERVICE_ID}-channels\``
       : `\`launchctl list | grep ${SERVICE_ID}\``
@@ -2777,9 +2663,9 @@ async function handleMarveenDown(): Promise<void> {
     tryReleaseOwnRespawnStamp(now)
     return
   }
-  if (marveenDownState.stage === 'gave_up') tryReleaseOwnRespawnStamp(now)
-  if (now - marveenDownState.lastAlertAt > PLUGIN_ALERT_DEDUP_MS) {
-    marveenDownState.lastAlertAt = now
+  if (alfredDownState.stage === 'gave_up') tryReleaseOwnRespawnStamp(now)
+  if (now - alfredDownState.lastAlertAt > PLUGIN_ALERT_DEDUP_MS) {
+    alfredDownState.lastAlertAt = now
     sendAlert(`🚨 ${BOT_NAME} ${providerLabel} plugin még mindig halott. Nézd meg kézzel.`)
   }
 }
@@ -2787,7 +2673,7 @@ async function handleMarveenDown(): Promise<void> {
 // BOOTSTAGGER1007 (b): the co-listen plugins of the main session (see
 // main-colisten-health.ts). One state per provider, for the dashboard's life.
 const colistenState = new Map<ChannelProviderType, ColistenState>()
-const ALL_PROVIDER_TYPES: ChannelProviderType[] = ['telegram', 'slack', 'discord', 'googlechat', 'teams']
+const ALL_PROVIDER_TYPES: ChannelProviderType[] = ['discord']
 
 // Called on every sweep where the main session's PRIMARY plugin is alive (a
 // dead primary is the down-cascade's job, and a restart from here would race it).
@@ -2799,54 +2685,54 @@ async function checkMainColistenChannels(claudePid: number): Promise<void> {
     primary,
     extras,
     // strictTree: only a plugin inside the MAIN claude's tree counts. The
-    // default probe falls back to "any Slack poller on the host", and every
-    // Slack sub-agent runs one (#1762 review).
+    // default probe can fall back to "any poller on the host", whereas
+    // sub-agents may run their own pollers (#1762 review).
     probe: (p) => probeChannelPluginLiveness(claudePid, p, undefined, { strictTree: true }),
     now: Date.now(),
     lastRespawnAt: lastMainRespawnAt(),
-    respawnGraceMs: MARVEEN_POST_RESPAWN_GRACE_MS,
+    respawnGraceMs: ALFRED_POST_RESPAWN_GRACE_MS,
     state: colistenState,
     alert: sendAlert,
     log: (level, fields, msg) => logger[level](fields, msg),
-    restart: () => resumeMarveenSession(),
+    restart: () => resumeAlfredSession(),
     botName: BOT_NAME,
   })
 }
 
-function handleMarveenUp(): void {
-  marveenSuspectFirstSeen = null
+function handleAlfredUp(): void {
+  alfredSuspectFirstSeen = null
   ownHardRestartStamp = null // recovered: the stamp is no longer ours to release
-  const report = decideMarveenRecoveryReport(marveenDownState, marveenRecreatedOutage, Date.now())
+  const report = decideAlfredRecoveryReport(alfredDownState, alfredRecreatedOutage, Date.now())
   if (report) {
     const downedFor = report.downedForSec
     const stage = report.stage
     const providerLabel = getMainAgentProvider()
-    logger.info({ stage, downedFor, provider: providerLabel }, 'Marveen channel plugin recovered')
+    logger.info({ stage, downedFor, provider: providerLabel }, 'Alfred channel plugin recovered')
     // Owner transparency (2026-07-30, "reggeli leallas"): a resume-stage
     // recovery means the main session was actually respawned -- the owner's
     // in-flight messages may have been dropped, so it must not be silent. Short
     // soft/save blips stay quiet, but a LONG outage is reported even when the
     // fix itself was soft: messages sent into that window went unanswered.
     // A recreate of the vanished session (stage 'recreated') counts as
-    // disruptive too; decideMarveenRecoveryReport owns the rule.
+    // disruptive too; decideAlfredRecoveryReport owns the rule.
     if (report.notify) {
       sendAlert(
         `✅ ${BOT_NAME} ${providerLabel} kapcsolat helyreállt (${downedFor}s kiesés, ${stage} szint). ` +
         `Ha a kiesés alatt írtál és nem jött válasz, mindjárt pótolom.`,
       )
     }
-    marveenDownState = null
-    marveenRecreatedOutage = null
+    alfredDownState = null
+    alfredRecreatedOutage = null
   }
 }
 
-function shouldEscalateMarveenDown(): boolean {
+function shouldEscalateAlfredDown(): boolean {
   const now = Date.now()
-  if (marveenSuspectFirstSeen === null) {
-    marveenSuspectFirstSeen = now
+  if (alfredSuspectFirstSeen === null) {
+    alfredSuspectFirstSeen = now
     return false
   }
-  return now - marveenSuspectFirstSeen >= MARVEEN_DOWN_CONFIRM_MS
+  return now - alfredSuspectFirstSeen >= ALFRED_DOWN_CONFIRM_MS
 }
 
 export function startChannelPluginMonitor(): NodeJS.Timeout | null {
@@ -2911,8 +2797,8 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
     // while the plugin is structurally down.
     checkExternalMainRespawn()
 
-    type Target = { session: string; isMarveen: boolean; agentName?: string; provider: ChannelProviderType }
-    const targets: Target[] = [{ session: MAIN_CHANNELS_SESSION, isMarveen: true, provider: mainProvider }]
+    type Target = { session: string; isAlfred: boolean; agentName?: string; provider: ChannelProviderType }
+    const targets: Target[] = [{ session: MAIN_CHANNELS_SESSION, isAlfred: true, provider: mainProvider }]
     // One list-sessions for the whole per-agent read: every isAgentRunning()
     // below asks the identical read-only query, and withTmuxBatch answers all
     // of them from one memoized spawn while this (synchronous) loop runs. No
@@ -2922,7 +2808,7 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
         if (isAgentRunning(a) && agentHasChannel(a)) {
           targets.push({
             session: agentSessionName(a),
-            isMarveen: false,
+            isAlfred: false,
             agentName: a,
             provider: resolveAgentProvider(a),
           })
@@ -2949,7 +2835,7 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
         paneErrorState.set(t.session, decision.next)
       }
       if (decision.alert) {
-        const label = t.isMarveen ? BOT_NAME : (t.agentName ?? t.session)
+        const label = t.isAlfred ? BOT_NAME : (t.agentName ?? t.session)
         logger.error({ session: t.session, agent: label }, 'Agent wedged on thinking-block API error -- manual reset needed')
         sendAlert(`🚨 A(z) ${label} ágens elakadt egy thinking-block API hibában (a session-history korrupt, minden új prompt ugyanazt a 400-at adja). Kézi reset kell: állítsd le és indítsd újra, friss session indul. Részletek: tmux attach -t ${t.session}`)
       }
@@ -2978,13 +2864,13 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
     // human pressed Enter. So these agents join THIS pass, gate-only: they get
     // the first-run answers (the same answerFirstRunGates) and NEVER the
     // generic Escape below -- on that dialog Escape quits the TUI.
-    const menuTargets: Array<{ session: string; isMarveen: boolean; agentName?: string; gateOnly?: boolean }> = [...targets]
+    const menuTargets: Array<{ session: string; isAlfred: boolean; agentName?: string; gateOnly?: boolean }> = [...targets]
     // Same dedupe as the targets loop above: this second per-agent
     // isAgentRunning() pass reads the identical query, answered once.
     withTmuxBatch(() => {
       for (const a of listAgentNames()) {
         if (agentHasChannel(a) || !readAgentWorksourceChannel(a) || readAgentRemoteHost(a) || !isAgentRunning(a)) continue
-        menuTargets.push({ session: agentSessionName(a), isMarveen: false, agentName: a, gateOnly: true })
+        menuTargets.push({ session: agentSessionName(a), isAlfred: false, agentName: a, gateOnly: true })
       }
     })
     for (const t of menuTargets) {
@@ -3017,7 +2903,7 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
         paneMenuState.set(t.session, decision.next)
       }
       if (decision.alert) {
-        const label = t.isMarveen ? BOT_NAME : (t.agentName ?? t.session)
+        const label = t.isAlfred ? BOT_NAME : (t.agentName ?? t.session)
         if (firstRunGate === 'login') {
           logger.warn({ session: t.session, agent: label }, 'Session parked on the Claude Code login picker -- operator login needed, alerting (no keystrokes sent)')
           sendAlert(`🔑 A(z) ${label} agentnek Claude-belépés kell (első indítás, "Select login method" képernyő). Lépj be: tmux attach -t ${t.session}, majd válaszd ki a belépési módot. Addig az ütemezett feladatai és üzenetei várakoznak, belépés után maguktól kézbesítődnek.`)
@@ -3076,7 +2962,7 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
             const escalation = runPermissionPromptPass(label, t.session, paneNow, {
               captureWithHistory: capturePaneWithHistory,
               escalation: permPromptState,
-              isMainAgent: t.isMarveen,
+              isMainAgent: t.isAlfred,
               messageMainAgent: (text) => { createAgentMessage('system', MAIN_AGENT_ID, text) },
               send: (text, meta) => sendAlert(text, meta),
             })
@@ -3135,7 +3021,7 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
     // session. Per-session state lives in agentStuckInput; drop it once the
     // spell ends so the map never grows unbounded.
     for (const t of targets) {
-      if (t.isMarveen) continue
+      if (t.isAlfred) continue
       const prev = agentStuckInput.get(t.session) ?? { parkedSig: null, firstSeenAt: null, lastRecoverAt: null, attempts: 0 }
       const next = await recoverStuckInputForSession(t.session, prev, MAIN_STUCK_THRESHOLDS, true)
       if (next.parkedSig === null) {
@@ -3152,13 +3038,11 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
     for (const t of targets) {
       const claudePid = await getClaudePidForSessionAsync(t.session)
       if (!claudePid) {
-        if (!t.isMarveen && t.agentName) {
+        if (!t.isAlfred && t.agentName) {
           const lastRestart = agentLastRestart.get(t.agentName)
           if (lastRestart && Date.now() - lastRestart < AGENT_RESTART_GRACE_MS) continue
         }
-        if (t.isMarveen) {
-          // GROMZONOPROVIDER1108 (Dani 73601): no claude, so no live Gromzo plugin either -> owner alerts are kept.
-          if (t.provider === 'gromzo') setGromzoMainLive(false)
+        if (t.isAlfred) {
           // The claude pid is gone. WHY decides recovery: a session that no
           // longer exists at all must be recreated from scratch (respawn-pane,
           // the only tool the down-cascade has on Linux, cannot resurrect a
@@ -3168,18 +3052,18 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
           // with no supervising service, and every scheduled main-agent task
           // silently skips (scheduler !sessionExists branch).
           if (!mainChannelsSessionExists()) {
-            if (shouldEscalateMarveenDown() && createMainChannelsSession() === 'started') {
+            if (shouldEscalateAlfredDown() && createMainChannelsSession() === 'started') {
               // The cascade restarts from scratch on the new session, but an
               // outage that was already open stays open until the plugin is
               // seen alive, so the closing message still goes out with the
               // full duration.
               monitorMainRespawnAt = Date.now()
-              marveenRecreatedOutage = carryOutageAcrossRecreate(marveenDownState, marveenRecreatedOutage)
-              marveenDownState = null
-              marveenSuspectFirstSeen = null
+              alfredRecreatedOutage = carryOutageAcrossRecreate(alfredDownState, alfredRecreatedOutage)
+              alfredDownState = null
+              alfredSuspectFirstSeen = null
             }
-          } else if (shouldEscalateMarveenDown()) {
-            await handleMarveenDown()
+          } else if (shouldEscalateAlfredDown()) {
+            await handleAlfredDown()
           }
         }
         continue
@@ -3187,28 +3071,21 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
       // An 'alive' read from the shared snapshot is confirmed with a fresh ps when it would
       // close an open down spell (and reset its restart back-off): the poller may have died
       // after the snapshot was taken.
-      const openDownSpell = t.isMarveen
-        ? marveenSuspectFirstSeen !== null || marveenDownState !== null || marveenRecreatedOutage !== null
+      const openDownSpell = t.isAlfred
+        ? alfredSuspectFirstSeen !== null || alfredDownState !== null || alfredRecreatedOutage !== null
         : agentDownSince.has(t.session) || (t.agentName !== undefined && agentRestartFailures.has(t.agentName))
-      // GROMZONOPROVIDER1108: a gromzo-pending main session runs WITHOUT its Gromzo channel on purpose (mxd's socket
-      // not usable or the main agent not enrolled yet); channels.sh restarts it once it is ready. Not a dead plugin.
-      if (t.isMarveen && t.provider === 'gromzo' && !mainGromzoPrimaryReady(readMainAgentIdRaw())) {
-        logger.debug({ session: t.session }, 'Main session is gromzo-pending -- no Gromzo channel expected yet, no liveness action')
-        setGromzoMainLive(false)
-        continue
-      }
       // CHANNELUNCONF1110: channels.sh launched the main session WITHOUT its primary channel (a token provider with no
       // token: store/.channel-unconfigured), and the rule still says so (a false marker alone does nothing, Dani K1).
       // An absent plugin is the expected state, not a dead one: no liveness action, no down ladder, nothing typed into
       // the session; channels.sh restarts it once the token is set. Said once per unconfigured spell.
-      if (t.isMarveen && mainSessionRunsUnconfigured(t.provider)) {
+      if (t.isAlfred && mainSessionRunsUnconfigured(t.provider)) {
         if (!mainUnconfiguredNoted) {
           mainUnconfiguredNoted = true
           logger.info({ session: t.session, provider: t.provider }, 'Main session runs without its channel: no token configured -- no liveness action until one is set')
         }
         continue
       }
-      if (t.isMarveen) mainUnconfiguredNoted = false
+      if (t.isAlfred) mainUnconfiguredNoted = false
       const liveness = await probeChannelPluginLivenessAsync(claudePid, t.provider, t.agentName, { confirmAlive: openDownSpell }, sweepSnapshot ?? undefined)
       if (liveness === 'unknown') {
         // The PROBE failed (ps timed out, state dir unreadable) -- that is not
@@ -3219,14 +3096,8 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
         continue
       }
       if (liveness === 'alive') {
-        if (t.isMarveen) {
-          handleMarveenUp()
-          // GROMZONOPROVIDER1108 (Samu 73588, Dani 73601): the Gromzo plugin is alive in THIS session, so a relayed alert
-          // reaches the owner now; the alerts kept while it was not go out. Ready alone is not enough (see notify.ts).
-          if (t.provider === 'gromzo') {
-            setGromzoMainLive(true)
-            try { flushGromzoPendingOwnerAlerts() } catch (err) { logger.warn({ err }, 'gromzo pending alerts flush failed') }
-          }
+        if (t.isAlfred) {
+          handleAlfredUp()
           // Process-alive does NOT prove the inbound MCP pipe is healthy (the
           // deafness blind spot). Cross-check the keep-alive freshness.
           checkMainKeepaliveStaleness()
@@ -3259,10 +3130,8 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
         }
         continue
       }
-      if (t.isMarveen) {
-        // GROMZONOPROVIDER1108 (Dani 73601): no live Gromzo plugin -> an owner alert is kept, not relayed into it.
-        if (t.provider === 'gromzo') setGromzoMainLive(false)
-        if (shouldEscalateMarveenDown()) await handleMarveenDown()
+      if (t.isAlfred) {
+        if (shouldEscalateAlfredDown()) await handleAlfredDown()
       } else {
         if (!agentDownSince.has(t.session)) {
           agentDownSince.set(t.session, Date.now())
@@ -3495,26 +3364,6 @@ export function startChannelPluginMonitor(): NodeJS.Timeout | null {
       } catch (err) {
         logger.warn({ err }, 'channel-monitor: periodic detached-claude reap failed')
       }
-      // MXDAGENTSOCKID1106 (b): after the detached claudes are gone, their gromzo plugins are orphans; sweep them.
-      try {
-        const killed = reapGromzoOrphans({ tmuxPath: tmuxBin() })
-        if (killed.length > 0) logger.warn({ killed }, 'channel-monitor: periodic reap removed orphaned gromzo-channel plugin(s)')
-      } catch (err) {
-        logger.warn({ err }, 'channel-monitor: periodic gromzo-orphan reap failed')
-      }
-      // Also sweep foreign MAIN-token pollers (a thief that never fully tripped
-      // the down cascade -- flapping getUpdates when a local-agent-mode subagent
-      // holds the token intermittently). Telegram only; fail-safe internally.
-      if (getMainAgentProvider() === 'telegram') {
-        try {
-          const killed = reapForeignMainPollers({ provider: 'telegram', mainSession: MAIN_CHANNELS_SESSION, tmuxPath: tmuxBin() })
-          if (killed.length > 0) {
-            logger.warn({ killed }, 'channel-monitor: periodic reap removed foreign main-token poller(s)')
-          }
-        } catch (err) {
-          logger.warn({ err }, 'channel-monitor: periodic foreign-main poller reap failed')
-        }
-      }
     }
     } finally {
       checkRunning = false
@@ -3543,8 +3392,8 @@ function mainSessionChannelsReady(): boolean {
   const primary = getMainAgentProvider()
   if (probeChannelPluginLiveness(claudePid, primary) !== 'alive') return false
   const extras = colistenProviders(primary, readExtraChannelPluginIds(), ALL_PROVIDER_TYPES.map((t) => getProvider(t)))
-  // strictTree: a Slack sub-agent's plugin must not stand in for the main
-  // session's own (the #1762 review finding).
+  // strictTree: another sub-agent's plugin must not stand in for the main
+  // session's own (#1762 review finding).
   return extras.every((p) => probeChannelPluginLiveness(claudePid, p, undefined, { strictTree: true }) === 'alive')
 }
 
@@ -3562,7 +3411,7 @@ function loadPerCpu(): number | null {
 // (safe-mode band / hard pause / cap); it NEVER kills or restarts anything.
 // FAIL-OPEN: any error/timeout allows the start, so a broken gate can never
 // freeze the fleet (worst case = pre-Commit-3 behaviour). The kill-switch
-// MARVEEN_MEM_GATE_DISABLE=1 is honoured inside the script.
+// ALFRED_MEM_GATE_DISABLE=1 is honoured inside the script.
 const MEM_GATE_SCRIPT = join(PROJECT_ROOT, 'scripts', 'fleet-memory-gate.sh')
 function memGateAllowsStart(agentName: string): boolean {
   try {
@@ -3622,6 +3471,3 @@ async function reconcileDesiredAgents(): Promise<void> {
     reconcileBurstInProgress = false
   }
 }
-
-// Backward-compatible alias
-export const startTelegramPluginMonitor = startChannelPluginMonitor

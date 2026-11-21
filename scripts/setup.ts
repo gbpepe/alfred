@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
 import { homedir, platform } from 'node:os'
-import { SERVICE_ID, BRAND_NAME, appServiceLabel, LEGACY_SERVICE_ID, LEGACY_APP_SERVICE_LABEL } from '../src/config.js'
+import { SERVICE_ID, BRAND_NAME, appServiceLabel } from '../src/config.js'
 import { brewPrefixBin, learnedPathDirProblem, plistPathDirOk } from '../src/platform.js'
 import { writeEnvFileFresh } from '../src/env.js'
 
@@ -46,7 +46,7 @@ const BANNER = `
 
 async function main() {
   console.log(BANNER)
-  header('Udvozol a Marveen telepito!')
+  header('Udvozol a Alfred telepito!')
   console.log('Ez a varazslo vegigvezet a beallitasokon.\n')
 
   // --- Kovetelmeny ellenorzes ---
@@ -167,7 +167,7 @@ async function main() {
 
   // .env iras
   header('4. .env fajl irasa')
-  let envContent = '# Marveen konfiguracio\n'
+  let envContent = '# Alfred konfiguracio\n'
   for (const [key, value] of Object.entries(config)) {
     envContent += `${key}=${value}\n`
   }
@@ -245,17 +245,6 @@ async function main() {
 </dict>
 </plist>`
 
-      // Retire a service unit from an older install that used the legacy fixed
-      // name, so an in-place re-run does not leave an orphan launchd job
-      // fighting for the same port as the newly named one.
-      if (plistName !== LEGACY_APP_SERVICE_LABEL) {
-        const legacyPlist = join(homedir(), 'Library', 'LaunchAgents', `${LEGACY_APP_SERVICE_LABEL}.plist`)
-        if (existsSync(legacyPlist)) {
-          try { execSync(`launchctl unload ${legacyPlist} 2>/dev/null`, { stdio: 'ignore' }) } catch { /* not loaded */ }
-          try { unlinkSync(legacyPlist) } catch { /* already gone */ }
-          warn(`Regi ${LEGACY_APP_SERVICE_LABEL} szolgaltatas eltavolitva (atnevezve: ${plistName})`)
-        }
-      }
       writeFileSync(plistPath, plist)
       try {
         execSync(`launchctl unload ${plistPath} 2>/dev/null`, { stdio: 'ignore' })
@@ -291,16 +280,6 @@ RestartSec=5
 WantedBy=default.target`
 
       writeFileSync(servicePath, service)
-      // Retire a legacy-named unit from an older install so the two do not run
-      // side by side after a rename.
-      if (SERVICE_ID !== LEGACY_SERVICE_ID) {
-        const legacyUnit = join(serviceDir, `${LEGACY_SERVICE_ID}.service`)
-        if (existsSync(legacyUnit)) {
-          try { execSync(`systemctl --user disable --now ${LEGACY_SERVICE_ID} 2>/dev/null`, { stdio: 'ignore' }) } catch { /* not active */ }
-          try { unlinkSync(legacyUnit) } catch { /* already gone */ }
-          warn(`Regi ${LEGACY_SERVICE_ID} systemd egyseg eltavolitva`)
-        }
-      }
       execSync('systemctl --user daemon-reload')
       execSync(`systemctl --user enable ${SERVICE_ID}`)
       execSync(`systemctl --user start ${SERVICE_ID}`)
@@ -337,7 +316,7 @@ WantedBy=default.target`
 
   // Kész
   header('Kesz!')
-  ok('Marveen sikeresen telepitve!')
+  ok('Alfred sikeresen telepitve!')
   console.log('')
   console.log('Kovetkezo lepesek:')
   console.log(`  1. Ha nem adtad meg a chat ID-t: kuldj /chatid-t a botnak`)

@@ -127,7 +127,7 @@ vi.mock('../web/scheduled-tasks-io.js', async (importOriginal) => {
   return {
     ...real,
     listScheduledTasks: () => mockListScheduledTasks(),
-    SCHEDULED_TASKS_DIR: '/tmp/marveen-usage-limit-gate-no-tasks-dir',
+    SCHEDULED_TASKS_DIR: '/tmp/alfred-usage-limit-gate-no-tasks-dir',
   }
 })
 

@@ -53,7 +53,7 @@ function supportLine(keyIndex: number): string {
     key: TEST_ONLY_KEYS[keyIndex],
     grantId: GRANT,
     consentVersion: 1,
-    dispatchPath: '/opt/marveen/scripts/support-dispatch.sh',
+    dispatchPath: '/opt/alfred/scripts/support-dispatch.sh',
     fromCidrs: TEST_ONLY_FROM,
     sshd: { major: 9, minor: 6 },
   })
@@ -92,7 +92,7 @@ describe('support access on disk, when something else goes wrong', () => {
           fromCidrs: TEST_ONLY_FROM,
           grantId: GRANT,
           consentVersion: 1,
-          dispatchPath: '/opt/marveen/scripts/support-dispatch.sh',
+          dispatchPath: '/opt/alfred/scripts/support-dispatch.sh',
           sshd: { major: 9, minor: 6 },
         },
       }),

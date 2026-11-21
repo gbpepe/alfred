@@ -8,7 +8,7 @@ body) from a send invocation, used by BOTH gates:
     to + cc + subject + body -- the approval record pins the EXACT letter, and
     a send is allowed only on an exact match.
 
-The extraction boundary (Marveen, msg 17900) is deterministic-or-deny:
+The extraction boundary (Alfred, msg 17900) is deterministic-or-deny:
   - readable literal (--body "...", < /abs/path, heredoc, MCP fields) -> text
   - anything shell-expanded at run time ($(cat), `...`, $VAR, unresolvable
     path, pipe) -> unreadable_reason, and the CALLER must fail closed.
@@ -77,7 +77,7 @@ def collect_bash_body(cmd: str):
     # Every curl/wget shape that sends a FILE as the body, each with its own
     # label: an unreadable one then says WHICH shape failed, instead of the
     # generic "no inspectable text" that this change exists to retire
-    # (Marveen's #1507 review: `--data-urlencode name@file` LOOKED handled --
+    # (Alfred's #1507 review: `--data-urlencode name@file` LOOKED handled --
     # the flag was in the @ regex -- but the name@ form never matched).
     for label, rx in _FILE_BODY_FORMS:
         for m in rx.finditer(cmd):
@@ -98,7 +98,7 @@ def collect_bash_body(cmd: str):
 
 # GATEBINVAK916: the file-body shapes. Each flag must stand alone (leading
 # space or start), so an address like x@y.hu or an @ inside a quoted payload is
-# never taken for a file. Measured list (Marveen's #1507 review, against the
+# never taken for a file. Measured list (Alfred's #1507 review, against the
 # gate's own _CURL_BODY_OPTS): the six @-flags, plus the five shapes that also
 # send a FILE but were not read: --data-urlencode name@file, -F/--form
 # name=@file or name=<file, wget --post-file / --body-file, curl -T.

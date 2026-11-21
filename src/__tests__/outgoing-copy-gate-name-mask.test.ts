@@ -87,7 +87,7 @@ describe('outgoing-copy gate: the name rule has its own mask (GATENEVSTRIP921)',
   })
 
   it('a URL passes', () => {
-    expect(nameProblems('https://github.com/Kovách/marveen nezd meg')).toEqual([])
+    expect(nameProblems('https://github.com/Kovách/alfred nezd meg')).toEqual([])
   })
 
   it('a snake_case identifier passes', () => {

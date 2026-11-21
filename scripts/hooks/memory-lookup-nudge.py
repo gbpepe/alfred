@@ -72,7 +72,7 @@ def agent_id(cwd):
         name = here[len(agents):].split(os.sep, 1)[0]
         if name:
             return name
-    return _env_value("MAIN_AGENT_ID", "marveen")
+    return _env_value("MAIN_AGENT_ID", "alfred")
 
 
 def is_human(prompt):

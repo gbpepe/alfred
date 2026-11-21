@@ -1,5 +1,5 @@
-// DCEXT1111: Marveen's additions to the Discord plugin (vendor/discord-plugin/<ver>/overlay). The logic in
-// marveen-ext.ts runs here directly; the wiring in the overlay's server.ts is checked on its text, against the
+// DCEXT1111: Alfred's additions to the Discord plugin (vendor/discord-plugin/<ver>/overlay). The logic in
+// alfred-ext.ts runs here directly; the wiring in the overlay's server.ts is checked on its text, against the
 // verbatim upstream file next to it.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
@@ -15,7 +15,7 @@ type ExtConfig = { ownerUserId: string; backfill: boolean; slashCommands?: unkno
 type Owner = { id: string; source: string } | { id: null; reason: string }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ext: any
-beforeAll(async () => { ext = await import(pathToFileURL(join(VENDOR, 'overlay', 'marveen-ext.ts')).href) })
+beforeAll(async () => { ext = await import(pathToFileURL(join(VENDOR, 'overlay', 'alfred-ext.ts')).href) })
 
 const OWNER = '290903699524550656'
 const OTHER = '111111111111111111'
@@ -28,8 +28,8 @@ describe('loadExtConfig', () => {
 
   it('reads what patch-discord-plugin.py writes; missing, broken or odd values fall to the safe side', () => {
     const at = (body: string | null): ExtConfig => {
-      rmSync(join(dir, 'marveen-ext.json'), { force: true })
-      if (body !== null) writeFileSync(join(dir, 'marveen-ext.json'), body)
+      rmSync(join(dir, 'alfred-ext.json'), { force: true })
+      if (body !== null) writeFileSync(join(dir, 'alfred-ext.json'), body)
       return ext.loadExtConfig(dir)
     }
     expect(at(JSON.stringify({ ownerUserId: OWNER, backfill: true }))).toEqual({ ownerUserId: OWNER, backfill: true, channelPolicy: {}, slashCommands: null })
@@ -123,7 +123,7 @@ describe('the wiring in the overlay server.ts', () => {
     expect(SERVER).not.toContain('for (const userId of access.allowFrom) {')
     const handler = SERVER.slice(SERVER.indexOf("notifications/claude/channel/permission_request'"), SERVER.indexOf('mcp.setRequestHandler(ListToolsRequestSchema'))
     expect(handler).toContain('const owner = currentOwner()')
-    expect(handler).toMatch(/if \(owner\.id === null\) \{[^]*?it stays in the terminal[^]*?return \/\/ MARVEEN-EXT\n\s*\} \/\/ MARVEEN-EXT\n\s*const userId = owner\.id/)
+    expect(handler).toMatch(/if \(owner\.id === null\) \{[^]*?it stays in the terminal[^]*?return \/\/ ALFRED-EXT\n\s*\} \/\/ ALFRED-EXT\n\s*const userId = owner\.id/)
     expect(handler).toContain('await client.users.fetch(userId)')
     expect(handler.match(/user\.send\(/g)).toHaveLength(1)
   })
@@ -144,7 +144,7 @@ describe('the wiring in the overlay server.ts', () => {
     expect(SERVER).toContain('const userId = ch.recipientId ?? dmChannelUsers.get(id) ?? (await dmResolver.resolve(id, access.allowFrom))')
     const ready = SERVER.slice(SERVER.indexOf("client.once('ready'"), SERVER.indexOf('client.login(TOKEN).catch'))
     // warm first (F2), then the recovery (F4), which needs the DM channels warm() found
-    expect(ready).toMatch(/await dmResolver\.warm\(loadAccess\(\)\.allowFrom\) \/\/ MARVEEN-EXT\n\s*await recoverMissed\(readyAt\)/)
+    expect(ready).toMatch(/await dmResolver\.warm\(loadAccess\(\)\.allowFrom\) \/\/ ALFRED-EXT\n\s*await recoverMissed\(readyAt\)/)
     expect(ready).toContain('.finally(() => { recoveryOpen = false; liveDelivered.clear() })')
   })
 })
@@ -157,7 +157,7 @@ describe('F3: a recorded voice message is marked', () => {
   })
 
   it('the inbound meta carries it, and the instructions say what to do with it', () => {
-    expect(SERVER).toMatch(/attachments: atts\.join\('; '\) \} : \{\}\),\n\s*\.\.\.voiceMeta\(msg\.flags\.bitfield\), \/\/ MARVEEN-EXT/)
+    expect(SERVER).toMatch(/attachments: atts\.join\('; '\) \} : \{\}\),\n\s*\.\.\.voiceMeta\(msg\.flags\.bitfield\), \/\/ ALFRED-EXT/)
     expect(SERVER).toContain('A message with voice="true" is a recorded voice message')
   })
 })
@@ -444,7 +444,7 @@ const OUTBOUND_SITES = [
   'post = await forum.threads.create({ name: forumPostTitle(text), message: payload })',
   'const thread = await msg.startThread({ name: autoThreadName(msg.content, msg.author.username) })',
   'await msg.reply(AUTO_THREAD_FAILED_REPLY)',
-  "await interaction.reply({ content: 'Not authorized.', ephemeral: true }).catch(() => {}) // MARVEEN-EXT",
+  "await interaction.reply({ content: 'Not authorized.', ephemeral: true }).catch(() => {}) // ALFRED-EXT",
   'await interaction.reply({ content: `↪ ${text}`, ephemeral: true })',
   '.startThread({ name })',
   'await ch.threads.create({ name })',
@@ -454,8 +454,8 @@ const OUTBOUND_SITES = [
   "await interaction.reply({ content: 'Details no longer available.', ephemeral: true })",
   'await interaction.update({ content: expanded, components: [row] })',
   '.update({ content: `${interaction.message.content}\\n\\n${label}`, components: [] })',
-  "await interaction.reply({ content: 'Not authorized.', ephemeral: true }).catch(() => {}) // MARVEEN-PATCH",
-  "await interaction.reply({ content: 'Already answered.', ephemeral: true }).catch(() => {}) // MARVEEN-PATCH",
+  "await interaction.reply({ content: 'Not authorized.', ephemeral: true }).catch(() => {}) // ALFRED-PATCH",
+  "await interaction.reply({ content: 'Already answered.', ephemeral: true }).catch(() => {}) // ALFRED-PATCH",
   '.update(answered.length <= MAX_CHUNK_LIMIT ?',
   'await msg.reply(',
   'void prompt.edit({',
@@ -1364,7 +1364,7 @@ describe('C2: rename_thread, only the bot\'s own thread', () => {
   })
 
   it('wiring: listed, through the outbound allowlist, the owner checked before setName', () => {
-    expect(SERVER).toContain("name: 'rename_thread', // MARVEEN-EXT")
+    expect(SERVER).toContain("name: 'rename_thread', // ALFRED-EXT")
     const c = SERVER.slice(SERVER.indexOf("case 'rename_thread': {"), SERVER.indexOf("case 'discord_info': {"))
     const at = (s: string) => { const i = c.indexOf(s); expect(i, s).toBeGreaterThan(0); return i }
     expect(at('const name = threadName(args.name)')).toBeLessThan(at('await fetchAllowedChannel(args.chat_id as string)'))

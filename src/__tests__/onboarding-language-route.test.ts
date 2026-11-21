@@ -48,12 +48,12 @@ writeFileSync(join(binDir, 'tmux'), [
 ].join('\n'))
 chmodSync(join(binDir, 'tmux'), 0o755)
 const origPath = process.env.PATH
-const origDockerDir = process.env.MARVEEN_DOCKER_DIR
-const origEnvDir = process.env.CLAUDECLAW_ENV_DIR
+const origDockerDir = process.env.ALFRED_DOCKER_DIR
+const origEnvDir = process.env.ALFRED_ENV_DIR
 process.env.PATH = `${binDir}:${origPath ?? ''}`
-process.env.MARVEEN_DOCKER_DIR = dockerDir
+process.env.ALFRED_DOCKER_DIR = dockerDir
 // src/env.ts (deployment(), installLang) reads its .env from here, at import time.
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+process.env.ALFRED_ENV_DIR = tmpRoot
 
 const { tryHandleOnboarding } = await import('../web/routes/onboarding.js')
 const { MAIN_CHANNELS_SESSION } = await import('../web/main-agent.js')
@@ -63,15 +63,15 @@ beforeAll(() => { Object.defineProperty(process, 'platform', { ...realPlatform, 
 afterAll(() => {
   Object.defineProperty(process, 'platform', realPlatform)
   process.env.PATH = origPath
-  if (origDockerDir === undefined) delete process.env.MARVEEN_DOCKER_DIR
-  else process.env.MARVEEN_DOCKER_DIR = origDockerDir
-  if (origEnvDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = origEnvDir
+  if (origDockerDir === undefined) delete process.env.ALFRED_DOCKER_DIR
+  else process.env.ALFRED_DOCKER_DIR = origDockerDir
+  if (origEnvDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = origEnvDir
   rmSync(tmpRoot, { recursive: true, force: true })
 })
 
 const ENV = join(tmpRoot, '.env')
-const ENV_DOCKER = 'MAIN_AGENT_ID=marveen\nBOT_NAME=Marveen\nOWNER_NAME=Owner\nWEB_PORT=3420\nMARVEEN_DEPLOYMENT=docker\nAGENT_TEXT_LANG=en\nDASHBOARD_LANG=en\n'
+const ENV_DOCKER = 'MAIN_AGENT_ID=alfred\nBOT_NAME=Alfred\nOWNER_NAME=Owner\nWEB_PORT=3420\nALFRED_DEPLOYMENT=docker\nAGENT_TEXT_LANG=en\nDASHBOARD_LANG=en\n'
 const CLAUDE_EN = '# a hand-made persona that no template renders\n'
 beforeEach(() => {
   writeFileSync(ENV, ENV_DOCKER, { mode: 0o600 })
@@ -119,7 +119,7 @@ describe('POST /api/onboarding/language (DOCKERUX1118)', () => {
   })
 
   it('a native install: 409 not_docker, nothing changes', async () => {
-    writeFileSync(ENV, ENV_DOCKER.replace('MARVEEN_DEPLOYMENT=docker\n', ''))
+    writeFileSync(ENV, ENV_DOCKER.replace('ALFRED_DEPLOYMENT=docker\n', ''))
     const r = await call('POST', '/api/onboarding/language', OWNER, { lang: 'hu' })
     expect([r.status, r.json.reason]).toEqual([409, 'not_docker'])
     expect(r.json.error).toContain('only in the Docker container')

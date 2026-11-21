@@ -2,7 +2,7 @@
 // substitution never matches the allow-list. Every `curl ... -H "Authorization: Bearer
 // $(cat <token>)"` recipe in its CLAUDE.md was therefore auto-denied, and the five generated
 // blocks are rewritten on every start, so a hand fix did not survive. A strict agent now gets
-// its recipes through scripts/marveen-api.sh. Since VOICETOKENLEAK1101 PR-A1 every other agent does too in the
+// its recipes through scripts/alfred-api.sh. Since VOICETOKENLEAK1101 PR-A1 every other agent does too in the
 // generated blocks (the curl recipe put the token value on its argv), unless its settings deny the helper.
 //
 // What is pinned here, on the files the generator really writes:
@@ -23,13 +23,13 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-strictapi-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-strictapi-test-'))
 // The real profile files, so "strict" is what templates/profiles/developer-junior.json says.
 cpSync(join(REPO, 'templates', 'profiles'), join(tmpRoot, 'templates', 'profiles'), { recursive: true })
 const captured: string[] = []
 
 vi.mock('../config.js', () => ({
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -77,7 +77,7 @@ vi.mock('../agent.js', () => ({
 const S = await import('../web/agent-scaffold.js')
 const { resolveProfilePlaceholders } = await import('../web/profiles.js')
 
-const HELPER_CMD = `bash ${join(tmpRoot, 'scripts', 'marveen-api.sh')}`
+const HELPER_CMD = `bash ${join(tmpRoot, 'scripts', 'alfred-api.sh')}`
 
 function stageAgent(name: string, profile: string | null, claudeMd = `# ${name}\n`): string {
   const dir = join(tmpRoot, 'agents', name)
@@ -115,13 +115,13 @@ const BLOCK_TITLES = [
 ]
 
 const helperVerbs = (() => {
-  const py = readFileSync(join(REPO, 'scripts', 'lib', 'marveen_api.py'), 'utf-8')
+  const py = readFileSync(join(REPO, 'scripts', 'lib', 'alfred_api.py'), 'utf-8')
   const usage = py.slice(py.indexOf('USAGE = """'), py.indexOf('"""', py.indexOf('USAGE = """') + 11))
   return new Set([...usage.matchAll(/^ {2}([a-z-]+)(?= |$)/gm)].map((m) => m[1]))
 })()
 
 function helperLines(text: string): string[] {
-  return text.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('bash ') && l.includes('marveen-api.sh'))
+  return text.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('bash ') && l.includes('alfred-api.sh'))
 }
 
 describe('agentRunsStrict', () => {
@@ -181,7 +181,7 @@ describe('a strict agent gets no recipe its dontAsk mode denies', () => {
     const profile = JSON.parse(readFileSync(join(REPO, 'templates', 'profiles', 'developer-junior.json'), 'utf-8'))
     const rule = (profile.filesystem.allow as string[])
       .map((r) => resolveProfilePlaceholders(r, { HOME: '/home/x', AGENT_DIR: '/agent' }))
-      .find((r) => r.includes('marveen-api.sh'))
+      .find((r) => r.includes('alfred-api.sh'))
     expect(rule).toBe(`Bash(${HELPER_CMD}:*)`)
     const lines = helperLines(text)
     expect(lines.length).toBeGreaterThanOrEqual(15)
@@ -287,11 +287,11 @@ describe('a non-strict agent gets the helper recipes in the generated blocks', (
         JSON.stringify({ permissions: { deny: [`Bash(${HELPER_CMD} memory-save:*)`] } }), 'utf-8')
       expect(S.agentUsesApiHelper('denied-h')).toBe(false)
       const file = startBlocks('denied-h')
-      expect(file).not.toContain('marveen-api.sh')
+      expect(file).not.toContain('alfred-api.sh')
       for (const part of file.split('<!-- BEGIN GENERATED: ').slice(1)) {
         expect(part, part.slice(0, 60)).toContain('Authorization: Bearer $(cat ')
       }
-      const said = warn.mock.calls.filter((c) => String(c[1]).includes('deny scripts/marveen-api.sh'))
+      const said = warn.mock.calls.filter((c) => String(c[1]).includes('deny scripts/alfred-api.sh'))
       expect(said).toHaveLength(1)
       expect(said[0][0]).toMatchObject({ name: 'denied-h' })
     } finally {
@@ -418,7 +418,7 @@ describe('the api-helper block (VOICETOKENLEAK1101 PR-A2): an existing agent bod
     expect(block(strictPath)).toBe('')
   })
 
-  // Samu 65192, Marveen 65196: the main agent gets the block too, ONLY as a marker block; the owner's body is byte for
+  // Samu 65192, Alfred 65196: the main agent gets the block too, ONLY as a marker block; the owner's body is byte for
   // byte what it was, and its payload files sit in the project root, which git ignores.
   it('the main agent: the block appended to the root CLAUDE.md, the owner body byte for byte unchanged, idempotent', () => {
     const body = '# Fő ágens\n\nA gazda szövege, curl-recepttel:\ncurl -s -X POST http://localhost:3420/api/memories -H "Authorization: Bearer $(cat store/.dashboard-token)"\n'
@@ -532,7 +532,7 @@ describe('which settings deny the helper (VOICETOKENLEAK1101 PR-A1, Dani 64941/1
     expect(S.bashRuleMatches('Bash(bash:*)', cmd)).toBe(true)
     expect(S.bashRuleMatches(`Bash(${HELPER_CMD} memory-save:*)`, cmd)).toBe(true)
     expect(S.bashRuleMatches(`Bash(${HELPER_CMD} daily-log:*)`, cmd)).toBe(false)
-    expect(S.bashRuleMatches('Bash(*marveen-api.sh*)', cmd)).toBe(true)
+    expect(S.bashRuleMatches('Bash(*alfred-api.sh*)', cmd)).toBe(true)
     expect(S.bashRuleMatches(cmd.replace(/^/, 'Bash(') + ')', cmd)).toBe(true)
     for (const r of ['Bash(curl -X POST:*)', 'Bash(sudo:*)', 'Bash(rm:*)', 'Bash(*/sudo *)', 'Read(**/.env)', 'Bash(git push -f:*)']) {
       expect(S.bashRuleMatches(r, cmd), r).toBe(false)
@@ -567,7 +567,7 @@ describe('the wiring', () => {
   it('the strict profile allow-lists the helper and agent-msg.sh', () => {
     const profile = JSON.parse(readFileSync(join(REPO, 'templates', 'profiles', 'developer-junior.json'), 'utf-8'))
     expect(profile.permissionMode).toBe('strict')
-    expect(profile.filesystem.allow).toContain('Bash(bash ${PROJECT_ROOT}/scripts/marveen-api.sh:*)')
+    expect(profile.filesystem.allow).toContain('Bash(bash ${PROJECT_ROOT}/scripts/alfred-api.sh:*)')
     expect(profile.filesystem.allow).toContain('Bash(bash ${PROJECT_ROOT}/scripts/agent-msg.sh:*)')
   })
 

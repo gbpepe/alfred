@@ -15,7 +15,7 @@
 #    némán, véglegesen leállt. Ezért ad a watchdog-ág mostantól nem-nulla kódot,
 #    és ezért Restart=always a unit -- a két platform szemantikája így egyezik.
 #
-# Kézzel rácsatlakozás: tmux attach -t <MAIN_AGENT_ID>-channels (pl. marveen-channels)
+# Kézzel rácsatlakozás: tmux attach -t <MAIN_AGENT_ID>-channels (pl. alfred-channels)
 
 INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -31,7 +31,7 @@ INSTALL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # SYSTEM_SENDER_IDS is EMPTY by default (src/config.ts) and no
 # agents/channels-sh-guard/ directory exists. Same defect and same fix as the
 # prod-tree-guard hook (card ecb62920 closed the identical shape for
-# `from=marveen`).
+# `from=alfred`).
 #
 # SCOPE, SAID OUT LOUD: no alert has been lost to this on this install.
 # store/channels-failures.log has zero "starting on SHARED" lines, so the
@@ -55,7 +55,7 @@ _guard_sender() {
   IFS="$saved_ifs"
   # Not registered here: the id the API does accept. This mirrors the recipient
   # on the same two calls, which already resolves this way.
-  printf '%s' "${MAIN_AGENT_ID:-marveen}"
+  printf '%s' "${MAIN_AGENT_ID:-alfred}"
 }
 
 # Read MAIN_AGENT_ID and CHANNEL_PROVIDER from .env WITHOUT exporting
@@ -118,7 +118,7 @@ fi
 _AKM_ENV_UNSET=""
 [ "$KEY_MODE" = keyonly ] || _AKM_ENV_UNSET="-u ANTHROPIC_API_KEY"
 CHANNEL_PROVIDER="${CHANNEL_PROVIDER:-telegram}"
-SESSION="${MAIN_AGENT_ID:-marveen}-channels"
+SESSION="${MAIN_AGENT_ID:-alfred}-channels"
 
 # Resolve plugin ID from provider.
 #
@@ -129,9 +129,9 @@ SESSION="${MAIN_AGENT_ID:-marveen}-channels"
 # the /mcp pane for it.
 resolve_plugin_ids() {
   case "$1" in
-    slack)    PLUGIN_ID="slack-channel@marveen-marketplace"; PLUGIN_PANE_ID="plugin:slack-channel:marveen-marketplace" ;;
-    whatsapp) PLUGIN_ID="whatsapp@marveen-marketplace";      PLUGIN_PANE_ID="plugin:whatsapp:marveen-marketplace" ;;
-    teams)    PLUGIN_ID="teams@marveen-marketplace";         PLUGIN_PANE_ID="plugin:teams:marveen-marketplace" ;;
+    slack)    PLUGIN_ID="slack-channel@alfred-marketplace"; PLUGIN_PANE_ID="plugin:slack-channel:alfred-marketplace" ;;
+    whatsapp) PLUGIN_ID="whatsapp@alfred-marketplace";      PLUGIN_PANE_ID="plugin:whatsapp:alfred-marketplace" ;;
+    teams)    PLUGIN_ID="teams@alfred-marketplace";         PLUGIN_PANE_ID="plugin:teams:alfred-marketplace" ;;
     discord)  PLUGIN_ID="discord@claude-plugins-official";   PLUGIN_PANE_ID="plugin:discord:discord" ;;
     gromzo)   PLUGIN_ID="gromzo-channel@gromzo-local";       PLUGIN_PANE_ID="plugin:gromzo-channel:gromzo" ;;
     *)        PLUGIN_ID="telegram@claude-plugins-official";  PLUGIN_PANE_ID="plugin:telegram:telegram" ;;
@@ -243,7 +243,7 @@ _resolve_main_model_raw() {
   # restart). The .env override above still wins, so a hand-set model is untouched.
   #
   # EVERY failure here is NAMED to store/channels-failures.log, never a silent
-  # empty (Marveen review, the jq-gap's sibling): a missing node, a missing/stale
+  # empty (Alfred review, the jq-gap's sibling): a missing node, a missing/stale
   # dist (channels can start before the update rebuilds it), or an empty read all
   # get a log line so the operator sees WHY the model is unset instead of it
   # looking like nothing was configured.
@@ -276,7 +276,7 @@ _resolve_main_model_raw() {
   # bot. On a CLI measured too old, the previous tier
   # (DISTRIBUTION_DEFAULT_FALLBACK_MODEL) launches instead, with a named line.
   # Fail-open: an unmeasurable version, or a dist without the guard, keeps the
-  # default (the latter is named too). MARVEEN_CLAUDE_CLI_VERSION overrides the
+  # default (the latter is named too). ALFRED_CLAUDE_CLI_VERSION overrides the
   # probe exactly as on the TS side (empty = unmeasured).
   # The probe needs the SAME binary the launch runs. The watchdogs call this
   # seam under a narrow launchd PATH, so after PATH try the dirs the TS side
@@ -305,8 +305,8 @@ _resolve_main_model_raw() {
       const fallback = String(reg.DISTRIBUTION_DEFAULT_FALLBACK_MODEL || "")
       if (!fallback || typeof sup.launchableDefaultModel !== "function") throw new Error("no guard")
       let ver = null
-      if (process.env.MARVEEN_CLAUDE_CLI_VERSION !== undefined) {
-        ver = sup.parseClaudeVersion(process.env.MARVEEN_CLAUDE_CLI_VERSION)
+      if (process.env.ALFRED_CLAUDE_CLI_VERSION !== undefined) {
+        ver = sup.parseClaudeVersion(process.env.ALFRED_CLAUDE_CLI_VERSION)
       } else if (process.argv[3]) {
         try {
           ver = sup.parseClaudeVersion(require("node:child_process").execFileSync(process.argv[3], ["--version"],
@@ -524,7 +524,7 @@ fi
 # exited 0, systemd's Restart=on-failure did not restart it, and the box lost
 # its supervisor with nothing to read afterwards; journald had no line either,
 # because leftover cgroup processes suppressed the usual "Deactivated" record).
-# Marveen's ordering decision (msg 23453): exit LOGGING lands first; only then
+# Alfred's ordering decision (msg 23453): exit LOGGING lands first; only then
 # is a Restart-policy change even discussable, because until the exit is
 # measured, `on-failure` is the last remaining signal.
 #
@@ -579,7 +579,7 @@ chexit_track() {
 trap chexit_track DEBUG
 trap 'record_channels_exit "$?"' EXIT
 
-# Positive-control seam for the trap itself (Marveen's stipulation, msg 23453):
+# Positive-control seam for the trap itself (Alfred's stipulation, msg 23453):
 # a deliberate exit through the test path MUST write a row, otherwise a silent
 # log is indistinguishable from "no exit happened". Sits AFTER the trap so the
 # exit exercises the real handler; touches nothing else.
@@ -596,11 +596,11 @@ fi
 #     server, i.e. a second getUpdates poller on the owner's bot -> 409, the live
 #     channel deaf until a restart;
 #   - a checkout without .env (a worktree, a fixture): it launched under the
-#     guessed name "marveen-channels" with the shared channel state.
+#     guessed name "alfred-channels" with the shared channel state.
 # Both stop here, loudly, with nothing started. No argument and a lone `restart`
 # (the documented manual restart in the installers' hint) launch as before; any
 # extra argument is refused too ($# is checked, not only $1). A .env without
-# MAIN_AGENT_ID keeps the old "marveen" default (older installs).
+# MAIN_AGENT_ID keeps the old "alfred" default (older installs).
 # Behaviour changes, on purpose:
 #   - an env-only setup (MAIN_AGENT_ID exported, no .env file) no longer launches;
 #   - an install whose .env is missing now exits 3 on every start, so a supervisor
@@ -625,7 +625,7 @@ fi
 # below), NOT by writing the TRACKED .claude/settings.json. The self-healing
 # guard that used to live here rewrote that file with json.dump(indent=2) --
 # ~500 lines of reformatting on every Slack install -- so every customer tree
-# came up dirty and every update went down the stash path (marveen2, 11-03:
+# came up dirty and every update went down the stash path (alfred2, 11-03:
 # the stash pop conflicted inside settings.json). A --settings file outranks the
 # project scope (measured, SLACKDMVESZT1006) and only this session reads it, so
 # the review-reset / branch-switch case the guard covered is covered too: the
@@ -746,7 +746,7 @@ unset TELEGRAM_BOT_TOKEN SLACK_BOT_TOKEN SLACK_APP_TOKEN DISCORD_BOT_TOKEN
 # the parent client's socket. Any `tmux new-session` we spawn then tries to
 # attach to that socket and fails with "Permission denied" (different uid,
 # different socket dir, or just the new-session-from-inside-tmux block). The
-# child marveen-channels session must live on a fresh tmux client context, so
+# child alfred-channels session must live on a fresh tmux client context, so
 # scrub the env var before any tmux command runs.
 unset TMUX
 
@@ -1188,10 +1188,10 @@ claude_native_update() {
 
 # HOSTINGERDOCKER1107: in the container the image owns the claude version (Dockerfile CLAUDE_CODE_VERSION, npm-global
 # in /usr/local, outside the volumes): no self-heal install and no daily update here. A newer claude is a newer image.
-marveen_in_docker() {
-  [ -f "$INSTALL_DIR/.env" ] && grep -qx 'MARVEEN_DEPLOYMENT=docker' "$INSTALL_DIR/.env"
+alfred_in_docker() {
+  [ -f "$INSTALL_DIR/.env" ] && grep -qx 'ALFRED_DEPLOYMENT=docker' "$INSTALL_DIR/.env"
 }
-if marveen_in_docker; then
+if alfred_in_docker; then
   command -v claude >/dev/null 2>&1 \
     || echo "$(date '+%F %T') claude MISSING in the container: the image is broken (no self-heal install in Docker mode)" >&2
   echo "$(date '+%F %T') claude update SKIPPED: Docker mode, the image owns the version" >&2
@@ -1267,7 +1267,7 @@ MODEL_FLAG=""
 # -- the ROTATING macOS Keychain OAuth session, or (Linux) the shared
 # ~/.claude/.credentials.json -- both periodically expire and 401 the main bot
 # ("Please run /login"), while the isolated sub-agents (long-lived fleet
-# setup-token) never do (confirmed root cause of the 2026-07-23 marveen-channels
+# setup-token) never do (confirmed root cause of the 2026-07-23 alfred-channels
 # silent outage). The helper provisions an isolated CLAUDE_CONFIG_DIR (same code
 # path as the sub-agents, via dist/web/agent-process.js) and authenticates the
 # main agent from the fleet setup-token instead.
@@ -1427,7 +1427,7 @@ EOF_MA
       curl -s --max-time 5 -X POST "http://localhost:${_guard_port:-3420}/api/messages" \
         -H "Content-Type: application/json" \
         -H @<(printf 'Authorization: Bearer %s\n' "$(cat "$INSTALL_DIR/store/.dashboard-token")") \
-        -d "{\"from\":\"$(_guard_sender)\",\"to\":\"${MAIN_AGENT_ID:-marveen}\",\"content\":\"[GUARD] A fo agens a KOZOS ~/.claude alol indult, pedig van flotta setup-token (store/.claude-oauth-token). A MAIN_AGENT_ISOLATED_CONFIG nincs beallitva, ezert az auth a rotalodo megosztott credentialbol megy: ez lejarhat, 401-be all a TUI, es a csatorna NEMAN elerhetetlen lesz. Teendo: MAIN_AGENT_ISOLATED_CONFIG=1 beallitasa, majd channels session restart.\"}" \
+        -d "{\"from\":\"$(_guard_sender)\",\"to\":\"${MAIN_AGENT_ID:-alfred}\",\"content\":\"[GUARD] A fo agens a KOZOS ~/.claude alol indult, pedig van flotta setup-token (store/.claude-oauth-token). A MAIN_AGENT_ISOLATED_CONFIG nincs beallitva, ezert az auth a rotalodo megosztott credentialbol megy: ez lejarhat, 401-be all a TUI, es a csatorna NEMAN elerhetetlen lesz. Teendo: MAIN_AGENT_ISOLATED_CONFIG=1 beallitasa, majd channels session restart.\"}" \
         -o /dev/null -w '%{http_code}' 2>>"$INSTALL_DIR/store/channels-failures.log" > "$INSTALL_DIR/store/.channels-guard-http.$$" || true
       # Honest delivery (NOTIFYVAKSWEEP826 zaro kor): a fenti WARN csak a helyi
       # logban el -- ha a koordinatornak szolo POST elbukik, az is a logba
@@ -1453,7 +1453,7 @@ EOF_MA
       curl -s --max-time 5 -X POST "http://localhost:${_guard_port:-3420}/api/messages" \
         -H "Content-Type: application/json" \
         -H @<(printf 'Authorization: Bearer %s\n' "$(cat "$INSTALL_DIR/store/.dashboard-token")") \
-        -d "{\"from\":\"$(_guard_sender)\",\"to\":\"${MAIN_AGENT_ID:-marveen}\",\"content\":\"[GUARD] A channels session most a KOZOS ~/.claude alol indult, pedig letezik izolalt config dir (.channels-config). A MAIN_AGENT_ISOLATED_CONFIG beallitas valoszinuleg elveszett (store/config-overrides.json torlodott es nincs .env kulcs). Az auth a rotalodo shared sessionbol megy, 401-veszely. Teendo: MAIN_AGENT_ISOLATED_CONFIG=1 visszaallitasa, majd channels session restart.\"}" \
+        -d "{\"from\":\"$(_guard_sender)\",\"to\":\"${MAIN_AGENT_ID:-alfred}\",\"content\":\"[GUARD] A channels session most a KOZOS ~/.claude alol indult, pedig letezik izolalt config dir (.channels-config). A MAIN_AGENT_ISOLATED_CONFIG beallitas valoszinuleg elveszett (store/config-overrides.json torlodott es nincs .env kulcs). Az auth a rotalodo shared sessionbol megy, 401-veszely. Teendo: MAIN_AGENT_ISOLATED_CONFIG=1 visszaallitasa, majd channels session restart.\"}" \
         -o /dev/null -w '%{http_code}' 2>>"$INSTALL_DIR/store/channels-failures.log" > "$INSTALL_DIR/store/.channels-guard-http.$$" || true
       # Honest delivery (NOTIFYVAKSWEEP826 zaro kor): a fenti WARN csak a helyi
       # logban el -- ha a koordinatornak szolo POST elbukik, az is a logba
@@ -1665,7 +1665,7 @@ if [ "$CHANNEL_PROVIDER" = "teams" ]; then
     *) _approval_origin="" ;;
   esac
   if [ -n "$_approval_origin" ]; then
-    STATE_DIR_ENV="${STATE_DIR_ENV}export MARVEEN_APPROVAL_URL=$(sh_single_quote "http://${_approval_origin}:${_approval_port}/api/approvals/teams-card-action") && "
+    STATE_DIR_ENV="${STATE_DIR_ENV}export ALFRED_APPROVAL_URL=$(sh_single_quote "http://${_approval_origin}:${_approval_port}/api/approvals/teams-card-action") && "
   else
     echo "[channels] TEAMSAPPROVECARD1118: WEB_HOST=$_approval_host is not loopback; Teams approval-card clicks are not forwarded"
   fi
@@ -1683,8 +1683,8 @@ fi
 #
 # `start-server` first, because the "no server yet -> new-session inherits this
 # shell's env" assumption below is only safe when NOTHING ELSE creates the
-# server in between. At boot it does: systemd starts marveen-channels and
-# marveen-dashboard in the same second, and the dashboard's worker sessions win
+# server in between. At boot it does: systemd starts alfred-channels and
+# alfred-dashboard in the same second, and the dashboard's worker sessions win
 # the race about half the time. Then `set-environment -g` silently no-ops (no
 # server), the dashboard creates the server WITHOUT the token, and our
 # new-session inherits that empty global env instead of this shell's -- the
@@ -1908,7 +1908,7 @@ esac
 
 # Hybrid channel-coordinator model: the native plugin stays the PRIMARY inbound
 # path (it always polls getUpdates here -- never outbound-only). The standalone
-# marveen-channel-coordinator only BACKFILLS while this session's plugin is
+# alfred-channel-coordinator only BACKFILLS while this session's plugin is
 # down, so there is never a second concurrent poller in steady state. Nothing to
 # set here: the coordinator gates itself on native liveness.
 
@@ -2049,9 +2049,9 @@ while [ "$i" -lt "$_boot_guard_s" ]; do
       if [ "$_eperm_restarted" = "0" ]; then
         _eperm_restarted=1
         $TMUX kill-session -t "=$SESSION:" 2>/dev/null
-        _CHANNELS_STARTDIR="$(mktemp -d /tmp/marveen-channels-XXXXXX)"
+        _CHANNELS_STARTDIR="$(mktemp -d /tmp/alfred-channels-XXXXXX)"
         # Carry the project CLAUDE.md into the fallback cwd so the session keeps
-        # Marveen's instructions/personality instead of running as a generic,
+        # Alfred's instructions/personality instead of running as a generic,
         # context-less assistant (the biggest degradation of the /tmp fallback).
         # Best-effort: a symlink failure degrades to the prior behaviour and
         # never blocks startup. The trust dialog for the fresh /tmp path still
@@ -2105,7 +2105,7 @@ unset _eperm_restarted _boot_guard_s
 
 # Set agent name once the session is ready. (/remote-control dropped: the operator no
 # longer uses Remote Control.)
-_bot_name="${BOT_NAME:-${MAIN_AGENT_ID:-marveen}}"
+_bot_name="${BOT_NAME:-${MAIN_AGENT_ID:-alfred}}"
 sleep 1
 # #1954: text and Enter go separately, and the Enter is repeated (bounded) while
 # the input box still holds the command -- a one-shot send whose Enter was lost
@@ -2124,9 +2124,9 @@ unset _bot_name
 
 # Reset the keep-alive watchdog baseline so a session that was just restarted
 # is not immediately judged stale by the dashboard's checkMainKeepaliveStaleness
-# (channel-monitor.ts, ~18min threshold). The dashboard's hardRestartMarveenChannels
+# (channel-monitor.ts, ~18min threshold). The dashboard's hardRestartAlfredChannels
 # path writes both files when it triggers the restart, but a manual
-# `launchctl kickstart -k com.marveen.channels` (or the launchd KeepAlive's own
+# `launchctl kickstart -k com.alfred.channels` (or the launchd KeepAlive's own
 # restart after a crash) bypasses the dashboard - those code paths never touched
 # the watchdog baseline, and the old mtimes survived into the fresh session,
 # triggering a false-positive respawn loop within minutes (2026-06-01 18:26).
@@ -2149,7 +2149,7 @@ date +%s > "$INSTALL_DIR/store/.channel-last-respawn"
 #
 # Two-stage detection, both must indicate "no plugin" before we fire keystrokes:
 #
-#   1. pgrep -P claude_pid bun   -- looks for a bun child of the marveen-channels
+#   1. pgrep -P claude_pid bun   -- looks for a bun child of the alfred-channels
 #      claude process. This catches the case the env-var grep misses: Claude Code
 #      does NOT inherit TELEGRAM_STATE_DIR into the spawned poller on the main
 #      session (only on sub-agents), so an env-var-needle scan reports "no
@@ -2195,7 +2195,7 @@ plugin_child_pid() {
   [ "$CHANNEL_UNCONFIGURED" = "1" ] && exit 0
   sleep 15
   CLAUDE_PID="$($TMUX list-panes -t "=$SESSION:" -F '#{pane_pid}' 2>/dev/null | head -1)"
-  # Check 1: bun grandchild of the marveen-channels claude
+  # Check 1: bun grandchild of the alfred-channels claude
   BUN_CHILD=""
   if [ -n "$CLAUDE_PID" ]; then
     BUN_CHILD="$(plugin_child_pid "$CLAUDE_PID")"

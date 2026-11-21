@@ -15,7 +15,7 @@ import { STATE_OBSERVER_STATE_DIR } from '../state-observer.js'
 import { createUserTurnCounter } from '../user-turns.js'
 import type { RouteContext } from './types.js'
 
-// Count "real" user turns (operator prompts, Telegram messages) in every
+// Count "real" user turns (operator prompts, channel messages) in every
 // Claude Code session JSONL under ~/.claude/projects/. Filters out
 // tool_result, local-command, and synthetic system events so a task-heavy
 // hour doesn't inflate the counter. Incremental: transcripts are append-only,
@@ -103,8 +103,8 @@ export async function tryHandleOverview(ctx: RouteContext): Promise<boolean> {
 
     const agentsForTeam: Array<{ id: string; label: string; role: string; running: boolean; hasAvatar: boolean; avatarUrl: string }> = []
     const mainHasAvatar = [
-      join(PROJECT_ROOT, 'store', 'marveen-avatar.png'),
-      join(PROJECT_ROOT, 'store', 'marveen-avatar.jpg'),
+      join(PROJECT_ROOT, 'store', 'alfred-avatar.png'),
+      join(PROJECT_ROOT, 'store', 'alfred-avatar.jpg'),
     ].some(existsSync)
     agentsForTeam.push({
       id: MAIN_AGENT_ID,
@@ -112,7 +112,7 @@ export async function tryHandleOverview(ctx: RouteContext): Promise<boolean> {
       role: 'main',
       running: true,
       hasAvatar: mainHasAvatar,
-      avatarUrl: `/api/marveen/avatar`,
+      avatarUrl: `/api/alfred/avatar`,
     })
     for (const a of subAgents) {
       const team = readAgentTeam(a)

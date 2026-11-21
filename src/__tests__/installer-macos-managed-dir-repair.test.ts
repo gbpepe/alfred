@@ -21,7 +21,7 @@ afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, f
 const mode = (p: string) => statSync(p).mode & 0o777
 
 function run(o: { owner?: string; existing?: number | 'symlink' | 'missing'; sudoFails?: boolean }) {
-  const base = mkdtempSync(join(tmpdir(), 'marveen-macos-repair-'))
+  const base = mkdtempSync(join(tmpdir(), 'alfred-macos-repair-'))
   dirs.push(base)
   const dir = join(base, 'ClaudeCode')
   let target: string | undefined

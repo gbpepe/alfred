@@ -1,6 +1,6 @@
-# Marveen
+# Alfred
 
-![Marveen Banner](banner.png)
+![Alfred Banner](banner.png)
 
 [![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -9,13 +9,13 @@
 [![Ollama](https://img.shields.io/badge/Ollama-nomic--embed-000000?logo=ollama&logoColor=white)](https://ollama.com/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?logo=telegram&logoColor=white)](https://core.telegram.org/bots)
 [![Slack](https://img.shields.io/badge/Slack-Socket_Mode-4A154B?logo=slack&logoColor=white)](https://api.slack.com/)
-[![GitHub stars](https://img.shields.io/github/stars/Szotasz/marveen?style=social)](https://github.com/Szotasz/marveen)
+[![GitHub stars](https://img.shields.io/github/stars/gbpepe/alfred?style=social)](https://github.com/gbpepe/alfred)
 
 > AI csapatod, ami fut amíg te alszol.
 
-Marveen egy AI asszisztens keretrendszer, ami Claude Code-ra épül. Saját AI csapatot építhetsz, akik Telegramon, Slacken vagy Discordon kommunikálnak veled, önállóan dolgoznak, és egymással is együttműködnek.
+Alfred egy AI asszisztens keretrendszer, ami Claude Code-ra épül. Saját AI csapatot építhetsz, akik Telegramon, Slacken vagy Discordon kommunikálnak veled, önállóan dolgoznak, és egymással is együttműködnek.
 
-Marveen is a self-hostable **agent harness** for Claude Code: it runs a team of AI agents, each with its own chat channel (Telegram, Slack or Discord), persistent memory, scheduled tasks, and MCP tools, lets them delegate work to one another, and gives you a web dashboard to watch and steer them.
+Alfred is a self-hostable **agent harness** for Claude Code: it runs a team of AI agents, each with its own chat channel (Telegram, Slack or Discord), persistent memory, scheduled tasks, and MCP tools, lets them delegate work to one another, and gives you a web dashboard to watch and steer them.
 
 ## Funkciók
 
@@ -75,8 +75,8 @@ Minden ágens saját, réteges memóriával rendelkezik (hot / warm / cold / sha
 
 ```bash
 cd ~
-git clone --branch main https://github.com/Szotasz/marveen.git
-cd marveen
+git clone --branch main https://github.com/gbpepe/alfred.git
+cd alfred
 ./install.sh
 ```
 
@@ -89,35 +89,35 @@ Alapértelmezés szerint a dashboard a 3420-as porton indul (`http://localhost:3
 ### Windows (WSL)
 
 ```powershell
-irm https://raw.githubusercontent.com/Szotasz/marveen/main/install-windows.ps1 | iex
+irm https://raw.githubusercontent.com/gbpepe/alfred/main/install-windows.ps1 | iex
 ```
 
 Vagy manuálisan:
 ```powershell
-git clone --branch main https://github.com/Szotasz/marveen.git
-cd marveen
+git clone --branch main https://github.com/gbpepe/alfred.git
+cd alfred
 .\install-windows.ps1
 ```
 
-A Windows telepítő automatikusan beállítja a WSL-t (Windows Subsystem for Linux) és azon belül telepíti a Marveen-t.
+A Windows telepítő automatikusan beállítja a WSL-t (Windows Subsystem for Linux) és azon belül telepíti a Alfredet.
 
 > **Ha a PowerShell ablak bezárul / a telepítő nem jut túl a WSL+Ubuntu lépésen:** nyisd meg az Ubuntu-t (Start menü → Ubuntu), majd a WSL Ubuntu shellben futtasd közvetlenül a Linux-telepítőt (a PowerShell wrapper megkerülése):
 > ```bash
-> cd ~ && curl -fsSL https://raw.githubusercontent.com/Szotasz/marveen/main/install-linux.sh -o install.sh && bash install.sh
+> cd ~ && curl -fsSL https://raw.githubusercontent.com/gbpepe/alfred/main/install-linux.sh -o install.sh && bash install.sh
 > ```
 > Ez a megbízható út, ha a `wsl.exe`/Windows-claude környezet összeakad.
 
 ### Docker (English)
 
-Marveen also runs as a container with Docker Compose, on any Linux server with Docker:
+Alfred also runs as a container with Docker Compose, on any Linux server with Docker:
 
 ```bash
-git clone -b main https://github.com/Szotasz/marveen.git && cd marveen
+git clone -b main https://github.com/gbpepe/alfred.git && cd alfred
 docker compose up -d
-docker compose logs marveen   # the dashboard link
+docker compose logs alfred   # the dashboard link
 ```
 
-The dashboard listens on the server's `127.0.0.1` only: connect with Marveen Bridge or an SSH tunnel, or use your own domain with automatic HTTPS (`MARVEEN_DOMAIN=... docker compose --profile tls up -d`). The setup wizard in the dashboard asks for the owner, the Claude login (`claude setup-token`) and the chat channel. Full guide: [docs/docker.md](docs/docker.md).
+The dashboard listens on the server's `127.0.0.1` only: connect with Alfred Bridge or an SSH tunnel, or use your own domain with automatic HTTPS (`ALFRED_DOMAIN=... docker compose --profile tls up -d`). The setup wizard in the dashboard asks for the owner, the Claude login (`claude setup-token`) and the chat channel. Full guide: [docs/docker.md](docs/docker.md).
 
 A telepítő végigvezet a beállításokon:
 1. Függőségek ellenőrzése és telepítése
@@ -132,14 +132,14 @@ A platform szabadon márkázható telepítéskor. Két, egymástól **független
 
 | Beállítás | Mi ez | Default |
 |-----------|-------|---------|
-| `BOT_NAME` | A fő ágens megjelenített neve (pl. `MyAssistant`) | `Marveen` |
+| `BOT_NAME` | A fő ágens megjelenített neve (pl. `MyAssistant`) | `Alfred` |
 | `BRAND_NAME` | A termék / rendszer neve a dashboard fejlécében (böngésző-cím, oldalsáv, mobil topbar) | `BOT_NAME` |
 
-A telepítő mindkettőt megkérdezi. Ha csak Entert nyomsz, minden marad `Marveen` (a viselkedés változatlan a meglévő telepítésekhez képest). Ha külön márkanevet adsz meg, a teljes felület és az OS szolgáltatás-azonosítók is azzal jönnek létre:
+A telepítő mindkettőt megkérdezi. Ha csak Entert nyomsz, minden marad `Alfred` (a viselkedés változatlan a meglévő telepítésekhez képest). Ha külön márkanevet adsz meg, a teljes felület és az OS szolgáltatás-azonosítók is azzal jönnek létre:
 
 ```bash
 # Példa: az ágens neve "MyAssistant", a terméké "AcmeAI"
-#   Mi legyen a botod neve? [Marveen]: MyAssistant
+#   Mi legyen a botod neve? [Alfred]: MyAssistant
 #   Mi a termék/márka neve? [MyAssistant]: AcmeAI
 ```
 
@@ -164,7 +164,7 @@ Nyisd meg: http://localhost:3420
 A telepítés során választhatsz csatorna providert (Linuxon és macOS-en is). Az alapértelmezett a Telegram.
 
 #### Telegram (alapértelmezett)
-Írj a botodnak Telegramon -- Marveen válaszol.
+Írj a botodnak Telegramon -- Alfred válaszol.
 
 #### Slack (alternatív)
 
@@ -252,14 +252,14 @@ A `monitor_agents.sh` script összefogja az összes futó ágens tmux session-j�
 ./scripts/monitor_agents.sh
 
 # Távolról (laptopról SSH-n, iTerm2-vel):
-ssh macmini -t "~/marveen/scripts/monitor_agents.sh"
+ssh macmini -t "~/alfred/scripts/monitor_agents.sh"
 
 # Ha új ágens indult és nem látod a monitorban -- kill + újraindítás:
 ssh macmini "/opt/homebrew/bin/tmux kill-session -t monitor" && \
-  ssh macmini -t "~/marveen/scripts/monitor_agents.sh"
+  ssh macmini -t "~/alfred/scripts/monitor_agents.sh"
 ```
 
-A script automatikusan felderíti a futó `agent-*` és `marveen-channels` session-öket. A monitor session törlése nem érinti az ágens session-öket -- csak a linked-window referenciákat szünteti meg.
+A script automatikusan felderíti a futó `agent-*` és `alfred-channels` session-öket. A monitor session törlése nem érinti az ágens session-öket -- csak a linked-window referenciákat szünteti meg.
 
 ### Ügynökönkénti költségkeret
 
@@ -267,29 +267,29 @@ A CostOps-konfigurációban (`costops-config.json`) ügynökönként havi keret 
 
 ### Remote access key enrollment
 
-A helper that lets an operator enroll a single device's SSH public key with a tightly restricted `authorized_keys` entry, then hands back a copyable connection bundle. Each device carries its own revocation id (`marveen-remote:<uuid>`) so access can be replaced or removed per device.
+A helper that lets an operator enroll a single device's SSH public key with a tightly restricted `authorized_keys` entry, then hands back a copyable connection bundle. Each device carries its own revocation id (`alfred-remote:<uuid>`) so access can be replaced or removed per device.
 
 Run it with the public key line as a single quoted argument:
 
 ```bash
-npm run remote-enroll -- "ssh-ed25519 <base64 key> marveen-remote:<uuid>"
+npm run remote-enroll -- "ssh-ed25519 <base64 key> alfred-remote:<uuid>"
 # optional flags:
-npm run remote-enroll -- --host 203.0.113.10 --port 2222 "ssh-ed25519 <base64 key> marveen-remote:<uuid>"
+npm run remote-enroll -- --host 203.0.113.10 --port 2222 "ssh-ed25519 <base64 key> alfred-remote:<uuid>"
 ```
 
-The public key line must be exactly three fields (type, key, comment) with no `authorized_keys` options and no extra fields. Only `ssh-ed25519` keys are accepted, and the comment must be `marveen-remote:<uuid>` (uuid v4).
+The public key line must be exactly three fields (type, key, comment) with no `authorized_keys` options and no extra fields. Only `ssh-ed25519` keys are accepted, and the comment must be `alfred-remote:<uuid>` (uuid v4).
 
 It appends (or replaces, when the same id is re-enrolled) this restricted line to the invoking user's `~/.ssh/authorized_keys`:
 
 ```
-restrict,port-forwarding,permitopen="127.0.0.1:3420",command="/bin/false" ssh-ed25519 <base64 key> marveen-remote:<uuid>
+restrict,port-forwarding,permitopen="127.0.0.1:3420",command="/bin/false" ssh-ed25519 <base64 key> alfred-remote:<uuid>
 ```
 
 `restrict` disables pty, agent, and X11 forwarding; the forced command is `/bin/false`; and the only endpoint the key may open is `127.0.0.1:3420`. The write is atomic (temp file plus rename) and guarded by an `authorized_keys.lock` file so concurrent runs cannot corrupt the list. `~/.ssh` is created 0700 and `authorized_keys` 0600 when missing; if either already exists with looser permissions the tool warns instead of changing them silently.
 
 After enrolling, it prints a base64 connection bundle between clearly marked delimiters. The bundle carries the host, SSH port and user, the fixed remote port (3420), the device id, the machine's `ssh-ed25519` host key, and -- by default -- the dashboard bearer token (`DASHBOARD_TOKEN` env or `store/.dashboard-token`), so the connecting app can authenticate against the dashboard without a separate step. A token-bearing bundle is a SECRET: hand it over on a private channel only, never by email or shared chat. Pass `--no-dashboard-token` to emit a token-free bundle (the device user must then obtain the dashboard access URL out of band). If no token can be found the tool warns and emits a token-free bundle. The host key is looked up in the known public-key locations (`/etc/ssh`, `/private/etc/ssh`, Homebrew and `/usr/local` prefixes) and, when none of those files exist -- as on stock macOS -- read from the running SSH server itself via `ssh-keyscan` on loopback. The connecting side requires the host key, so if it cannot be obtained from any source the tool exits with an error instead of printing an unusable bundle; start the SSH server (macOS: System Settings > General > Sharing > Remote Login) and re-run. When `--host` is not given, the tool prints a hint to verify the resolved address is the one the device will reach.
 
-To revoke a device, delete the line whose comment matches its id (`marveen-remote:<uuid>`) from `~/.ssh/authorized_keys`.
+To revoke a device, delete the line whose comment matches its id (`alfred-remote:<uuid>`) from `~/.ssh/authorized_keys`.
 
 ### Frissítés
 ```bash
@@ -314,8 +314,8 @@ claude setup-token
 # 2. A VPS-en:
 export CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 cd ~
-git clone --branch main https://github.com/Szotasz/marveen.git
-cd marveen
+git clone --branch main https://github.com/gbpepe/alfred.git
+cd alfred
 ./install.sh    # automatikusan install-linux.sh-t futtat
 ```
 
@@ -325,7 +325,7 @@ A token 1 évig érvényes. Ne állíts be `ANTHROPIC_API_KEY`-t mellé.
 - **RAM**: legalább 2 GB ajánlott (t3.small). 1 GB-os gépen az npm build swap nélkül elbukhat -- a telepítő figyelmeztet és felajánl swap-létrehozást.
 - **claude.ai MCP-k**: ha a claude.ai fiókodban sok MCP connector van engedélyezve, a headless claude session megpróbálja betölteni mindet, ami instabilitást okozhat. Telepítés előtt tiltsd le a felesleges MCP-ket a claude.ai Settings oldalán.
 - **Közvetlen futtatás**: `./install-linux.sh` (Linux) vagy `./install-macos.sh` (macOS) ha az OS-detekciót ki akarod hagyni.
-- **Egyedi Homebrew-prefix (macOS)**: ha a Homebrew nem a `/opt/homebrew` vagy `/usr/local` alatt van, és a telepítő shelljében a `brew` nincs a PATH-on (például SSH-n át, nem-interaktívan futtatva), add meg a prefixet: `MARVEEN_BREW_PREFIX=$HOME/homebrew ./install-macos.sh`. Enélkül a telepítő nem találja a meglévő Homebrew-t, és egy másodikat telepít.
+- **Egyedi Homebrew-prefix (macOS)**: ha a Homebrew nem a `/opt/homebrew` vagy `/usr/local` alatt van, és a telepítő shelljében a `brew` nincs a PATH-on (például SSH-n át, nem-interaktívan futtatva), add meg a prefixet: `ALFRED_BREW_PREFIX=$HOME/homebrew ./install-macos.sh`. Enélkül a telepítő nem találja a meglévő Homebrew-t, és egy másodikat telepít.
 - **Kérdések nélküli (szkriptelt) telepítés**: `./install-linux.sh --non-interactive`, minden válasz környezeti változóból, a titkok fájlból. Részletek: [docs/install-non-interactive.md](docs/install-non-interactive.md).
 
 ## Követelmények
@@ -345,16 +345,16 @@ Kérdésed van? Csatlakozz az AI a mindennapokban közösséghez:
 
 ## Támogasd a projektet
 
-Ha hasznos számodra a Marveen, támogasd a fejlesztést:
+Ha hasznos számodra a Alfred, támogasd a fejlesztést:
 
 [![Támogatás](https://img.shields.io/badge/Támogatás-Donably-orange)](https://www.donably.com/ai-a-mindennapokban-szabolccsal)
 
 ## Köszönet
 
-A Marveen több külső projektre és koncepcióra épít. A teljes felsorolás (forrás, szerző, licensz, hogyan használjuk) az [ATTRIBUTIONS.md](./ATTRIBUTIONS.md) fájlban található. Köszönet a Perplexity AI-nek (Bumblebee), Artem Zhutovnak (handoff / retrospective / skill-management skill suite), Mike Van Hornnak (printing-press), Andrej Karpathynak (CLAUDE.md pattern), és Matt Pococknak (handoff design tippek) a munkájukért.
+A Alfred több külső projektre és koncepcióra épít. A teljes felsorolás (forrás, szerző, licensz, hogyan használjuk) az [ATTRIBUTIONS.md](./ATTRIBUTIONS.md) fájlban található. Köszönet a Perplexity AI-nek (Bumblebee), Artem Zhutovnak (handoff / retrospective / skill-management skill suite), Mike Van Hornnak (printing-press), Andrej Karpathynak (CLAUDE.md pattern), és Matt Pococknak (handoff design tippek) a munkájukért.
 
 ## Készítette
 
 **Szota Szabolcs** -- AI konzultáns, az "AI a mindennapokban" csatorna készítője
 
-[![GitHub](https://img.shields.io/github/stars/Szotasz/marveen?style=social)](https://github.com/Szotasz/marveen)
+[![GitHub](https://img.shields.io/github/stars/gbpepe/alfred?style=social)](https://github.com/gbpepe/alfred)

@@ -1,66 +1,26 @@
-// Where does a one-way notification go? (OWNERCHAT803)
-//
-// Measured on a fresh wizard install (ai-bootcamp-vps100, 2026-08-03): the
-// pairing succeeds and the channel plugin works -- inbound chat is fine -- but
-// the main .env still carries the installer default `ALLOWED_CHAT_ID=0`,
-// because only the TERMINAL install path writes the paired chat back into it
-// (install-macos.sh:1266). Every one-way send therefore went to chat 0, which
-// the Bot API answers with 400 "chat not found". Measured against the live API,
-// not assumed.
-//
-// The reason nobody noticed: the interactive path does not use this value at
-// all. The plugin gates inbound on the channel's own access.json, so the
-// install looks healthy from the user's side while the daily digest, the
-// welcome message for a newly created agent, and every system alert land
-// nowhere.
-//
-// TWO THINGS THIS MODULE DELIBERATELY DOES NOT DO
-//
-// 1. It does not write anything back into .env. That was the other candidate
-//    fix, and it is the more dangerous one: `memories.chat_id` is written AND
-//    filtered with ALLOWED_CHAT_ID (db.ts saveAgentMemory / recentMemories /
-//    getMemoriesForChat), and there is no migration for that column. Changing
-//    the value on a running install would silently orphan every memory written
-//    before the change -- on a fresh install, the user's entire first session.
-//    Measured on the fleet DB: the same FTS query returns 963 rows under the
-//    real chat id and 0 under "0".
-// 2. It therefore does not touch the memory key. The memory store keeps using
-//    ALLOWED_CHAT_ID exactly as before. Fixing that is a separate card with a
-//    migration, and must never ship in the same release as this.
+// Where does a one-way notification go?
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ALLOWED_CHAT_ID, CHANNEL_CHAT_ID, CHANNEL_PROVIDER, MAIN_AGENT_ID } from './config.js'
+import { CHANNEL_CHAT_ID, CHANNEL_PROVIDER } from './config.js'
 import { channelStateDir, type ChannelProviderType } from './channel-provider.js'
 import { logger } from './logger.js'
 import { alertChatFormatError, alertChatValue, OWNER_ALERT_CHAT_KEY } from './alert-chat-format.js'
 
 /**
- * The .env value that names the owner chat for a given provider. ALLOWED_CHAT_ID
- * is the Telegram key; every other provider has its own (SLACK_CHANNEL_ID,
- * DISCORD_CHANNEL_ID, ... -- getChannelChatId), surfaced as CHANNEL_CHAT_ID.
- * A Slack-bound install routinely keeps a stale numeric Telegram id in
- * ALLOWED_CHAT_ID; feeding that to chat.postMessage earns a permanent
- * `channel_not_found`, so the provider's own key must win there.
+ * The .env value that names the owner chat for Discord (`DISCORD_CHANNEL_ID`,
+ * surfaced as `CHANNEL_CHAT_ID`).
  */
 export function configuredOwnerChatFor(
-  provider: ChannelProviderType,
-  env: { allowedChatId: string; channelChatId: string } = { allowedChatId: ALLOWED_CHAT_ID, channelChatId: CHANNEL_CHAT_ID },
+  _provider: ChannelProviderType = CHANNEL_PROVIDER,
+  env: { channelChatId?: string } = { channelChatId: CHANNEL_CHAT_ID },
 ): string {
-  return provider === 'telegram' ? env.allowedChatId : env.channelChatId
+  return env.channelChatId ?? ''
 }
 
 /**
  * Normalise a configured chat id to "set" or "not set".
- *
- * `"0"` is the installer's placeholder, and it is the whole reason this bug
- * survived: every existing guard tested for EMPTINESS (`!ALLOWED_CHAT_ID`,
- * `!ALLOWED_CHAT_ID.trim()`), and `"0"` is neither empty nor falsy. Measured:
- * `!"0"` is false and `!"0".trim()` is false, so the code's own
- * "suppressed: empty ALLOWED_CHAT_ID (config error)" branches never fired on
- * exactly the installs that needed them -- the send went out and earned a 400
- * instead. One place decides what "not set" means, so a future consumer cannot
- * reinvent the same hole.
+ * `"0"` is the installer placeholder and is treated as unset.
  */
 export function normalizeChatId(raw: string | null | undefined): string | null {
   const v = (raw ?? '').trim()
@@ -72,62 +32,33 @@ export function normalizeChatId(raw: string | null | undefined): string | null {
 /**
  * The chat id the owner actually reads, or null when this install has none.
  *
- * Order: the configured value first (so an operator who set it by hand, and
- * every install that predates the wizard, keeps behaving identically), then
- * the main agent's channel allowlist -- the same access.json the plugin
- * enforces on inbound, so a resolved id is deliverable by construction.
- *
- * Returning null is a real answer: "this install has no owner chat". Callers
- * must skip the send rather than pass a placeholder on to the API.
+ * Order: the configured value first, then the main agent's Discord access.json
+ * allowlist (`allowFrom`, then `groups`). Returning null skips the send.
  */
 export function resolveOwnerChatId(
   readAccessFile: (path: string) => string = (p) => readFileSync(p, 'utf-8'),
-  configured: string | null = ALLOWED_CHAT_ID,
-  provider: ChannelProviderType = 'telegram',
+  configured: string | null = CHANNEL_CHAT_ID,
+  provider: ChannelProviderType = 'discord',
 ): string | null {
   const fromEnv = normalizeChatId(configured)
   if (fromEnv) return fromEnv
-  if (provider === 'teams') {
-    // TEAMSAPPROVECARD1118: the Teams plugin writes no access.json (see teamsAllowlistIds). Unlike the first-entry
-    // heuristic below, Teams takes the alert rule here too (review, #2884): exactly one paired user is the owner. With
-    // two paired users the first one is not the owner by anything but file order, and the digest, the welcome message
-    // and the command-task output are owner content; null skips the send instead of handing it to the other person.
-    return soleTeamsOwner(readAccessFile).chatId
-  }
   try {
-    // `provider` defaults to 'telegram' so every existing caller (daily digest,
-    // welcome/avatar messages, command-task, inbound-probe) is byte-identical.
-    // The schedule-runner passes CHANNEL_PROVIDER so a Slack-bound main agent
-    // resolves the owner from its slack/access.json instead of a (missing)
-    // telegram one.
     const raw = JSON.parse(readAccessFile(join(channelStateDir(provider), 'access.json'))) as Record<string, unknown>
-    // Same shape and same "first allowlist entry" heuristic as
-    // schedule-runner's resolveBoundChatId, which already resolves the main
-    // agent from this exact file. access.json has no owner field; with more
-    // than one entry the first is a guess, which is why the caller-facing
-    // behaviour stays "best effort delivery", never "authorisation".
     if (Array.isArray(raw.allowFrom)) {
       for (const entry of raw.allowFrom) {
         const id = normalizeChatId(typeof entry === 'number' ? String(entry) : (entry as string))
         if (id) return id
       }
     }
-    // Telegram/Discord keep allowed groups under `groups`, Slack under
-    // `channels` -- the same allowFrom -> groups -> channels heuristic as
-    // schedule-runner's chatIdFromAccessConfig, so a Slack main agent bound
-    // only to a channel (empty DM allowlist) resolves an owner here too, not
-    // just in the task-prompt path.
-    for (const mapKey of ['groups', 'channels'] as const) {
-      const map = raw[mapKey]
-      if (!map || typeof map !== 'object') continue
-      for (const key of Object.keys(map as Record<string, unknown>)) {
+    const groups = raw['groups']
+    if (groups && typeof groups === 'object') {
+      for (const key of Object.keys(groups as Record<string, unknown>)) {
         const id = normalizeChatId(key)
         if (id) return id
       }
     }
   } catch {
-    // No access.json, unreadable, or not JSON: no owner chat. Not an error --
-    // an install with no channel configured is a legitimate state.
+    // No access.json, unreadable, or not JSON: no owner chat.
   }
   return null
 }
@@ -135,32 +66,18 @@ export function resolveOwnerChatId(
 export type AlertOwnerChat = { chatId: string; reason?: undefined } | { chatId: null; reason: string }
 
 /**
- * The owner chat for an ALERT (quota, security, disk, stuck session, the
- * shell/Python senders) -- stricter than resolveOwnerChatId, which stays the
- * rule for the daily digest and the other callers that already accepted its
- * first-entry heuristic.
+ * The owner chat for an ALERT -- stricter than resolveOwnerChatId.
  *
- * The configured .env value still wins. The access.json fallback applies only
- * when the DM allowlist (`allowFrom`) holds EXACTLY ONE usable entry: then the
- * install has one paired person, and that person is the owner. With more than
- * one entry the first is a guess, and on a fleet that serves several people a
- * guessed quota or security alert lands in a stranger's chat -- so it is not
- * sent. `groups` / `channels` keys are never used, and neither is an allowFrom
- * entry that starts with "-" (a Telegram group or channel id, not a person).
- *
- * `reason` is set whenever chatId is null, so the caller can log WHY the alert
- * was not sent instead of dropping it quietly. scripts/lib/owner-chat.sh and
- * scripts/lib/owner_chat.py are ports of this function, not of
- * resolveOwnerChatId (src/__tests__/owner-chat-parity.test.ts).
+ * The configured .env value wins. Otherwise the access.json fallback applies only
+ * when the DM allowlist (`allowFrom`) holds EXACTLY ONE usable entry.
  */
 export function resolveAlertOwnerChat(
   readAccessFile: (path: string) => string = (p) => readFileSync(p, 'utf-8'),
-  configured: string | null = ALLOWED_CHAT_ID,
-  provider: ChannelProviderType = 'telegram',
+  configured: string | null = CHANNEL_CHAT_ID,
+  provider: ChannelProviderType = 'discord',
 ): AlertOwnerChat {
   const fromEnv = normalizeChatId(configured)
   if (fromEnv) return { chatId: fromEnv }
-  if (provider === 'teams') return soleTeamsOwner(readAccessFile)
   let raw: Record<string, unknown>
   try {
     raw = JSON.parse(readAccessFile(join(channelStateDir(provider), 'access.json'))) as Record<string, unknown>
@@ -170,44 +87,7 @@ export function resolveAlertOwnerChat(
   return soleDmOwner(raw)
 }
 
-// TEAMSAPPROVECARD1118: the claude-channel-teams plugin (0.3.x, src/pairing/allowlist.ts) writes NO access.json. Its
-// paired users live in <state dir>/allowlist.json, {"version":1,"entries":[{"aad_object_id":"<uuid>",...}]}, compared
-// case-insensitively. Reading access.json for Teams answered "no readable access.json" on every real Teams install,
-// so the approval notification and every owner alert of a Teams main agent was dropped (customer, v1.49.1). The
-// object id found here is a delivery target: resolveTeamsTarget (teams-send.ts) turns it into that person's 1:1 chat.
-export const TEAMS_ALLOWLIST_FILE = 'allowlist.json'
-
-/** The paired users of a parsed Teams allowlist.json, lowercased and deduplicated, in file order. Any shape the
- *  plugin itself reads as empty (another version, no entries array, an entry without a string id) gives none. */
-export function teamsAllowlistIds(raw: unknown): string[] {
-  if (!raw || typeof raw !== 'object') return []
-  const file = raw as { version?: unknown; entries?: unknown }
-  if (file.version !== 1 || !Array.isArray(file.entries)) return []
-  const ids: string[] = []
-  for (const e of file.entries) {
-    const id = e && typeof e === 'object' ? (e as { aad_object_id?: unknown }).aad_object_id : undefined
-    if (typeof id !== 'string') continue
-    const norm = id.trim().toLowerCase()
-    if (norm && !ids.includes(norm)) ids.push(norm)
-  }
-  return ids
-}
-
-/** The alert rule for Teams: exactly one paired user is the owner; none or several is a reason, never a guess. */
-function soleTeamsOwner(readAccessFile: (path: string) => string): AlertOwnerChat {
-  let ids: string[]
-  try {
-    ids = teamsAllowlistIds(JSON.parse(readAccessFile(join(channelStateDir('teams'), TEAMS_ALLOWLIST_FILE))))
-  } catch {
-    return { chatId: null, reason: 'no owner chat: .env placeholder/empty and no readable Teams allowlist.json' }
-  }
-  if (ids.length === 1) return { chatId: ids[0] }
-  if (ids.length === 0) return { chatId: null, reason: 'no owner chat: .env placeholder/empty and the Teams allowlist.json has no paired user' }
-  return { chatId: null, reason: `no owner chat: .env placeholder/empty and the Teams allowlist.json has ${ids.length} paired users, refusing to guess` }
-}
-
-/** The exactly-one-DM-entry rule on a parsed access.json, shared by the
- *  resolver above and its tests. */
+/** The exactly-one-DM-entry rule on a parsed access.json. */
 export function soleDmOwner(raw: Record<string, unknown> | null): AlertOwnerChat {
   const entries = new Set<string>()
   if (raw && Array.isArray(raw.allowFrom)) {
@@ -223,29 +103,10 @@ export function soleDmOwner(raw: Record<string, unknown> | null): AlertOwnerChat
   return { chatId: null, reason: `no owner chat: .env placeholder/empty and access.json has ${entries.size} DM entries, refusing to guess` }
 }
 
-// ---------------------------------------------------------------- OWNER_ALERT_CHAT_ID (ISSUE2556X, marveen#2556)
-//
-// The owner names the chat their alerts go to on the dashboard's settings page (an overrides-only registry key: a
-// .env line never counts). It is a DELIVERY target and nothing else:
-//   - it wins in resolveAlertDeliveryChat (notify.ts), and through ownerAlertChatOverride in front of
-//     resolveOwnerChatId at each delivery call site (the daily log, the welcome and avatar messages, the approval
-//     notification, the command-task and scheduler alerts): `ownerAlertChatOverride(p) ?? resolveOwnerChatId(...)`,
-//     written out at the call site so a test that stubs resolveOwnerChatId keeps stubbing what the site calls;
-//   - resolveOwnerChatId and resolveAlertOwnerChat are unchanged: the command gate (routes/commands.ts,
-//     midturn-commands.ts) still learns who the owner is from them, and so does every other caller that is not a
-//     delivery. A delivery setting must never make anyone the owner.
-// Unset (empty or "0"), every resolver answers exactly as before. The key names a chat on the install's channel
-// (CHANNEL_PROVIDER): a caller asking for another provider (the Telegram-only sends on a Slack install) does not get
-// it. A value in the wrong shape for that provider is not used; it is logged as an error once per value, and the
-// caller's own rule answers (its reason says so when that rule finds no chat either).
+// ---------------------------------------------------------------- OWNER_ALERT_CHAT_ID
 
 export type OwnerAlertChat = { chatId: string; invalid?: undefined } | { chatId: null; invalid?: string }
 
-// The install's store/config-overrides.json, the file settings-store reads (STORE_DIR = <project root>/store).
-// OWNER_ALERT_CHAT_ID is an overrides-only string key with the default '': the store answers the override when the
-// file holds one, else ''; a missing or unreadable file is ''. This reads that file directly, the way the shell and
-// Python ports do, and is parity-tested against the store (settings-overrides-only.test.ts). Importing settings-store
-// here instead would pull config.ts's STORE_DIR into every consumer of notify.ts, whose tests mock config.js.
 export const OVERRIDES_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', 'store', 'config-overrides.json')
 export function readOverrideValue(key: string, path: string = OVERRIDES_FILE): string | number | undefined {
   try {
@@ -265,8 +126,6 @@ export function readOwnerAlertChat(
   installProvider: ChannelProviderType = CHANNEL_PROVIDER,
 ): OwnerAlertChat {
   if (provider !== installProvider) return { chatId: null }
-  // gromzo has no alert chat: the owner is reached through the main agent (GROMZONOPROVIDER1108).
-  if (provider === 'gromzo') return { chatId: null }
   let raw: unknown
   try { raw = read() } catch { return { chatId: null } }
   const value = alertChatValue(raw)
@@ -298,6 +157,6 @@ export function resolveAlertDeliveryChat(
 
 /** The owner's OWNER_ALERT_CHAT_ID for a DELIVERY on `provider`, or null (unset, invalid, or another provider).
  *  Never for deciding who the owner is. */
-export function ownerAlertChatOverride(provider: ChannelProviderType = 'telegram'): string | null {
+export function ownerAlertChatOverride(provider: ChannelProviderType = 'discord'): string | null {
   return readOwnerAlertChat(provider).chatId
 }

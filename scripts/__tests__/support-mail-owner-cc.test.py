@@ -38,7 +38,7 @@ def main():
     # kulonben olyan cimzettet adna, akit egyik kapu sem lat.
     check('az OWNER_CC a configbol jon (lib.env_file_value, csak a .env), nem literal',
           re.search(r'OWNER_CC\s*=\s*lib\.env_file_value\(\s*"SUPPORT_OWNER_CC"\s*\)', src) is not None)
-    # TERMEK-KAPU: a Marveen minden vevo gepere kimegy, tehat a repoban NEM allhat
+    # TERMEK-KAPU: a Alfred minden vevo gepere kimegy, tehat a repoban NEM allhat
     # egyetlen telepites gazdajanak a cime sem. Ezt a template-identity-hygiene teszt
     # is meri; itt azert ismetlem, mert EZ A FAJL az, ahol az elso valtozat elbukott.
     check('NINCS hardcode-olt szemelyes cim a fajlban',

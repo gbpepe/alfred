@@ -1,6 +1,6 @@
 {
   "schedule": "*/15 * * * *",
-  "agent": "marveen",
+  "agent": "alfred",
   "enabled": false,
   "type": "command",
   "command": "python3 {{PROJECT_ROOT}}/scripts/usage-collect.py",

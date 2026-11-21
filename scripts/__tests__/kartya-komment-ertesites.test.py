@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """KOMMENTERTESITES922: komment-modban a MAS FELELOSU kartya ertesites nelkul MEGTAGADVA.
 
-AZ ESET (Marveen, 2026-09-22): az eszkoz komment-only modban eddig csak KIIRTA, hogy
+AZ ESET (Alfred, 2026-09-22): az eszkoz komment-only modban eddig csak KIIRTA, hogy
 `Ertesites: nem ment (komment-only)`. Egyetlen napon tizszer elolvasta es tovabbment, kozben egy
 merge-rol csak a kartyara irt -- egy tars allapot-kepe elavult. Egy jelzes, amit megszoktunk, nem
 kapu. Mira mutatott ra, hogy memoriaba irni ezt NEM lezaras.
@@ -65,7 +65,7 @@ def run(card_id, author, extra=()):
         f.write('Ez egy próba-komment, ékezetes szöveggel, hogy az ékezet-kapu ne ezen akadjon fenn.')
     env = dict(os.environ)
     env['KARTYA_DB'] = DB_PATH
-    env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['ALFRED_ROOT'] = SANDBOX_ROOT
     return subprocess.run([sys.executable, SCRIPT, '--id', card_id, '--comment-file', cf,
                            '--author', author, *extra],
                           capture_output=True, text=True, env=env, timeout=30)

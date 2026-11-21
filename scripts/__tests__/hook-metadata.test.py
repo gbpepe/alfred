@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tests for scripts/hook-metadata.py (fingerprint-drift validator) and
-scripts/hooks/hook_switches.py (MARVEEN_DISABLED_HOOKS + stdin cap). HOOKDRIFT926.
+scripts/hooks/hook_switches.py (ALFRED_DISABLED_HOOKS + stdin cap). HOOKDRIFT926.
 
 Run: python3 scripts/__tests__/hook-metadata.test.py
 
@@ -836,7 +836,7 @@ class Switches(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_disable_list_parsing(self):
-        env = {"MARVEEN_DISABLED_HOOKS": " Log-A.py ; tool-log-capture,,x "}
+        env = {"ALFRED_DISABLED_HOOKS": " Log-A.py ; tool-log-capture,,x "}
         self.assertEqual(hook_switches.disabled_hooks(env), {"log-a", "tool-log-capture", "x"})
         self.assertTrue(hook_switches.is_disabled("log-a", env, self.empty))
         self.assertTrue(hook_switches.is_disabled("/abs/scripts/hooks/tool-log-capture.py", env, self.empty))
@@ -845,7 +845,7 @@ class Switches(unittest.TestCase):
 
     def test_gates_cannot_be_disabled_by_env(self):
         everything = ",".join(sorted(hook_switches.DEFAULT_NON_DISABLEABLE))
-        env = {"MARVEEN_DISABLED_HOOKS": everything + ",log-a"}
+        env = {"ALFRED_DISABLED_HOOKS": everything + ",log-a"}
         for path in (self.empty, None):  # a temp sidecar, and the repo's own
             for name in hook_switches.DEFAULT_NON_DISABLEABLE:
                 self.assertFalse(hook_switches.is_disabled(name, env, path), name)
@@ -878,7 +878,7 @@ class Switches(unittest.TestCase):
 
     def test_sidecar_adds_locks_for_local_hooks(self):
         path = sidecar(self.tmp.name, {"version": 1, "hooks": {}, "non_disableable": ["local-ledger.py", "Local-Post-Gate"]})
-        env = {"MARVEEN_DISABLED_HOOKS": "local-ledger,local-post-gate,log-a"}
+        env = {"ALFRED_DISABLED_HOOKS": "local-ledger,local-post-gate,log-a"}
         self.assertEqual(hook_switches.locked_names(path) - hook_switches.DEFAULT_NON_DISABLEABLE,
                          {"local-ledger", "local-post-gate"})
         self.assertFalse(hook_switches.is_disabled("local-ledger", env, path))
@@ -890,7 +890,7 @@ class Switches(unittest.TestCase):
     def test_sidecar_cannot_unlock_the_default_floor(self):
         path = sidecar(self.tmp.name, {"version": 1, "hooks": {}, "non_disableable": []})
         self.assertTrue(hook_switches.DEFAULT_NON_DISABLEABLE <= hook_switches.locked_names(path))
-        env = {"MARVEEN_DISABLED_HOOKS": "egress-gate"}
+        env = {"ALFRED_DISABLED_HOOKS": "egress-gate"}
         self.assertFalse(hook_switches.is_disabled("egress-gate", env, path))
 
     def test_a_sidecar_with_local_names_still_keeps_the_whole_floor(self):
@@ -900,7 +900,7 @@ class Switches(unittest.TestCase):
         path = sidecar(self.tmp.name, {"version": 1, "hooks": {}, "non_disableable": ["local-ledger"]})
         locked = hook_switches.locked_names(path)
         self.assertEqual(locked, hook_switches.DEFAULT_NON_DISABLEABLE | {"local-ledger"})
-        env = {"MARVEEN_DISABLED_HOOKS": "egress-gate,email-send-gate,local-ledger,log-a"}
+        env = {"ALFRED_DISABLED_HOOKS": "egress-gate,email-send-gate,local-ledger,log-a"}
         for name in ("egress-gate", "email-send-gate", "fleet-freeze-gate", "local-ledger"):
             self.assertTrue(hook_switches.is_locked(name, path), name)
             self.assertFalse(hook_switches.is_disabled(name, env, path), name)
@@ -911,8 +911,8 @@ class Switches(unittest.TestCase):
         # different) sidecar would be an env switch for the install's own
         # locks. Point every plausible variable at such files and check that
         # the default lookup still reads the repo's sidecar.
-        names = ("MARVEEN_HOOKS_METADATA", "MARVEEN_HOOKS_METADATA_PATH", "MARVEEN_HOOK_METADATA",
-                 "MARVEEN_HOOK_METADATA_PATH", "MARVEEN_METADATA_PATH", "HOOKS_METADATA_PATH",
+        names = ("ALFRED_HOOKS_METADATA", "ALFRED_HOOKS_METADATA_PATH", "ALFRED_HOOK_METADATA",
+                 "ALFRED_HOOK_METADATA_PATH", "ALFRED_METADATA_PATH", "HOOKS_METADATA_PATH",
                  "HOOK_METADATA_PATH", "HOOK_SWITCHES_METADATA")
         repo = hook_switches.DEFAULT_METADATA_PATH
         hook_switches._CACHE.clear()
@@ -930,7 +930,7 @@ class Switches(unittest.TestCase):
                 hook_switches._CACHE.clear()
                 self.assertEqual(hook_switches.locked_names(), expected[0], body)
                 self.assertEqual(hook_switches.is_locked("log-a"), expected[1], body)
-                self.assertEqual(hook_switches.is_disabled("log-a", {"MARVEEN_DISABLED_HOOKS": "log-a"}),
+                self.assertEqual(hook_switches.is_disabled("log-a", {"ALFRED_DISABLED_HOOKS": "log-a"}),
                                  not expected[1], body)
                 # Also at import time: a fresh process with the variables set.
                 probe = ("import json, sys; sys.path.insert(0, %r); import hook_switches as h; "
@@ -949,11 +949,11 @@ class Switches(unittest.TestCase):
     def test_missing_sidecar_means_default_floor_only(self):
         path = os.path.join(self.tmp.name, "absent.json")
         self.assertEqual(hook_switches.locked_names(path), hook_switches.DEFAULT_NON_DISABLEABLE)
-        self.assertTrue(hook_switches.is_disabled("log-a", {"MARVEEN_DISABLED_HOOKS": "log-a"}, path))
+        self.assertTrue(hook_switches.is_disabled("log-a", {"ALFRED_DISABLED_HOOKS": "log-a"}, path))
 
     def test_broken_sidecar_fails_safe(self):
         # The install's own lock list is unknown: nothing may be env-disabled.
-        env = {"MARVEEN_DISABLED_HOOKS": "log-a,tool-log-capture"}
+        env = {"ALFRED_DISABLED_HOOKS": "log-a,tool-log-capture"}
         for body in ("{not json", "[]", {"non_disableable": "local-ledger"}, {"non_disableable": [3]}):
             path = sidecar(tempfile.mkdtemp(dir=self.tmp.name), body)
             self.assertEqual(hook_switches.sidecar_locks(path)[1], False, body)
@@ -961,12 +961,12 @@ class Switches(unittest.TestCase):
             self.assertFalse(hook_switches.is_disabled("tool-log-capture", env, path), body)
             self.assertTrue(hook_switches.is_locked("log-a", path), body)
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as cm:
-            hook_switches.read_hook_stdin("log-a", io.BytesIO(b"12345"), {"MARVEEN_HOOK_INPUT_MAX_BYTES": "4"}, path)
+            hook_switches.read_hook_stdin("log-a", io.BytesIO(b"12345"), {"ALFRED_HOOK_INPUT_MAX_BYTES": "4"}, path)
         self.assertEqual(cm.exception.code, 2)
 
     def test_sidecar_lock_also_closes_the_stdin_cap(self):
         path = sidecar(self.tmp.name, {"version": 1, "hooks": {}, "non_disableable": ["local-ledger"]})
-        env = {"MARVEEN_HOOK_INPUT_MAX_BYTES": "4"}
+        env = {"ALFRED_HOOK_INPUT_MAX_BYTES": "4"}
         self.assertIsNone(hook_switches.read_hook_stdin("local-ledger", io.BytesIO(b"12345"), env, self.empty))
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as cm:
             hook_switches.read_hook_stdin("local-ledger", io.BytesIO(b"12345"), env, path)
@@ -980,17 +980,17 @@ class Switches(unittest.TestCase):
             meta = json.load(f)
         gates = {e["hook"] for entries in meta["hooks"].values() for e in entries if e["gate"]}
         self.assertTrue(gates)
-        env = {"MARVEEN_DISABLED_HOOKS": ",".join(gates)}
+        env = {"ALFRED_DISABLED_HOOKS": ",".join(gates)}
         for name in gates:
             self.assertFalse(hook_switches.is_disabled(name, env), name)
 
     def test_stdin_cap_fail_open_for_logging(self):
-        env = {"MARVEEN_HOOK_INPUT_MAX_BYTES": "10"}
+        env = {"ALFRED_HOOK_INPUT_MAX_BYTES": "10"}
         self.assertEqual(hook_switches.read_hook_stdin("log-a", io.BytesIO(b"0123456789"), env), "0123456789")
         self.assertIsNone(hook_switches.read_hook_stdin("log-a", io.BytesIO(b"0123456789A"), env))
 
     def test_stdin_cap_fail_closed_for_gates(self):
-        env = {"MARVEEN_HOOK_INPUT_MAX_BYTES": "10"}
+        env = {"ALFRED_HOOK_INPUT_MAX_BYTES": "10"}
         err = io.StringIO()
         with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as cm:
             hook_switches.read_hook_stdin("outgoing-copy-gate", io.BytesIO(b"x" * 11), env)
@@ -999,7 +999,7 @@ class Switches(unittest.TestCase):
 
     def test_bad_cap_value_uses_default(self):
         for raw in ("", "abc", "0", "-5"):
-            self.assertEqual(hook_switches.max_input_bytes({"MARVEEN_HOOK_INPUT_MAX_BYTES": raw}),
+            self.assertEqual(hook_switches.max_input_bytes({"ALFRED_HOOK_INPUT_MAX_BYTES": raw}),
                              hook_switches.DEFAULT_MAX_INPUT_BYTES)
 
 
@@ -1009,10 +1009,10 @@ class WiredHooks(unittest.TestCase):
     def test_tool_log_capture_reads_through_the_helper(self):
         mod = load(os.path.join(HOOKS_DIR, "tool-log-capture.py"), "tool_log_capture_under_test")
         payload = {"session_id": "s", "tool_name": "Bash"}
-        cases = [({}, payload), ({"MARVEEN_DISABLED_HOOKS": "tool-log-capture"}, None),
-                 ({"MARVEEN_HOOK_INPUT_MAX_BYTES": "5"}, None)]
+        cases = [({}, payload), ({"ALFRED_DISABLED_HOOKS": "tool-log-capture"}, None),
+                 ({"ALFRED_HOOK_INPUT_MAX_BYTES": "5"}, None)]
         for env, expected in cases:
-            saved = {k: os.environ.pop(k, None) for k in ("MARVEEN_DISABLED_HOOKS", "MARVEEN_HOOK_INPUT_MAX_BYTES")}
+            saved = {k: os.environ.pop(k, None) for k in ("ALFRED_DISABLED_HOOKS", "ALFRED_HOOK_INPUT_MAX_BYTES")}
             os.environ.update(env)
             real = sys.stdin
             sys.stdin = io.TextIOWrapper(io.BytesIO(json.dumps(payload).encode()))
@@ -1020,7 +1020,7 @@ class WiredHooks(unittest.TestCase):
                 self.assertEqual(mod._read_payload(), expected, env)
             finally:
                 sys.stdin = real
-                for k in ("MARVEEN_DISABLED_HOOKS", "MARVEEN_HOOK_INPUT_MAX_BYTES"):
+                for k in ("ALFRED_DISABLED_HOOKS", "ALFRED_HOOK_INPUT_MAX_BYTES"):
                     os.environ.pop(k, None)
                     if saved[k] is not None:
                         os.environ[k] = saved[k]

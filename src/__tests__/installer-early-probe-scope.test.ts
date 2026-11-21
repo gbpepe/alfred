@@ -47,7 +47,7 @@ function runProbe(claudeExit: number, claudeOut: string, lang: 'en' | 'hu'): { o
     writeFileSync(f, script)
     const r = spawnSync('bash', [f], {
       encoding: 'utf-8',
-      env: { PATH: `${bin}:${process.env.PATH ?? '/usr/bin:/bin'}`, HOME: dir, MARVEEN_LANG: lang },
+      env: { PATH: `${bin}:${process.env.PATH ?? '/usr/bin:/bin'}`, HOME: dir, ALFRED_LANG: lang },
     })
     return { out: (r.stdout ?? '') + (r.stderr ?? ''), code: r.status }
   } finally {

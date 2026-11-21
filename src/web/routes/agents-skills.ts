@@ -12,10 +12,10 @@ import { sanitizeAgentName, sanitizeSkillName, safeJoin } from '../sanitize.js'
 import { serializeSkillsDir } from '../skills-dir-queue.js'
 import type { RouteContext } from './types.js'
 
-// Marveen's skills live at the global ~/.claude/skills/ path (shared with
+// Alfred's skills live at the global ~/.claude/skills/ path (shared with
 // the operator's Claude Code install); sub-agents under their own
 // agents/<name>/.claude/skills/. agentDir(MAIN_AGENT_ID) points at the
-// non-existent agents/marveen/ folder so we must branch here.
+// non-existent agents/alfred/ folder so we must branch here.
 function skillsRootFor(name: string): string {
   return name === MAIN_AGENT_ID
     ? join(homedir(), '.claude', 'skills')
@@ -78,7 +78,7 @@ export async function tryHandleAgentsSkills(ctx: RouteContext): Promise<boolean>
     const { file } = parseMultipart(body, contentType)
     if (!file) { json(res, { error: 'No file uploaded' }, 400); return true }
 
-    // MARVEENGAPS1020 (b): queued for approval, never unzipped into the
+    // ALFREDGAPS1020 (b): queued for approval, never unzipped into the
     // agent's skill root (skill-quarantine.ts).
     try {
       const r = importArchiveToPending({ scope: 'agent', agent: name }, file.data)
@@ -153,7 +153,7 @@ export async function tryHandleAgentsSkills(ctx: RouteContext): Promise<boolean>
     if (!skillName) { json(res, { error: 'Skill name is required' }, 400); return true }
     if (!description) { json(res, { error: 'Skill description is required' }, 400); return true }
 
-    // MARVEENGAPS1020 (b): the generated SKILL.md is queued for approval.
+    // ALFREDGAPS1020 (b): the generated SKILL.md is queued for approval.
     const target = { scope: 'agent' as const, agent: agentName }
     const clash = nameConflict(target, skillName)
     if (clash === 'live') { json(res, { error: 'Skill already exists' }, 409); return true }

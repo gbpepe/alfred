@@ -48,7 +48,7 @@ EOF
 set -e
 umask $um
 CHANNEL_PROVIDER=teams
-TEAMS_ALLOWLIST_PLUGINS="teams@marveen-marketplace"
+TEAMS_ALLOWLIST_PLUGINS="teams@alfred-marketplace"
 DIM= NC=
 ok() { echo "OK \$*"; }
 warn() { echo "WARN \$*"; }

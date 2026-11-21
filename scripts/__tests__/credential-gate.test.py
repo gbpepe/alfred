@@ -57,7 +57,7 @@ def make_store():
     td = tempfile.mkdtemp(prefix="credgate-")
     store = os.path.join(td, "store")
     os.makedirs(store)
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute("""
       CREATE TABLE approvals (
         id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, category TEXT NOT NULL,
@@ -129,7 +129,7 @@ def log_lines(store):
 
 
 def approve(store, category, content_hash, status="approved", rid="appr-1"):
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute(f"INSERT INTO approvals (id, agent_id, category, action_description, status, resolved_at, content_hash)"
                 f" VALUES (?, 'teszt', ?, 'x', ?, {NOW_S}, ?)", (rid, category, status, content_hash))
     con.commit()

@@ -112,7 +112,7 @@ export type LockBody = {
  *
  * `owner` is not only a label: it is handed to createAgentMessage as the
  * from_agent of the broadcast, and the caller's free-text `note` rides inside
- * the content. A privileged channel id (the telegram coordinator, the voice
+ * the content. A privileged channel id (the channel coordinator, the voice
  * channel) classifies as `channel-inbound` at delivery -- "this is the owner,
  * a reply is expected" -- so accepting one here would let ANY holder of the
  * shared dashboard token mint an owner-framed message carrying its own text,

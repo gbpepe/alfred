@@ -24,7 +24,7 @@ function writeEnv(lines: string[]) {
   writeFileSync(join(dir, '.env'), lines.map((l) => `${l}\n`).join(''))
 }
 function db() {
-  return new Database(join(dir, 'store', 'claudeclaw.db'))
+  return new Database(join(dir, 'store', 'alfred.db'))
 }
 function approve(anchor: string, id = 'ap-1') {
   const d = db()

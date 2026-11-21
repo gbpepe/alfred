@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/alfred/**/*.ts",
+    "src/__tests__/alfred-*.test.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/__tests__/alfred-api-*.test.ts",
+    "src/__tests__/alfred-commands-hook.test.ts",
+    "src/__tests__/alfred-restart-button-force.test.ts"
+  ]
+}

@@ -24,7 +24,7 @@ function resolveRun(stdin: string, env: Record<string, string> = {}): Promise<Re
     const child = execFile(
       process.execPath,
       [join(ROOT, 'scripts', 'vault-resolve.mjs')],
-      { env: { PATH: process.env.PATH || '', HOME: join(ROOT, 'home'), VAULT_RESOLVE_URL: serverUrl, MARVEEN_AGENT_ID: 'zz-agent', ...env } },
+      { env: { PATH: process.env.PATH || '', HOME: join(ROOT, 'home'), VAULT_RESOLVE_URL: serverUrl, ALFRED_AGENT_ID: 'zz-agent', ...env } },
       (error, stdout, stderr) => {
         const code = error && typeof (error as unknown as { code?: number }).code === 'number' ? (error as unknown as { code: number }).code : error ? 1 : 0
         resolve({ code, stdout, stderr, ms: Date.now() - t0 })

@@ -78,7 +78,7 @@ rejection revokes the right without anyone editing the file. Whoever can write
 the list still cannot grant themselves the right; that separation is the whole
 point, and it only holds where the approvals path is out of the agent's reach.
 
-Anchor semantics (Marveen msg 17900, 5+1 conditions):
+Anchor semantics (Alfred msg 17900, 5+1 conditions):
   1. the hash is computed from the SAME extraction the copy gate audits
      (email_extract.collect_email_envelope -- single implementation);
   2. an approval is ONE-SHOT: consumed atomically on allow;
@@ -119,7 +119,7 @@ _ROOT = os.path.dirname(os.path.dirname(_HERE))
 # hook from a tmp install (<tmp>/scripts linked to the repo's scripts/;
 # abspath, not realpath, keeps <tmp> as the root).
 STORE_DIR = os.path.join(_ROOT, "store")
-DB_PATH = os.path.join(STORE_DIR, "claudeclaw.db")
+DB_PATH = os.path.join(STORE_DIR, "alfred.db")
 CONFIG_PATH = os.path.join(STORE_DIR, "autonomy-config.json")
 # EMAILALLANDOCIMZETT926: a standing recipient list, consulted at level 2 ONLY.
 # The owner asked for one address (his own) to receive notifications without a
@@ -667,7 +667,7 @@ def _post_daily_log(text: str):
         if not token:
             return False, "ures dashboard-token"
         url = "http://127.0.0.1:%s/api/daily-log" % _install_setting("WEB_PORT", "3420")
-        body = json.dumps({"agent_id": _install_setting("MAIN_AGENT_ID", "marveen"),
+        body = json.dumps({"agent_id": _install_setting("MAIN_AGENT_ID", "alfred"),
                            "content": text}, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(url, data=body, method="POST", headers={
             "Authorization": "Bearer " + token,
@@ -1312,7 +1312,7 @@ def main():
     try:
         payload = json.load(sys.stdin)
     except Exception:
-        # FAIL-CLOSED, deliberately DIVERGING from the copy gate (Marveen's
+        # FAIL-CLOSED, deliberately DIVERGING from the copy gate (Alfred's
         # #1149 review): the copy gate AUDITS and chooses session-liveness on
         # a broken harness payload; this gate AUTHORIZES, and an unreadable
         # payload on a send-matched call must not authorize anything. Loud

@@ -1,4 +1,4 @@
-// ISSUE2556X (marveen#2556): OWNER_ALERT_CHAT_ID, the owner's alert chat from the settings page. With two paired DMs
+// ISSUE2556X (alfred#2556): OWNER_ALERT_CHAT_ID, the owner's alert chat from the settings page. With two paired DMs
 // and the installer's ALLOWED_CHAT_ID=0 the alert resolver refuses to guess, and every system alert was lost; the key
 // names the chat outright. Delivery only: who the owner IS (the command gate, the ledger) is not touched.
 // The three ports (TS, shell, Python) are held to one table, as owner-chat-parity.test.ts does for the old rule.
@@ -42,7 +42,7 @@ function makeInstall(c: Case): string {
   const dir = mkdtempSync(join(tmpdir(), 'owner-alert-chat-'))
   dirs.push(dir)
   const provider = c.provider ?? 'telegram'
-  let env = 'MAIN_AGENT_ID=marveen\n'
+  let env = 'MAIN_AGENT_ID=alfred\n'
   if (c.install !== undefined) env += `CHANNEL_PROVIDER=${c.install}\n`
   if (c.envChat !== undefined) env += `${ENV_KEY[provider]}=${c.envChat}\n`
   if (c.envLine !== undefined) env += `OWNER_ALERT_CHAT_ID=${c.envLine}\n`
@@ -282,7 +282,7 @@ describe('where the key is read (pinned in source)', () => {
   })
   it('the owner-identity sites do not', () => {
     for (const f of ['src/web/routes/commands.ts', 'src/web/midturn-commands.ts', 'src/web/inbound-probe.ts', 'src/db.ts',
-      'scripts/hooks/marveen-commands.py', 'scripts/hooks/ledger-capture.py', 'scripts/hooks/ledger-outbound.py',
+      'scripts/hooks/alfred-commands.py', 'scripts/hooks/ledger-capture.py', 'scripts/hooks/ledger-outbound.py',
       'scripts/watchdog-inbound-prober.py']) {
       expect(src(f), f).not.toMatch(/OWNER_ALERT_CHAT|ownerAlertChatOverride|resolveAlertDeliveryChat|resolve_alert_chat|alert_chat_override/)
     }

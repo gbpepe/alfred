@@ -7,12 +7,12 @@
 // covers cold launches (launchd start, manual `launchctl kickstart`).
 //
 // What it does NOT cover: the in-process respawn-pane recovery paths in
-// channel-monitor.ts (resumeMarveenSession and respawnMarveenSessionFresh).
+// channel-monitor.ts (resumeAlfredSession and respawnAlfredSessionFresh).
 // Those call `tmux respawn-pane` directly with the claude command, completely
 // bypassing channels.sh - so the post-init unlock never runs. The
 // 2026-06-01 18:55 incident demonstrated this end-to-end: the keep-alive
-// staleness watchdog fired respawnMarveenSessionFresh at 18:55:09, the new
-// session came up cleanly, but the Telegram plugin landed in `◯ disabled`
+// staleness watchdog fired respawnAlfredSessionFresh at 18:55:09, the new
+// session came up cleanly, but the channel plugin landed in `◯ disabled`
 // (likely a side-effect of a prior unlock-while-already-running cycle
 // disabling it) and stayed there because no unlock probe was scheduled.
 // The channel was offline for ~6 minutes until manually rescued via /mcp.
@@ -44,7 +44,7 @@ import { stripAllAnsi, stripGhostSuggestion, idleConsideringDimGhost, liveFooter
 const TMUX = resolveFromPath('tmux')
 
 // Mirror of scripts/channels.sh post-init grace. The plugin handshake
-// (bun spawn + Telegram getMe + sendMessage) usually completes within 15s
+// (bun spawn + initial channel handshake) usually completes within 15s
 // of the claude TUI being interactive. After scheduleIdentitySetup's
 // 8s modal-dismiss + 5s /rename + a ~1s safety buffer, the prompt is ready
 // around T+15s. We wait another 20s on top of that so a healthy plugin
@@ -55,7 +55,7 @@ const UNLOCK_PROBE_DELAY_MS = 35_000
 // If the bun child still hasn't appeared the first time we look, give it
 // one more grace window before we conclude the plugin is wedged. Some
 // installs see the bun process appear only after the first inbound poll,
-// which can be delayed if Telegram's long-poll happens to be quiet.
+// which can be delayed if the channel connection is still settling.
 const UNLOCK_PROBE_RETRY_DELAY_MS = 15_000
 const UNLOCK_PROBE_MAX_RETRIES = 2
 
@@ -364,7 +364,7 @@ function runUnlockProbe(state: UnlockProbeState): void {
  * Schedule a post-respawn unlock probe for the main channels session.
  *
  * Call this fire-and-forget right after `tmux respawn-pane` in any in-process
- * recovery path (resumeMarveenSession, respawnMarveenSessionFresh, etc.).
+ * recovery path (resumeAlfredSession, respawnAlfredSessionFresh, etc.).
  * The probe waits for the new claude session to finish cold-starting, then
  * checks `pgrep -P <claude_pid> bun`:
  *   - bun child present: plugin healthy, do nothing.

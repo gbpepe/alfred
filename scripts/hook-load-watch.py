@@ -82,7 +82,7 @@ Exit codes: 0 measured (tick: findings, if any, were alerted or are within the r
 Env:
   HOOK_LOAD_WATCH_ROOT          install root (default: this script's parent's parent)
   HOOK_LOAD_WATCH_STATE_DIR     stamp and alert state (default <root>/store)
-  HOOK_LOAD_WATCH_TO            alert recipient (default .env MAIN_AGENT_ID, then marveen)
+  HOOK_LOAD_WATCH_TO            alert recipient (default .env MAIN_AGENT_ID, then alfred)
   HOOK_LOAD_WATCH_FROM          alert sender (default: the rule above)
   HOOK_LOAD_WATCH_API           dashboard base URL (default http://localhost:<.env WEB_PORT or 3420>)
   HOOK_LOAD_WATCH_ALERT_DRYRUN  1: print "ALERT_DRYRUN: <message>" instead of the POST (tests)
@@ -927,7 +927,7 @@ def send(content):
         print("ALERT_DRYRUN: " + content, flush=True)
         return True
     env = read_env_keys(("MAIN_AGENT_ID", "SYSTEM_SENDER_IDS", "WEB_PORT"))
-    main_id = env.get("MAIN_AGENT_ID") or "marveen"
+    main_id = env.get("MAIN_AGENT_ID") or "alfred"
     listed = {re.sub(r"[^A-Za-z0-9_-]", "", e) for e in env.get("SYSTEM_SENDER_IDS", "").split(",")}
     sender = os.environ.get("HOOK_LOAD_WATCH_FROM") or (SENDER_ID if SENDER_ID in listed else main_id)
     to = os.environ.get("HOOK_LOAD_WATCH_TO") or main_id

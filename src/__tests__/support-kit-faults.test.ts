@@ -94,7 +94,7 @@ describe('the kit on disk, when something goes wrong', () => {
   let kitDir: string
 
   const write = (files: KitFileSource[]) =>
-    writeKit({ supportDir, files, installRoot: '/opt/marveen', nodePath: '/usr/bin/node', nodeMin: 20, release: RELEASE, sleep: noSleep })
+    writeKit({ supportDir, files, installRoot: '/opt/alfred', nodePath: '/usr/bin/node', nodeMin: 20, release: RELEASE, sleep: noSleep })
   async function failureOf(work: () => Promise<unknown>): Promise<{ code: unknown; message: string }> {
     try {
       await work()
@@ -118,7 +118,7 @@ describe('the kit on disk, when something goes wrong', () => {
   beforeEach(() => {
     noFault()
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-kit-faults-')))
-    supportDir = join(root, 'home', '.marveen', 'support')
+    supportDir = join(root, 'home', '.alfred', 'support')
     kitDir = join(supportDir, KIT_SUBFOLDER)
   })
   afterEach(() => {
@@ -235,7 +235,7 @@ describe('the kit on disk, when something goes wrong', () => {
       mkdirSync(other, { recursive: true })
       fault.foreignOwned = [other]
       const failure = await failureOf(() =>
-        writeKit({ supportDir: other, files: FILES_2, installRoot: '/opt/marveen', nodePath: '/usr/bin/node', nodeMin: 20, release: RELEASE, sleep: noSleep }),
+        writeKit({ supportDir: other, files: FILES_2, installRoot: '/opt/alfred', nodePath: '/usr/bin/node', nodeMin: 20, release: RELEASE, sleep: noSleep }),
       )
       expect(failure.code).toBe('kit_foreign_owner')
       noFault()

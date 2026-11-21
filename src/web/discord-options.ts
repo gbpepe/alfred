@@ -1,7 +1,7 @@
 // /options (owner request 2026-11-15): the Discord channel's switches, their current values and where each is set.
 // Read-only, Discord-only. Two sources:
 //   1. the Discord plugin's access.json (its state dir), set in the terminal with /discord:access;
-//   2. Marveen's Discord overlay settings (config registry, effective value), set on the dashboard.
+//   2. Alfred's Discord overlay settings (config registry, effective value), set on the dashboard.
 // No ids of people or roles (counts only), never a token. A channel id is shown: it names the channel.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -61,16 +61,16 @@ function settingLine(key: string, r: SettingRead, render: (v: string) => string)
   return `${key}: ${render(r.value)}${r.source === 'default' ? ' (alap)' : ''}`
 }
 
-// As the patcher reads the switch (scripts/patch-telegram-plugin.py is_on, the settings store's flag reading):
+// As the patcher reads the switch (scripts/patch-discord-plugin.py, the settings store's flag reading):
 // 1/true/yes/on is on, anything else off ("igen" included).
 function onOff(v: string): string {
   return isSettingValueOn(v) ? 'be' : 'ki'
 }
 
-// The overlay's id shape (marveen-ext.ts SNOWFLAKE_ID).
+// The overlay's id shape (alfred-ext.ts SNOWFLAKE_ID).
 const SNOWFLAKE_ID = /^[0-9]{15,20}$/
 
-// What the overlay's parseChannelPolicy keeps (marveen-ext.ts): a channel id with an object that has a valid role or
+// What the overlay's parseChannelPolicy keeps (alfred-ext.ts): a channel id with an object that has a valid role or
 // a literal true switch; only valid role ids count. The rest is dropped by the plugin, so it is counted apart.
 function channelPolicyLines(raw: string): { lines: string[]; kept: number } {
   const t = raw.trim()
@@ -107,7 +107,7 @@ export function discordOptionsText(deps: OptionsDeps = defaultOptionsDeps): stri
       out.push(`  · ${oneLine(ch, 25)}: megszólítás kell ${rm}, allowFrom ${count(g?.allowFrom)} fő`)
     }
   }
-  out.push('', 'Marveen-bővítés · állítás: dashboard, Beállítások, Csatornák')
+  out.push('', 'Alfred-bővítés · állítás: dashboard, Beállítások, Csatornák')
   out.push(settingLine('DISCORD_PLUGIN_EXT', deps.setting('DISCORD_PLUGIN_EXT'), onOff))
   out.push(settingLine('DISCORD_OWNER_USER_ID', deps.setting('DISCORD_OWNER_USER_ID'), v => (v.trim() ? 'beállítva' : 'nincs beállítva')))
   out.push(settingLine('DISCORD_BACKFILL', deps.setting('DISCORD_BACKFILL'), onOff))

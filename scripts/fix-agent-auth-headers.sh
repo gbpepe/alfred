@@ -22,8 +22,8 @@ fi
 python3 - "${TARGETS[@]}" <<'PYEOF'
 import re, sys, pathlib
 
-AUTH_INLINE = '-H "Authorization: Bearer $(cat ~/ClaudeClaw/store/.dashboard-token)" '
-AUTH_BLOCK = '  -H "Authorization: Bearer $(cat ~/ClaudeClaw/store/.dashboard-token)" \\\n'
+AUTH_INLINE = '-H "Authorization: Bearer $(cat ~/Alfred/store/.dashboard-token)" '
+AUTH_BLOCK = '  -H "Authorization: Bearer $(cat ~/Alfred/store/.dashboard-token)" \\\n'
 
 # Multi-line curl block: "curl ... localhost:3420/api/... \\" followed by -H
 # lines, ending with a -d payload. Backfill the Authorization header before -d.

@@ -1,6 +1,6 @@
 {
-  "name": "Marveen Dashboard",
-  "short_name": "Marveen",
+  "name": "Alfred Dashboard",
+  "short_name": "Alfred",
   "description": "AI fleet management dashboard",
   "start_url": "/",
   "display": "standalone",

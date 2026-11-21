@@ -46,13 +46,13 @@ it('the sub-agent list is exactly the plan\'s: the root .env, five store files, 
   // .channels-config/.claude.json is covered by the .channels-config directory entry (#2503), not listed twice.
   expect(SUBAGENT_PROTECTED_INSTALL_PATHS.map((t: { rel?: string; home?: string }) => t.rel ?? `~/${t.home}`))
     .toEqual(['.env', ...STORE_FILES.map((f) => `store/${f}`), '~/.claude/settings.json', '~/.claude/settings.local.json', '.channels-config',
-      'agents/*/.mcp.json', 'agents/*/.claude-config/.claude.json', 'agents/*/.claude-config/.marveen-mcp-inherited.json',
+      'agents/*/.mcp.json', 'agents/*/.claude-config/.claude.json', 'agents/*/.claude-config/.alfred-mcp-inherited.json',
       '.mcp.json', '~/.claude.json',
       // PLUGINCODEWRITE1104: the plugin trees and the shared user-level trees
-      '~/.claude/plugins', 'plugins', '~/marveen-local-plugins', '~/.claude/agents', '~/.claude/skills', '~/.claude/hooks',
+      '~/.claude/plugins', 'plugins', '~/alfred-local-plugins', '~/.claude/agents', '~/.claude/skills', '~/.claude/hooks',
       'agents/*/.claude-config/plugins/installed_plugins.json', 'agents/*/.claude-config/plugins/known_marketplaces.json',
       // WORKERCFGDIR1104: the two workers' start-up files (the config dirs contain #2505's plugins entries)
-      ...['.marveen-worker', '.marveen-worker-fast'].flatMap((w) => ['.claude-config', '.claude', '.mcp.json', 'CLAUDE.md', 'CLAUDE.local.md'].map((f) => `~/${w}/${f}`)),
+      ...['.alfred-worker', '.alfred-worker-fast'].flatMap((w) => ['.claude-config', '.claude', '.mcp.json', 'CLAUDE.md', 'CLAUDE.local.md'].map((f) => `~/${w}/${f}`)),
       // CHANSTATEWRITE1104: the channel trust files and dirs under the three state roots
       ...['~/.claude/channels', '.claude/channels', 'agents/*/.claude/channels'].flatMap((b) => [
         'access.json', '.env', 'invites.json', 'inbound-evidence.jsonl', 'inbound-evidence.jsonl.1', 'inbox-pending.jsonl',

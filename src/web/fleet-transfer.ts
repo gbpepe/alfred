@@ -128,7 +128,7 @@ function identityIgnoredWarning(ignored: string[]): string {
     `Csak ${FLEET_IDENTITY_KEYS.join(', ')} vehető át, vezérlőkarakter nélküli értékkel.`
 }
 
-const CHANNEL_PROVIDER_IDS: readonly ChannelProviderType[] = ['telegram', 'slack', 'discord', 'googlechat', 'teams']
+const CHANNEL_PROVIDER_IDS: readonly ChannelProviderType[] = ['discord']
 
 // FLEETIMPORTFOLLOW1021: what the import would take over, checked against the
 // TARGET, shared by the dry run and the apply so the two never disagree.
@@ -162,7 +162,7 @@ export function planIdentityTakeover(fleet: Pick<FleetJson, 'mainAgent' | 'agent
   }
   // The target's own MAIN_AGENT_ID is never a sub-agent there: the main agent lives in
   // PROJECT_ROOT, and the agent API refuses that name. A directory with it is a stray
-  // (agents/marveen drafts on a host), and re-importing the id the target already runs
+  // (agents/alfred drafts on a host), and re-importing the id the target already runs
   // under changes nothing, so it does not count. A sub-agent the import brings still does.
   const onTarget = listAgentNames().filter(n => n !== MAIN_AGENT_ID)
   const subAgents = new Set([...onTarget, ...(fleet.agents ?? []).map(a => String(a.name))])
@@ -261,8 +261,8 @@ export interface VaultExport {
   entries: Record<string, unknown>[]
   bindings: Record<string, unknown>[]
   // NOTE: channel .env (bot tokens) deliberately NOT exported -- re-pair model:
-  // a Telegram bot accepts only one active poller; exporting+auto-activating tokens
-  // would cause 409 errors and silent messages on the source. Target must re-pair manually.
+  // a channel bot accepts only one active poller; exporting+auto-activating tokens
+  // would cause contention and silent messages on the source. Target must re-pair manually.
 }
 
 export interface DiffReport {
@@ -583,7 +583,7 @@ function exportChannelsAccess(channelsDir: string): Record<string, unknown> {
 // exportChannelsAccess's behaviour.
 function exportMainChannelAccessResolved(): Record<string, unknown> {
   const out: Record<string, unknown> = {}
-  const providers: ChannelProviderType[] = ['telegram', 'slack', 'discord', 'googlechat', 'teams']
+  const providers: ChannelProviderType[] = ['discord']
   for (const provider of providers) {
     const accessPath = join(channelStateDir(provider), 'access.json')
     if (existsSync(accessPath)) out[provider] = safeReadJson(accessPath)
@@ -1080,7 +1080,7 @@ function writeMainAgentFiles(ma: MainAgentExport, tracker: WriteTracker): void {
   // known providers (install-scoped on a fresh target), legacy shared base for
   // anything else. B1: provider names validated by validateNames() first.
   const channelsBase = join(homedir(), '.claude', 'channels')
-  const knownProviders = new Set(['telegram', 'slack', 'discord', 'googlechat', 'teams'])
+  const knownProviders = new Set(['discord'])
   for (const [provider, access] of Object.entries(ma.channelsAccess ?? {})) {
     const provDir = knownProviders.has(provider)
       ? channelStateDir(provider as ChannelProviderType)

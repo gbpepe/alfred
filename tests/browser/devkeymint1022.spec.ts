@@ -20,9 +20,9 @@ async function open(page: import('@playwright/test').Page, status: Record<string
     r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ keys: [] }) }))
   await page.addInitScript((l) => {
     try {
-      localStorage.setItem('marveen.lang', l)
+      localStorage.setItem('alfred.lang', l)
       if (!sessionStorage.getItem('devkey-seeded')) {
-        localStorage.setItem('marveen-dashboard-token', 'a'.repeat(64))
+        localStorage.setItem('alfred-dashboard-token', 'a'.repeat(64))
         sessionStorage.setItem('devkey-seeded', '1')
       }
     } catch { /* ignore */ }
@@ -45,9 +45,9 @@ test.describe('DEVKEYMINT1022 -- token-mode browser on an install with a login',
     await expect(btn).toHaveText('Belépés a dashboard-jelszóval')
     await expect(page.locator('#authBridgeKeyLine')).toHaveCount(0)
     await page.screenshot({ path: 'test-results/devkeymint1022-hu.png', fullPage: false })
-    expect(await page.evaluate(() => localStorage.getItem('marveen-dashboard-token'))).toBe('a'.repeat(64))
+    expect(await page.evaluate(() => localStorage.getItem('alfred-dashboard-token'))).toBe('a'.repeat(64))
     await Promise.all([page.waitForEvent('load'), btn.click()])
-    expect(await page.evaluate(() => localStorage.getItem('marveen-dashboard-token'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('alfred-dashboard-token'))).toBeNull()
     expect(errors, `page errors: ${errors.join(' | ')}`).toEqual([])
   })
 

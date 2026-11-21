@@ -1,6 +1,6 @@
 """Is this UserPromptSubmit prompt an owner slash command from Telegram (or a Discord slash command)?
 
-One definition for every hook that must agree on it. marveen-commands.py
+One definition for every hook that must agree on it. alfred-commands.py
 blocks such a prompt (exit 2) when the dashboard answers it, so the model
 never sees that turn. The hooks running ALONGSIDE it must not consume state
 into it: inbox-drain.py marked an inter-agent message "delivered" and printed

@@ -1,33 +1,25 @@
-import { postAgentCreateToGromzo } from '../agent-create-gromzo.js'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { PROJECT_ROOT, MAIN_AGENT_ID, TELEGRAM_BOT_TOKEN, CHANNEL_PROVIDER, CHANNEL_TOKEN, DASHBOARD_PUBLIC_URL, WEB_PORT } from '../../config.js'
+import { PROJECT_ROOT, MAIN_AGENT_ID, CHANNEL_PROVIDER, DASHBOARD_PUBLIC_URL, WEB_PORT } from '../../config.js'
 import {
   consumeApproval, consumeCategoryApproval,
   CATEGORY_CONSUME_DEFAULT_WINDOW_S, CATEGORY_CONSUME_MAX_WINDOW_S,
   createApproval, getApproval, resolveApproval, listApprovals, expireTimedOutApprovals,
-  createAgentMessage, setApprovalTelegramMessageId, decideApproval,
+  createAgentMessage, decideApproval,
   type Approval,
 } from '../../db.js'
 import { logger } from '../../logger.js'
 import { readBody, readBodyOrRefuse, json } from '../http-helpers.js'
 import { approvalGranteeOf, approvalNotGrantedReason, identityDenialBody } from '../auth-gate.js'
-import { ownerAlertChatOverride, resolveOwnerChatId } from '../../owner-chat.js'
-import { sendOwnerMessage, sendOwnerSlackDm, slackTargetFor, noticeTargetDrift } from '../../notify.js'
-import { getEffectiveSettingValue } from '../../settings-store.js'
-import { mainBotToken, ownerDmVerdict, SLACK_CHUNK } from '../../slack-notify.js'
-import { reactionRoute, reactionsOn, repliesOn, dashboardOnlyLine, postReactionPrompt, startApprovalSlackSweeper, type RouteDeps } from '../approval-slack-route.js'
+import { sendOwnerMessage } from '../../notify.js'
 import { OWNER_TEXT, formatExpiry, type ApprovalLang } from '../approval-texts.js'
 import { approvalTextLang } from '../agent-text-lang.js'
-import { sendTelegramMessage } from '../telegram.js'
-import { teamsCardRoute, teamsCardsOn, postApprovalCard, handleTeamsCardAction, type TeamsCardDeps } from '../approval-teams-card.js'
-import { sendTeamsMessage } from '../../teams-send.js'
-import { readTeamsCreds, channelStateDir } from '../../channel-provider.js'
 import { mayActAsOwner, OWNER_SESSION_REQUIRED, refuseOwner } from './auth.js'
 import type { RouteContext } from './types.js'
 import { fileAgentSpecRequest, AGENT_CREATE_CATEGORY } from '../agent-create-approval.js'
-import { readVaultAcl, isAgentReadableDecodedVaultId, claimedAgentOf } from '../vault-acl.js'
+import { claimedAgentOf, isAgentReadableDecodedVaultId, readVaultAcl } from '../vault-acl.js'
+import { getEffectiveSettingValue } from '../../settings-store.js'
 
 // Kanban 80d0e3c6: APPROVING is the owner's decision, so the two routes that make a row approved
 // (the born-approved POST and PATCH status=approved) take an owner credential. Measured before:
@@ -153,14 +145,13 @@ export function categoryWindowSeconds(v: unknown): number | null {
 }
 
 // The dashboard's Approvals page as the BROWSER reaches it (DASHBOARD_PUBLIC_URL, else this host's port), for the
-// owner's message (APPROVALSLACK1030: the decision is one tap away). Exported for tests.
+// owner's message. Exported for tests.
 export function approvalsPageUrl(publicUrl: string = DASHBOARD_PUBLIC_URL, port: number = WEB_PORT): string {
   return `${publicUrl.trim().replace(/\/+$/, '') || `http://localhost:${port}`}/#approvals`
 }
 
-// Owner-facing text (Slack DM or the channel provider). Pure + exported for
-// tests. Plain text (no markdown escaping concerns), proper accents: this is
-// outgoing copy.
+// Owner-facing text. Pure + exported for tests. Plain text (no markdown escaping concerns),
+// proper accents: this is outgoing copy.
 // APPROVALTAGEN1108: in [lang] (approval-texts.ts), the install's explicit AGENT_TEXT_LANG by default.
 export function buildOwnerApprovalText(approval: Approval, lang: ApprovalLang = approvalTextLang()): string {
   const t = OWNER_TEXT[lang]
@@ -193,7 +184,7 @@ export function buildOwnerChatApprovedText(approval: Approval, ownerMessageId: n
 // agent, there is no in-band signal left at all: the leg-2 short-circuit
 // below skips the main-agent message unconditionally. The old self-notify was
 // useless but VISIBLE -- losing even that would rebuild the closed loop this
-// card documents, one layer deeper (Marveen's review finding on #1026).
+// card documents, one layer deeper (Alfred's review finding on #1026).
 // Everyone else already got the normal main-agent notify, so the fallback is
 // main-requester-only. The marker names the reason so the reader knows this
 // is a degraded delivery, not the normal path.
@@ -216,149 +207,36 @@ function fallbackInBand(approval: Approval, reason: string): void {
 
 // APPROVALVAK821 (a) -- the request must reach the OWNER, not only the main
 // agent's inter-agent queue. Fire-and-forget on purpose: the POST response
-// must not wait on the Telegram round-trip, and a failed send must not fail
-// the request -- but it must be LOUD in the logs, because a silently
-// undelivered approval is exactly the closed loop this fixes.
+// must not wait on the network round-trip, and a failed send must not fail
+// the request -- but it must be LOUD in the logs.
 //
 // With `chatApprovedMessageId` set, the row is already approved (the owner said
 // yes in that chat message) and the owner gets the informative note instead of
-// the question. Two things differ on that path: the note's own message id is
-// NOT stamped (telegram_message_id already names the owner's approving
-// message), and a failed note does NOT fall back in-band -- the only requester
-// allowed on this path is the main agent, which already knows the action is
-// approved; an [APPROVAL_REQUEST] marker would mislead it.
-// APPROVALSLACK1030 (2): what the reaction path reads, in one place (tests replace it).
-export const reactionDeps: RouteDeps = {
-  setting: (key) => String(getEffectiveSettingValue(key) ?? ''),
-  token: () => mainBotToken(),
-  ownerTarget: async () => (await slackTargetFor('owner')) || '',
-  verdict: (channel, owner) => ownerDmVerdict(channel, owner),
-  drift: (current) => noticeTargetDrift(current),
-  chunk: SLACK_CHUNK,
-  lang: () => approvalTextLang(),
-}
+// the question.
 
-// TEAMSAPPROVECARD1118: what the Teams approval card reads, in one place (tests replace it).
-export const teamsCardDeps: TeamsCardDeps = {
-  setting: (key) => String(getEffectiveSettingValue(key) ?? ''),
-  creds: () => (CHANNEL_PROVIDER === 'teams' && CHANNEL_TOKEN ? readTeamsCreds(CHANNEL_TOKEN) : null),
-  stateDir: () => channelStateDir('teams'),
-  send: sendTeamsMessage,
-  alert: (text) => { void sendOwnerMessage(text) },
-}
-
-/** AGENTCREATEPR3-1119: the owner's channel ask of a filed agent_create request (a server-filed request: the text is the
- *  server's). A seam for the test that a failing delivery leaves the request pending. */
+/** AGENTCREATEPR3-1119: the owner's channel ask of a filed agent_create request. */
 const notifyAgentCreateDefault = (approval: Approval, lang: ApprovalLang): void => {
   notifyOwner(approval, null, true, lang)
-  // AGENTCREATEPR3-1119: also on the owner's Gromzo app when mxd can take decisions (never blocks; logged when not)
-  void postAgentCreateToGromzo(approval, lang)
 }
 let agentCreateNotifier = notifyAgentCreateDefault
 function notifyAgentCreateOwner(approval: Approval, lang: ApprovalLang): void { agentCreateNotifier(approval, lang) }
 /** Test seam: the owner's channel ask of one request, as a server-filed one. */
 export function _notifyOwnerForTest(approval: Approval, lang: ApprovalLang): void { notifyOwner(approval, null, true, lang) }
-/** Test seam: the agent_create notifier in force (the default asks the channels and the Gromzo app). */
+/** Test seam: the agent_create notifier in force. */
 export function _runAgentCreateNotifierForTest(approval: Approval, lang: ApprovalLang): void { agentCreateNotifier(approval, lang) }
 export function _setAgentCreateNotifierForTest(fn: ((approval: Approval, lang: ApprovalLang) => void) | null): void {
   agentCreateNotifier = fn ?? notifyAgentCreateDefault
 }
 
-function notifyOwner(approval: Approval, chatApprovedMessageId: number | string | null = null, serverFiled = false, filedLang?: ApprovalLang): void {
+function notifyOwner(approval: Approval, chatApprovedMessageId: number | string | null = null, _serverFiled = false, filedLang?: ApprovalLang): void {
   const informative = chatApprovedMessageId != null
-  // APPROVALTAGEN1108: the language is read ONCE per request: the text, the Slack DM, its expiry and the language
-  // stored with the post (the words its replies are checked with) are the same one. A server-filed request passes the
-  // language its description was worded in (Samu 73350), so the description and the post never differ.
-  const lang = filedLang ?? (reactionDeps.lang ?? approvalTextLang)()
-  let text = informative
+  const lang = filedLang ?? approvalTextLang()
+  const text = informative
     ? buildOwnerChatApprovedText(approval, chatApprovedMessageId, lang)
     : buildOwnerApprovalText(approval, lang)
   void (async () => {
-    // APPROVALSLACK1030 (2): the owner decides with a Slack reaction the server itself checks, when this request may
-    // (approval-slack-route.ts); otherwise the normal DM below, saying the decision is on the dashboard.
-    // APPROVALSLACK1030 B: with APPROVAL_SLACK_REPLIES on, the same one-message path, and the owner's typed reply decides.
-    // TEAMSAPPROVECARD1118: on a Teams install with the card switch on, an email_send request whose envelope the server
-    // can verify goes out as the server-rendered card; anything else gets the normal message saying where to decide.
-    if (!informative && CHANNEL_PROVIDER === 'teams' && teamsCardsOn(teamsCardDeps.setting)) {
-      const route = teamsCardRoute(approval, teamsCardDeps)
-      if (route.ok && await postApprovalCard(approval, route, formatExpiry(approval.timeout_at, lang), lang, teamsCardDeps)) return
-      text += '\n' + OWNER_TEXT[lang].teamsCardOnly(route.ok ? 'teams_post_failed' : route.reason)
-    }
-    if (!informative && (reactionsOn(reactionDeps.setting) || repliesOn(reactionDeps.setting))) {
-      const expires = formatExpiry(approval.timeout_at, lang)
-      const route = await reactionRoute(approval, serverFiled, reactionDeps, expires, approvalsPageUrl(), lang)
-      if (route.ok && await postReactionPrompt(approval, route)) return
-      text += '\n' + dashboardOnlyLine(route.ok ? 'slack_post_failed' : route.reason, lang)
-    }
-    // APPROVALSLACK1030: an owner who moved to Slack (NOTIFY_SLACK_TARGET set) while the channel provider stays
-    // Telegram got the request on Telegram (measured 2026-10-30: both of the day's requests logged this function's
-    // Telegram branch, its messageId and no provider). The owner asked for Slack only: the request goes to the owner's
-    // Slack DM, and a miss falls back in-band, never to Telegram.
-    // AGENTCREATEPR3-1119 (Samu 81756, 2): an agent_create text longer than one Slack message is never split; the DM is a
-    // short pointer to the dashboard (no post row: no reply to it approves anything).
-    if (approval.category === 'agent_create' && text.length > reactionDeps.chunk) text = OWNER_TEXT[lang].agentCreateTooLong(approval.id, approvalsPageUrl())
-    const slack = await sendOwnerSlackDm(text)
-    if (slack.attempted) {
-      if (slack.sent) {
-        logger.info({ approvalId: approval.id, provider: 'slack', informative }, 'approval owner notification sent')
-        return
-      }
-      if (slack.error === 'no_slack_token') {
-        logger.warn({ approvalId: approval.id, provider: 'slack', informative }, 'approval owner notification suppressed: no channel token')
-        if (!informative) fallbackInBand(approval, 'no-token')
-        return
-      }
-      if (slack.error?.startsWith('unresolved_target')) {
-        logger.warn({ approvalId: approval.id, provider: 'slack', informative }, 'approval owner notification suppressed: no owner chat')
-        if (!informative) fallbackInBand(approval, 'no-owner-chat')
-        return
-      }
-      logger.warn({ approvalId: approval.id, provider: 'slack', error: slack.error, informative },
-        'approval owner notification FAILED -- the request is only visible on the dashboard')
-      if (!informative) fallbackInBand(approval, 'send-failed')
-      return
-    }
-
-    // APPROVALVAK821 fixed this path so the request reaches the OWNER and not
-    // only the main agent's queue -- but the fix went out Telegram-only, so on
-    // any install that speaks another provider the old silence came straight
-    // back. Measured on a Discord install 2026-09-26: every approval request
-    // logged `owner notification suppressed: no TELEGRAM_BOT_TOKEN`, the owner
-    // was told nothing, and the only notification went to the main agent, i.e.
-    // to the very agent whose request it was. An approval gate whose owner
-    // never hears about it is not a gate.
-    //
-    // The Telegram branch is kept for Telegram installs ONLY because it also
-    // records the message id (setApprovalTelegramMessageId); every other
-    // provider goes through sendOwnerMessage, which resolves provider, token
-    // and owner chat the same way every other owner message does.
-    if (CHANNEL_PROVIDER === 'telegram' && TELEGRAM_BOT_TOKEN) {
-      const ownerChat = ownerAlertChatOverride('telegram') ?? resolveOwnerChatId()
-      if (!ownerChat) {
-        logger.warn({ approvalId: approval.id, informative }, 'approval owner notification suppressed: no owner chat')
-        if (!informative) fallbackInBand(approval, 'no-owner-chat')
-        return
-      }
-      try {
-        const messageId = await sendTelegramMessage(TELEGRAM_BOT_TOKEN, ownerChat, text)
-        if (!informative && messageId != null) setApprovalTelegramMessageId(approval.id, messageId)
-        logger.info({ approvalId: approval.id, messageId, informative }, 'approval owner notification sent')
-      } catch (err) {
-        logger.warn({ err, approvalId: approval.id, informative }, 'approval owner notification FAILED -- the request is only visible on the dashboard')
-        if (!informative) fallbackInBand(approval, 'send-failed')
-      }
-      return
-    }
-
-    // sendOwnerMessage REPORTS whether it went out (PR1655 review, ask 2). The
-    // funnel it wraps swallows every provider exception, so a `catch` here
-    // would be unreachable and a failed Discord send would be recorded as a
-    // delivered notification. The result is read instead.
-    // The literals below are deliberate, not a computed reason string: the
-    // delivery contract test (approvals-delivery.test.ts) reads this function's
-    // SOURCE and requires every failure path to name its fallback explicitly.
-    // That test exists so a refactor cannot quietly drop a fallback -- and it
-    // caught exactly that when this branch first used a template string.
+    // sendOwnerMessage REPORTS whether it went out. The literals below are deliberate:
+    // approvals-delivery.test.ts checks that every failure path names its fallback explicitly.
     const r = await sendOwnerMessage(text)
     if (r.sent) {
       logger.info({ approvalId: approval.id, provider: CHANNEL_PROVIDER, informative }, 'approval owner notification sent')
@@ -383,12 +261,8 @@ function notifyOwner(approval: Approval, chatApprovedMessageId: number | string 
 }
 
 function notifyMainAgent(approval: Approval): void {
-  // APPROVALVAK821 (b): when the requester IS the main agent, this used to
-  // deliver the notification back to the requester itself -- which counted as
-  // "notified" while no human ever saw it. The owner Telegram above is the
-  // real notification; a self-addressed message is noise that hides the gap.
   if (approval.agent_id === MAIN_AGENT_ID) {
-    logger.info({ approvalId: approval.id }, 'approval main-agent notify skipped: requester is the main agent (owner is notified on Telegram)')
+    logger.info({ approvalId: approval.id }, 'approval main-agent notify skipped: requester is the main agent (owner is notified on channel)')
     return
   }
   try {
@@ -407,7 +281,7 @@ function notifyMainAgent(approval: Approval): void {
   }
 }
 
-// MARVEENGAPS1020 (a): a route that needs an approval files it itself, with a
+// ALFREDGAPS1020 (a): a route that needs an approval files it itself, with a
 // description it built from the real object, on the same path as POST
 // /api/approvals: same row, same timeout rule, same owner and main-agent
 // notification. The requester cannot word the request the owner reads.
@@ -419,7 +293,7 @@ export function fileServerApproval(params: {
   action_payload?: string | null
   content_hash: string
 }): Approval {
-  const lang = (reactionDeps.lang ?? approvalTextLang)()
+  const lang = approvalTextLang()
   const description = typeof params.action_description === 'function' ? params.action_description(lang) : params.action_description
   const approval = createApproval({
     id: randomUUID(),
@@ -430,21 +304,10 @@ export function fileServerApproval(params: {
     timeout_at: computeTimeoutAt(params.category, undefined),
     content_hash: params.content_hash,
   })
-  // serverFiled: the description is the server's own words, so the reaction path may show it (APPROVALSLACK1030 (2)).
   notifyOwner(approval, null, true, lang)
   notifyMainAgent(approval)
   logger.info({ id: approval.id, agent_id: approval.agent_id, category: approval.category }, 'Approval request filed by the server')
   return approval
-}
-
-/** APPROVALSLACK1030 (2) and B: the owner's Slack reactions and typed replies, read by the server (idle while both switches are off). */
-export function startApprovalReactionSweeper(): NodeJS.Timeout {
-  return startApprovalSlackSweeper({
-    setting: reactionDeps.setting,
-    token: reactionDeps.token,
-    pageUrl: approvalsPageUrl(),
-    alert: (t) => { void sendOwnerSlackDm(t).catch(() => {}) },
-  })
 }
 
 export function startApprovalTimeoutSweeper(): NodeJS.Timeout {
@@ -516,20 +379,6 @@ function handleCategoryConsume(ctx: RouteContext, id: string, body: Record<strin
 
 export async function tryHandleApprovals(ctx: RouteContext): Promise<boolean> {
   const { req, res, path, method, url } = ctx
-
-  // POST /api/approvals/teams-card-action -- TEAMSAPPROVECARD1118: an approval-card click forwarded by the Teams
-  // plugin. No dashboard token is taken here (auth-gate requiresAuth): the handler checks the Bot Framework channel
-  // token itself, and only a click on the server-posted card by the owner decides (web/approval-teams-card.ts).
-  if (path === '/api/approvals/teams-card-action' && method === 'POST') {
-    const raw = await readBodyOrRefuse(req, res, { maxBytes: 64 * 1024 })
-    if (!raw) return true
-    let activity: unknown
-    try { activity = JSON.parse(raw.toString()) } catch { json(res, { error: 'Invalid JSON' }, 400); return true }
-    const auth = req.headers.authorization
-    const answer = await handleTeamsCardAction(typeof auth === 'string' ? auth : undefined, activity, teamsCardDeps)
-    json(res, answer.body, answer.status)
-    return true
-  }
 
   // POST /api/agent-specs -- AGENTCREATEPR2-1119: an agent files an agent_create REQUEST (the shared token too: nothing
   // is created here). The server validates and stores the spec, and opens an approval bound to its hash. Off unless
@@ -646,11 +495,8 @@ export async function tryHandleApprovals(ctx: RouteContext): Promise<boolean> {
     // value of the right shape passes. Whether the owner approved this action
     // in the chat is the main agent's judgement, not a server check.
     //
-    // The id is the owner's approving chat message: a positive integer
-    // (Telegram), or a short id string for providers whose message ids are not
-    // safe integers (a Slack ts, a Discord snowflake). Only an integer id is
-    // stored in the row's telegram_message_id column (INTEGER, the same column
-    // PATCH writes); a string id is kept in the owner note and the log line.
+    // The id is the owner's approving chat message (e.g. a Discord snowflake
+    // or positive integer message id), kept in the owner note and the log line.
     let chatApprovedMessageId: number | string | null = null
     if (owner_approved_message_id !== undefined && owner_approved_message_id !== null) {
       if (!mayActAsOwner(ctx.auth, req)) {
@@ -686,8 +532,7 @@ export async function tryHandleApprovals(ctx: RouteContext): Promise<boolean> {
     if (chatApprovedMessageId != null) {
       // Same resolve path as PATCH, so the row is indistinguishable from a
       // PATCH-approved one for every reader (e.g. the email-approval-gate).
-      resolveApproval(id, 'approved', `${CHANNEL_PROVIDER}_text`,
-        typeof chatApprovedMessageId === 'number' ? chatApprovedMessageId : null)
+      resolveApproval(id, 'approved', `${CHANNEL_PROVIDER}_text`)
       approval = getApproval(id) ?? approval
     }
 
@@ -804,7 +649,7 @@ export async function tryHandleApprovals(ctx: RouteContext): Promise<boolean> {
 
   // PATCH /api/approvals/:id -- resolve (approve/reject/timeout)
   if (idMatch && method === 'PATCH') {
-    let body: { status?: unknown; resolved_by?: unknown; telegram_message_id?: unknown; content_hash?: unknown }
+    let body: { status?: unknown; resolved_by?: unknown; content_hash?: unknown }
     try {
       body = JSON.parse((await readBody(req)).toString())
     } catch {
@@ -812,7 +657,7 @@ export async function tryHandleApprovals(ctx: RouteContext): Promise<boolean> {
       return true
     }
 
-    const { status, resolved_by, telegram_message_id } = body
+    const { status, resolved_by } = body
     if (status !== 'approved' && status !== 'rejected' && status !== 'timeout') {
       json(res, { error: 'status must be approved, rejected, or timeout' }, 400)
       return true
@@ -821,7 +666,6 @@ export async function tryHandleApprovals(ctx: RouteContext): Promise<boolean> {
       json(res, { error: 'resolved_by is required' }, 400)
       return true
     }
-    const msgId = typeof telegram_message_id === 'number' ? telegram_message_id : null
 
     // Approving takes the owner (see OWNER_ONLY); rejecting or timing out does not, since
     // an agent that cancels a request gains nothing by it.
@@ -857,7 +701,7 @@ export async function tryHandleApprovals(ctx: RouteContext): Promise<boolean> {
       return true
     }
 
-    const updated = resolveApproval(idMatch[1], status, resolved_by.trim(), msgId)
+    const updated = resolveApproval(idMatch[1], status, resolved_by.trim())
     if (!updated) {
       // Either not found or already resolved
       const existing = getApproval(idMatch[1])

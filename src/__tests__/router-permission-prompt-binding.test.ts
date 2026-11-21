@@ -101,7 +101,7 @@ let seq = 0
 function pendingFor(agent: string) {
   return {
     id: 5000 + seq++,
-    from_agent: 'marveen',
+    from_agent: 'alfred',
     to_agent: agent,
     content: 'queued behind the prompt',
     status: 'pending',

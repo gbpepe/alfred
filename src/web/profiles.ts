@@ -7,7 +7,7 @@ import { logger } from '../logger.js'
 // list that Claude Code's native permissions engine understands. Choosing a
 // strict profile also drops --dangerously-skip-permissions, so Claude Code
 // enforces the allow/deny list rather than bypassing it. Channels plugin
-// permission prompts (the Telegram Allow/Deny inline buttons) still fire
+// permission prompts (the channel Allow/Deny interactive controls) still fire
 // because they live on a different notification channel.
 export interface ProfileTemplate {
   id: string

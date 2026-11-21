@@ -15,7 +15,7 @@ import { KIT_HASHES_FILE, KIT_SOURCES, parseKitHashes } from './support-kit-sour
 import { SUPPORT_ROUTINE_MIN_NODE_MAJOR } from './support-standby.js'
 
 /** Where the support folder is, relative to the login user's home (a working name until the M3 measurement). */
-export const SUPPORT_DIR_IN_HOME = '.marveen/support'
+export const SUPPORT_DIR_IN_HOME = '.alfred/support'
 /** No kit file is larger than this; a larger one is not read (the same cap verifyKit reads with). */
 export const KIT_SOURCE_MAX_BYTES = KIT_FILE_MAX_BYTES
 const HASHES_MAX_BYTES = 4096

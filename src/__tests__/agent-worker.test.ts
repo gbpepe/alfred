@@ -28,7 +28,7 @@ describe('buildWorkerPrompt', () => {
 
   it('does not inject any persona / project voice', () => {
     const p = buildWorkerPrompt('TASK', out, done)
-    expect(p).not.toMatch(/Marveen|Szabolcs|asszisztens/i)
+    expect(p).not.toMatch(/Alfred|Szabolcs|asszisztens/i)
   })
 })
 
@@ -64,14 +64,14 @@ describe('configDirKeychainService', () => {
   // service named "Claude Code-credentials-<sha256(CLAUDE_CONFIG_DIR)[0:8]>"
   // and it SHADOWS <CONFIG_DIR>/.credentials.json. The worker auth-recovery
   // deletes this exact entry so the freshly-seeded file becomes authoritative.
-  // Verified live 2026-06-10 against the marveen-worker config dir.
+  // Verified live 2026-06-10 against the alfred-worker config dir.
   it('derives the sha256[0:8] service suffix (verified live vector)', () => {
-    expect(configDirKeychainService('/Users/marvin/.marveen-worker/.claude-config'))
+    expect(configDirKeychainService('/Users/marvin/.alfred-worker/.claude-config'))
       .toBe('Claude Code-credentials-1d2e1367')
   })
 
   it('is path-specific: a different config dir hashes to a different service', () => {
-    const a = configDirKeychainService('/Users/marvin/.marveen-worker/.claude-config')
+    const a = configDirKeychainService('/Users/marvin/.alfred-worker/.claude-config')
     const b = configDirKeychainService('/tmp/some-other-config')
     expect(a).not.toBe(b)
     expect(b.startsWith('Claude Code-credentials-')).toBe(true)
@@ -80,8 +80,8 @@ describe('configDirKeychainService', () => {
 
 describe('workerHomeFor (WORKERHOME1: worker home derives from MAIN_AGENT_ID)', () => {
   it('default install keeps the historical paths -- zero migration, unchanged Keychain hash', () => {
-    expect(workerHomeFor('marveen', 'slow').endsWith('/.marveen-worker')).toBe(true)
-    expect(workerHomeFor('marveen', 'fast').endsWith('/.marveen-worker-fast')).toBe(true)
+    expect(workerHomeFor('alfred', 'slow').endsWith('/.alfred-worker')).toBe(true)
+    expect(workerHomeFor('alfred', 'fast').endsWith('/.alfred-worker-fast')).toBe(true)
   })
 
   it('a non-default id derives its own isolated dirs (sandbox/renamed install)', () => {
@@ -90,19 +90,19 @@ describe('workerHomeFor (WORKERHOME1: worker home derives from MAIN_AGENT_ID)', 
   })
 
   it('never collides with the default install dir for a different id', () => {
-    expect(workerHomeFor('jarvis', 'slow')).not.toBe(workerHomeFor('marveen', 'slow'))
-    expect(workerHomeFor('jarvis', 'fast')).not.toBe(workerHomeFor('marveen', 'fast'))
+    expect(workerHomeFor('jarvis', 'slow')).not.toBe(workerHomeFor('alfred', 'slow'))
+    expect(workerHomeFor('jarvis', 'fast')).not.toBe(workerHomeFor('alfred', 'fast'))
   })
 
   it('slow and fast variants of the same id never share a home', () => {
-    expect(workerHomeFor('marveen', 'slow')).not.toBe(workerHomeFor('marveen', 'fast'))
+    expect(workerHomeFor('alfred', 'slow')).not.toBe(workerHomeFor('alfred', 'fast'))
   })
 })
 
 describe('workerStartAllowed (WORKERHOME1: WEB_ONLY must suppress every worker start)', () => {
   // An explicit install root: the default (PROJECT_ROOT) would make these depend on where the suite runs
   // (a worktree checkout is itself a second instance).
-  const install = { projectRoot: '/Users/x/ClaudeClaw', isGitFile: () => false, tmpDir: '/var/folders/zz/T' }
+  const install = { projectRoot: '/Users/x/Alfred', isGitFile: () => false, tmpDir: '/var/folders/zz/T' }
 
   it('blocks in WEB_ONLY staging', () => {
     expect(workerStartAllowed({ WEB_ONLY: 'true' }, install)).toBe(false)
@@ -116,15 +116,15 @@ describe('workerStartAllowed (WORKERHOME1: WEB_ONLY must suppress every worker s
 
   it('#2419 follow-up: blocks a second instance (worktree, linked worktree, temp clone) unless it opts in', () => {
     const second = [
-      { projectRoot: '/Users/x/ClaudeClaw/.claude/worktrees/wt1', isGitFile: () => false, tmpDir: '/var/folders/zz/T' },
+      { projectRoot: '/Users/x/Alfred/.claude/worktrees/wt1', isGitFile: () => false, tmpDir: '/var/folders/zz/T' },
       { projectRoot: '/Users/x/abel-wt-bridgemeasure', isGitFile: () => true, tmpDir: '/var/folders/zz/T' },
       { projectRoot: '/private/tmp/canary', isGitFile: () => false, tmpDir: '/var/folders/zz/T' },
     ]
     for (const where of second) {
       expect(workerStartAllowed({}, where), where.projectRoot).toBe(false)
-      expect(workerStartAllowed({ MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES: '1' }, where), where.projectRoot).toBe(true)
-      expect(workerStartAllowed({ MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES: 'true' }, where), where.projectRoot).toBe(false)
-      expect(workerStartAllowed({ WEB_ONLY: 'true', MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES: '1' }, where), where.projectRoot).toBe(false)
+      expect(workerStartAllowed({ ALFRED_ALLOW_SECOND_INSTANCE_SERVICES: '1' }, where), where.projectRoot).toBe(true)
+      expect(workerStartAllowed({ ALFRED_ALLOW_SECOND_INSTANCE_SERVICES: 'true' }, where), where.projectRoot).toBe(false)
+      expect(workerStartAllowed({ WEB_ONLY: 'true', ALFRED_ALLOW_SECOND_INSTANCE_SERVICES: '1' }, where), where.projectRoot).toBe(false)
     }
   })
 
@@ -174,7 +174,7 @@ describe('worker custom-provider inheritance (subscription-less fleet support)',
     expect(src).toContain('stampCustomApiKeyApproval')
   })
 
-  it('buildCustomProviderLaunchEnv is only called when no MARVEEN_WORKER_MODEL override is set', () => {
+  it('buildCustomProviderLaunchEnv is only called when no ALFRED_WORKER_MODEL override is set', () => {
     const __dirname = dirname(fileURLToPath(import.meta.url))
     const src = readFileSync(join(__dirname, '../web/agent-worker.ts'), 'utf-8')
     // The call must be guarded by a WORKER_MODEL_OVERRIDE falsy check so an

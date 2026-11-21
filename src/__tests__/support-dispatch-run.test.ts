@@ -83,7 +83,7 @@ function writeExe(path: string, text: string): void {
 function setup(consent = 2): void {
   home = mkdtempSync(join(tmpdir(), 'dispatch-run-'))
   bin = join(home, 'fakebin')
-  supportDir = join(home, '.marveen', 'support')
+  supportDir = join(home, '.alfred', 'support')
   kit = join(supportDir, 'kit')
   const install = join(home, 'install')
   mkdirSync(bin, { recursive: true })
@@ -301,7 +301,7 @@ describe('run <text>: refused before anything runs', () => {
     expect(r.status).toBe(0)
     expect(existsSync(marker())).toBe(true)
   })
-  it('without a yes from marveen.io', () => {
+  it('without a yes from alfred.io', () => {
     writeFileSync(join(bin, 'body'), allowBody('deny'))
     const r = run("touch '" + marker() + "'")
     expect(reason(r.stderr)).toBe('not_allowed')
@@ -434,7 +434,7 @@ describe('run <text>: stopped at the cap, by a disable, by a revoke; the whole g
     expect(Date.now() - triggered).toBeLessThan(10_000)
   }, 60_000)
 
-  it('marveen.io saying no at the minute recheck stops a running run (R4)', async () => {
+  it('alfred.io saying no at the minute recheck stops a running run (R4)', async () => {
     const { done } = runAsync(startedCommand('sleep 120'))
     await waitFor('the command to run', () => existsSync(running()))
     const triggered = Date.now()

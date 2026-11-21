@@ -92,26 +92,26 @@ describe('decideColistenAction', () => {
 describe('providerOfPluginId', () => {
   const providers: Array<{ type: ChannelProviderType; pluginId: string }> = [
     { type: 'telegram', pluginId: 'telegram@claude-plugins-official' },
-    { type: 'slack', pluginId: 'slack-channel@marveen-marketplace' },
+    { type: 'slack', pluginId: 'slack-channel@alfred-marketplace' },
   ]
   it('maps a plugin id to its provider, and an unknown id to null', () => {
-    expect(providerOfPluginId('slack-channel@marveen-marketplace', providers)).toBe('slack')
+    expect(providerOfPluginId('slack-channel@alfred-marketplace', providers)).toBe('slack')
     expect(providerOfPluginId(' telegram@claude-plugins-official ', providers)).toBe('telegram')
-    expect(providerOfPluginId('whatsapp@marveen-marketplace', providers)).toBeNull()
+    expect(providerOfPluginId('whatsapp@alfred-marketplace', providers)).toBeNull()
   })
 })
 
 describe('colistenProviders', () => {
   const providers: Array<{ type: ChannelProviderType; pluginId: string }> = [
     { type: 'telegram', pluginId: 'telegram@claude-plugins-official' },
-    { type: 'slack', pluginId: 'slack-channel@marveen-marketplace' },
+    { type: 'slack', pluginId: 'slack-channel@alfred-marketplace' },
     { type: 'discord', pluginId: 'discord@claude-plugins-official' },
   ]
   it('our host: telegram primary + slack co-listen -> [slack]', () => {
-    expect(colistenProviders('telegram', ['slack-channel@marveen-marketplace'], providers)).toEqual(['slack'])
+    expect(colistenProviders('telegram', ['slack-channel@alfred-marketplace'], providers)).toEqual(['slack'])
   })
   it('the primary is never watched here, even if listed as an extra', () => {
-    expect(colistenProviders('slack', ['slack-channel@marveen-marketplace', 'telegram@claude-plugins-official'], providers)).toEqual(['telegram'])
+    expect(colistenProviders('slack', ['slack-channel@alfred-marketplace', 'telegram@claude-plugins-official'], providers)).toEqual(['telegram'])
   })
   it('each provider once, unknown ids dropped, no extras -> []', () => {
     expect(colistenProviders('telegram', ['discord@claude-plugins-official', 'discord@claude-plugins-official', 'whatsapp@x'], providers)).toEqual(['discord'])
@@ -137,7 +137,7 @@ describe('runColistenCheck: live primary + dead co-listen = restart and alert', 
         alert: (t) => { alerts.push(t) },
         log: () => {},
         restart: async () => { restarts++; return opts.restartOk ?? true },
-        botName: 'Marveen',
+        botName: 'Alfred',
       })
     }
     return { run, alerts, get restarts() { return restarts }, state }
@@ -208,13 +208,13 @@ describe('the binding in channel-monitor (source)', () => {
     expect(src).toMatch(/checkMainKeepaliveStaleness\(\)\n(?:\s*\/\/[^\n]*\n)*\s*await checkMainColistenChannels\(claudePid\)/)
   })
   it('probes each co-listen provider under the main claude, restarts with the conversation kept, alerts through sendAlert', () => {
-    const fn = src.slice(src.indexOf('async function checkMainColistenChannels'), src.indexOf('function handleMarveenUp'))
+    const fn = src.slice(src.indexOf('async function checkMainColistenChannels'), src.indexOf('function handleAlfredUp'))
     expect(fn).toContain('colistenProviders(primary, readExtraChannelPluginIds(), ALL_PROVIDER_TYPES.map((t) => getProvider(t)))')
     // strictTree (#1762 review): the default probe answers "any Slack poller on the host".
     expect(fn).toContain('probe: (p) => probeChannelPluginLiveness(claudePid, p, undefined, { strictTree: true })')
-    expect(fn).toContain('restart: () => resumeMarveenSession()')
+    expect(fn).toContain('restart: () => resumeAlfredSession()')
     expect(fn).toContain('alert: sendAlert')
-    expect(fn).toContain('respawnGraceMs: MARVEEN_POST_RESPAWN_GRACE_MS')
+    expect(fn).toContain('respawnGraceMs: ALFRED_POST_RESPAWN_GRACE_MS')
     expect(fn).toContain('lastRespawnAt: lastMainRespawnAt()')
   })
 })

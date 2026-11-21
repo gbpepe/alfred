@@ -28,7 +28,7 @@ function templatePreCompactPrompt(): string {
   return prompt
 }
 
-// #2338 moved the template's task-state save to marveen-api.sh, so the curl
+// #2338 moved the template's task-state save to alfred-api.sh, so the curl
 // this pass upgrades now lives only in prompts an agent already has. The last
 // shipped curl prompt is frozen as a fixture; "old" is it without the header.
 function headerPrompt(): string {

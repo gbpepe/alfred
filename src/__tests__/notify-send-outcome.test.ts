@@ -26,7 +26,7 @@ vi.mock('../config.js', () => ({
   CHANNEL_CHAT_ID: K.chat,
   ALLOWED_CHAT_ID: K.chat,
   get ALERT_CHAT_ID() { return cfg.alertChat },
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
   PROJECT_ROOT: '/tmp/notify-send-outcome-test',
 }))
 

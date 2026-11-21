@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """KANBANSTUCKBACKFILL924: a tomeges/gepi komment automated=1 jelet kap, es a jel nem esik le csendben.
 
-AZ ESET (Marveen 29529, Geri merese 29524): a #1531 ota a /api/kanban/stuck a felelos SAJAT
+AZ ESET (Alfred 29529, Geri merese 29524): a #1531 ota a /api/kanban/stuck a felelos SAJAT
 kommentjet munka-nyomnak veszi, kiveve ha a sor automated=1. A 08-24-i cim->komment migraciot
 es a 09-04-i sopreseket maga a felelos irta, tehat 81 kartya csak ettol allt "elkezdett, majd
 beakadt"-kent a listan. A multat egy egyszeri backfill javitja; ez a teszt a JOVOT fogja:
@@ -67,7 +67,7 @@ def run(db_path, extra=(), comment=True):
         f.write('Söprés-komment próbája, ékezetes szöveggel, hogy az ékezet-kapu ne ezen akadjon fenn.')
     env = dict(os.environ)
     env['KARTYA_DB'] = db_path
-    env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['ALFRED_ROOT'] = SANDBOX_ROOT
     args = [sys.executable, SCRIPT, '--id', 'SAJAT924', '--author', 'geri', *extra]
     if comment:
         args += ['--comment-file', cf]

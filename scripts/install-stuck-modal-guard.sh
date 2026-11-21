@@ -33,7 +33,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-# #1873: com.<SERVICE_ID>.stuck-modal-guard, not a fixed com.marveen.stuck-modal-guard -- two installs
+# #1873: com.<SERVICE_ID>.stuck-modal-guard, not a fixed com.alfred.stuck-modal-guard -- two installs
 # under one user must not share (and overwrite) one helper job.
 . "$SCRIPT_DIR/launchd-label.sh"
 LABEL="$(helper_launchd_label "$PROJECT_DIR" stuck-modal-guard)"

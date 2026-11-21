@@ -16,8 +16,8 @@
 //
 // The two rules this replaces -- replace '/' and '.' only, and replace '/'
 // only -- give the SAME name for every path made of [a-zA-Z0-9-/.], which is
-// every path the fleet had ever run on (/Users/<name>/ClaudeClaw, agents/<id>
-// with [a-z0-9-] ids, /root/marveen-develop-test, /home/<user>/marveen). They
+// every path the fleet had ever run on (/Users/<name>/Alfred, agents/<id>
+// with [a-z0-9-] ids, /root/alfred-develop-test, /home/<user>/alfred). They
 // diverge on an underscore, a space or an accented letter in the install path
 // or the user name, where they name a directory Claude Code never creates and
 // every reader on it (context counter, active model, conversation view,

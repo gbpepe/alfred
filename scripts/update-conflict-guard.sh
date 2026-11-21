@@ -12,7 +12,7 @@
 # What it does, and nothing more:
 #   - Only in the install's own git tree (the toplevel must be the install dir); no git or no tree: one line, done.
 #   - Clean tree: one `git diff-index HEAD` (plumbing, writes nothing), under a time limit. Nothing else runs.
-#   - Unmerged (conflicted) paths are repaired ONLY when stash@{0} is a "marveen-update-auto-stash" entry (a conflicted
+#   - Unmerged (conflicted) paths are repaired ONLY when stash@{0} is a "alfred-update-auto-stash" entry (a conflicted
 #     pop leaves it there), which holds the operator's own copy, and no merge/cherry-pick/revert/rebase of the
 #     operator's is in progress (then: report only). Before the repair: the conflicted files and a `git diff HEAD`
 #     patch go to an owner-only store/update-conflict-backup-<ts>-<rand>/; if that backup fails, nothing is repaired. The repair touches only the
@@ -111,12 +111,12 @@ for m in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply; do
 done
 
 # A conflicted `git stash pop` keeps the popped entry at stash@{0}. So the operator's copy is the update's only when
-# stash@{0} itself is a marveen-update-auto-stash entry; an older one further down belongs to another run.
+# stash@{0} itself is a alfred-update-auto-stash entry; an older one further down belongs to another run.
 STASH_LINE="$(g stash list -n 1 2>/dev/null)"
 case "$STASH_LINE" in
-  *marveen-update-auto-stash*) ;;
+  *alfred-update-auto-stash*) ;;
   *)
-    say "WARNING: conflicted files, but stash@{0} is not a marveen-update-auto-stash entry holding the local copy; not touched: $LIST"
+    say "WARNING: conflicted files, but stash@{0} is not a alfred-update-auto-stash entry holding the local copy; not touched: $LIST"
     write_state refused_no_stash "$UNMERGED$MARKER_ONLY"
     exit 0 ;;
 esac

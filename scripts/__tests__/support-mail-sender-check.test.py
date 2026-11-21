@@ -55,7 +55,7 @@ def make_project(td, level=2, env_lines=(), ledger=None, config=True):
     if config:
         with open(os.path.join(store, "autonomy-config.json"), "w", encoding="utf-8") as fh:
             json.dump({"version": 1, "categories": [{"key": "email_send", "level": level}]}, fh)
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute("""CREATE TABLE approvals (
         id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, category TEXT NOT NULL,
         action_description TEXT NOT NULL, action_payload TEXT,
@@ -80,7 +80,7 @@ def make_project(td, level=2, env_lines=(), ledger=None, config=True):
 
 
 def approve(root, anchor, aid="ap-1", category="email_send"):
-    con = sqlite3.connect(os.path.join(root, "store", "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(root, "store", "alfred.db"))
     con.execute("INSERT INTO approvals (id, agent_id, category, action_description, status, resolved_at,"
                 f" content_hash) VALUES (?, 'agent-a', ?, 'x', 'approved', {NOW_S}, ?)", (aid, category, anchor))
     con.commit()
@@ -90,7 +90,7 @@ def approve(root, anchor, aid="ap-1", category="email_send"):
 def approval_row(root, anchor, aid, status, resolved_sql):
     """An email_send row in a state other than a fresh approval: pending
     (resolved_sql NULL) or approved long ago (outside the window)."""
-    con = sqlite3.connect(os.path.join(root, "store", "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(root, "store", "alfred.db"))
     con.execute("INSERT INTO approvals (id, agent_id, category, action_description, status, resolved_at,"
                 f" content_hash) VALUES (?, 'agent-a', 'email_send', 'x', ?, {resolved_sql}, ?)",
                 (aid, status, anchor))
@@ -99,7 +99,7 @@ def approval_row(root, anchor, aid, status, resolved_sql):
 
 
 def consumed(root, aid="ap-1"):
-    con = sqlite3.connect(os.path.join(root, "store", "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(root, "store", "alfred.db"))
     row = con.execute("SELECT consumed_at FROM approvals WHERE id=?", (aid,)).fetchone()
     con.close()
     return bool(row and row[0] is not None)

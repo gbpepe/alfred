@@ -134,8 +134,8 @@ restart_channels() {
     fi
   fi
   if command -v systemctl >/dev/null 2>&1; then
-    if systemctl --user restart marveen-channels.service >/dev/null 2>&1; then
-      log "restart issued: systemctl --user restart marveen-channels.service"
+    if systemctl --user restart alfred-channels.service >/dev/null 2>&1; then
+      log "restart issued: systemctl --user restart alfred-channels.service"
       return 0
     fi
   fi

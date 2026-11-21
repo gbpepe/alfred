@@ -14,7 +14,7 @@ if [ -f "$INSTALL_DIR/.env" ]; then
   SLUG="$(grep -E '^MAIN_AGENT_ID=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2-)"
   BOT_NAME="$(grep -E '^BOT_NAME=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2-)"
 fi
-SLUG="${SLUG:-marveen}"
+SLUG="${SLUG:-alfred}"
 # Unit name: SERVICE_ID, else MAIN_AGENT_ID, with a fallback to existing units (see the helper).
 # The tmux session name stays on SLUG.
 # shellcheck source=resolve-unit-id.sh
@@ -24,7 +24,7 @@ else
   UNIT_ID="$SLUG"  # helper missing (partial copy): the pre-SERVICE_ID behaviour
 fi
 
-MARVEEN_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
+ALFRED_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
 # shellcheck source=../install-lang.sh
 source "${INSTALL_DIR}/install-lang.sh"
 
@@ -46,7 +46,7 @@ INSTALL_DIR="$INSTALL_DIR" python3 "${INSTALL_DIR}/scripts/boot-hook-prune.py" 2
 # Timestamp every run: this script appends to store/boot.log across reboots,
 # and without a date the log cannot tell "started once" from "started twice".
 echo "=== $(date '+%Y-%m-%d %H:%M:%S %Z') ==="
-echo "${BOT_NAME:-Marveen} $(_t start.starting)"
+echo "${BOT_NAME:-Alfred} $(_t start.starting)"
 OS="$(uname -s)"
 LAUNCHD_FAILED=""
 if [ "$OS" = "Darwin" ]; then

@@ -65,11 +65,11 @@ describe('token monitor agent colours', () => {
   it('no collision after a period switch brings a listed agent in', () => {
     // The review case: 'geri' is coloured on 1h, 'codi' (listed) appears on 7d.
     const c = load()
-    c.tuAssignColors(['geri', 'marveen'])
+    c.tuAssignColors(['geri', 'alfred'])
     const geri = c.tuGetColor('geri')
-    c.tuAssignColors(['codi', 'geri', 'marveen'])
+    c.tuAssignColors(['codi', 'geri', 'alfred'])
     expect(c.tuGetColor('geri')).toBe(geri)
-    expect(collisions(c.tuGetColor, ['codi', 'geri', 'marveen'])).toEqual([])
+    expect(collisions(c.tuGetColor, ['codi', 'geri', 'alfred'])).toEqual([])
   })
 
   it('no collision when every listed agent arrives after the unlisted ones', () => {
@@ -90,7 +90,7 @@ describe('token monitor agent colours', () => {
   })
 
   it('the same agent set gets the same colours on every load', () => {
-    const agents = ['zeta', 'alpha', 'marveen', 'mid']
+    const agents = ['zeta', 'alpha', 'alfred', 'mid']
     const a = load(); a.tuAssignColors(agents)
     const b = load(); b.tuAssignColors([...agents].reverse())
     expect(agents.map(a.tuGetColor)).toEqual(agents.map(b.tuGetColor))

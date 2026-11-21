@@ -9,8 +9,8 @@ non-zero with a FAIL line and ZERO requests; the accepted forms keep their behav
 line as the server's queue answer (#1674) makes it, and a DOWNGRADED notice on stderr only when the
 pair's hourly high budget turned the row normal).
 
-agent-msg.sh runs against a local stub API on 127.0.0.1 (MARVEEN_API_BASE) with a dummy token file
-(MARVEEN_TOKEN_FILE), so nothing reaches a real dashboard.
+agent-msg.sh runs against a local stub API on 127.0.0.1 (ALFRED_API_BASE) with a dummy token file
+(ALFRED_TOKEN_FILE), so nothing reaches a real dashboard.
 
 Run:  python3 scripts/__tests__/agent-msg-priority.test.py
 """
@@ -59,7 +59,7 @@ def main():
     tok = tempfile.NamedTemporaryFile('w', delete=False, prefix='agent-msg-priority-token-')
     tok.write('test-token')
     tok.close()
-    env = dict(os.environ, MARVEEN_API_BASE='http://127.0.0.1:%d' % srv.server_address[1], MARVEEN_TOKEN_FILE=tok.name)
+    env = dict(os.environ, ALFRED_API_BASE='http://127.0.0.1:%d' % srv.server_address[1], ALFRED_TOKEN_FILE=tok.name)
 
     def run(args, answer=None, stdin=None):
         ANSWER['body'] = answer if answer is not None else {'id': 7, 'status': 'pending', 'queue': QUEUE}

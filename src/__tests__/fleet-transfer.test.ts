@@ -103,9 +103,9 @@ vi.mock('../web/scheduled-tasks-io.js', () => ({
 vi.mock('../config.js', () => ({
   PROJECT_ROOT: '/mock/project',
   STORE_DIR: '/mock/store',
-  MAIN_AGENT_ID: 'marveen',
-  BOT_NAME: 'Marveen',
-  BRAND_NAME: 'Marveen',
+  MAIN_AGENT_ID: 'alfred',
+  BOT_NAME: 'Alfred',
+  BRAND_NAME: 'Alfred',
   OWNER_NAME: 'Szabolcs',
   CHANNEL_PROVIDER: 'telegram',
   // config.ts builds it from web/sanitize.ts plus the voice channel id in effect.
@@ -476,20 +476,20 @@ describe('importFleet: identity takeover', () => {
       expect(warned(result, 'atlas', 'MAIN_AGENT_ID')).toBe(true)
     })
 
-    // Samu's #2119 review: a stray agents/<own id> directory on the target (agents/marveen
+    // Samu's #2119 review: a stray agents/<own id> directory on the target (agents/alfred
     // drafts) made a re-import of the target's own identity read as a collision.
     it("the target's own MAIN_AGENT_ID with a stray agents/<id> directory is still taken over", async () => {
-      listAgentNamesMock.mockImplementation(() => ['samu', 'marveen'])   // 'marveen' = the mocked MAIN_AGENT_ID
-      const { result, env } = await applyWith({ ...IDENTITY, MAIN_AGENT_ID: 'marveen' })
-      expect(env?.MAIN_AGENT_ID).toBe('marveen')
+      listAgentNamesMock.mockImplementation(() => ['samu', 'alfred'])   // 'alfred' = the mocked MAIN_AGENT_ID
+      const { result, env } = await applyWith({ ...IDENTITY, MAIN_AGENT_ID: 'alfred' })
+      expect(env?.MAIN_AGENT_ID).toBe('alfred')
       expect(warned(result, 'NEM vehető át')).toBe(false)
     })
 
     it("the target's own MAIN_AGENT_ID is still refused when the import itself brings a sub-agent of that name", async () => {
-      const agent = { name: 'marveen', config: {}, claudeMd: '', soulMd: '', mcp: {}, settings: {}, channelsAccess: {}, agentSkills: [] }
-      const { result, env } = await applyWith({ ...IDENTITY, MAIN_AGENT_ID: 'marveen' }, [agent])
+      const agent = { name: 'alfred', config: {}, claudeMd: '', soulMd: '', mcp: {}, settings: {}, channelsAccess: {}, agentSkills: [] }
+      const { result, env } = await applyWith({ ...IDENTITY, MAIN_AGENT_ID: 'alfred' }, [agent])
       expect(env).toBeNull()
-      expect(warned(result, 'marveen', 'MAIN_AGENT_ID')).toBe(true)
+      expect(warned(result, 'alfred', 'MAIN_AGENT_ID')).toBe(true)
     })
 
     it('MAIN_AGENT_ID equal to a sub-agent the same import brings: nothing is taken over', async () => {
@@ -559,7 +559,7 @@ describe('importFleet: identity takeover', () => {
   })
 
   it('dry-run counts both atlas and hestia memories (no remap dedup)', async () => {
-    // If remap were active (atlas -> marveen), duplicate dedup could collapse rows.
+    // If remap were active (atlas -> alfred), duplicate dedup could collapse rows.
     // With original agent_ids preserved, all 2 memories count as new.
     const { importFleet } = await import('../web/fleet-transfer.js')
     const result = importFleet(FLEET_WITH_SOURCE_ID, { apply: false })

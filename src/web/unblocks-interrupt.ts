@@ -1,7 +1,7 @@
 // Card #673 -- `affects_current_work: 'unblocks'`: the one named case where an
 // inter-agent message may reach a BUSY pane instead of waiting for an idle gap.
 //
-// WHY THIS EXISTS, MEASURED (2026-09-25, store/claudeclaw.db, 3966 delivered rows):
+// WHY THIS EXISTS, MEASURED (2026-09-25, store/alfred.db, 3966 delivered rows):
 //
 //   webby->cody   n=1805  median  95 s  p95 1765 s  p99 2605 s  max 6550 s
 //   every other edge with n>=20 ........ p95 between 62 s and 229 s

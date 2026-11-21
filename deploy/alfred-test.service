@@ -1,0 +1,38 @@
+# On-demand Staging unit (do NOT run `systemctl enable alfred-test.service`).
+# Controlled dynamically by `alfred-ops` via `deploy/spinup-test.sh` and `deploy/teardown-test.sh`.
+[Unit]
+Description=Alfred Multi-Agent Core (Test / Staging — On-Demand)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alfred
+Group=alfred
+WorkingDirectory=/opt/alfred-test
+EnvironmentFile=/opt/alfred-test/.env
+Environment=NODE_ENV=production
+Environment=ALFRED_ENV=test
+Environment=ALFRED_DB_PATH=store/alfred-test.db
+Environment=ALFRED_WORKSPACES_DIR=workspaces-test
+Environment=ALFRED_BUDGET_MULTIPLIER=0.2
+Environment=NODE_OPTIONS=--max-old-space-size=256
+ExecStart=/usr/bin/node /opt/alfred-test/dist/alfred/run.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+
+# Sized for 2 GB RAM VPS alongside alfred-ops (256M) and alfred-prod (768M)
+MemoryHigh=384M
+MemoryMax=512M
+CPUQuota=50%
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/alfred-test
+SyslogIdentifier=alfred-test
+
+[Install]
+WantedBy=multi-user.target

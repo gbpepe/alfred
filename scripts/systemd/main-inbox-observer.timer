@@ -1,5 +1,5 @@
 [Unit]
-Description=Run the Marveen main-agent inbox observer every 5 minutes
+Description=Run the Alfred main-agent inbox observer every 5 minutes
 
 [Timer]
 # Deliberately NOT bound to the dashboard unit: the stalled-queue case this

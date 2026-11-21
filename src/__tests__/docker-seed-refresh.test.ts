@@ -17,8 +17,8 @@ type Files = Record<string, string>
 function put(base: string, files: Files) {
   for (const [rel, body] of Object.entries(files)) { mkdirSync(dirname(join(base, rel)), { recursive: true }); writeFileSync(join(base, rel), body) }
 }
-const lit = (s: string, id: { owner: string; bot: string }) => s.replaceAll('{{MAIN_AGENT_ID}}', 'marveen').replaceAll('{{OWNER_NAME}}', id.owner).replaceAll('{{BOT_NAME}}', id.bot)
-const PRE = { owner: 'Owner', bot: 'Marveen' }                  // first-boot's identity before the wizard
+const lit = (s: string, id: { owner: string; bot: string }) => s.replaceAll('{{MAIN_AGENT_ID}}', 'alfred').replaceAll('{{OWNER_NAME}}', id.owner).replaceAll('{{BOT_NAME}}', id.bot)
+const PRE = { owner: 'Owner', bot: 'Alfred' }                  // first-boot's identity before the wizard
 const NOW = { owner: 'Kiss & Társa\\Kft', bot: 'Jarvis/2 & co' }  // the wizard's names, sed metacharacters on purpose
 
 // The tree the volume ran (v1.48.0-shaped: no i18n/en, no seed-lang.sh) and the new image's tree.
@@ -45,12 +45,12 @@ const NEW: Files = {
 
 function volume(opts: { installed: Files; verify?: Record<string, number>; registerFails?: boolean }) {
   const base = mkdtempSync(join(tmpdir(), 'dseed-'))
-  const install = join(base, 'opt-marveen'); const meta = join(base, 'opt-marveen-docker'); const home = join(base, 'home'); const log = join(base, 'cli.log')
+  const install = join(base, 'opt-alfred'); const meta = join(base, 'opt-alfred-docker'); const home = join(base, 'home'); const log = join(base, 'cli.log')
   mkdirSync(install, { recursive: true }); mkdirSync(meta, { recursive: true }); mkdirSync(join(home, '.claude', 'skills'), { recursive: true })
   put(install, OLD)
   writeFileSync(join(install, '.image-id'), 'old-image\n'); writeFileSync(join(meta, 'image.id'), 'new-image\n')
   cpSync(join(ROOT, 'docker', 'seed-snapshot.sh'), join(meta, 'seed-snapshot.sh')); cpSync(join(ROOT, 'docker', 'seed-refresh-docker.sh'), join(meta, 'seed-refresh-docker.sh'))
-  writeFileSync(join(install, '.env'), `MAIN_AGENT_ID=marveen\nOWNER_NAME=${NOW.owner}\nBOT_NAME=${NOW.bot}\nAGENT_TEXT_LANG=en\n`)
+  writeFileSync(join(install, '.env'), `MAIN_AGENT_ID=alfred\nOWNER_NAME=${NOW.owner}\nBOT_NAME=${NOW.bot}\nAGENT_TEXT_LANG=en\n`)
   put(home, Object.fromEntries(Object.entries(opts.installed).map(([k, v]) => [join('.claude', k), v])))
   const verify = opts.verify ?? { taskA: 0, taskB: 1, topC: 0 }
   put(install, { 'dist/package.json': '{"type":"commonjs"}\n', 'dist/web/schedule-registry-cli.js': `const fs=require('fs');fs.appendFileSync(${JSON.stringify(log)}, process.argv.slice(2).join(' ')+'\\n');
@@ -62,7 +62,7 @@ if(c==='register'){process.exit(${opts.registerFails ? 1 : 0})} process.exit(0)\
 type Vol = ReturnType<typeof volume>
 
 function snapshot(v: Vol): string {
-  return execFileSync('bash', [join(v.meta, 'seed-snapshot.sh')], { env: { PATH: process.env.PATH, MARVEEN_INSTALL_DIR: v.install, MARVEEN_DOCKER_DIR: v.meta }, encoding: 'utf-8' })
+  return execFileSync('bash', [join(v.meta, 'seed-snapshot.sh')], { env: { PATH: process.env.PATH, ALFRED_INSTALL_DIR: v.install, ALFRED_DOCKER_DIR: v.meta }, encoding: 'utf-8' })
 }
 /** What code-sync does to the seed dirs: the old tree's code out, the new image's in (state such as .seed-prev stays). */
 function swap(v: Vol) {
@@ -77,7 +77,7 @@ function firstBootRefresh(v: Vol, extra = ''): { out: string; code: number } {
     'env_val() { grep -m1 "^$1=" .env | cut -d= -f2-; }', 'OWNER_NAME="$(env_val OWNER_NAME)"; BOT_NAME="$(env_val BOT_NAME)"; AGENT_ID="$(env_val MAIN_AGENT_ID)"; WEB_PORT=3420',
     'SEED_LANG=hu', 'if [ -f scripts/lib/seed-lang.sh ]; then . scripts/lib/seed-lang.sh; SEED_LANG="$(seed_lang "$INSTALL_DIR")"; fi',
     '. scripts/lib/seed-refresh.sh', extra, REFRESH_BLOCK, 'echo "first-boot rc=$?"'].join('\n')
-  const r = spawnSync('bash', ['-c', script], { env: { PATH: process.env.PATH, HOME: v.home, MARVEEN_DOCKER_DIR: v.meta, LANG: 'C.UTF-8' }, encoding: 'utf-8' })
+  const r = spawnSync('bash', ['-c', script], { env: { PATH: process.env.PATH, HOME: v.home, ALFRED_DOCKER_DIR: v.meta, LANG: 'C.UTF-8' }, encoding: 'utf-8' })
   return { out: (r.stdout ?? '') + (r.stderr ?? ''), code: r.status ?? -1 }
 }
 const read = (v: Vol, rel: string) => readFileSync(join(v.home, '.claude', rel), 'utf-8')
@@ -113,7 +113,7 @@ describe('a v1.48.0 volume on the new image (snapshot -> swap -> first-boot)', (
       expect(read(v, `${SCHED}/taskA/SKILL.md`)).toBe(lit(NEW[`i18n/en/seed-${SCHED}/taskA/SKILL.md`], NOW))
       // taskB was rendered with the CURRENT identity: untouched as well
       expect(read(v, `${SCHED}/taskB/SKILL.md`)).toBe(lit(NEW[`seed-${SCHED}/taskB/SKILL.md`], NOW))
-      expect(read(v, `${SCHED}/topC/SKILL.md`)).toBe('C v2 marveen\n')
+      expect(read(v, `${SCHED}/topC/SKILL.md`)).toBe('C v2 alfred\n')
       // trusted tasks re-registered with the installer source; taskB (not trusted, extra-free) is all shipped -> registered
       expect(cli(v)).toContain('register --source installer taskA')
       expect(cli(v)).toContain('register --source installer topC')

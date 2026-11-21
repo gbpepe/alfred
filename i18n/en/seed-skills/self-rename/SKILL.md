@@ -51,7 +51,7 @@ print('BRAND_NAME set')
 PYEOF
 ```
 
-5. **Restart so the change shows.** Read `SERVICE_ID` from the `.env` (if it is missing: `MAIN_AGENT_ID`; if that is missing too: `marveen`):
+5. **Restart so the change shows.** Read `SERVICE_ID` from the `.env` (if it is missing: `MAIN_AGENT_ID`; if that is missing too: `alfred`):
    - **macOS**: `launchctl kickstart -k gui/$(id -u)/com.<SERVICE_ID>.app`
    - **Linux (systemd user)**: `systemctl --user restart <SERVICE_ID>-dashboard` (on a root VPS, where there is no user session: `systemctl restart <SERVICE_ID>-dashboard`)
    - The persona (how you talk about yourself) updates at the NEXT agent session start. **On a solo install** (only the main agent runs) you may also restart channels: `systemctl --user restart <SERVICE_ID>-channels`. WARNING: this also restarts your own session, so FIRST reply to the owner ("I've renamed myself, restarting with the new name"), and ONLY THEN issue it. **On a multi-agent fleet** do NOT restart channels (you share the tmux server): the persona takes effect at the next natural restart.

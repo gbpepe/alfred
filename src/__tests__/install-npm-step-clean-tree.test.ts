@@ -1,11 +1,11 @@
 // INSTALLDIRTYTREE1103: the installers' dependency step must leave the tracked
-// package-lock.json untouched. On marveen2 (11-03) the macOS installer's plain
+// package-lock.json untouched. On alfred2 (11-03) the macOS installer's plain
 // `npm install` rewrote it (+1 line, better-sqlite3 "hasInstallScript"), so the
 // fresh install was dirty and every later update went down the stash path.
 //
 // The npm block of each installer is cut out of the real script and EXECUTED in
 // a throwaway git repo, with a stub `npm` that rewrites the lock exactly the way
-// npm install did on marveen2. `npm ci` never writes the lock.
+// npm install did on alfred2. `npm ci` never writes the lock.
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -41,7 +41,7 @@ function run(snippet: string, ciOk: boolean): { status: string; calls: string; e
     git('add', '.')
     git('commit', '-qm', 'base')
     // The stub: `ci` succeeds or fails as asked; `install` rewrites the lock like
-    // the real npm did on marveen2; `rebuild` succeeds. Every call is logged.
+    // the real npm did on alfred2; `rebuild` succeeds. Every call is logged.
     writeFileSync(join(bin, 'npm'), `#!/bin/bash
 echo "$1" >> "${dir}/calls"
 case "$1" in

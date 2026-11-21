@@ -28,8 +28,8 @@ import { dispatchForChat, ownerUnsetResult } from './routes/commands.js'
 
 const CHANNEL_RX = /<channel\s+([^>]*)>([\s\S]*?)<\/channel>/g
 const COMMAND_RX = /^\/[A-Za-z][A-Za-z0-9_]{0,31}(?:@[A-Za-z0-9_]+)?(?:\s|$)/
-const TELEGRAM_SOURCE_RX = /\bsource="[^"]*telegram[^"]*"/i
-const TELEGRAM_MAX_TEXT = 4096
+const CHANNEL_SOURCE_RX = /\bsource="[^"]*discord[^"]*"/i
+const CHANNEL_MAX_TEXT = 4096
 const SEEN_MAX = 200
 // A read larger than this is a transcript rewrite, not a tail: skip to the end.
 const MAX_READ_BYTES = 4 * 1024 * 1024
@@ -41,7 +41,7 @@ export interface MidTurnCommand {
   forwarded: boolean
   /** The transcript line's own timestamp: the dedup key when there is no message id. */
   ts: string | null
-  /** The topic the command was written in (TELEGRAM_TOPICS_ENABLED); absent in a plain chat. */
+  /** Optional thread id for the reply; absent in a plain chat. */
   threadId?: string
 }
 
@@ -51,7 +51,7 @@ function attr(attrs: string, name: string): string | null {
 }
 
 // One transcript line -> the command it carries, or null. Same acceptance as
-// the hook's main(): exactly one <channel> block, a telegram source, a chat_id,
+// the hook's main(): exactly one <channel> block, a discord source, a chat_id,
 // and a single-line body that starts with /word.
 export function parseQueuedChannelCommand(line: string): MidTurnCommand | null {
   if (!line.includes('queued_command')) return null
@@ -66,7 +66,7 @@ export function parseQueuedChannelCommand(line: string): MidTurnCommand | null {
   const attrs = blocks[0][1]
   const body = blocks[0][2].trim()
   if (!COMMAND_RX.test(body) || body.includes('\n')) return null
-  if (!TELEGRAM_SOURCE_RX.test(attrs)) return null
+  if (!CHANNEL_SOURCE_RX.test(attrs)) return null
   const chatId = attr(attrs, 'chat_id')
   if (!chatId) return null
   const ts = (entry as { timestamp?: unknown }).timestamp
@@ -164,9 +164,9 @@ export interface MidTurnDeps {
 export const SEND_ATTEMPTS = 3
 const SEND_RETRY_MS = 1500
 
-// Measured on the test bot (2026-09-23 15:00): one `connect ETIMEDOUT` to
-// api.telegram.org and the /runs answer was gone, silently. A reply the
-// command already produced is worth two more tries.
+// Measured on the test bot (2026-09-23 15:00): a transient `connect ETIMEDOUT`
+// dropped the /runs answer silently. A reply the command already produced is
+// worth two more tries.
 async function sendWithRetry(deps: MidTurnDeps, chatId: string, text: string, threadId?: string): Promise<void> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)))
   for (let attempt = 1; ; attempt++) {
@@ -225,7 +225,7 @@ export async function midTurnTick(state: TailState, deps: MidTurnDeps, firstRun 
 
 function chunks(text: string): string[] {
   const out: string[] = []
-  for (let i = 0; i < text.length; i += TELEGRAM_MAX_TEXT) out.push(text.slice(i, i + TELEGRAM_MAX_TEXT))
+  for (let i = 0; i < text.length; i += CHANNEL_MAX_TEXT) out.push(text.slice(i, i + CHANNEL_MAX_TEXT))
   return out.length ? out : ['']
 }
 

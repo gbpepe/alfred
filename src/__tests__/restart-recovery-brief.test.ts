@@ -360,9 +360,9 @@ describe('outside-written fields are cleaned and cut before they are typed', () 
     const b = buildRecoveryBrief(facts({
       branch: 'devy/some-task',
       dirty: [{ code: ' M', path: 'src/web/a b.ts' }],
-      inProgress: [{ id: 'PR2038WORKSOURCE', title: '[PR #2038 Szotasz/marveen] worksource: a < b && c > d, 100% (kész)' }],
+      inProgress: [{ id: 'PR2038WORKSOURCE', title: '[PR #2038 gbpepe/alfred] worksource: a < b && c > d, 100% (kész)' }],
     }))!
-    expect(b).toContain('  - PR2038WORKSOURCE: [PR #2038 Szotasz/marveen] worksource: a < b && c > d, 100% (kész)')
+    expect(b).toContain('  - PR2038WORKSOURCE: [PR #2038 gbpepe/alfred] worksource: a < b && c > d, 100% (kész)')
     expect(b).toContain('a(z) devy/some-task agon')
     expect(b).toContain('   M src/web/a b.ts')
   })

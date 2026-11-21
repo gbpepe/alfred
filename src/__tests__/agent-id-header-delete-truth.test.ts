@@ -13,10 +13,10 @@ import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-agentid-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-agentid-test-'))
 
 vi.mock('../config.js', () => ({
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -72,7 +72,7 @@ describe('agent-id-header: what it says about delete and versions (VERZIOTORLES1
   // VOICETOKENLEAK1101 PR-A1: the helper has no delete verb, so the default (helper) text names the delete an owner
   // decision; the curl fallback (a profile that denies the helper) still tells how to read the row out first.
   it('the helper text: the update goes through the helper with a payload file, and a delete is an owner decision', () => {
-    expect(body).toMatch(/marveen-api\.sh memory-update <id> agent-b \S+api-memoria\.txt/)
+    expect(body).toMatch(/alfred-api\.sh memory-update <id> agent-b \S+api-memoria\.txt/)
     expect(body).toMatch(/nincs törlő igéje[\s\S]{0,60}gazda-döntés \(data_delete\)/)
     for (const s of ['$(cat', '.dashboard-token', 'Authorization']) expect(body, s).not.toContain(s)
   })

@@ -44,9 +44,9 @@ mkdir -p "$FAKE/scripts/lib" && cp "$(dirname "$SCRIPT")/lib/archive-list-has.sh
 
 # Load-bearing markers backup.sh insists on.
 if command -v sqlite3 >/dev/null 2>&1; then
-  sqlite3 "$FAKE/store/claudeclaw.db" 'CREATE TABLE t(x);'
+  sqlite3 "$FAKE/store/alfred.db" 'CREATE TABLE t(x);'
 else
-  printf 'db' > "$FAKE/store/claudeclaw.db"
+  printf 'db' > "$FAKE/store/alfred.db"
 fi
 printf 'x' > "$FHOME/.claude/skills/demo/SKILL.md"
 printf 'x' > "$FHOME/.claude/scheduled-tasks/demo/SKILL.md"
@@ -89,7 +89,7 @@ else
   pass "no FAILED / MISSING line in the output"
 fi
 
-ARCHIVE="$(ls -1 "$OUT"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
+ARCHIVE="$(ls -1 "$OUT"/alfred-*.tar.gz 2>/dev/null | head -1)"
 LIST="$TMP/archive.list"
 [ -n "$ARCHIVE" ] && tar -tzf "$ARCHIVE" > "$LIST" 2>/dev/null || : > "$LIST"
 
@@ -116,7 +116,7 @@ printf '{"schema":1}' > "$FAKE/store/agent-package-credential.json"
 set +e
 OUTPUT2="$(cd "$FAKE" && HOME="$FHOME" BACKUP_DIR="$OUT" bash scripts/backup.sh 2>&1)"
 RC2=$?
-ARCHIVE2="$(ls -1 "$OUT"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
+ARCHIVE2="$(ls -1 "$OUT"/alfred-*.tar.gz 2>/dev/null | head -1)"
 [ -n "$ARCHIVE2" ] && tar -tzf "$ARCHIVE2" > "$LIST" 2>/dev/null || : > "$LIST"
 
 if [ "$RC2" -eq 0 ]; then pass "backup.sh exits 0 with the temp files present"; else

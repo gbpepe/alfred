@@ -1,6 +1,6 @@
 #!/bin/bash
-# Marveen - Rendszer költöztetés
-# Korábbi AI asszisztens rendszer átmigrálása Marveen-be
+# Alfred - Rendszer költöztetés
+# Korábbi AI asszisztens rendszer átmigrálása Alfred-be
 
 set -e
 
@@ -40,7 +40,7 @@ post_memory() {
   return 0
 }
 
-MARVEEN_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
+ALFRED_LANG="$(cat "${INSTALL_DIR}/.lang" 2>/dev/null || echo hu)"
 # shellcheck source=../install-lang.sh
 source "${INSTALL_DIR}/install-lang.sh"
 
@@ -68,7 +68,7 @@ if [ ! -e "$SOURCE_PATH" ]; then
 fi
 
 read -rp "$(_t migrate.prompt_agent)" AGENT_ID
-AGENT_ID=${AGENT_ID:-marveen}
+AGENT_ID=${AGENT_ID:-alfred}
 
 echo ""
 echo -e "${BOLD}$(_t migrate.section_2)${NC}"
@@ -151,7 +151,7 @@ case "$SOURCE_TYPE" in
 esac
 
 # Collect all discoverable files into a temp list
-MEMORY_FILES="/tmp/marveen-migrate-files.txt"
+MEMORY_FILES="/tmp/alfred-migrate-files.txt"
 > "$MEMORY_FILES"
 
 # Re-scan since the subshell above doesn't persist variables
@@ -236,15 +236,15 @@ with open(files_path) as fl:
             pass
 
 print(json.dumps(chunks))
-" > /tmp/marveen-migrate-chunks.json
+" > /tmp/alfred-migrate-chunks.json
 
-CHUNK_COUNT=$(python3 -c "import json; print(len(json.load(open('/tmp/marveen-migrate-chunks.json'))))")
+CHUNK_COUNT=$(python3 -c "import json; print(len(json.load(open('/tmp/alfred-migrate-chunks.json'))))")
 echo -e "  ${BOLD}$CHUNK_COUNT${NC}$(_t migrate.chunks_prefix)"
 
 if [ "$CHUNK_COUNT" -gt 0 ]; then
   curl -s -w '\n%{http_code}' -X POST "$API/memories/import" \
     -H "Content-Type: application/json" -H @<(printf '%s\n' "$AUTH_HEADER") \
-    -d "{\"agent_id\": \"$AGENT_ID\", \"chunks\": $(cat /tmp/marveen-migrate-chunks.json)}" | python3 -c "
+    -d "{\"agent_id\": \"$AGENT_ID\", \"chunks\": $(cat /tmp/alfred-migrate-chunks.json)}" | python3 -c "
 import json, sys
 raw = sys.stdin.read().rsplit('\\n', 1)
 body, code = (raw[0], raw[1].strip()) if len(raw) == 2 else (raw[0], '000')
@@ -278,4 +278,4 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Cleanup
-rm -f /tmp/marveen-migrate-files.txt /tmp/marveen-migrate-chunks.json
+rm -f /tmp/alfred-migrate-files.txt /tmp/alfred-migrate-chunks.json

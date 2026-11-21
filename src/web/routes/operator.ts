@@ -117,10 +117,10 @@ export function projectQuota(q: QuotaSnapshot): Record<string, unknown> {
 // ÜTEMEZŐ/Következő (names the owner's tasks). A new upstream row stays hidden
 // until it is listed here.
 export const OPERATOR_HEALTH_ROWS: Readonly<Record<string, readonly string[]>> = {
-  'MARVEEN': ['Verzió', 'Fő session', 'Dashboard', 'Modell', 'Fallback', 'Auth', 'Kontextus', 'Cache'],
+  'ALFRED': ['Verzió', 'Fő session', 'Dashboard', 'Modell', 'Fallback', 'Auth', 'Kontextus', 'Cache'],
   'KERET': ['5 órás', 'Heti', 'Előfizetés'],
   'ÜTEMEZŐ (24 óra)': ['Körök'],
-  'CSATORNA': ['Forgalom', 'Telegram plugin-patch', 'Hiba-napló (24 óra)'],
+  'CSATORNA': ['Forgalom', 'Discord plugin-patch', 'Hiba-napló (24 óra)'],
   'RENDSZER': ['Claude Code', 'Tárhely'],
 }
 

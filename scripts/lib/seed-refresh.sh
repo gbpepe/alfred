@@ -65,7 +65,7 @@ render_persona_file() {
 # set to MAIN_AGENT_ID, re-serialised as 2-space JSON plus a newline, and NO
 # placeholder substitution. Unparseable input comes out as is (the seeder's
 # byte-copy fallback). #2285: comparing against the placeholder render instead
-# kept the shipped literal "agent": "marveen", so on any other MAIN_AGENT_ID the
+# kept the shipped literal "agent": "alfred", so on any other MAIN_AGENT_ID the
 # untouched copy never matched and a config fix never arrived.
 render_seeded_task_config() {
   MAIN_AGENT_ID="${MAIN_AGENT_ID:-}" node -e '

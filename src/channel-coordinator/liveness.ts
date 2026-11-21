@@ -4,7 +4,7 @@
 // getClaudePidForSession + hasChannelPluginAlive are extracted VERBATIM from
 // channel-monitor.ts (which now imports them here) so both processes use one
 // implementation. The coordinator adds a higher-level decision on top:
-// decideNativeChannelDown() -- "is the native Telegram plugin currently NOT
+// decideNativeChannelDown() -- "is the native channel plugin currently NOT
 // consuming inbound?" -- which gates whether the coordinator should backfill.
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
@@ -29,7 +29,7 @@ const execFileAsync = promisify(execFile)
 export const KEEPALIVE_FILE = join(PROJECT_ROOT, 'store', '.channel-keepalive')
 export const KEEPALIVE_STALE_MS = 18 * 60 * 1000
 // After any main-session respawn the plugin needs time to come up; never call
-// the native "down" inside this window (matches MARVEEN_POST_RESPAWN_GRACE_MS).
+// the native "down" inside this window (matches ALFRED_POST_RESPAWN_GRACE_MS).
 export const STARTUP_GRACE_MS = 360_000
 export const RESPAWN_STAMP_FILE = join(PROJECT_ROOT, 'store', '.channel-last-respawn')
 
@@ -74,9 +74,9 @@ export interface PluginAliveContext {
   /**
    * Only a plugin process INSIDE claudePid's tree counts: no bot.pid and no
    * machine-wide fallback. For a session that shares a provider with other
-   * sessions on the host (the main session's co-listen Slack next to the
-   * sub-agents' Slack plugins), the fallbacks answer "some Slack poller lives
-   * somewhere", not "this session has one" (BOOTSTAGGER1007 b review, #1762).
+   * sessions on the host (e.g. a main session co-listening alongside sub-agent
+   * channel plugins), the fallbacks answer "some poller lives somewhere", not
+   * "this session has one" (BOOTSTAGGER1007 b review, #1762).
    */
   strictTree?: boolean
   /**
@@ -168,16 +168,6 @@ export function decideHasPluginAlive(ctx: PluginAliveContext): boolean {
       const cmd = cmdOf.get(botPid) || ''
       if (matchesProviderPollerCmd(cmd, providerType)) {
         debugLog?.('plugin alive via bot.pid (reparented)', { claudePid, orphanPid: botPid, agentName, providerType })
-        return true
-      }
-    }
-  }
-
-  if (providerType === 'slack') {
-    for (const [pid, cmd] of cmdOf) {
-      if (seen.has(pid)) continue
-      if (matchesProviderPollerCmd(cmd, providerType) && isPidAlive(pid)) {
-        debugLog?.('slack plugin alive via process scan', { claudePid, slackPid: pid, agentName })
         return true
       }
     }
@@ -419,7 +409,7 @@ export function readRespawnStampMs(): number {
 }
 
 // Age of the keepalive file in ms, or null if missing/unreadable. The scheduled
-// keepalive prompt (run inside the marveen-channels TUI) touches this every
+// keepalive prompt (run inside the alfred-channels TUI) touches this every
 // ~6 min; if the TUI is wedged it cannot, so the file ages.
 export function readKeepaliveAgeMs(nowMs: number): number | null {
   try {

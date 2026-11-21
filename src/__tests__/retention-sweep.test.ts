@@ -53,7 +53,7 @@ const DAY = 86400
 
 beforeAll(() => {
   // In-memory, so the sweep under test can never delete rows from the real
-  // store/claudeclaw.db (these prunes are agent-agnostic DELETEs -- they would
+  // store/alfred.db (these prunes are agent-agnostic DELETEs -- they would
   // happily eat production history).
   process.env.NODE_ENV = 'test'
   initDatabase(':memory:')

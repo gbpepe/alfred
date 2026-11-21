@@ -1,6 +1,6 @@
 /**
  * FEDAPPLYGATE1018: POST /api/federation/apply restarts the main agent, so it is a manual main restart and takes
- * the same gate as /api/marveen/restart (manual-restart-gate.ts). Before, it called hardRestartMarveenChannels()
+ * the same gate as /api/alfred/restart (manual-restart-gate.ts). Before, it called hardRestartAlfredChannels()
  * with no check and could cut a running turn. What it proves:
  * - the route: a refused gate answers 409 with the reason and does not restart; an allowed gate restarts; an
  *   explicit {"force": true} skips the gate and is logged; the page's plain '{}' body is gated;
@@ -22,7 +22,7 @@ vi.mock('../web/manual-restart-gate.js', async (importOriginal) => {
 })
 vi.mock('../web/channel-monitor.js', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../web/channel-monitor.js')>()
-  return { ...orig, hardRestartMarveenChannels: () => hard() }
+  return { ...orig, hardRestartAlfredChannels: () => hard() }
 })
 
 const { tryHandleFederation } = await import('../web/routes/federation.js')

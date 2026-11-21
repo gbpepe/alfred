@@ -23,14 +23,14 @@ vi.mock('../web/manual-restart-gate.js', async (importOriginal) => {
 })
 vi.mock('../web/channel-monitor.js', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../web/channel-monitor.js')>()
-  return { ...orig, hardRestartMarveenChannels: () => hard() }
+  return { ...orig, hardRestartAlfredChannels: () => hard() }
 })
 vi.mock('../web/restart-wake.js', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../web/restart-wake.js')>()
   return { ...orig, scheduleMainRestartWake: (...a: unknown[]) => wake(...a) }
 })
 
-const { tryHandleMarveen } = await import('../web/routes/marveen.js')
+const { tryHandleAlfred } = await import('../web/routes/alfred.js')
 const { tryHandleAgents } = await import('../web/routes/agents.js')
 const { MAIN_AGENT_ID, PROJECT_ROOT } = await import('../config.js')
 const { MAIN_CHANNELS_SESSION } = await import('../web/main-agent.js')
@@ -52,7 +52,7 @@ function fakeCtx(path: string, body: string | null) {
 }
 
 const ROUTES: Array<[string, string, (ctx: RouteContext) => Promise<boolean>]> = [
-  ['/api/marveen/restart', '/api/marveen/restart', (ctx) => tryHandleMarveen(ctx, join(PROJECT_ROOT, 'web'))],
+  ['/api/alfred/restart', '/api/alfred/restart', (ctx) => tryHandleAlfred(ctx, join(PROJECT_ROOT, 'web'))],
   ['/api/agents/:name/restart (main)', `/api/agents/${encodeURIComponent(MAIN_AGENT_ID)}/restart`, (ctx) => tryHandleAgents(ctx, join(PROJECT_ROOT, 'web'))],
 ]
 

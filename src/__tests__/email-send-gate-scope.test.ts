@@ -11,7 +11,7 @@ import { gateDecision } from '../../scripts/email-send-gate.mjs'
 // file was itself blocked by the live gate's old patterns -- the eighth
 // measured false positive of the day.)
 //
-// Per Marveen's strict condition (msg 14282): this is a HARD-deny whose
+// Per Alfred's strict condition (msg 14282): this is a HARD-deny whose
 // mistakes act outward, so REAL send attempts must keep failing -- the
 // positive controls below are the acceptance bar, not decor.
 describe('gateDecision Bash: content about mail no longer denies (the measured FP classes)', () => {
@@ -26,11 +26,11 @@ describe('gateDecision Bash: content about mail no longer denies (the measured F
   })
 
   it('a card-comment sqlite write quoting the evidence passes', () => {
-    expect(bash(`sqlite3 store/claudeclaw.db "INSERT INTO kanban_comments (card_id, author, content) VALUES ('X','Samu','a send.py es a sendmail mintak a tartalomra tuzeltek')"`).deny).toBe(false)
+    expect(bash(`sqlite3 store/alfred.db "INSERT INTO kanban_comments (card_id, author, content) VALUES ('X','Samu','a send.py es a sendmail mintak a tartalomra tuzeltek')"`).deny).toBe(false)
   })
 
   it('an inter-agent message about the mail infrastructure passes', () => {
-    expect(bash(`curl -s -X POST http://localhost:3420/api/messages -d '{"from":"samu","to":"marveen","content":"az api.resend.com kulcs rotalva, a graph-mail send ut tesztelesre var"}'`).deny).toBe(false)
+    expect(bash(`curl -s -X POST http://localhost:3420/api/messages -d '{"from":"samu","to":"alfred","content":"az api.resend.com kulcs rotalva, a graph-mail send ut tesztelesre var"}'`).deny).toBe(false)
   })
 
   it('READING the send tooling passes (cat, grep)', () => {

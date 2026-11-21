@@ -6,7 +6,7 @@
 #   seed_copy_is_untouched  the copy equals the render of .seed-prev/<rel> or of the current tree's <rel> (git's history
 #                           always holds the current version too: a retry or an earlier partial run stays untouched), with
 #                           EITHER identity: the current .env names, or the ones first-boot renders with before the
-#                           wizard (Owner / Marveen; the wizard renames only .env, CLAUDE.md and SOUL.md)
+#                           wizard (Owner / Alfred; the wizard renames only .env, CLAUDE.md and SOUL.md)
 #   seed_tracked_files      every file under the dir (the image build removed every gitignored file of the seed dirs)
 #   sched_task_verified_ok  the registry verdict, recorded per task in .seed-prev/.verdicts on its first ask, so a run
 #                           that crashed after a write still answers with the verdict from BEFORE the write
@@ -73,7 +73,7 @@ docker_seed_refresh() {
   command -v shasum >/dev/null 2>&1 || { echo "seed-refresh: WARN: no shasum in the image; skipped (the snapshot is kept)"; return 1; }
   GREEN="${GREEN:-}"; NC="${NC:-}"; ORANGE="${ORANGE:-}"
   SEED_REFRESH_UPDATED=0; SEED_REFRESH_KEPT=0; SCHED_REVIEW_NAMES=""; SCHED_REGISTER_NAMES=""; SEED_REGISTERED_NAMES=""
-  SEED_DEFAULT_OWNER="${SEED_DEFAULT_OWNER:-Owner}"; SEED_DEFAULT_BOT="${SEED_DEFAULT_BOT:-Marveen}"
+  SEED_DEFAULT_OWNER="${SEED_DEFAULT_OWNER:-Owner}"; SEED_DEFAULT_BOT="${SEED_DEFAULT_BOT:-Alfred}"
   MAIN_AGENT_ID="${MAIN_AGENT_ID:-}"; BOT_NAME="${BOT_NAME:-}"; OWNER_NAME="${OWNER_NAME:-}"; WEB_PORT="${WEB_PORT:-3420}"
   SEED_LANG="${SEED_LANG:-hu}"
   seed_refresh_groups

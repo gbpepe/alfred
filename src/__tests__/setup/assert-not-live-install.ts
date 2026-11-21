@@ -23,7 +23,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 const LIVE_MARKERS = [
   join('store', '.dashboard-token'),
-  join('store', 'claudeclaw.db'),
+  join('store', 'alfred.db'),
   join('store', '.claude-oauth-token'),
 ]
 

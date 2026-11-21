@@ -44,7 +44,7 @@ afterEach(() => {
 
 describe('stampProjectTrustForDir: the install root (#1904)', () => {
   it('a git-checkout install: the install root is trusted next to the agent dir', () => {
-    const root = join(work, 'marveen')
+    const root = join(work, 'alfred')
     const agent = join(root, 'agents', 'webdev')
     mkdirSync(agent, { recursive: true })
     gitInit(root)
@@ -56,7 +56,7 @@ describe('stampProjectTrustForDir: the install root (#1904)', () => {
 
   it('a tarball install under a home that is a git repo: the home is NOT stamped', () => {
     const home = join(work, 'home')
-    const root = join(home, 'marveen')
+    const root = join(home, 'alfred')
     const agent = join(root, 'agents', 'webdev')
     mkdirSync(agent, { recursive: true })
     gitInit(home)
@@ -68,7 +68,7 @@ describe('stampProjectTrustForDir: the install root (#1904)', () => {
   })
 
   it('an agent dir symlinked into another repository: that repository is NOT stamped', () => {
-    const root = join(work, 'marveen')
+    const root = join(work, 'alfred')
     const foreign = join(work, 'foreign')
     mkdirSync(join(root, 'agents'), { recursive: true })
     mkdirSync(join(foreign, 'webdev'), { recursive: true })
@@ -91,7 +91,7 @@ describe('stampProjectTrustForDir: the install root (#1904)', () => {
   })
 
   it('an agent dir that is its own repository, in a tarball install: nothing new', () => {
-    const root = join(work, 'marveen')
+    const root = join(work, 'alfred')
     const agent = join(root, 'agents', 'solo')
     mkdirSync(agent, { recursive: true })
     gitInit(agent)
@@ -100,7 +100,7 @@ describe('stampProjectTrustForDir: the install root (#1904)', () => {
   })
 
   it('already stamped, root included: a second launch writes nothing', () => {
-    const root = join(work, 'marveen')
+    const root = join(work, 'alfred')
     const agent = join(root, 'agents', 'webdev')
     mkdirSync(agent, { recursive: true })
     gitInit(root)
@@ -111,7 +111,7 @@ describe('stampProjectTrustForDir: the install root (#1904)', () => {
 
 describe('installRootTrustKey (#1904, review of #1911)', () => {
   it('looks git up once per process and root: the second start does not run git', () => {
-    const root = join(work, 'marveen')
+    const root = join(work, 'alfred')
     mkdirSync(root, { recursive: true })
     let calls = 0
     const lookup = (dir: string) => { calls++; return gitToplevelFor(dir) }
@@ -122,16 +122,16 @@ describe('installRootTrustKey (#1904, review of #1911)', () => {
   })
 
   it('an install root reached through a symlink: the resolved root is the key (git answers resolved)', () => {
-    const real = join(work, 'real-marveen')
+    const real = join(work, 'real-alfred')
     mkdirSync(real, { recursive: true })
     gitInit(real)
-    const link = join(work, 'marveen')
+    const link = join(work, 'alfred')
     symlinkSync(real, link)
     expect(installRootTrustKey(link)).toBe(real)
   })
 
   it('an answer that is not the install root itself is null, whatever it is', () => {
-    const root = join(work, 'marveen')
+    const root = join(work, 'alfred')
     mkdirSync(root, { recursive: true })
     expect(installRootTrustKey(root, () => work)).toBeNull()
     expect(installRootTrustKey(join(work, 'missing'), () => join(work, 'missing'))).toBeNull()
@@ -143,11 +143,11 @@ describe('gitToplevelFor (#1904)', () => {
     expect(gitToplevelFor('/x', () => { throw new Error('ENOENT git') })).toBeNull()
     expect(gitToplevelFor('/x', () => '')).toBeNull()
     expect(gitToplevelFor('/x', () => '  \n')).toBeNull()
-    expect(gitToplevelFor('/x', () => '/home/u/marveen\n')).toBe('/home/u/marveen')
+    expect(gitToplevelFor('/x', () => '/home/u/alfred\n')).toBe('/home/u/alfred')
   })
 
   it.each(['GIT_DIR', 'GIT_WORK_TREE'])('an inherited %s does not point it at another repo', (v) => {
-    const root = join(work, 'marveen')
+    const root = join(work, 'alfred')
     const agent = join(root, 'agents', 'webdev')
     const other = join(work, 'other')
     mkdirSync(agent, { recursive: true })

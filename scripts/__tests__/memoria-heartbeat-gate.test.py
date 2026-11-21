@@ -2,7 +2,7 @@
 """Branch tests for memoria_heartbeat_gate against a throwaway database.
 
 Every outward path is rebound: db, marker, token, messages URL, and the wake
-call itself. Nothing here may reach store/claudeclaw.db or the live agent.
+call itself. Nothing here may reach store/alfred.db or the live agent.
 
 The scenario that matters most is `scenario_own_turn_does_not_retrigger`: it is
 the whole reason the watermark is written by the agent instead of by the gate.
@@ -82,7 +82,7 @@ def add_tool(con, agent=None, summary="ls") -> None:
 # end-of-turn bookkeeping call (matches the live tool_call_log row 4266,
 # modulo the machine-specific install path).
 MARK_SEEN_SUMMARY = (
-    f"python3 {gate.MARVEEN_DIR}/scripts/memoria_heartbeat_gate.py "
+    f"python3 {gate.ALFRED_DIR}/scripts/memoria_heartbeat_gate.py "
     "--mark-seen --conv-upto 1609"
 )
 
@@ -390,7 +390,7 @@ def scenario_agent_id_comes_from_env() -> None:
     looks at the value itself.
     """
     print("the agent id is resolved like the product does")
-    env = gate.MARVEEN_DIR / ".env"
+    env = gate.ALFRED_DIR / ".env"
     expected = None
     try:
         for line in env.read_text(encoding="utf-8").splitlines():
@@ -406,10 +406,10 @@ def scenario_agent_id_comes_from_env() -> None:
     else:
         # No .env (a stripped checkout, or a git worktree): the fallback has to
         # be the PRODUCT's, because src/config.ts resolves it as
-        # `env['MAIN_AGENT_ID'] ?? 'marveen'`. On such an install "marveen" is
+        # `env['MAIN_AGENT_ID'] ?? 'alfred'`. On such an install "alfred" is
         # the registered main agent, so the POST is accepted; anything else we
         # invented here would be rejected with 403.
-        check_eq("falls back exactly like src/config.ts", gate.AGENT, "marveen")
+        check_eq("falls back exactly like src/config.ts", gate.AGENT, "alfred")
 
     check_eq(
         "not a name from another install",
@@ -430,7 +430,7 @@ def scenario_env_shapes() -> None:
     import tempfile, pathlib
     esetek = [
         # PARITAS-TABLAZAT a termek src/env.ts readEnvFile-javal + a config.ts
-        # `?? 'marveen'` fallbackjaval. Merve 2026-09-27 a LEFORDITOTT dist/env.js
+        # `?? 'alfred'` fallbackjaval. Merve 2026-09-27 a LEFORDITOTT dist/env.js
         # ellen, tizenharom alakon; minden elvart ertek ONNAN jon, nem attol, ami
         # kenyelmes lenne. Az elozo valtozat itt az ENGEDEKENY alakot pinnelte
         # helyesnek, es ezzel ot ponton a termektol ELTERO viselkedest rogzitett.
@@ -438,14 +438,14 @@ def scenario_env_shapes() -> None:
         # a termek kulcsa `export MAIN_AGENT_ID` lesz, tehat a kulcs HIANYZIK ->
         # fallback. Ez a legfontosabb sor: epp ez a felreiranyitas, amiert a
         # BEEGETETT913 keszult.
-        ("export MAIN_AGENT_ID=exportalt\n", "marveen"),
+        ("export MAIN_AGENT_ID=exportalt\n", "alfred"),
         ('MAIN_AGENT_ID="idezett"\n', "idezett"),
         # a sorvegi komment az ERTEK RESZE a termeknel
         ("MAIN_AGENT_ID=kommentes  # ez itt megjegyzes\n", "kommentes  # ez itt megjegyzes"),
         # idezojel csak akkor jon le, ha MINDKET veg az; itt a veg a komment
         ('MAIN_AGENT_ID="ra#cs"  # a kettes a kommentben\n', '"ra#cs"  # a kettes a kommentben'),
-        ("  export   MAIN_AGENT_ID = 'mind'   \n", "marveen"),
-        ("BOT_NAME=Valami\n", "marveen"),
+        ("  export   MAIN_AGENT_ID = 'mind'   \n", "alfred"),
+        ("BOT_NAME=Valami\n", "alfred"),
         # URES ertek: a termek `??`-ja NULLISH-only, tehat az ures sztring ATMEGY
         ("MAIN_AGENT_ID=\n", ""),
         # a termek minden sort feldolgoz es FELULIRJA a kulcsot: az UTOLSO nyer
@@ -456,7 +456,7 @@ def scenario_env_shapes() -> None:
         ("MAIN_AGENT_ID='egyoldalu\n", "'egyoldalu"),
         # --- A 2026-09-27 TOVABBI NEGY ALAK (a review merese a termek sajat readEnvFile-ja ellen) ---
         # UTF-8 BOM az elso soron: a termek JS trim()-je a U+FEFF-et is levagja, a Python strip()-je
-        # nem, es ez nema felreiranyitas lett volna (a riasztas a `marveen`-nek menne).
+        # nem, es ez nema felreiranyitas lett volna (a riasztas a `alfred`-nek menne).
         ("\ufeffMAIN_AGENT_ID=bomos\n", "bomos"),
         # ervenytelen UTF-8 bajt egy megjegyzesben: a termek U+FFFD-re cserel es megy tovabb; a kapu
         # eddig UnicodeDecodeError-ral meghalt (a memoria-kapu importkor oldja fel az azonositot).
@@ -471,11 +471,11 @@ def scenario_env_shapes() -> None:
         # es amit a JS trim() levag, de a Python strip() nem: a BOM az ertek vegen
         ("MAIN_AGENT_ID=vegen\ufeff\n", "vegen"),
     ]
-    eredeti = gate.MARVEEN_DIR
+    eredeti = gate.ALFRED_DIR
     with tempfile.TemporaryDirectory() as d:
-        gate.MARVEEN_DIR = pathlib.Path(d)
+        gate.ALFRED_DIR = pathlib.Path(d)
         for tartalom, vart in esetek:
-            env_fajl = gate.MARVEEN_DIR / ".env"
+            env_fajl = gate.ALFRED_DIR / ".env"
             if isinstance(tartalom, bytes):
                 env_fajl.write_bytes(tartalom)
             else:
@@ -483,7 +483,7 @@ def scenario_env_shapes() -> None:
             kapott = gate.main_agent_id()
             cimke = ascii(tartalom).replace("\\n", " ")[:46]
             check_eq(f"{cimke} -> {vart!r}", kapott, vart)
-    gate.MARVEEN_DIR = eredeti
+    gate.ALFRED_DIR = eredeti
 
 
 def scenario_sender_is_the_agent_id() -> None:

@@ -211,7 +211,7 @@ describe('prompt (CMD920 test 23 + the changed-definition ask)', () => {
   })
 
   it('the envelope is the existing channel-inbound category (owner provenance, no new wrapper)', () => {
-    expect(classifyAgentMessage(COORDINATOR_AGENT_ID, 'marveen')?.category).toBe('channel-inbound')
+    expect(classifyAgentMessage(COORDINATOR_AGENT_ID, 'alfred')?.category).toBe('channel-inbound')
     expect(buildOwnerCommandInbound('x', OWNER, 'a', T0)).toMatch(/^<channel source="owner-command" /)
   })
 })
@@ -401,9 +401,9 @@ describe('/api/custom-commands (CMD920 test 26)', () => {
 
   it('a write carrying an agent identity is refused, in body or header, and from a federation peer', async () => {
     for (const [body, headers, auth] of [
-      [{ ...def, agent_id: 'marveen' }, {}, { kind: 'token' }],
+      [{ ...def, agent_id: 'alfred' }, {}, { kind: 'token' }],
       [{ ...def, updated_by: 'worker' }, {}, { kind: 'token' }],
-      [def, { 'x-agent-id': 'marveen' }, { kind: 'token' }],
+      [def, { 'x-agent-id': 'alfred' }, { kind: 'token' }],
       [def, {}, { kind: 'federation', peer: 'remote' }],
     ] as Array<[unknown, Record<string, string>, unknown]>) {
       const r = await call('POST', '/api/custom-commands', body, headers, auth)
@@ -412,8 +412,8 @@ describe('/api/custom-commands (CMD920 test 26)', () => {
     expect(countCustomCommands()).toBe(0)
     // PUT and DELETE too
     insertCustomCommand({ name: 'jo', description: '', kind: 'actions', body: '[{"action":"message","value":"a"}]', enabled: true, updatedBy: 'owner' })
-    expect((await call('PUT', '/api/custom-commands/jo', { description: 'y', agent: 'marveen' })).status).toBe(403)
-    expect((await call('DELETE', '/api/custom-commands/jo', undefined, { 'x-agent-name': 'marveen' })).status).toBe(403)
+    expect((await call('PUT', '/api/custom-commands/jo', { description: 'y', agent: 'alfred' })).status).toBe(403)
+    expect((await call('DELETE', '/api/custom-commands/jo', undefined, { 'x-agent-name': 'alfred' })).status).toBe(403)
     expect(getCustomCommand('jo')!.description).toBe('')
   })
 
@@ -490,9 +490,9 @@ describe('task action (/napindito, /heartbeat)', () => {
   })
 
   it('taskStepText: fired / busy (queued by the scheduler, NOT a failure) / not found', () => {
-    expect(taskStepText('reggeli-napindito', { ok: true, result: 'marveen: fired' }))
-      .toEqual({ ok: true, text: 'reggeli-napindito marveen: elindult. Az eredményt a feladat maga küldi.' })
-    const busy = taskStepText('reggeli-napindito', { ok: true, result: 'marveen: busy' })
+    expect(taskStepText('reggeli-napindito', { ok: true, result: 'alfred: fired' }))
+      .toEqual({ ok: true, text: 'reggeli-napindito alfred: elindult. Az eredményt a feladat maga küldi.' })
+    const busy = taskStepText('reggeli-napindito', { ok: true, result: 'alfred: busy' })
     expect(busy.ok).toBe(true)
     expect(busy.text).toMatch(/foglalt, sorba állt, amint szabad, lefut/)
     expect(taskStepText('nincs', { ok: false, error: 'Schedule not found' }))

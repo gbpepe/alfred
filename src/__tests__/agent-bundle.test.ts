@@ -187,7 +187,7 @@ describe('agent bundle export/import', () => {
       remoteHost: 'devbox',
       remoteWorkdir: '/home/user/proj',
       claudeConfigDir: '/home/user/.claude-alt',
-      oauthTokenFile: '/home/user/.config/marveen/tokens/agent.token',
+      oauthTokenFile: '/home/user/.config/alfred/tokens/agent.token',
       displayName: 'Keep me',
     }))
     sanitizeImportedConfig(stagedAgent)
@@ -224,8 +224,8 @@ describe('agent bundle export/import', () => {
   })
 
   it('builds a safe download filename', () => {
-    expect(bundleFilename('tester')).toBe('marveen-agent-tester.tar.gz')
-    expect(bundleFilename('../../etc/passwd')).toBe('marveen-agent-passwd.tar.gz')
+    expect(bundleFilename('tester')).toBe('alfred-agent-tester.tar.gz')
+    expect(bundleFilename('../../etc/passwd')).toBe('alfred-agent-passwd.tar.gz')
   })
 })
 
@@ -365,6 +365,6 @@ describe('fleet bundle export/import', () => {
   })
 
   it('builds a stable fleet download filename', () => {
-    expect(fleetBundleFilename()).toBe('marveen-fleet.tar.gz')
+    expect(fleetBundleFilename()).toBe('alfred-fleet.tar.gz')
   })
 })

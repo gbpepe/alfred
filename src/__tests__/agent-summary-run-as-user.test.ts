@@ -61,7 +61,7 @@ async function get(path: string): Promise<unknown> {
 
 beforeEach(() => {
   SANDBOX = mkdtempSync(join(tmpdir(), 'runasuser-sum-'))
-  writeConfig('withuser', { runAsUser: 'marveen-withuser' })
+  writeConfig('withuser', { runAsUser: 'alfred-withuser' })
   writeConfig('nouser', { model: 'sonnet' })
   // Fails RUN_AS_USER_ALLOWED: the API must not echo what the spawn would refuse.
   writeConfig('baduser', { runAsUser: 'root; rm -rf /' })
@@ -72,7 +72,7 @@ describe('runAsUser in the agent API (#2358)', () => {
   it('GET /api/agents: each row carries its own agent\'s runAsUser, null when unset or invalid', async () => {
     const rows = await get('/api/agents') as Array<Record<string, unknown>>
     expect(rows.map((r) => [r.name, r.runAsUser])).toEqual([
-      ['withuser', 'marveen-withuser'],
+      ['withuser', 'alfred-withuser'],
       ['nouser', null],
       ['baduser', null],
     ])
@@ -82,7 +82,7 @@ describe('runAsUser in the agent API (#2358)', () => {
 
   it('GET /api/agents/:name: the detail carries it too', async () => {
     const withUser = await get('/api/agents/withuser') as Record<string, unknown>
-    expect(withUser.runAsUser).toBe('marveen-withuser')
+    expect(withUser.runAsUser).toBe('alfred-withuser')
     const noUser = await get('/api/agents/nouser') as Record<string, unknown>
     expect(Object.prototype.hasOwnProperty.call(noUser, 'runAsUser')).toBe(true)
     expect(noUser.runAsUser).toBeNull()

@@ -272,7 +272,7 @@ describe('the owner-facing texts (doctor line, one-time notice)', () => {
     // Samu 72311: the notice tells the truth for the version it ships in. B alone: the main agent still got the key.
     // MAINAUTH1107 (A): the main agent no longer gets it either, unless its own authMode is api (the switch's sentence
     // and a new notice stamp come with D).
-    // MAINAUTHSWITCH1107 (D, Marveen copy round 72333): no config word for the owner; the switch named where it is
+    // MAINAUTHSWITCH1107 (D, Alfred copy round 72333): no config word for the owner; the switch named where it is
     expect(notice('subscription', 'en')).toContain('only the agents whose authentication is set to the API key on the dashboard get it')
     expect(notice('subscription', 'en')).toContain('on its card, Settings tab, in the Authentication group')
     expect(notice('subscription', 'hu')).toContain('amelyeknél a dashboardon API-kulcsos hitelesítés van beállítva')

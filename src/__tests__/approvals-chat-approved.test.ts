@@ -207,7 +207,7 @@ describe('email-approval-gate accepts a chat-approved row', () => {
       version: 1,
       categories: [{ key: 'email_send', label: 'Email', level: 2, locked: false }],
     }))
-    initDatabase(join(store, 'claudeclaw.db'))
+    initDatabase(join(store, 'alfred.db'))
     sendSpy.mockClear()
   })
 

@@ -2,14 +2,14 @@
 // tmux kill-session or are left over from a previous agent crash).
 //
 // The bug we close (2026-06-01 incident, channel-disconnect roundtrip):
-//   - stopAgentProcess used `pkill -f TELEGRAM_STATE_DIR=<dir>`, but the
-//     plugin process argv is just `bun run --cwd .../telegram/0.0.6 start`
+//   - stopAgentProcess used `pkill -f DISCORD_STATE_DIR=<dir>`, but the
+//     plugin process argv is just `bun run --cwd .../discord/0.0.4 start`
 //     - the env var lives in /proc-equivalent environment storage, not argv,
-//     so `pkill -f` never matches and the orphan keeps polling getUpdates
+//     so `pkill -f` never matches and the orphan keeps polling
 //     with the same bot token until SIGTERM by hand.
 //   - startAgentProcess only killed the tmux session pre-launch and did NOT
 //     reap orphans at all. After a restart the old poller raced the new one
-//     and Telegram returned 409 Conflict in a loop.
+//     and contended on the bot session in a loop.
 //   - The plugin writes bot.pid in <chanDir>/bot.pid. That works on the
 //     happy path but if a new poller crashed and a later one overwrote the
 //     file, the older orphan is no longer in bot.pid - we miss it.
@@ -35,7 +35,7 @@ import { shQuote } from './ssh-tmux.js'
 // `ps eww -e` does not: `-e` there only adds other users' processes, and the
 // BSD default still drops every tty-less one (measured 2026-10-07 on the host:
 // 255 rows vs 981 for `ps axeww`; a detached node carrying
-// TELEGRAM_STATE_DIR=<probe> was absent from the former, present in the
+// DISCORD_STATE_DIR=<probe> was absent from the former, present in the
 // latter). An orphaned poller is exactly a tty-less process -- its tmux pane
 // is gone -- so the old form was blind to the very thing this scan exists to
 // find (card PSEWWMACOSBLIND1007). `x` adds the tty-less processes; procps on
@@ -64,22 +64,16 @@ export function execFailure(err: unknown): { code: string | null; signal: string
 }
 
 const STATE_ENV_VAR: Record<ChannelProviderType, string> = {
-  telegram: 'TELEGRAM_STATE_DIR',
-  slack: 'SLACK_STATE_DIR',
   discord: 'DISCORD_STATE_DIR',
-  googlechat: 'GOOGLECHAT_STATE_DIR',
-  teams: 'TEAMS_STATE_DIR',
-  // gromzo has no state dir; no process ever carries this variable, so no gromzo poller is a candidate here.
-  gromzo: 'GROMZO_STATE_DIR',
 }
 
 // Parse `ps axeww` output and return every PID whose process environment
 // contains `<envVar>=<value>`. Exported for testability.
 //
 // `ps axeww` rows on macOS look like:
-//   90798 s000  S+   0:00.01 bun run --cwd ... HOME=/Users/... TELEGRAM_STATE_DIR=/path... ...
-// The match must be precise: substring `TELEGRAM_STATE_DIR=/path` against
-// `TELEGRAM_STATE_DIR=/path-elsewhere` is acceptable because the value is an
+//   90798 s000  S+   0:00.01 bun run --cwd ... HOME=/Users/... DISCORD_STATE_DIR=/path... ...
+// The match must be precise: substring `DISCORD_STATE_DIR=/path` against
+// `DISCORD_STATE_DIR=/path-elsewhere` is acceptable because the value is an
 // absolute path, but we still anchor on the env-var literal to avoid
 // matching a row that just *mentions* the path string in its argv.
 //
@@ -89,9 +83,9 @@ const STATE_ENV_VAR: Record<ChannelProviderType, string> = {
 // with `ps axeww` those tty-less jobs are now visible on macOS too, where
 // nothing in the guards behind this scan would spare them (a JS runtime, not a
 // pane, not claude). A channel plugin poller is launched by Claude Code as a
-// plugin, so it always has CLAUDE_PLUGIN_ROOT (measured on the host: every
-// telegram and slack-channel poller does; the agent's background jobs and its
-// non-plugin MCP servers do not). The bot.pid path is unaffected.
+// plugin, so it always has CLAUDE_PLUGIN_ROOT (every channel poller carries it;
+// the agent's background jobs and its non-plugin MCP servers do not). The
+// bot.pid path is unaffected.
 const PLUGIN_ROOT_ENV_RE = /(?:^|\s)CLAUDE_PLUGIN_ROOT=\S/
 
 export function parsePollerPidsFromPs(
@@ -149,15 +143,15 @@ function listPollerPidsByStateDir(envVar: string, chanDir: string): number[] {
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // The CLAUDE_PLUGIN_ROOT anchor for one provider: the env literal, then the
-// provider dir segment ending on a path/version/space boundary, so `/telegram`
-// does not match a longer sibling like `/telegram-inline`.
+// provider dir segment ending on a path/version/space boundary, so `/discord`
+// does not match a longer sibling like `/discord-inline`.
 function pluginRootRegex(pluginRootNeedle: string): RegExp {
   return new RegExp(`CLAUDE_PLUGIN_ROOT=\\S*${escapeRe(pluginRootNeedle)}(?:[/@ ]|$)`)
 }
 
 // The rows of ONE channel state dir: the state-dir literal `<envVar>=<chanDir>`
-// ending on whitespace or end of line (so `/x/telegram` does not also match
-// `/x/telegram-old`), and, when `rootRe` is given, that anchor too.
+// ending on whitespace or end of line (so `/x/discord` does not also match
+// `/x/discord-old`), and, when `rootRe` is given, that anchor too.
 function stateDirLiteralRe(envVar: string, chanDir: string): RegExp {
   return new RegExp(`(?:^|\\s)${escapeRe(envVar)}=${escapeRe(chanDir)}(?:\\s|$)`)
 }
@@ -178,8 +172,8 @@ function stateDirRowPids(psEwwOutput: string, envVar: string, chanDir: string, r
 /**
  * The poller candidates of ONE channel state dir: an env-scan row counts only
  * if it carries BOTH the state-dir literal `<envVar>=<chanDir>` (ending on
- * whitespace or end of line, so `/x/telegram` does not also match
- * `/x/telegram-old`) AND the provider's CLAUDE_PLUGIN_ROOT anchor.
+ * whitespace or end of line, so `/x/discord` does not also match
+ * `/x/discord-old`) AND the provider's CLAUDE_PLUGIN_ROOT anchor.
  * Exported for testability.
  */
 export function parseStateDirPollerPids(
@@ -856,7 +850,7 @@ export function reapChannelOrphans(
   // Never kill the tmux SERVER either (TMUXSERVERREAP929). When channels.sh
   // creates the server itself (after a host reboot it usually does: it runs
   // `tmux start-server` with the state-dir var already exported), the server
-  // process carries TELEGRAM_STATE_DIR in its own environment, so the env scan
+  // process carries DISCORD_STATE_DIR in its own environment, so the env scan
   // matches it. Killing it tears down EVERY agent's pane on the host, not just
   // this one's poller. Measured 2026-09-28 12:47, 14:47 and 2026-09-29 04:31:
   // the reap's `reaped` list held the server pid (the parent of every pane),
@@ -959,7 +953,7 @@ function isClaudeBinary(command: string): boolean {
  * Pure: return the pids of `claude --channels` processes that are NOT attached
  * to any live tmux pane (orphans). `livePanePids` is the set of pane pids from
  * `tmux list-panes -a`. `channelNeedle` optionally restricts to one plugin
- * (e.g. 'plugin:telegram@...'); when omitted, every channel plugin is in scope.
+ * (e.g. 'plugin:discord@...'); when omitted, every channel plugin is in scope.
  *
  * `ownTmuxServerPid` keeps the scan to THIS install. `livePanePids` lists only
  * the panes of our own tmux server, so the live session of another install on
@@ -1022,95 +1016,6 @@ function underForeignTmuxServer(pid: number, byPid: Map<number, ProcRow>, ownTmu
     cur = row.ppid
   }
   return false
-}
-
-// ---------------------------------------------------------------------------
-// Gromzo-channel orphans (MXDAGENTSOCKID1106 (b), Samu 71288).
-//
-// The gromzo-channel plugin is a node MCP server, a direct child of its claude. Up to marveen-mxd #85 it does NOT
-// exit when its stdin closes (measured 2026-11-06 on the installed plugin: alive 8 s after stdin end, still
-// reconnecting to mxd); every plugin shipped before #85 behaves so until it is updated, and even after #85 the
-// plugin of a DETACHED claude that is still alive never sees its stdin close. None of the reapers above sees it: reapChannelOrphans matches *_STATE_DIR / bot.pid, and
-// reapDetachedChannelClaudes kills only the bun children of a detached claude (killBunChildren). So the plugin of
-// a killed detached claude lives on under pid 1, keeps its agent.sock connection and keeps popping the agent's
-// messages from mxd, with nobody to hand them to.
-//
-// A candidate is a JS-runtime row of the env scan whose env carries CLAUDE_PLUGIN_ROOT=<...>/gromzo-channel AND
-// MXD_AGENT=<slug>. MXD_AGENT alone is not enough: it is exported into the launch command, so every child of the
-// agent's claude inherits it (measured: claude, node, bun, even an ffmpeg). An orphan is a candidate that no live
-// pane of OUR tmux server holds and that does not sit under another install's tmux server. The live plugin of
-// every running agent hangs under its pane (node -> claude -> pane), so it is spared.
-const GROMZO_ROOT_RE = /(?:^|\s)CLAUDE_PLUGIN_ROOT=\S*\/gromzo-channel(?:\/|\s|$)/
-const MXD_AGENT_RE = /(?:^|\s)MXD_AGENT=([a-z0-9-]{1,32})(?:\s|$)/
-
-/** Pure: the gromzo-channel plugin rows of an env scan, with the agent each serves. Exported for testability. */
-export function parseGromzoPluginRows(psEwwOutput: string): { pid: number; agent: string }[] {
-  const out: { pid: number; agent: string }[] = []
-  for (const line of psEwwOutput.split('\n')) {
-    if (!GROMZO_ROOT_RE.test(line)) continue
-    const agent = line.match(MXD_AGENT_RE)?.[1]
-    const m = line.match(/^\s*(\d+)\s/)
-    if (!agent || !m) continue
-    const pid = parseInt(m[1]!, 10)
-    if (pid > 1) out.push({ pid, agent })
-  }
-  return out
-}
-
-/** Pure: the gromzo plugin pids that are orphans (see the block comment). Exported for testability. */
-export function findGromzoOrphans(
-  rows: { pid: number; agent: string }[],
-  procs: ProcRow[],
-  livePanePids: Set<number>,
-  ownTmuxServerPid: number | null,
-): { pid: number; agent: string }[] {
-  if (livePanePids.size === 0) return []
-  const byPid = new Map<number, ProcRow>()
-  for (const p of procs) byPid.set(p.pid, p)
-  return rows.filter(({ pid }) => {
-    const row = byPid.get(pid)
-    if (!row) return false // gone since the scan
-    // The pid could have been reused between the env scan and this snapshot: signal it only while its own command
-    // line still names the gromzo-channel plugin (Dani #2558 review (1)).
-    if (!row.command.includes('/gromzo-channel/')) return false
-    if (isClaudeBinary(row.command)) return false
-    if (attachedToLivePane(pid, byPid, livePanePids)) return false
-    if (underForeignTmuxServer(pid, byPid, ownTmuxServerPid)) return false
-    return true
-  })
-}
-
-/**
- * Reap gromzo-channel plugins that no live agent holds any more (see the block comment above). Run it AFTER
- * reapDetachedChannelClaudes: the plugin of a claude that reaper just killed is an orphan only from then on.
- * Fail-safe: no live pane, or a failed scan, reaps nothing. Signals only the dashboard's own uid. Returns the
- * pids actually killed.
- */
-export function reapGromzoOrphans(opts: { tmuxPath?: string } & ReapSeams = {}): number[] {
-  const tmuxPath = opts.tmuxPath ?? 'tmux'
-  const live = opts.panePids ? opts.panePids() : livePanePids(tmuxPath)
-  if (live.size === 0) {
-    logger.warn('channel-poller-reap: no live panes resolved, skipping gromzo-orphan reap (fail-safe)')
-    return []
-  }
-  const psEww = opts.psEww ? opts.psEww() : envScanOrEmpty({ reaper: 'gromzo-orphan' })
-  if (psEww === null) return []
-  const rows = parseGromzoPluginRows(psEww)
-  if (rows.length === 0) return []
-  const procs = opts.procs ? opts.procs() : snapshotProcs()
-  const server = opts.tmuxServerPid ? opts.tmuxServerPid() : tmuxServerPid(tmuxPath)
-  const orphans = findGromzoOrphans(rows, procs, live, server)
-  if (orphans.length === 0) return []
-  const where = { reaper: 'gromzo-orphan', agents: [...new Set(orphans.map((o) => o.agent))] }
-  const owners = splitByOwner(orphans.map((o) => o.pid), opts.ownUid === undefined ? dashboardUid() : opts.ownUid, opts.ownerOf)
-  logOwnerSkips(where, owners)
-  const killOutcome = terminatePids(owners.own, { kill: opts.kill })
-  if (killOutcome.killed.length > 0) {
-    logger.info({ ...where, reaped: killOutcome.killed, outcome: outcomeByKind(killOutcome) },
-      'channel-poller-reap: orphaned gromzo-channel plugin(s) killed (no live agent holds them)')
-  }
-  logNotKilled(where, killOutcome)
-  return killOutcome.killed
 }
 
 function snapshotProcs(): ProcRow[] {
@@ -1225,20 +1130,19 @@ export function reapDetachedChannelClaudes(opts: { channelNeedle?: string; tmuxP
 //
 //   reapChannelOrphans          -> matches by <PROVIDER>_STATE_DIR=<chanDir>.
 //     The MAIN channels session is launched by channels.sh with NO
-//     TELEGRAM_STATE_DIR export (the plugin falls back to its default dir,
+//     DISCORD_STATE_DIR export (the plugin falls back to its default dir,
 //     ~/.claude/channels/<provider>), so the main poller carries no state-dir
 //     needle and is invisible to that env scan.
 //   reapDetachedChannelClaudes  -> matches `claude --channels` processes not
 //     attached to a live pane. A THIEF here is NOT a `--channels` session: it
 //     is a plain local-agent-mode / CLI `claude` running in the project cwd,
-//     which AUTO-LOADS the telegram plugin because the PROJECT settings.json
-//     has enabledPlugins.telegram=true. Its argv has no `--channels`, so that
-//     reaper never even considers it.
+//     which AUTO-LOADS the channel plugin when PROJECT settings.json enables it.
+//     Its argv has no `--channels`, so that reaper never considers it.
 //
 // Net effect: a local-agent-mode subagent (e.g. one the main session's own
 // Agent/Task tool spawns) loads the plugin with the DEFAULT state dir, grabs
-// the MAIN bot token, and long-polls getUpdates alongside the legit poller ->
-// 409 Conflict -> the main bot silently drops inbound. The existing
+// the MAIN bot token, and contends alongside the legit poller ->
+// the main bot silently drops inbound. The existing
 // down-recovery restarts the VICTIM (the legit session), never the THIEF, so
 // the outage persists until the thief happens to exit.
 //
@@ -1253,15 +1157,9 @@ export function reapDetachedChannelClaudes(opts: { channelNeedle?: string; tmuxP
 // test would wrongly spare it).
 
 // argv[0] basename of the CLAUDE_PLUGIN_ROOT plugin dir per provider. The
-// telegram plugin cache path ends in `.../telegram/<ver>`; slack-channel in
-// `.../slack-channel/<ver>`; etc.
+// discord plugin cache path ends in `.../discord/<ver>`.
 const PLUGIN_ROOT_NEEDLE: Record<ChannelProviderType, string> = {
-  telegram: '/telegram',
-  slack: '/slack-channel',
   discord: '/discord',
-  googlechat: '/googlechat',
-  teams: '/teams',
-  gromzo: '/gromzo-channel',
 }
 
 // Candidate = a poller bound to the MAIN default state dir: its env carries
@@ -1270,13 +1168,13 @@ const PLUGIN_ROOT_NEEDLE: Record<ChannelProviderType, string> = {
 // the main-dir pollers). Exported for testability.
 export function parseMainDirPollerPids(
   psEwwOutput: string,
-  pluginRootNeedle: string, // e.g. '/telegram'
-  stateEnvVar: string,      // e.g. 'TELEGRAM_STATE_DIR'
+  pluginRootNeedle: string, // e.g. '/discord'
+  stateEnvVar: string,      // e.g. 'DISCORD_STATE_DIR'
 ): number[] {
   const escaped = pluginRootNeedle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   // Anchor on the CLAUDE_PLUGIN_ROOT env literal, then the provider dir segment
-  // ending on a path/version/space boundary so `/telegram` does not match a
-  // longer sibling like `/telegram-inline`.
+  // ending on a path/version/space boundary so `/discord` does not match a
+  // longer sibling like `/discord-inline`.
   const rootRe = new RegExp(`CLAUDE_PLUGIN_ROOT=\\S*${escaped}(?:[/@ ]|$)`)
   const out: number[] = []
   for (const line of psEwwOutput.split('\n')) {
@@ -1388,21 +1286,4 @@ export function reapForeignMainPollers(opts: {
   }
   logNotKilled(where, killOutcome)
   return killOutcome.killed
-}
-
-/**
- * reapGromzoOrphans a few seconds AFTER a respawn-pane -k: the old claude's gromzo plugin becomes an orphan only
- * once that claude is gone, which is after the respawn, so the pre-respawn reaps cannot see it. The new plugin
- * hangs under the live pane and is spared. Fire and forget; never throws.
- */
-export function scheduleGromzoOrphanReap(where: string, tmuxPath: string, delayMs = 3000): void {
-  const t = setTimeout(() => {
-    try {
-      const killed = reapGromzoOrphans({ tmuxPath })
-      if (killed.length > 0) logger.warn({ where, killed }, 'channel-poller-reap: post-respawn gromzo-orphan reap')
-    } catch (err) {
-      logger.warn({ ...execFailure(err), where }, 'channel-poller-reap: post-respawn gromzo-orphan reap failed')
-    }
-  }, delayMs)
-  t.unref?.()
 }

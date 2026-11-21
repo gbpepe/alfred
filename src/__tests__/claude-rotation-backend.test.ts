@@ -15,14 +15,14 @@ import {
 import { probePlanUsage, parseRetryAfter, observationFromProbe, usageFromProbe } from '../claude-plan-usage-probe.js'
 
 const NOW = 1_800_000_000_000
-const ROTATE = 'ROTATE agent=marveen target=b targetLabel=Team Seat currentLabel=Personal PRO currentPct=100 resetsInMin=60 trigger=5h'
-const NO_ALT = 'NO_ALTERNATIVE agent=marveen currentLabel=Personal PRO currentPct=100 resetsInMin=60 trigger=5h'
+const ROTATE = 'ROTATE agent=alfred target=b targetLabel=Team Seat currentLabel=Personal PRO currentPct=100 resetsInMin=60 trigger=5h'
+const NO_ALT = 'NO_ALTERNATIVE agent=alfred currentLabel=Personal PRO currentPct=100 resetsInMin=60 trigger=5h'
 const SUB_ROTATE = 'SUBAGENT_ROTATE agent=iris target=c targetLabel=c currentLabel=b currentPct=95 resetsInMin=10 trigger=5h'
 const FLEET_FAILED = 'FLEET_FAILED fleetPlan=b restarted=dani failed=geri,iris'
 
 function harness(lines: string[][], opts: { notifyOk?: boolean[]; rotateStatus?: number } = {}) {
   const order: string[] = []
-  let state: ClaudePlansState = { activePlanByAgent: { marveen: 'a' }, plans: {} }
+  let state: ClaudePlansState = { activePlanByAgent: { alfred: 'a' }, plans: {} }
   let tick = 0
   const notifyOk = [...(opts.notifyOk ?? [])]
   const deps: RotationBackendDeps = {
@@ -31,7 +31,7 @@ function harness(lines: string[][], opts: { notifyOk?: boolean[]; rotateStatus?:
       order.push(`rotate:${input.agentId}->${input.targetPlanId}`)
       const status = opts.rotateStatus ?? 200
       return status === 200
-        ? { status, payload: { ok: true, agentId: input.agentId, ...(input.agentId !== 'marveen' ? { launchAuth: 'plan-token' } : {}) } }
+        ? { status, payload: { ok: true, agentId: input.agentId, ...(input.agentId !== 'alfred' ? { launchAuth: 'plan-token' } : {}) } }
         : { status, payload: { error: 'Main agent restart failed' } }
     }),
     notify: vi.fn(async (text: string) => {
@@ -55,9 +55,9 @@ describe('a backend tick (PLANROTATEDEADLOCK1115 P3)', () => {
     const s = await runRotationTick(h.deps)
     expect(h.order).toHaveLength(2)
     expect(h.order[0]).toMatch(/^signal:Claude plan switch: Personal PRO \(100%, 5h, resets in 60 min\) -> Team Seat\. The main session restarts now\.$/)
-    expect(h.order[1]).toBe('rotate:marveen->b')
-    expect(h.deps.rotate).toHaveBeenCalledWith({ agentId: 'marveen', targetPlanId: 'b', continue: false })
-    expect(s.rotated).toEqual(['marveen'])
+    expect(h.order[1]).toBe('rotate:alfred->b')
+    expect(h.deps.rotate).toHaveBeenCalledWith({ agentId: 'alfred', targetPlanId: 'b', continue: false })
+    expect(s.rotated).toEqual(['alfred'])
     expect(h.state().backend?.lastCheckAt).toBe(NOW)
   })
 
@@ -65,7 +65,7 @@ describe('a backend tick (PLANROTATEDEADLOCK1115 P3)', () => {
     const h = harness([[ROTATE], []], { notifyOk: [false] })
     await runRotationTick(h.deps)
     expect(h.order[0]).toMatch(/^signal-FAILED:/)
-    expect(h.order[1]).toBe('rotate:marveen->b')
+    expect(h.order[1]).toBe('rotate:alfred->b')
     expect(h.state().backend?.pendingSignals).toHaveLength(1)
     // the retry a tick later carries the time it was first meant for
     const later = { ...h.deps, now: () => NOW + 10 * 60_000 }
@@ -101,7 +101,7 @@ describe('a backend tick (PLANROTATEDEADLOCK1115 P3)', () => {
     const h = harness([[ROTATE]], { rotateStatus: 500 })
     const s = await runRotationTick(h.deps)
     expect(s.rotated).toEqual([])
-    expect(h.order[2]).toBe('signal:Claude plan switch for marveen FAILED (HTTP 500): Main agent restart failed')
+    expect(h.order[2]).toBe('signal:Claude plan switch for alfred FAILED (HTTP 500): Main agent restart failed')
   })
 
   it('SUBAGENT_ROTATE: the rotation FIRST, then the signal with the launch outcome', async () => {
@@ -188,7 +188,7 @@ describe('the lastRotationAt guard in the tick (P5)', () => {
     const s = await runRotationTick(h.deps)
     expect(h.order).toEqual([])
     expect(h.deps.rotate).not.toHaveBeenCalled()
-    expect(s.refused).toEqual(['marveen'])
+    expect(s.refused).toEqual(['alfred'])
     expect(s.rotated).toEqual([])
     expect(h.state().backend?.lastRotationAt).toBe(NOW - MAIN_ROTATION_MIN_GAP_MS + 60_000)
   })
@@ -198,7 +198,7 @@ describe('the lastRotationAt guard in the tick (P5)', () => {
     h.deps.writeState({ ...h.state(), backend: { lastRotationAt: NOW - MAIN_ROTATION_MIN_GAP_MS } })
     const s = await runRotationTick(h.deps)
     expect(h.order[0]).toMatch(/^signal:Claude plan switch/)
-    expect(h.order[1]).toBe('rotate:marveen->b')
+    expect(h.order[1]).toBe('rotate:alfred->b')
     expect(s.refused).toEqual([])
   })
 

@@ -30,7 +30,7 @@ describe('isTailnetIPv4 (CGNAT 100.64.0.0/10 boundaries)', () => {
 })
 
 describe('isZeroTierIfaceName (Linux "zt" + id interface naming)', () => {
-  it('accepts the live case (elvis-marveen network, measured 2026-11-03)', () => {
+  it('accepts the live case (elvis-alfred network, measured 2026-11-03)', () => {
     expect(isZeroTierIfaceName('ztdiyqolon')).toBe(true)
   })
   it('is case-insensitive and accepts short-ish ids', () => {

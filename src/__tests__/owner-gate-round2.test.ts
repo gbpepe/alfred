@@ -27,10 +27,10 @@ vi.mock('../web/vault.js', async (orig) => ({
   deleteSecret: vi.fn((id: string) => vaultSecrets.delete(id)),
   getSecret: vi.fn((id: string) => vaultSecrets.get(id) ?? null),
 }))
-const hardRestartMarveenChannels = vi.fn(() => ({ ok: true }))
+const hardRestartAlfredChannels = vi.fn(() => ({ ok: true }))
 vi.mock('../web/channel-monitor.js', async (orig) => ({
   ...(await orig<typeof import('../web/channel-monitor.js')>()),
-  hardRestartMarveenChannels: () => hardRestartMarveenChannels(),
+  hardRestartAlfredChannels: () => hardRestartAlfredChannels(),
   restartMainForRotationContinue: vi.fn(async () => ({ ok: true, mode: 'continue' })),
 }))
 const restartAgentProcess = vi.fn(async () => ({ ok: true, pid: 1 }))
@@ -196,7 +196,7 @@ beforeEach(() => {
   rmSync(CLAUDE_PLANS_STATE_PATH, { force: true })
   vaultSecrets.clear()
   vaultSecrets.set(PLAN_TOK.tokenSecretId, 'sk-ant-oat01-og2-test')
-  hardRestartMarveenChannels.mockClear()
+  hardRestartAlfredChannels.mockClear()
   restartAgentProcess.mockClear()
   probePlanUsage.mockClear()
   execFileMock.mockClear()
@@ -581,7 +581,7 @@ describe('controls: what stays token-callable', () => {
     expect(r.status).toBe(400)
     expect(r.body.error).toBe('Unknown target plan id: og2-not-registered')
     expect(planFiles()).toEqual(before)
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
     expect(restartAgentProcess).not.toHaveBeenCalled()
   })
   it('rotate with the bare token to a registered plan is not refused by the owner gate (stops at the isolation check)', async () => {
@@ -590,7 +590,7 @@ describe('controls: what stays token-callable', () => {
     expect(refusedByOwnerGate(r)).toBe(false)
     expect(r.status).toBe(409)
     expect(planFiles()).toEqual(before)
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
   })
   it('probe with the bare token is not refused by the owner gate, and logs the plan id with the caller kind', async () => {
     const info = vi.spyOn(logger, 'info')

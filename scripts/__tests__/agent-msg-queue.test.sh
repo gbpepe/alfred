@@ -34,8 +34,8 @@ chmod +x "$BIN/curl"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/sleep"; chmod +x "$BIN/sleep"
 
 send() {  # send <json> [warn_at]
-  OUT="$(env PATH="$BIN:$PATH" STUB_JSON="$1" MARVEEN_TOKEN_FILE="$SANDBOX/token" \
-             ${2:+MARVEEN_QUEUE_WARN_AT="$2"} \
+  OUT="$(env PATH="$BIN:$PATH" STUB_JSON="$1" ALFRED_TOKEN_FILE="$SANDBOX/token" \
+             ${2:+ALFRED_QUEUE_WARN_AT="$2"} \
              /bin/bash "$HELPER" igor hex "tiszta szoveg" 2>"$SANDBOX/err.txt")"
   RC=$?
   ERR="$(cat "$SANDBOX/err.txt")"
@@ -63,9 +63,9 @@ ok "depth 2 is below the default threshold" "$(has_notice && echo 1 || echo 0)" 
 send '{"id":6,"queue":{"queueDepth":3,"oldestPendingSec":0,"estimatedDelaySec":null}}'
 ok "depth 3 reaches the default threshold" "$(has_notice && echo 0 || echo 1)" "err: $ERR"
 send '{"id":7,"queue":{"queueDepth":8,"oldestPendingSec":0,"estimatedDelaySec":null}}' 0
-ok "MARVEEN_QUEUE_WARN_AT=0 switches the notice off" "$(has_notice && echo 1 || echo 0)" "err: $ERR"
+ok "ALFRED_QUEUE_WARN_AT=0 switches the notice off" "$(has_notice && echo 1 || echo 0)" "err: $ERR"
 send '{"id":8,"queue":{"queueDepth":2,"oldestPendingSec":0,"estimatedDelaySec":null}}' 2
-ok "MARVEEN_QUEUE_WARN_AT=2 lowers the threshold" "$(has_notice && echo 0 || echo 1)" "err: $ERR"
+ok "ALFRED_QUEUE_WARN_AT=2 lowers the threshold" "$(has_notice && echo 0 || echo 1)" "err: $ERR"
 
 # The warning text is the LAST field of the parse; the queue fields must not
 # swallow it, and it must not swallow them.

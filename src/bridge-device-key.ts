@@ -7,7 +7,7 @@
 // from the dashboard, and revoking it by hand still leaves the token valid.
 //
 // The dashboard's own pairing path never had that gap: it mints a per-device
-// key bound to the marveen-remote:<uuid> install id. This module gives the
+// key bound to the alfred-remote:<uuid> install id. This module gives the
 // server-side CLIs the same thing, through the SAME mint (mintBridgeDeviceKey),
 // so a device is listed and revocable however it was paired.
 //
@@ -85,7 +85,7 @@ export type DeviceKeyRequest =
  * Validate a standalone issuance request (`bridge-device-key`).
  *
  * The install id must belong to a device ENROLLED on this machine (its
- * restricted marveen-remote:<uuid> line is in authorized_keys). A key minted
+ * restricted alfred-remote:<uuid> line is in authorized_keys). A key minted
  * for an id with no SSH line would be a dashboard credential no pairing
  * explains, and the dashboard's revoke (which drops both halves by id) would
  * have nothing to pair it with.
@@ -96,7 +96,7 @@ export function checkDeviceKeyRequest(
   authorizedKeys: string | null,
 ): DeviceKeyRequest {
   const id = (installId ?? '').trim()
-  if (!isInstallId(id)) return { ok: false, reason: '--install-id must be a marveen-remote install id (uuid v4)' }
+  if (!isInstallId(id)) return { ok: false, reason: '--install-id must be a alfred-remote install id (uuid v4)' }
   const chosen = (name ?? '').trim() || defaultDeviceName(id)
   if (!DEVICE_NAME_RE.test(chosen)) {
     return { ok: false, reason: '--name must be 1-64 characters: letters, digits, space, . _ -' }
@@ -104,7 +104,7 @@ export function checkDeviceKeyRequest(
   if (authorizedKeys === null || !removeAuthorizedKey(authorizedKeys, id).removed) {
     return {
       ok: false,
-      reason: `no enrolled Bridge device marveen-remote:${id} in authorized_keys; pair it first (npm run remote-enroll)`,
+      reason: `no enrolled Bridge device alfred-remote:${id} in authorized_keys; pair it first (npm run remote-enroll)`,
     }
   }
   return { ok: true, installId: id, name: chosen }

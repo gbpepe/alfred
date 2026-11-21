@@ -1,5 +1,5 @@
 /**
- * The letter an email_send approval is for, as the server can CHECK it (APPROVALSLACK1030 (2), Samu 65945).
+ * The letter an email_send approval is for, as the server can CHECK it (Samu 65945).
  *
  * An approval request carries content_hash, the sha256 anchor scripts/hooks/email-approval-gate.py computes over the
  * letter's envelope (content_anchor). The server used to take that hash unchecked and show the requesting agent's own

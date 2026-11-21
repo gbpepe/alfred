@@ -44,9 +44,9 @@ check("unknown glued ending is not a suffix", v.apply_pronunciation("Notional"),
 
 check("missing dictionary never raises", v.apply_pronunciation("Monday", path="/nonexistent.json"), "Monday")
 
-os.environ.pop("MARVEEN_WHISPER_MODEL", None)
+os.environ.pop("ALFRED_WHISPER_MODEL", None)
 check("whisper model default", v._whisper_model_name(), "small")
-os.environ["MARVEEN_WHISPER_MODEL"] = "medium"
+os.environ["ALFRED_WHISPER_MODEL"] = "medium"
 check("whisper model override", v._whisper_model_name(), "medium")
 
 print("All tests passed." if not fails else f"{fails} failed")

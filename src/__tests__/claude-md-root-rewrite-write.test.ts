@@ -12,12 +12,12 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-hostmove-write-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-hostmove-write-'))
 const NEW_ROOT = tmpRoot
 const OLD_ROOT = '/Users/old-user/klaudia'
 
 vi.mock('../config.js', () => ({
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-main',

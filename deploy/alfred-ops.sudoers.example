@@ -1,0 +1,24 @@
+# Scoped NOPASSWD sudoers rules for `alfred-ops` on Linux VPS.
+# Install with:
+#   sudo cp deploy/alfred-ops.sudoers.example /etc/sudoers.d/alfred-ops
+#   sudo chmod 0440 /etc/sudoers.d/alfred-ops
+#   sudo visudo -cf /etc/sudoers.d/alfred-ops
+#
+# Grants user `alfred` ONLY the exact systemctl subcommands needed to manage
+# `alfred-test` and `alfred-prod` — no shell access and no control over `alfred-ops` itself.
+
+Cmnd_Alias ALFRED_SYSTEMCTL = \
+  /bin/systemctl start alfred-test, \
+  /bin/systemctl stop alfred-test, \
+  /bin/systemctl restart alfred-test, \
+  /bin/systemctl is-active alfred-test, \
+  /bin/systemctl restart alfred-prod, \
+  /bin/systemctl is-active alfred-prod, \
+  /usr/bin/systemctl start alfred-test, \
+  /usr/bin/systemctl stop alfred-test, \
+  /usr/bin/systemctl restart alfred-test, \
+  /usr/bin/systemctl is-active alfred-test, \
+  /usr/bin/systemctl restart alfred-prod, \
+  /usr/bin/systemctl is-active alfred-prod
+
+alfred ALL=(root) NOPASSWD: ALFRED_SYSTEMCTL

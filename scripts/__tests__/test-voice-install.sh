@@ -28,7 +28,7 @@ _section() { echo ""; echo "--- $* ---"; }
 # DOCKER MODE (default): spin up persistent ubuntu:24.04, run self
 # Container is kept alive after the test for manual inspection.
 # ============================================================
-CONTAINER_NAME="${VOICE_TEST_CONTAINER:-marveen-voice-test}"
+CONTAINER_NAME="${VOICE_TEST_CONTAINER:-alfred-voice-test}"
 
 if [[ "${SKIP_DOCKER:-}" != "1" && "${WITH_DOCKER:-}" != "1" ]]; then
   sed -n '2,/^# Exit code/p' "$0" | sed 's/^# \{0,1\}//'
@@ -39,15 +39,15 @@ fi
 if [[ "${SKIP_DOCKER:-}" != "1" ]]; then
   # `docker rm -f` below must only ever hit a container this script owns.
   case "$CONTAINER_NAME" in
-    marveen-voice-test|marveen-voice-test-*) ;;
-    *) echo "Refusing: VOICE_TEST_CONTAINER must be marveen-voice-test or start with marveen-voice-test- (got '$CONTAINER_NAME')." >&2; exit 2 ;;
+    alfred-voice-test|alfred-voice-test-*) ;;
+    *) echo "Refusing: VOICE_TEST_CONTAINER must be alfred-voice-test or start with alfred-voice-test- (got '$CONTAINER_NAME')." >&2; exit 2 ;;
   esac
   # Remove any leftover container from a previous run
   docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
   echo "==> Starting persistent test container: $CONTAINER_NAME"
   docker run -d --name "$CONTAINER_NAME" \
-    -v "$REPO_ROOT:/marveen:ro" \
+    -v "$REPO_ROOT:/alfred:ro" \
     ubuntu:24.04 \
     tail -f /dev/null
 
@@ -57,7 +57,7 @@ if [[ "${SKIP_DOCKER:-}" != "1" ]]; then
     -e SKIP_DOCKER=1 \
     -e INSTALL_DIR=/tmp/voice-test \
     "$CONTAINER_NAME" \
-    bash /marveen/scripts/__tests__/test-voice-install.sh 2>&1 || EXIT_CODE=$?
+    bash /alfred/scripts/__tests__/test-voice-install.sh 2>&1 || EXIT_CODE=$?
 
   echo ""
   if [[ "$EXIT_CODE" -eq 0 ]]; then
@@ -91,7 +91,7 @@ DEST="${INSTALL_DIR:-/tmp/voice-test}"
 # The installer under test. Overridable so the guard test can point it at a stub:
 # a version of this script without the container check (a bisect, a revert, a
 # mutant) must not be able to run the real installer on the test host.
-VOICE_INSTALLER="${VOICE_INSTALLER:-/marveen/scripts/install-voice.sh}"
+VOICE_INSTALLER="${VOICE_INSTALLER:-/alfred/scripts/install-voice.sh}"
 echo "==> Voice install acceptance test"
 echo "    INSTALL_DIR=$DEST"
 echo "    $(uname -a)"

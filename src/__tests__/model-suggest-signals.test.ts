@@ -168,18 +168,18 @@ describe('DELIVERED_RUNS_SQL', () => {
     // skipped-precheck rows against 29 rounds that reached the model. Counting
     // every row returns 749 and the classifier reads a busy, cheap agent.
     const now = Date.now()
-    add('marveen', 'skipped-precheck', 720, now - 1000)
-    add('marveen', 'fired', 29, now - 1000)
+    add('alfred', 'skipped-precheck', 720, now - 1000)
+    add('alfred', 'fired', 29, now - 1000)
     const rows = db.prepare(DELIVERED_RUNS_SQL).all(now - 86400_000) as DeliveredRunsRow[]
-    expect(rows).toEqual([{ agent: 'marveen', cnt: 29 }])
+    expect(rows).toEqual([{ agent: 'alfred', cnt: 29 }])
   })
 
   it('excludes rows older than the window instead of averaging over all history', () => {
     const now = Date.now()
-    add('marveen', 'fired', 5, now - 1000)
-    add('marveen', 'fired', 500, now - 90 * 86400_000)
+    add('alfred', 'fired', 5, now - 1000)
+    add('alfred', 'fired', 500, now - 90 * 86400_000)
     const rows = db.prepare(DELIVERED_RUNS_SQL).all(now - 7 * 86400_000) as DeliveredRunsRow[]
-    expect(rows).toEqual([{ agent: 'marveen', cnt: 5 }])
+    expect(rows).toEqual([{ agent: 'alfred', cnt: 5 }])
   })
 })
 

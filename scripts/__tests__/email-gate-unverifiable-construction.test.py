@@ -37,7 +37,7 @@ def make_install(td, level):
     with open(os.path.join(store, "autonomy-config.json"), "w", encoding="utf-8") as fh:
         json.dump({"version": 1, "categories": [{"key": "email_send", "label": "Email", "level": level,
                                                  "locked": False}]}, fh)
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute("""CREATE TABLE approvals (id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, category TEXT NOT NULL,
         action_description TEXT NOT NULL, action_payload TEXT, status TEXT NOT NULL DEFAULT 'pending',
         timeout_at INTEGER, telegram_message_id INTEGER,

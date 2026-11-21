@@ -2,7 +2,7 @@
 # #1878 item 4 -- scripts/__tests__/test-voice-install.sh must not act by default.
 # Its Docker mode removes and starts a container; its self-test mode runs
 # install-voice.sh (system packages). A plain run only prints usage, the Docker
-# mode only touches a marveen-voice-test* container, and the self-test mode
+# mode only touches a alfred-voice-test* container, and the self-test mode
 # refuses outside a container. docker is a recording stub: nothing real runs.
 # Run: bash scripts/__tests__/test-voice-install-guard.test.sh
 
@@ -46,11 +46,11 @@ rc="$(run VOICE_TEST_CONTAINER=prod-db WITH_DOCKER=1)"
 [ "$rc" = "2" ] && [ -z "$(calls)" ] && pass "a foreign container name is refused, no docker call" || fail "foreign name refused" "rc 2, no calls" "rc $rc, $(calls)"
 rc="$(run WITH_DOCKER=1)"
 case "$(calls)" in
-  "rm -f marveen-voice-test"*) pass "the default name is used (rc $rc)" ;;
-  *) fail "the default name is used" "rm -f marveen-voice-test first" "$(calls | head -1)" ;;
+  "rm -f alfred-voice-test"*) pass "the default name is used (rc $rc)" ;;
+  *) fail "the default name is used" "rm -f alfred-voice-test first" "$(calls | head -1)" ;;
 esac
-rc="$(run WITH_DOCKER=1 VOICE_TEST_CONTAINER=marveen-voice-test-ci)"
-grep -q "^rm -f marveen-voice-test-ci$" "$TMP/docker-calls" 2>/dev/null && pass "a marveen-voice-test-* name is accepted" || fail "prefixed name accepted" "rm -f marveen-voice-test-ci" "$(calls | head -1)"
+rc="$(run WITH_DOCKER=1 VOICE_TEST_CONTAINER=alfred-voice-test-ci)"
+grep -q "^rm -f alfred-voice-test-ci$" "$TMP/docker-calls" 2>/dev/null && pass "a alfred-voice-test-* name is accepted" || fail "prefixed name accepted" "rm -f alfred-voice-test-ci" "$(calls | head -1)"
 
 echo "3. the self-test mode refuses outside a container"
 if [ -f /.dockerenv ]; then
@@ -65,7 +65,7 @@ fi
 echo "4. the installer path is the overridable one everywhere"
 # A source check on purpose: a live positive control would have to let the
 # self-test mode reach an installer, which is exactly what must never happen here.
-hard="$(grep -nE 'bash[[:space:]]+/marveen/scripts/install-voice\.sh' "$SCRIPT" | head -3)"
+hard="$(grep -nE 'bash[[:space:]]+/alfred/scripts/install-voice\.sh' "$SCRIPT" | head -3)"
 over="$(grep -cE 'bash "\$VOICE_INSTALLER"' "$SCRIPT")"
 [ -z "$hard" ] && [ "$over" -ge 1 ] && pass "every installer call goes through \$VOICE_INSTALLER ($over)" || fail "installer calls overridable" "no hardcoded call" "${hard:-none hardcoded, $over overridable}"
 

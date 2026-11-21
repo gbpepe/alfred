@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Marveen backup.
+# Alfred backup.
 #
 # The archive has two top-level groups so a restore is unambiguous about
 # where each file belongs (see docs/MIGRATION.md):
@@ -14,9 +14,9 @@
 #     agents/*/PACKAGE.md, LOCAL.md, .package/manifest.json  (an agent package's layers and record)
 #     agents/*/.claude/channels/{telegram,slack,discord}/.env, access.json
 #     agents/*/agent-config.json, .claude/settings.local.json, .claude/skills/
-#       (token and key files in skills only with MARVEEN_BACKUP_AGENT_SECRETS=1),
+#       (token and key files in skills only with ALFRED_BACKUP_AGENT_SECRETS=1),
 #       .claude-config/projects/*/memory/   (if present)
-#     agents/*/secrets/        (only with MARVEEN_BACKUP_AGENT_SECRETS=1; off by default)
+#     agents/*/secrets/        (only with ALFRED_BACKUP_AGENT_SECRETS=1; off by default)
 #     .channels-config/projects/*/memory/   (main agent file memory, if present)
 #
 #   home/   -> extract under $HOME
@@ -28,7 +28,7 @@
 #     .claude/channels/*/access.json, invites.json, approved/**  (pairing state)
 #     Library/LaunchAgents/com.<MAIN_AGENT_ID>.*.plist (launchd jobs)
 #
-# Output: backups/claudeclaw-YYYYmmdd-HHMMSS.tar.gz
+# Output: backups/alfred-YYYYmmdd-HHMMSS.tar.gz
 # Retention: keeps the most recent 14 archives, prunes the rest.
 #
 # Restore (preserve modes so the 0600 token files stay private):
@@ -54,7 +54,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # real backup directory (and its retention sweep).
 BACKUP_DIR="${BACKUP_DIR:-${REPO_ROOT}/backups}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-ARCHIVE="${BACKUP_DIR}/claudeclaw-${STAMP}.tar.gz"
+ARCHIVE="${BACKUP_DIR}/alfred-${STAMP}.tar.gz"
 KEEP=14
 
 mkdir -p "${BACKUP_DIR}"
@@ -62,16 +62,16 @@ cd "${REPO_ROOT}"
 
 # Checkpoint WAL into the main DB file so the snapshot is self-contained.
 # Tolerate a missing sqlite3 CLI -- just fall back to copying the files as-is.
-if [[ -f store/claudeclaw.db ]] && command -v sqlite3 >/dev/null 2>&1; then
-  sqlite3 store/claudeclaw.db 'PRAGMA wal_checkpoint(TRUNCATE);' >/dev/null || true
+if [[ -f store/alfred.db ]] && command -v sqlite3 >/dev/null 2>&1; then
+  sqlite3 store/alfred.db 'PRAGMA wal_checkpoint(TRUNCATE);' >/dev/null || true
 fi
 
 # --- Build the two path lists (each relative to its own base). -------------
 # tar refuses missing entries, which would fail the whole backup on a fresh
 # machine (no agents yet) -- so we only list paths that actually exist.
-REPOLIST="$(mktemp -t claudeclaw-repo.XXXXXX)"
-HOMELIST="$(mktemp -t claudeclaw-home.XXXXXX)"
-MANIFEST="$(mktemp -t claudeclaw-manifest.XXXXXX)"
+REPOLIST="$(mktemp -t alfred-repo.XXXXXX)"
+HOMELIST="$(mktemp -t alfred-home.XXXXXX)"
+MANIFEST="$(mktemp -t alfred-manifest.XXXXXX)"
 # The staging tree lives next to the archives, NOT in $TMPDIR. macOS runs
 # com.apple.bsd.dirhelper daily at 03:35 (StartCalendarInterval) with
 # CLEAN_FILES_OLDER_THAN_DAYS=3: it deletes $TMPDIR files whose atime is older
@@ -157,10 +157,10 @@ if [[ -d agents ]]; then
   #   .claude/settings.local.json  per-agent permission and deny rules
   #   .claude/skills/              agent-private skills (not under ~/.claude);
   #                                .env, keys, credentials and token files in
-  #                                them only with MARVEEN_BACKUP_AGENT_SECRETS=1
+  #                                them only with ALFRED_BACKUP_AGENT_SECRETS=1
   #   secrets/                     per-agent credentials kept out of the channel
   #                                dirs (SSH keys, CLI logins, mailbox config).
-  #                                OPT-IN: only when MARVEEN_BACKUP_AGENT_SECRETS=1
+  #                                OPT-IN: only when ALFRED_BACKUP_AGENT_SECRETS=1
   #                                (see docs/MIGRATION.md)
   #   .claude-config/projects/*/memory
   #                                file memory of an agent with its own
@@ -176,7 +176,7 @@ if [[ -d agents ]]; then
   find agents -mindepth 3 -maxdepth 3 -type f -path 'agents/*/.claude/settings.local.json' -print >> "${REPOLIST}"
   # Skills are taken file by file: a skill folder can also hold credential
   # files, and those follow the same opt-in switch as secrets/ below.
-  if [[ "${MARVEEN_BACKUP_AGENT_SECRETS:-}" == "1" ]]; then
+  if [[ "${ALFRED_BACKUP_AGENT_SECRETS:-}" == "1" ]]; then
     find agents -mindepth 4 -path 'agents/*/.claude/skills/*' \( -type f -o -type l \) -print >> "${REPOLIST}"
     find agents -mindepth 2 -maxdepth 2 -type d -name 'secrets' -print >> "${REPOLIST}"
   else
@@ -225,14 +225,14 @@ if [[ -d "${REPO_ROOT}/.claude/channels" ]]; then
 fi
 # launchd jobs for this fleet. The job labels are com.<MAIN_AGENT_ID>.<service>
 # (see src/web/main-agent.ts), so resolve MAIN_AGENT_ID the way the app does
-# (src/env.ts: read from .env, default "marveen" when unset) instead of
+# (src/env.ts: read from .env, default "alfred" when unset) instead of
 # hardcoding one deployment's prefix. Parsing mirrors env.ts: last definition
 # wins, surrounding matching quotes stripped.
-MAIN_AGENT_ID="marveen"
+MAIN_AGENT_ID="alfred"
 if [[ -f "${REPO_ROOT}/.env" ]]; then
   # `|| true`: with `set -o pipefail`, a no-match grep would otherwise fail the
   # whole substitution (and, under `set -e`, abort the backup) on any install
-  # that leaves MAIN_AGENT_ID unset and relies on the "marveen" default.
+  # that leaves MAIN_AGENT_ID unset and relies on the "alfred" default.
   _mid="$(grep -E '^[[:space:]]*MAIN_AGENT_ID[[:space:]]*=' "${REPO_ROOT}/.env" | tail -1 \
     | sed -E 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//; s/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/' || true)"
   [[ -n "${_mid}" ]] && MAIN_AGENT_ID="${_mid}"
@@ -271,7 +271,7 @@ fi
 # cloning origin). Restore, after cloning origin:
 #   git fetch <restored>/repo/local-commits.bundle 'refs/heads/*:refs/heads/*'
 if command -v git >/dev/null 2>&1 && [[ -d "${REPO_ROOT}/.git" ]]; then
-  BUNDLE="$(mktemp -t claudeclaw-bundle.XXXXXX)"
+  BUNDLE="$(mktemp -t alfred-bundle.XXXXXX)"
   # An empty ref set makes `git bundle` refuse with "empty bundle", which is
   # the GOOD case (everything is already pushed), not an error -- so a failure
   # here just drops the file instead of failing the backup.
@@ -291,7 +291,7 @@ fi
 
 # --- Manifest (stored at the archive root for self-description). -----------
 {
-  echo "Marveen backup ${STAMP}"
+  echo "Alfred backup ${STAMP}"
   echo "host: $(hostname 2>/dev/null || echo '?')   user: ${USER:-?}   home: ${HOME}"
   echo "repo root: ${REPO_ROOT}"
   echo "Restore: tar -xpzf <archive> -C <tmp>; copy repo/* -> project root, home/* -> \$HOME."
@@ -364,7 +364,7 @@ echo "backup: wrote ${ARCHIVE} ($(wc -c < "${ARCHIVE}" | awk '{print $1}') bytes
 #   - a few load-bearing items are present by name (an archive that is valid,
 #     small and useless -- the 09-04 shape -- shows up here even if the
 #     manifest itself was built wrong).
-ARCHIVE_LIST="$(mktemp -t claudeclaw-verify.XXXXXX)"
+ARCHIVE_LIST="$(mktemp -t alfred-verify.XXXXXX)"
 trap 'rm -f "${REPOLIST}" "${HOMELIST}" "${MANIFEST}" "${ARCHIVE_LIST}"; [[ -n "${BUNDLE}" ]] && rm -f "${BUNDLE}"; rm -rf "${STAGE}"' EXIT
 tar -tzf "${ARCHIVE}" > "${ARCHIVE_LIST}"
 
@@ -386,7 +386,7 @@ done < <(sed -e 's/  *(.*)$//' "${MANIFEST}")
 # Load-bearing by name. Each one has already been lost or nearly lost once:
 # the memory directories and the local-commit bundle on 2026-09-04, the
 # credential-carrying store/ files by the whitelist that preceded it.
-for marker in "repo/store/claudeclaw.db" "home/.claude/skills" "home/.claude/scheduled-tasks"; do
+for marker in "repo/store/alfred.db" "home/.claude/skills" "home/.claude/scheduled-tasks"; do
   archive_list_has "${ARCHIVE_LIST}" "${marker}" || {
     echo "backup: MISSING load-bearing item: ${marker}" >&2
     missing=$((missing + 1))
@@ -417,7 +417,7 @@ if [[ "${missing}" -gt 0 ]]; then
   # code or mask the real failure.
   # To the install's own main agent: MAIN_AGENT_ID as resolved near the top of
   # this script (from .env the way the app reads it: last definition wins,
-  # quotes stripped, default "marveen"), never a fixed name -- an id that does
+  # quotes stripped, default "alfred"), never a fixed name -- an id that does
   # not exist on this install makes the alert go nowhere (card a8a92d55). Do not
   # re-read .env here: a second, simpler parse took the FIRST definition, kept
   # the quotes, and without `|| true` aborted the script under pipefail on an
@@ -441,7 +441,7 @@ echo "backup: WARNING -- archive contains sensitive tokens; keep ${BACKUP_DIR} o
 
 # Keep the newest ${KEEP} archives, drop the rest. while-read (not mapfile)
 # for macOS bash 3.2 compatibility.
-ls -1t "${BACKUP_DIR}"/claudeclaw-*.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)) | while IFS= read -r f; do
+ls -1t "${BACKUP_DIR}"/alfred-*.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)) | while IFS= read -r f; do
   [[ -z "${f}" ]] && continue
   rm -f "${f}"
   echo "backup: pruned $(basename "${f}")"

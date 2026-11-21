@@ -127,7 +127,7 @@ export function isFederationWireEndpoint(path: string, method: string): boolean 
 
 // DOCKERHTTPS1119 (Dani 81108 N1): on the public listener a request with NO principal reaches only these
 // unauthenticated /api/ paths: the probes and the sign-in steps the page needs before a cookie exists. Every other
-// path requiresAuth() leaves open (avatars, the Teams card callback, the operator key login, ...) answers 404 there
+// path requiresAuth() leaves open (avatars, the operator key login, ...) answers 404 there
 // unless a browser cookie came with it, so a future exception in requiresAuth does not reach the internet by itself.
 export const PUBLIC_LISTENER_OPEN_PATHS: ReadonlyArray<readonly [method: string, path: string]> = [
   ['GET', '/api/auth/status'],
@@ -167,16 +167,12 @@ export function requiresAuth(path: string, method: string): boolean {
   // DASHOPERATOR1005: the operator page signs in with its key here, before any
   // cookie exists. The handler checks the key, the scope and the owner switch.
   if (path === '/api/operator/login' && method === 'POST') return false
-  if (method === 'GET' && (path === '/api/marveen/avatar' || path === '/api/marveen/owner-avatar' || /^\/api\/agents\/[^/]+\/avatar$/.test(path))) return false
+  if (method === 'GET' && (path === '/api/alfred/avatar' || path === '/api/alfred/owner-avatar' || /^\/api\/agents\/[^/]+\/avatar$/.test(path))) return false
   if (path === '/.well-known/fleetq' && method === 'GET') return true
   // VIDEOREVIEW1002: <video src> cannot send a bearer header. The stream is
   // authorised by a single-file, short-lived ticket instead, which the handler
   // checks itself (routes/video-review.ts); without a valid ticket it is 403.
   if (path === '/api/video-review/file' && (method === 'GET' || method === 'HEAD')) return false
-  // TEAMSAPPROVECARD1118: the Teams approval-card click, forwarded by the Teams plugin. It is authorised by the Bot
-  // Framework channel token the handler checks itself (bot-channel-token.ts); a dashboard token, shared by every agent,
-  // must not count there, so the route takes none. Without a channel token it is 401 (web/approval-teams-card.ts).
-  if (path === '/api/approvals/teams-card-action' && method === 'POST') return false
   return path.startsWith('/api/')
 }
 
@@ -398,7 +394,7 @@ export const AGENT_TOKEN_ALLOWLIST: readonly AgentAllowEntry[] = [
   { methods: ['GET'], pattern: /^\/api\/voice\/directive$/, why: 'voice-reply-directive hook' },
   // VAULTSZELES826 (0) replay, Samu 74563: what sub-agents call today and must keep after AGENT_TOKENS.
   // The proposer is the authenticated token (routes/skills.ts proposedBy = auth.agent); approval stays the owner's.
-  { methods: ['POST'], pattern: /^\/api\/skills\/propose$/, why: 'skill proposal (marveen-api.sh skill-propose, every agent CLAUDE.md)' },
+  { methods: ['POST'], pattern: /^\/api\/skills\/propose$/, why: 'skill proposal (alfred-api.sh skill-propose, every agent CLAUDE.md)' },
   { methods: ['GET'], pattern: /^\/api\/updates$/, why: 'update status (read): version, conflict guard, deployment kind' },
   // AUTOUPDATEDIVERG1110 (Dani F3): read-only, no fetch; an agent reads the hash it files its update_rebase request with.
   { methods: ['GET'], pattern: /^\/api\/updates\/rebase-plan$/, why: 'update rebase plan (read): local commits, upstream, the hash an approval binds' },
@@ -830,7 +826,7 @@ export async function gateRequest(
 ): Promise<AuthResult | null> {
   const auth = resolveAuth(req, url, path, method, opts.dashboardToken, opts.resolveAgentToken, opts.publicListener === true)
   // Dani n1 (81264): a setup session counts as no principal here too, so it does not reach the self-authenticating
-  // public routes (the operator login, avatars, the video file, the Teams card callback) either.
+  // public routes (the operator login, avatars, the video file) either.
   if (opts.publicListener === true && (auth.kind === 'none' || auth.kind === 'setup') && path.startsWith('/api/') && !requiresAuth(path, method) && !publicListenerOpenPath(path, method)) {
     res.writeHead(404, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'Not found' }))

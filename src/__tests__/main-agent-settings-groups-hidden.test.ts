@@ -1,7 +1,7 @@
 // #2727: the agent detail modal is shared by the main agent and the sub-agents. The security profile and the
-// Claude plan are per sub-agent settings: openMarveenDetail never fills their selects, so for the main agent
+// Claude plan are per sub-agent settings: openAlfredDetail never fills their selects, so for the main agent
 // they showed the value of the sub-agent opened before (or an empty select on a fresh load), above a Save
-// button that returns early for role 'main'. applyMarveenReadonlyMode is the one hook both open paths run, so
+// button that returns early for role 'main'. applyAlfredReadonlyMode is the one hook both open paths run, so
 // that is where the two groups are hidden. The function is pulled out of web/app.js and run against a small
 // stand-in for the document; the markup side is pinned as strings, since no DOM test renders the modal.
 import { describe, it, expect } from 'vitest'
@@ -21,10 +21,10 @@ const el = (hidden = false): El => ({
 })
 
 function load() {
-  const src = APP.match(/\nfunction applyMarveenReadonlyMode\(readOnly\) \{\n[\s\S]*?\n\}\n/)
-  expect(src, 'applyMarveenReadonlyMode not found in web/app.js').toBeTruthy()
+  const src = APP.match(/\nfunction applyAlfredReadonlyMode\(readOnly\) \{\n[\s\S]*?\n\}\n/)
+  expect(src, 'applyAlfredReadonlyMode not found in web/app.js').toBeTruthy()
   const ids = ['securityProfileGroup', 'claudePlanGroup', 'authModeGroup', 'memoryIsolationGroup', 'codeModeGroup', 'mainAuthGroup',
-    'marveenReadonlyNote', 'editClaudeMd', 'editSoulMd', 'editMcpJson', 'editAgentModel',
+    'alfredReadonlyNote', 'editClaudeMd', 'editSoulMd', 'editMcpJson', 'editAgentModel',
     'saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'saveAuthModeBtn', 'saveModelBtn']
   const els: Record<string, El> = Object.fromEntries(ids.map((id) => [id, el()]))
   const teamTab = el()
@@ -33,7 +33,7 @@ function load() {
     querySelector: (sel: string) => (sel.includes('data-tab="team"') ? teamTab : null),
   }
   let mainAuthLoads = 0
-  const fn = new Function('document', 'loadMainAuthPanel', `${src![0]}\nreturn applyMarveenReadonlyMode`)(
+  const fn = new Function('document', 'loadMainAuthPanel', `${src![0]}\nreturn applyAlfredReadonlyMode`)(
     document, () => { mainAuthLoads++ },
   ) as (readOnly: boolean) => void
   return { fn, els, teamTab, loads: () => mainAuthLoads }
@@ -71,7 +71,7 @@ describe('main agent: per sub-agent settings groups are hidden (#2727)', () => {
     expect(els.authModeGroup.hidden).toBe(true)
     expect(els.memoryIsolationGroup.hidden).toBe(true)
     expect(els.mainAuthGroup.hidden).toBe(false)
-    expect(els.marveenReadonlyNote.hidden).toBe(false)
+    expect(els.alfredReadonlyNote.hidden).toBe(false)
     expect(els.editAgentModel.disabled).toBe(true)
     expect(els.saveModelBtn.hidden).toBe(false)
     expect(els.saveModelBtn.disabled).toBe(true)
@@ -120,8 +120,8 @@ describe('main agent: per sub-agent settings groups are hidden (#2727)', () => {
   })
 
   it('both open paths run the hook, and nothing else decides the visibility of the two groups', () => {
-    expect(APP.match(/applyMarveenReadonlyMode\(true\)/g) ?? []).toHaveLength(1)
-    expect(APP.match(/applyMarveenReadonlyMode\(false\)/g) ?? []).toHaveLength(1)
+    expect(APP.match(/applyAlfredReadonlyMode\(true\)/g) ?? []).toHaveLength(1)
+    expect(APP.match(/applyAlfredReadonlyMode\(false\)/g) ?? []).toHaveLength(1)
     expect(APP).not.toMatch(/getElementById\('claudePlanGroup'\)/)
     expect(APP).not.toMatch(/getElementById\('securityProfileGroup'\)/)
   })

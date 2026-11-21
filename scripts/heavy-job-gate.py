@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Admission gate for heavy jobs (video render, ffmpeg encode, local LLM batch,
 full test suite, TypeScript build, headless browser test). Opt-in: nothing in
-Marveen calls it on its own; an agent or a script wraps a heavy command in it.
+Alfred calls it on its own; an agent or a script wraps a heavy command in it.
 Linux only (it reads /proc/meminfo and uses a systemd --user scope).
 
 Usage:

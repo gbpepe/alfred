@@ -62,7 +62,7 @@ except Exception as _lib_exc:  # noqa: BLE001 -- SyntaxError, ImportError, anyth
     _LIB_ERR = _lib_exc
 
 HOOK = 'memory-frontmatter-bash-gate'
-STATE_DIR = os.environ.get('MEMFM_BASH_STATE_DIR') or os.path.join(tempfile.gettempdir(), 'claudeclaw-memfm-bash-gate')
+STATE_DIR = os.environ.get('MEMFM_BASH_STATE_DIR') or os.path.join(tempfile.gettempdir(), 'alfred-memfm-bash-gate')
 STALE_S = 6 * 3600
 
 

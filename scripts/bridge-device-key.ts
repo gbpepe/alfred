@@ -7,7 +7,7 @@
 // The remote installer pairs its Bridge on the server while the dashboard may
 // not be up yet, and fills the bundle's dashboard credential in later, over
 // SSH. It used to read the SHARED token for that; this command gives it the
-// device's own key instead: bound to the marveen-remote:<uuid> install id,
+// device's own key instead: bound to the alfred-remote:<uuid> install id,
 // listed under the dashboard device keys and revocable there (one revoke drops
 // the key and the authorized_keys line together). A previous key of the same
 // device is revoked (replace-by-id), exactly as on dashboard re-pairing.
@@ -58,7 +58,7 @@ export type IssueResult =
 /**
  * Validate, then mint. `openDb` exists for the tests: they open an in-memory
  * database first and pass a no-op, so the mint runs end to end without ever
- * opening the install's real store/claudeclaw.db. A refused request never
+ * opening the install's real store/alfred.db. A refused request never
  * opens the database at all.
  */
 export function issueDeviceKey(
@@ -77,7 +77,7 @@ export function issueDeviceKey(
 function main(): void {
   const args = parseArgs(process.argv.slice(2))
   const sshDir = resolveSshDir((dir) => {
-    process.stderr.write(`warning: MARVEEN_SSH_DIR override active -- reading ${dir}, not the real ~/.ssh\n`)
+    process.stderr.write(`warning: ALFRED_SSH_DIR override active -- reading ${dir}, not the real ~/.ssh\n`)
   })
   let authorizedKeys: string | null
   try {
@@ -88,7 +88,7 @@ function main(): void {
   const issued = issueDeviceKey(args, authorizedKeys)
   if (!issued.ok) fail(issued.reason)
   process.stderr.write(
-    `device key ${issued.replaced ? 'replaced' : 'minted'} for marveen-remote:${issued.installId} ("${issued.name}"); ` +
+    `device key ${issued.replaced ? 'replaced' : 'minted'} for alfred-remote:${issued.installId} ("${issued.name}"); ` +
       'it is listed and revocable under the dashboard device keys.\n',
   )
   process.stdout.write(`${DEVICE_KEY_BEGIN}\n${issued.key}\n${DEVICE_KEY_END}\n`)

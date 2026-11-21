@@ -1,22 +1,22 @@
 #!/bin/bash
-# Marveen - OS-detect wrapper
+# Alfred - OS-detect wrapper
 # Detects the operating system and launches the appropriate installer.
 
 # ── Language selection ────────────────────────────────────────────────────────
-# INSTNONINTER1118: --non-interactive asks nothing; MARVEEN_LANG or the default (hu).
-for __a in "$@"; do [ "$__a" = --non-interactive ] && MARVEEN_LANG="${MARVEEN_LANG:-hu}"; done
-if [[ -z "${MARVEEN_LANG:-}" ]]; then
+# INSTNONINTER1118: --non-interactive asks nothing; ALFRED_LANG or the default (hu).
+for __a in "$@"; do [ "$__a" = --non-interactive ] && ALFRED_LANG="${ALFRED_LANG:-hu}"; done
+if [[ -z "${ALFRED_LANG:-}" ]]; then
   echo ""
   echo "  🌍  1. Magyar (HU)    2. English (EN)"
   read -rp "  Language / Nyelv [1/2, default: 1]: " _LANG_CHOICE
   case "${_LANG_CHOICE:-1}" in
-    2|en|EN) MARVEEN_LANG=en ;;
-    *) MARVEEN_LANG=hu ;;
+    2|en|EN) ALFRED_LANG=en ;;
+    *) ALFRED_LANG=hu ;;
   esac
 fi
-export MARVEEN_LANG
+export ALFRED_LANG
 # Save language choice for update.sh and other scripts
-echo "$MARVEEN_LANG" > "$(dirname "$0")/.lang"
+echo "$ALFRED_LANG" > "$(dirname "$0")/.lang"
 # ─────────────────────────────────────────────────────────────────────────────
 
 case "$(uname -s)" in
@@ -27,7 +27,7 @@ case "$(uname -s)" in
     exec "$(dirname "$0")/install-linux.sh" "$@"
     ;;
   *)
-    if [[ "${MARVEEN_LANG:-hu}" == "en" ]]; then
+    if [[ "${ALFRED_LANG:-hu}" == "en" ]]; then
       echo "Unsupported operating system: $(uname -s)"
       echo "Supported: macOS (Darwin), Linux (Ubuntu/Debian + Fedora/Nobara/RHEL)"
     else

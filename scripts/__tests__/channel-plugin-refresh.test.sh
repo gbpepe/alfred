@@ -48,7 +48,7 @@ exit 0
 EOF
 chmod +x "$TMPD/claude"
 
-REG_WITH='{"version":2,"plugins":{"slack-channel@marveen-marketplace":[{"scope":"user","version":"0.2.1"}]}}'
+REG_WITH='{"version":2,"plugins":{"slack-channel@alfred-marketplace":[{"scope":"user","version":"0.2.1"}]}}'
 REG_WITHOUT='{"version":2,"plugins":{"telegram@claude-plugins-official":[{"scope":"user","version":"0.0.7"}]}}'
 
 # fixture: <home> and <install> trees; reg <config dir> <json> writes a registry.
@@ -103,9 +103,9 @@ mkdir -p "$INST/agents/a2/.claude-config"
 FAKE_UPDATED=1 run
 HOME_R="$(cd -P "$HOME_D/.claude" && pwd)"; A1_R="$(cd -P "$INST/agents/a1/.claude-config" && pwd)"
 eq "two of four config dirs have it: four calls" "4" "$(calls)"
-eq "...home: marketplace update first" "$HOME_R|plugin marketplace update marveen-marketplace" "$(sed -n 1p "$FAKE_LOG")"
-eq "...then the plugin update" "$HOME_R|plugin update slack-channel@marveen-marketplace" "$(sed -n 2p "$FAKE_LOG")"
-eq "...the agent's dir the same way" "$A1_R|plugin update slack-channel@marveen-marketplace" "$(sed -n 4p "$FAKE_LOG")"
+eq "...home: marketplace update first" "$HOME_R|plugin marketplace update alfred-marketplace" "$(sed -n 1p "$FAKE_LOG")"
+eq "...then the plugin update" "$HOME_R|plugin update slack-channel@alfred-marketplace" "$(sed -n 2p "$FAKE_LOG")"
+eq "...the agent's dir the same way" "$A1_R|plugin update slack-channel@alfred-marketplace" "$(sed -n 4p "$FAKE_LOG")"
 eq "...never a plugin install" "0" "$(grep -c 'plugin install' "$FAKE_LOG")"
 case "$OUT" in *"2 frissitve, 0 naprakesz, 0 hibas"*) pass "...and the summary counts it" ;; *) fail "...and the summary counts it" "2 frissitve, 0 naprakesz, 0 hibas" "$OUT" ;; esac
 
@@ -139,7 +139,7 @@ reg "$INST/agents/a1/.claude-config" "$REG_WITH"
 FAKE_FAIL="/home/" run
 eq "the update step fails on one dir: exit 0" "0" "$RC"
 eq "...the next dir is still refreshed" "1" "$(grep -c 'a1/.claude-config|plugin update' "$FAKE_LOG")"
-case "$OUT" in *"FIGYELEM: slack-channel@marveen-marketplace frissitese nem sikerult"*"kilepesi kod 3"*) pass "...and the failure is logged with its exit code" ;; *) fail "...logged" "FIGYELEM ... kilepesi kod 3" "$OUT" ;; esac
+case "$OUT" in *"FIGYELEM: slack-channel@alfred-marketplace frissitese nem sikerult"*"kilepesi kod 3"*) pass "...and the failure is logged with its exit code" ;; *) fail "...logged" "FIGYELEM ... kilepesi kod 3" "$OUT" ;; esac
 case "$OUT" in *"0 frissitve, 1 naprakesz, 1 hibas"*) pass "...and counted" ;; *) fail "...and counted" "0 frissitve, 1 naprakesz, 1 hibas" "$OUT" ;; esac
 
 fresh
@@ -242,7 +242,7 @@ eq "...exactly once" "1" "$(grep -c 'refresh_channel_plugins' "$UPDATE")"
 echo ""
 echo "the current ref comes from the registry (SLACKPLUGINVER1006B)"
 echo "============================================================"
-ID=slack-channel@marveen-marketplace
+ID=slack-channel@alfred-marketplace
 C="$TMPD/c/$RANDOM$RANDOM/cfg"; mkdir -p "$C"
 ref_of() { ( . "$LIB" && channel_plugin_current_ref "$C" "$ID" ); }
 OUT="$(ref_of)"; RC=$?
@@ -279,12 +279,12 @@ run_block() { # home install
     RED="" NC="" bash -c 'write_result() { :; }; . "$0"' "$TMPD/smoke-block.sh" 2>&1 )
 }
 B="$TMPD/b/$RANDOM$RANDOM"; BH="$B/home"; BI="$B/install"
-mkdir -p "$BH/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0" \
-  "$BH/.claude/plugins/cache/marveen-marketplace/slack-channel/0.2.3" "$BI/store" "$BI/scripts/lib" "$BI/agents"
+mkdir -p "$BH/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0" \
+  "$BH/.claude/plugins/cache/alfred-marketplace/slack-channel/0.2.3" "$BI/store" "$BI/scripts/lib" "$BI/agents"
 cp "$LIB" "$BI/scripts/lib/channel-plugin-refresh.sh"
-REFF="$BI/store/marveen-marketplace-slack-channel-ref.txt"
+REFF="$BI/store/alfred-marketplace-slack-channel-ref.txt"
 echo "0.1.0" > "$REFF"
-reg "$BH/.claude" '{"plugins":{"'"$ID"'":[{"scope":"user","installPath":"'"$BH"'/.claude/plugins/cache/marveen-marketplace/slack-channel/0.2.3","gitCommitSha":"abcdef0123456789"}]}}'
+reg "$BH/.claude" '{"plugins":{"'"$ID"'":[{"scope":"user","installPath":"'"$BH"'/.claude/plugins/cache/alfred-marketplace/slack-channel/0.2.3","gitCommitSha":"abcdef0123456789"}]}}'
 OUT="$(run_block "$BH" "$BI")"
 case "$OUT" in *"ref valtozott: 0.1.0 -> 0.2.3@abcdef012345"*) pass "a new version dir next to the old one is noticed" ;; *) fail "new version noticed" "ref valtozott: 0.1.0 -> 0.2.3@abcdef012345" "$OUT" ;; esac
 eq "...and becomes the stored ref" "0.2.3@abcdef012345" "$(cat "$REFF")"

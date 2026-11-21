@@ -187,7 +187,7 @@ describe('renderKanbanOwnerStrip', () => {
     strip.find('kanban-owner-strip-item')[1].listeners.click()
     expect(opened).toEqual([cards[2]])
     strip.find('kanban-owner-strip-head')[0].listeners.click()
-    expect(store.get('marveen.kanbanOwnerStripCollapsed')).toBe('1')
+    expect(store.get('alfred.kanbanOwnerStripCollapsed')).toBe('1')
     expect(strip.classes.has('collapsed')).toBe(true)
   })
 

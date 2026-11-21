@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Copy this image's code into the install volume, atomically and verified (HOSTINGERDOCKER1107, Dani 72670).
 
-/opt/marveen is a volume that holds the code AND the state, as a normal install does (every path the same, so the
-gates that resolve real paths see no symlink). The code comes from /opt/marveen-image. When the image changes:
+/opt/alfred is a volume that holds the code AND the state, as a normal install does (every path the same, so the
+gates that resolve real paths see no symlink). The code comes from /opt/alfred-image. When the image changes:
 
   1. the whole code tree is copied into a stage dir inside the volume and verified against the build manifest
      (every file's sha256, every symlink's target);
@@ -22,9 +22,9 @@ import os
 import shutil
 import sys
 
-IMG = os.environ.get('MARVEEN_IMAGE_DIR', '/opt/marveen-image')
-DST = os.environ.get('MARVEEN_INSTALL_DIR', '/opt/marveen')
-META = os.environ.get('MARVEEN_DOCKER_DIR', '/opt/marveen-docker')
+IMG = os.environ.get('ALFRED_IMAGE_DIR', '/opt/alfred-image')
+DST = os.environ.get('ALFRED_INSTALL_DIR', '/opt/alfred')
+META = os.environ.get('ALFRED_DOCKER_DIR', '/opt/alfred-docker')
 KEEP = ('.claude/settings.json', '.claude/settings.local.json')
 PENDING = '.code-sync-pending'
 ID_FILE = '.image-id'

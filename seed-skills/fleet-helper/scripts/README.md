@@ -1,6 +1,6 @@
 # fleet-helper
 
-Közös, függőség nélküli Python-segédek egy ClaudeClaw-típusú ágensflottához. A
+Közös, függőség nélküli Python-segédek egy Alfred-típusú ágensflottához. A
 cél: a determinisztikus munkát (lekérés, szűrés, SQL, formázás, escape) Pythonban végezd el,
 ne az LLM-körön belül égesd rá a modell tokenjeit. Csak Python 3
 stdlib.
@@ -91,4 +91,4 @@ mail_rules.example.json  # copy to mail_rules.json (gitignored) with real values
 - A `mail_rules.json` (a valódi feladóid) legyen gitignore-olt (lásd `.gitignore`).
 
 ## Licenc
-MIT, összhangban a szülőprojekttel (ClaudeClaw / marveen).
+MIT, összhangban a szülőprojekttel (Alfred).

@@ -66,8 +66,8 @@ describe('installKit', () => {
 
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-kit-install-')))
-    tree = join(root, 'opt', 'marveen')
-    supportDir = join(root, 'home', '.marveen', 'support')
+    tree = join(root, 'opt', 'alfred')
+    supportDir = join(root, 'home', '.alfred', 'support')
   })
   afterEach(() => {
     rmSync(root, { recursive: true, force: true })
@@ -155,8 +155,8 @@ describe('installKit', () => {
   })
 
   it.each<[string, () => Partial<InstallKitInput>]>([
-    ['an install root that is not absolute', () => ({ installRoot: 'opt/marveen' })],
-    ['an install root with a space', () => ({ installRoot: join(root, 'my marveen') })],
+    ['an install root that is not absolute', () => ({ installRoot: 'opt/alfred' })],
+    ['an install root with a space', () => ({ installRoot: join(root, 'my alfred') })],
     ['an install root that is missing', () => ({ installRoot: join(root, 'nope') })],
     ['an install root that is a file', () => ({ installRoot: join(tree, KIT_HASHES_FILE) })],
     ['a node path that is not absolute', () => ({ nodePath: 'node' })],
@@ -198,13 +198,13 @@ describe('installKit', () => {
     const saved = process.env['HOME']
     process.env['HOME'] = join(root, 'elsewhere')
     try {
-      await createInstallKit({ name: 'marveen', isRoot: false, home })({ installRoot: tree, nodePath: NODE, release: RELEASE })
+      await createInstallKit({ name: 'alfred', isRoot: false, home })({ installRoot: tree, nodePath: NODE, release: RELEASE })
     } finally {
       if (saved === undefined) delete process.env['HOME']
       else process.env['HOME'] = saved
     }
-    expect(SUPPORT_DIR_IN_HOME).toBe('.marveen/support')
-    expect(readdirSync(join(home, '.marveen', 'support')).sort()).toEqual(['kit'])
+    expect(SUPPORT_DIR_IN_HOME).toBe('.alfred/support')
+    expect(readdirSync(join(home, '.alfred', 'support')).sort()).toEqual(['kit'])
     expect(existsSync(join(root, 'elsewhere'))).toBe(false)
   })
 })

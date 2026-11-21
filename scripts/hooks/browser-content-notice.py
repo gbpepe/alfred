@@ -18,7 +18,7 @@ out of it, and names the injection patterns it found.
 
 WHERE IT IS WIRED
 -----------------
-On WebSearch by default (MARVEENGAPS1020): every sub-agent through the
+On WebSearch by default (ALFREDGAPS1020): every sub-agent through the
 scaffold, the main agent through the repo-shipped .claude/settings.json.
 Since MCPUNTRUSTED1114 the same group also covers the catalog's gmail,
 gmail-v2, google-calendar, google-drive and playwright MCP servers: mail,
@@ -103,7 +103,7 @@ LOG_PATH = Path(os.environ.get("BROWSER_CONTENT_LOG", REPO_ROOT / "store" / "bro
 # below are all short and an injection that hides past this offset also has to
 # survive the model's own attention budget.
 SCAN_LIMIT = 200_000
-# The log keeps payloads (see PRIVATE_PAYLOAD_RX), and since MARVEENGAPS1020 (c) the hook runs on
+# The log keeps payloads (see PRIVATE_PAYLOAD_RX), and since ALFREDGAPS1020 (c) the hook runs on
 # every WebSearch of every agent, so it would grow without end. Past this size
 # the current file is moved to <log>.1 (replacing an older .1) and a new one is
 # started: at most about twice this much is kept. A record is at most

@@ -25,7 +25,7 @@ const PROMPT = 'Ellenorizd a napi T1-sort, es irj egy sort a lapra. Ekezet: árv
 beforeAll(async () => {
   io = await import('../web/scheduled-tasks-io.js')
   routes = await import('../web/routes/schedules.js')
-  io.writeScheduledTask('lista-proba', { description: 'proba', prompt: PROMPT, schedule: '5 4 * * *', agent: 'marveen', enabled: true })
+  io.writeScheduledTask('lista-proba', { description: 'proba', prompt: PROMPT, schedule: '5 4 * * *', agent: 'alfred', enabled: true })
 })
 
 afterAll(() => {
@@ -57,7 +57,7 @@ describe('GET /api/schedules: prompts only on request (card 12b0f698)', () => {
     expect(task.promptLength).toBe(io.listScheduledTasks().find((t) => t.name === 'lista-proba')!.prompt.length)
     expect(task.promptSha256).toBe(createHash('sha256').update(io.listScheduledTasks().find((t) => t.name === 'lista-proba')!.prompt).digest('hex'))
     expect(task.schedule).toBe('5 4 * * *')
-    expect(task.agent).toBe('marveen')
+    expect(task.agent).toBe('alfred')
     expect(task.enabled).toBe(true)
     expect((r.body as any[]).every((t) => !('prompt' in t))).toBe(true)
   })

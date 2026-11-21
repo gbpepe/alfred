@@ -9,7 +9,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync }
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-agent-package-leak-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-agent-package-leak-'))
 const STORE = join(tmpRoot, 'store')
 mkdirSync(STORE, { recursive: true })
 vi.mock('../config.js', async (importOriginal) => ({ ...(await importOriginal<object>()), PROJECT_ROOT: tmpRoot, STORE_DIR: join(tmpRoot, 'store') }))
@@ -62,7 +62,7 @@ const ANSWERS: Record<string, Answer> = {
   'error body is the bare token': { status: 500, body: TEST_TOKEN },
   '401 echoing the token': { status: 401, body: JSON.stringify({ error: 'invalid_token', token: TEST_TOKEN }) },
   '403 with the token as trial pick': { status: 403, body: JSON.stringify({ error: 'not_entitled', reason: 'free', trial_pick: TEST_TOKEN }) },
-  '409 with the token as version': { status: 409, body: JSON.stringify({ error: 'incompatible', min_marveen_version: TEST_TOKEN }) },
+  '409 with the token as version': { status: 409, body: JSON.stringify({ error: 'incompatible', min_alfred_version: TEST_TOKEN }) },
   'redirect to a token URL': { status: 302, headers: { location: `https://elsewhere.test/${TEST_TOKEN}` } },
   '429 with the token as Retry-After': { status: 429, headers: { 'retry-after': TEST_TOKEN } },
   'too large': { status: 200, chunks: Array.from({ length: 40 }, () => Buffer.from(TEST_TOKEN.repeat(200))) },

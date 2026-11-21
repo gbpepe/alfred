@@ -31,7 +31,7 @@ function state(): Record<string, any> {
 
 function transcriptFor(agent: string): string {
   // A sub-agent's transcript lives in its isolated config dir; the main agent's under .channels-config.
-  const dir = agent === 'marveen'
+  const dir = agent === 'alfred'
     ? join(tmp, '.channels-config', 'projects', 'p')
     : join(tmp, 'agents', agent, '.claude-config', 'projects', 'p')
   mkdirSync(dir, { recursive: true })
@@ -71,45 +71,45 @@ beforeEach(() => {
   writeFileSync(join(tmp, 'scripts', 'notify.sh'),
     '#!/bin/bash\nD="$(cd "$(dirname "$0")/.." && pwd)"\n[ -f "$D/notify-fail" ] && exit 1\nprintf \'%s\\n---\\n\' "$1" >> "$D/notify.log"\n')
   chmodSync(join(tmp, 'scripts', 'notify.sh'), 0o755)
-  writeFileSync(join(tmp, '.env'), `MAIN_AGENT_ID=marveen\nTELEGRAM_BOT_TOKEN=${TOKEN}\n`)
+  writeFileSync(join(tmp, '.env'), `MAIN_AGENT_ID=alfred\nTELEGRAM_BOT_TOKEN=${TOKEN}\n`)
   hook = join(tmp, 'scripts', 'hooks', 'login-lost-alert.py')
 })
 afterEach(() => { if (tmp) rmSync(tmp, { recursive: true, force: true }) })
 
 describe('LOGINKIESES1119: login-lost-alert hook', () => {
   it('a logged-out turn sends exactly one alert; the next turns within 30 minutes send none', () => {
-    turn('marveen', loginEntry())
-    turn('marveen', loginEntry())
-    turn('marveen', loginEntry('Login expired · Please run /login'))
+    turn('alfred', loginEntry())
+    turn('alfred', loginEntry())
+    turn('alfred', loginEntry('Login expired · Please run /login'))
     const log = notifyLog()
     expect(log).toHaveLength(1)
-    expect(log[0]).toMatch(/^RIASZTÁS: a\(z\) marveen ügynök Claude-bejelentkezése kiesett \(\d\d:\d\d óta\)/)
+    expect(log[0]).toMatch(/^RIASZTÁS: a\(z\) alfred ügynök Claude-bejelentkezése kiesett \(\d\d:\d\d óta\)/)
     expect(log[0]).toContain('„Bejelentkezés” gomb')
-    expect(state().marveen.failed_turns).toBe(3)
+    expect(state().alfred.failed_turns).toBe(3)
     expect(statSync(join(tmp, 'store', 'login-alert-state.json')).mode & 0o777).toBe(0o600)
   })
 
   it('after 30 minutes a still logged-out agent gets one reminder', () => {
-    turn('marveen', loginEntry())
+    turn('alfred', loginEntry())
     const p = join(tmp, 'store', 'login-alert-state.json')
     const s = state()
-    s.marveen.last_alert -= 31 * 60
+    s.alfred.last_alert -= 31 * 60
     writeFileSync(p, JSON.stringify(s))
-    turn('marveen', loginEntry())
-    turn('marveen', loginEntry())
+    turn('alfred', loginEntry())
+    turn('alfred', loginEntry())
     const log = notifyLog()
     expect(log).toHaveLength(2)
-    expect(log[1]).toMatch(/^RIASZTÁS, ismétlés: a\(z\) marveen ügynök \d\d:\d\d óta nincs bejelentkezve \(2 sikertelen kör\)/)
+    expect(log[1]).toMatch(/^RIASZTÁS, ismétlés: a\(z\) alfred ügynök \d\d:\d\d óta nincs bejelentkezve \(2 sikertelen kör\)/)
   })
 
   it('the first normal turn after the outage sends one "recovered" message and clears the state', () => {
-    turn('marveen', loginEntry())
-    turn('marveen', normalEntry('Kész, tessék.'))
-    turn('marveen', normalEntry('Ez is kész.'))
+    turn('alfred', loginEntry())
+    turn('alfred', normalEntry('Kész, tessék.'))
+    turn('alfred', normalEntry('Ez is kész.'))
     const log = notifyLog()
     expect(log).toHaveLength(2)
-    expect(log[1]).toMatch(/^HELYREÁLLT: a\(z\) marveen ügynök újra rendesen válaszol/)
-    expect(state().marveen).toBeUndefined()
+    expect(log[1]).toMatch(/^HELYREÁLLT: a\(z\) alfred ügynök újra rendesen válaszol/)
+    expect(state().alfred).toBeUndefined()
   })
 
   it('StopFailure with authentication_failed alerts too; another API error says nothing about the login', () => {
@@ -122,181 +122,181 @@ describe('LOGINKIESES1119: login-lost-alert hook', () => {
   })
 
   it('another synthetic API error (prompt too long) neither alerts nor counts as recovery', () => {
-    turn('marveen', loginEntry())
-    turn('marveen', { type: 'assistant', isApiErrorMessage: true, error: 'invalid_request',
+    turn('alfred', loginEntry())
+    turn('alfred', { type: 'assistant', isApiErrorMessage: true, error: 'invalid_request',
       message: { model: '<synthetic>', role: 'assistant', content: [{ type: 'text', text: 'Prompt is too long' }] } })
     expect(notifyLog()).toHaveLength(1)
-    expect(state().marveen.failed_turns).toBe(1)
+    expect(state().alfred.failed_turns).toBe(1)
   })
 
   it('an agent that only talks about a lost login is not logged out', () => {
-    turn('marveen', normalEntry('A transzkriptben ez állt: "Not logged in · Please run /login", ezt javítjuk.'))
-    turn('marveen', normalEntry('ok'), { last_assistant_message: 'Login expired miatt állt le tegnap a flotta.' })
+    turn('alfred', normalEntry('A transzkriptben ez állt: "Not logged in · Please run /login", ezt javítjuk.'))
+    turn('alfred', normalEntry('ok'), { last_assistant_message: 'Login expired miatt állt le tegnap a flotta.' })
     expect(notifyLog()).toHaveLength(0)
     expect(existsSync(join(tmp, 'store', 'login-alert-state.json'))).toBe(false)
   })
 
   it('every agent has its own state: a sub-agent outage does not mute the main agent alert', () => {
     turn('grafit', loginEntry())
-    turn('marveen', loginEntry())
+    turn('alfred', loginEntry())
     turn('grafit', loginEntry())
     const log = notifyLog()
     expect(log).toHaveLength(2)
     expect(log[0]).toContain('grafit ügynök')
-    expect(log[1]).toContain('marveen ügynök')
+    expect(log[1]).toContain('alfred ügynök')
     turn('grafit', normalEntry('vissza'))
-    expect(Object.keys(state())).toEqual(['marveen'])
+    expect(Object.keys(state())).toEqual(['alfred'])
   })
 
   it('a failed notify.sh does not count as sent: the next logged-out turn tries again', () => {
     writeFileSync(join(tmp, 'notify-fail'), '')
-    turn('marveen', loginEntry())
+    turn('alfred', loginEntry())
     expect(notifyLog()).toHaveLength(0)
     rmSync(join(tmp, 'notify-fail'))
-    turn('marveen', loginEntry())
+    turn('alfred', loginEntry())
     expect(notifyLog()).toHaveLength(1)
     expect(notifyLog()[0]).toMatch(/^RIASZTÁS: /)
   })
 
   it('two sessions under one agent id: a good session does not "recover" a logged-out one (no alert / recovered flood)', () => {
     for (let i = 0; i < 3; i++) {
-      turn('marveen', loginEntry(), { session_id: 'channels' })
-      turn('marveen', normalEntry('rendes válasz'), { session_id: 'worker' })
+      turn('alfred', loginEntry(), { session_id: 'channels' })
+      turn('alfred', normalEntry('rendes válasz'), { session_id: 'worker' })
     }
     expect(notifyLog()).toHaveLength(1)
-    turn('marveen', normalEntry('újra bent'), { session_id: 'channels' })
+    turn('alfred', normalEntry('újra bent'), { session_id: 'channels' })
     const log = notifyLog()
     expect(log).toHaveLength(2)
     expect(log[1]).toMatch(/^HELYREÁLLT: /)
-    expect(state().marveen).toBeUndefined()
+    expect(state().alfred).toBeUndefined()
   })
 
   it('a logged-out session not seen for an hour counts as gone: the replacement session sends a "probably recovered"', () => {
-    turn('marveen', loginEntry(), { session_id: 'old' })
+    turn('alfred', loginEntry(), { session_id: 'old' })
     const p = join(tmp, 'store', 'login-alert-state.json')
     const s = state()
-    s.marveen.sessions.old -= 59 * 60
+    s.alfred.sessions.old -= 59 * 60
     writeFileSync(p, JSON.stringify(s))
-    turn('marveen', normalEntry('még nem'), { session_id: 'new' })
+    turn('alfred', normalEntry('még nem'), { session_id: 'new' })
     expect(notifyLog()).toHaveLength(1)
     const s2 = state()
-    s2.marveen.sessions.old -= 2 * 60
+    s2.alfred.sessions.old -= 2 * 60
     writeFileSync(p, JSON.stringify(s2))
-    turn('marveen', normalEntry('új munkamenet, bent vagyok'), { session_id: 'new' })
+    turn('alfred', normalEntry('új munkamenet, bent vagyok'), { session_id: 'new' })
     expect(notifyLog()).toHaveLength(2)
     expect(notifyLog()[1]).toMatch(/^VALÓSZÍNŰLEG HELYREÁLLT: /)
-    expect(state().marveen).toBeUndefined()
+    expect(state().alfred).toBeUndefined()
   })
 
   it('two logged-out sessions of one agent share the 30-minute brake: one alert, and recovery only after both are back', () => {
     for (let i = 0; i < 3; i++) {
-      turn('marveen', loginEntry(), { session_id: 'a' })
-      turn('marveen', loginEntry(), { session_id: 'b' })
+      turn('alfred', loginEntry(), { session_id: 'a' })
+      turn('alfred', loginEntry(), { session_id: 'b' })
     }
     expect(notifyLog()).toHaveLength(1)
-    turn('marveen', normalEntry('a vissza'), { session_id: 'a' })
+    turn('alfred', normalEntry('a vissza'), { session_id: 'a' })
     expect(notifyLog()).toHaveLength(1)
-    turn('marveen', normalEntry('b vissza'), { session_id: 'b' })
+    turn('alfred', normalEntry('b vissza'), { session_id: 'b' })
     expect(notifyLog()).toHaveLength(2)
     expect(notifyLog()[1]).toMatch(/^HELYREÁLLT: /)
   })
 
   it('a Stop and a StopFailure for the same turn count as one failed turn', () => {
-    turn('marveen', loginEntry(), { session_id: 's' })
-    stopFailure('marveen', 'authentication_failed')
+    turn('alfred', loginEntry(), { session_id: 's' })
+    stopFailure('alfred', 'authentication_failed')
     expect(notifyLog()).toHaveLength(1)
-    expect(state().marveen.failed_turns).toBe(1)
+    expect(state().alfred.failed_turns).toBe(1)
     const p = join(tmp, 'store', 'login-alert-state.json')
     const st = state()
-    st.marveen.last_down.t -= 11
+    st.alfred.last_down.t -= 11
     writeFileSync(p, JSON.stringify(st))
-    turn('marveen', loginEntry(), { session_id: 's' })
-    expect(state().marveen.failed_turns).toBe(2)
-    turn('marveen', loginEntry(), { session_id: 's' })
-    expect(state().marveen.failed_turns).toBe(3)
+    turn('alfred', loginEntry(), { session_id: 's' })
+    expect(state().alfred.failed_turns).toBe(2)
+    turn('alfred', loginEntry(), { session_id: 's' })
+    expect(state().alfred.failed_turns).toBe(3)
   })
 
   it('Revizor case 1: a logged-out session beside a good one, 3 rounds: at most one alert, no recovery until the logged-out one answers', () => {
     for (let i = 0; i < 3; i++) {
-      turn('marveen', loginEntry(), { session_id: 'kint' })
-      turn('marveen', normalEntry('jó válasz'), { session_id: 'bent' })
+      turn('alfred', loginEntry(), { session_id: 'kint' })
+      turn('alfred', normalEntry('jó válasz'), { session_id: 'bent' })
     }
     expect(notifyLog()).toHaveLength(1)
     expect(notifyLog()[0]).toMatch(/^RIASZTÁS: /)
-    turn('marveen', normalEntry('vissza'), { session_id: 'kint' })
+    turn('alfred', normalEntry('vissza'), { session_id: 'kint' })
     expect(notifyLog()).toHaveLength(2)
     expect(notifyLog()[1]).toMatch(/^HELYREÁLLT: /)
   })
 
   it('Revizor case 2: an overload error of the logged-out session neither alerts nor recovers, the outage stays', () => {
-    turn('marveen', loginEntry(), { session_id: 'kint' })
+    turn('alfred', loginEntry(), { session_id: 'kint' })
     const overload = { type: 'assistant', isApiErrorMessage: true, error: 'overloaded',
       message: { model: '<synthetic>', role: 'assistant', content: [{ type: 'text', text: 'API Error: 529 Overloaded' }] } }
-    turn('marveen', overload, { session_id: 'kint' })
-    turn('marveen', overload, { session_id: 'kint', last_assistant_message: 'API Error: 529 Overloaded' })
-    stopFailure('marveen', 'overloaded')
+    turn('alfred', overload, { session_id: 'kint' })
+    turn('alfred', overload, { session_id: 'kint', last_assistant_message: 'API Error: 529 Overloaded' })
+    stopFailure('alfred', 'overloaded')
     expect(notifyLog()).toHaveLength(1)
-    expect(Object.keys(state().marveen.sessions)).toContain('kint')
+    expect(Object.keys(state().alfred.sessions)).toContain('kint')
   })
 
   it('S8: an own recovery that failed to send does not survive a new outage of that session', () => {
-    turn('marveen', loginEntry(), { session_id: 'a' })
+    turn('alfred', loginEntry(), { session_id: 'a' })
     writeFileSync(join(tmp, 'notify-fail'), '')
-    turn('marveen', normalEntry('vissza'), { session_id: 'a' })
+    turn('alfred', normalEntry('vissza'), { session_id: 'a' })
     rmSync(join(tmp, 'notify-fail'))
-    turn('marveen', loginEntry(), { session_id: 'a' })
+    turn('alfred', loginEntry(), { session_id: 'a' })
     const p = join(tmp, 'store', 'login-alert-state.json')
     const st = state()
-    st.marveen.sessions.a -= 61 * 60
+    st.alfred.sessions.a -= 61 * 60
     writeFileSync(p, JSON.stringify(st))
-    turn('marveen', normalEntry('másik munkamenet'), { session_id: 'b' })
+    turn('alfred', normalEntry('másik munkamenet'), { session_id: 'b' })
     expect(notifyLog().at(-1)).toMatch(/^VALÓSZÍNŰLEG HELYREÁLLT: /)
   })
 
   it('another API error during an outage is no recovery (E1): transcript line and payload text are the same error', () => {
-    turn('marveen', loginEntry())
-    turn('marveen', { type: 'assistant', isApiErrorMessage: true, error: 'overloaded',
+    turn('alfred', loginEntry())
+    turn('alfred', { type: 'assistant', isApiErrorMessage: true, error: 'overloaded',
       message: { model: '<synthetic>', role: 'assistant', content: [{ type: 'text', text: 'API Error: 529 Overloaded' }] } },
       { last_assistant_message: 'API Error: 529 Overloaded' })
-    turn('marveen', loginEntry(), { last_assistant_message: 'API Error: 500 Internal server error' })
+    turn('alfred', loginEntry(), { last_assistant_message: 'API Error: 500 Internal server error' })
     expect(notifyLog()).toHaveLength(1)
-    expect(state().marveen).toBeDefined()
+    expect(state().alfred).toBeDefined()
   })
 
   it('a StopFailure without session_id keys the same session as its transcript file name', () => {
-    const t = transcriptFor('marveen')
+    const t = transcriptFor('alfred')
     const sid = 'abc-123'
     const t2 = join(t, '..', `${sid}.jsonl`)
     writeFileSync(t2, '')
     const r = spawnSync('python3', ['-I', '-S', hook], { input: JSON.stringify({ hook_event_name: 'StopFailure', transcript_path: t2, cwd: tmp, error: 'authentication_failed' }), encoding: 'utf-8' })
     expect(r.status).toBe(0)
-    expect(Object.keys(state().marveen.sessions)).toEqual([sid])
-    turn('marveen', normalEntry('bent vagyok'), { session_id: sid })
+    expect(Object.keys(state().alfred.sessions)).toEqual([sid])
+    turn('alfred', normalEntry('bent vagyok'), { session_id: sid })
     expect(notifyLog()[1]).toMatch(/^HELYREÁLLT: /)
   })
 
   it('a failed "recovered" send is kept and retried on the next normal turn', () => {
-    turn('marveen', loginEntry())
+    turn('alfred', loginEntry())
     writeFileSync(join(tmp, 'notify-fail'), '')
-    turn('marveen', normalEntry('vissza'))
-    expect(state().marveen).toBeDefined()
+    turn('alfred', normalEntry('vissza'))
+    expect(state().alfred).toBeDefined()
     rmSync(join(tmp, 'notify-fail'))
-    turn('marveen', normalEntry('vissza megint'))
+    turn('alfred', normalEntry('vissza megint'))
     const log = notifyLog()
     expect(log).toHaveLength(2)
     expect(log[1]).toMatch(/^HELYREÁLLT: /)
-    expect(state().marveen).toBeUndefined()
+    expect(state().alfred).toBeUndefined()
   })
 
   it('the turn\'s own last_assistant_message wins over a transcript tail that still ends on the error line', () => {
-    turn('marveen', loginEntry())
-    turn('marveen', loginEntry(), { last_assistant_message: 'Megvan, itt az eredmény.' })
+    turn('alfred', loginEntry())
+    turn('alfred', loginEntry(), { last_assistant_message: 'Megvan, itt az eredmény.' })
     expect(notifyLog()).toHaveLength(2)
     expect(notifyLog()[1]).toMatch(/^HELYREÁLLT: /)
   })
 
   it('the bot token never reaches the hook output or the state file; a broken payload is a silent exit 0', () => {
-    const r = turn('marveen', loginEntry())
+    const r = turn('alfred', loginEntry())
     expect(r.stdout + r.stderr).not.toContain(TOKEN)
     expect(readFileSync(join(tmp, 'store', 'login-alert-state.json'), 'utf-8')).not.toContain(TOKEN)
     const bad = spawnSync('python3', ['-I', '-S', hook], { input: 'not json', encoding: 'utf-8' })

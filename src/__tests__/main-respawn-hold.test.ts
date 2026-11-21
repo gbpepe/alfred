@@ -6,12 +6,12 @@ import { join } from 'node:path'
 // being respawned in-process. Measured on our host, 2026-10-11:
 //   16:40:02.995  stuck-tool-call-watcher: recovering main channels session
 //   16:40:04.545  Scheduled task fired
-//   16:40:07.720  Marveen session respawned with --continue
+//   16:40:07.720  Alfred session respawned with --continue
 //   16:40:31.978  Scheduled prompt did NOT arrive as typed (head-lost)
 // The respawn paths stamp lastMainRespawnAt() only at the END, so the fix marks
 // the START (main-respawn-hold.ts). What is pinned here:
 //   1. the mark's own expiry and settle, and that it is cleared on every exit;
-//   2. the real resumeMarveenSession holds from its first line, through the
+//   2. the real resumeAlfredSession holds from its first line, through the
 //      awaits where the 16:40:04 fire happened -- a mark set at the end fails;
 //   3. the wiring of all three in-process respawn functions.
 // Everything that could reach the live host is stubbed: tmux (child_process),
@@ -140,7 +140,7 @@ describe('beginMainRespawn: the end function', () => {
   })
 })
 
-describe('the real resumeMarveenSession holds from its first line to its last', () => {
+describe('the real resumeAlfredSession holds from its first line to its last', () => {
   beforeEach(() => {
     _resetMainRespawnHoldForTest()
     execCalls.length = 0
@@ -152,11 +152,11 @@ describe('the real resumeMarveenSession holds from its first line to its last', 
   })
 
   it('the 16:40 order: a fire 1.5 s into the recovery meets an in-flight hold, and the end starts the settle', async () => {
-    const { resumeMarveenSession } = await import('../web/channel-monitor.js')
+    const { resumeAlfredSession } = await import('../web/channel-monitor.js')
     const atRespawnPane: Array<string | null> = []
     execHook = (args) => { if (args.includes('respawn-pane')) atRespawnPane.push(mainRespawnHold(Date.now())) }
 
-    const done = resumeMarveenSession()
+    const done = resumeAlfredSession()
     // The respawn-pane already ran (it is synchronous); the function now sits in
     // its post-respawn modal waits -- the window the 16:40:04.545 fire landed in.
     expect(atRespawnPane).toEqual(['in-flight'])
@@ -171,10 +171,10 @@ describe('the real resumeMarveenSession holds from its first line to its last', 
   })
 
   it('a respawn-pane that throws still clears the mark (finally), so the schedule is not held for a minute', async () => {
-    const { resumeMarveenSession } = await import('../web/channel-monitor.js')
+    const { resumeAlfredSession } = await import('../web/channel-monitor.js')
     execHook = (args) => { if (args.includes('respawn-pane')) throw new Error("can't find pane") }
 
-    await expect(resumeMarveenSession()).resolves.toBe(false)
+    await expect(resumeAlfredSession()).resolves.toBe(false)
     expect(mainRespawnHold(Date.now())).toBe('settling')
   })
 
@@ -204,8 +204,8 @@ describe('wiring: every in-process respawn of the main session is marked', () =>
   }
 
   it.each([
-    'export async function resumeMarveenSession',
-    'function respawnMarveenSessionFresh',
+    'export async function resumeAlfredSession',
+    'function respawnAlfredSessionFresh',
     'export function respawnMainSessionFresh',
   ])('%s: begin before the first reap or respawn-pane, end in a finally that closes the function', (header) => {
     const fn = body(header)

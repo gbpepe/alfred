@@ -29,11 +29,11 @@ const RECORD: SupportGroupRecord = {
     { name: 'key2', fingerprint: FP2 },
   ],
   fromCidrs: ['203.0.113.7/32', '2001:db8::7/128'],
-  dispatchPath: '/home/marveen/.marveen/support/kit/support-dispatch.sh',
+  dispatchPath: '/home/alfred/.alfred/support/kit/support-dispatch.sh',
   sshd: { major: 9, minor: 6 },
 }
 const TEXT =
-  'marveen-support-group 1\n' +
+  'alfred-support-group 1\n' +
   'grant-id 3f2504e0-4f89-41d3-9a0c-0305e82c3301\n' +
   'consent 1\n' +
   'consent-at 2026-11-15T06:10:00Z\n' +
@@ -41,7 +41,7 @@ const TEXT =
   'key key2 ' + FP2 + '\n' +
   'from 203.0.113.7/32\n' +
   'from 2001:db8::7/128\n' +
-  'dispatch /home/marveen/.marveen/support/kit/support-dispatch.sh\n' +
+  'dispatch /home/alfred/.alfred/support/kit/support-dispatch.sh\n' +
   'sshd 9.6\n'
 
 describe('the group record text', () => {
@@ -88,7 +88,7 @@ describe('the group record text', () => {
 
   it.each<[string, string]>([
     ['nothing', ''],
-    ['another header', TEXT.replace('marveen-support-group 1', 'marveen-support-group 2')],
+    ['another header', TEXT.replace('alfred-support-group 1', 'alfred-support-group 2')],
     ['no final line end', TEXT.slice(0, -1)],
     ['CR LF line ends', TEXT.replace(/\n/g, '\r\n')],
     ['a repeated grant id', TEXT + 'grant-id 3f2504e0-4f89-41d3-9a0c-0305e82c3301\n'],

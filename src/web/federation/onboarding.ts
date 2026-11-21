@@ -36,9 +36,9 @@ import { shellWord } from '../sanitize.js'
 import { catalogAgentNames } from './local-catalog.js'
 import { getFederationConfig, DEFAULT_ROUTING_MODE, type FederationConfig, type FederationRoutingMode } from './config.js'
 
-export const FEDERATION_BLOCK_BEGIN = '<!-- MARVEEN-FEDERATION:BEGIN -- kezelt blokk / managed block, do not edit inside -->'
-export const FEDERATION_BLOCK_END = '<!-- MARVEEN-FEDERATION:END -->'
-export const FEDERATION_POLICY_ANCHOR = '<!-- MARVEEN-FEDERATION:POLICY -->'
+export const FEDERATION_BLOCK_BEGIN = '<!-- ALFRED-FEDERATION:BEGIN -- kezelt blokk / managed block, do not edit inside -->'
+export const FEDERATION_BLOCK_END = '<!-- ALFRED-FEDERATION:END -->'
+export const FEDERATION_POLICY_ANCHOR = '<!-- ALFRED-FEDERATION:POLICY -->'
 // Insert after this template section when present (EOF-fallback otherwise --
 // hand-edited or migrated installs may lack the heading).
 // PERSONAESC1107: the English persona (templates/en/CLAUDE.md.template) names the same section in English; without it
@@ -95,7 +95,7 @@ Ez a rendszer össze van kötve más, azonos keretrendszerű példányokkal. A t
 \`<rendszer>/<ügynök>\` alakban címzed a MEGSZOKOTT üzenet-API-n át — például:
 
 \`\`\`bash
-bash scripts/marveen-api.sh message ${id.mainAgentId} <rendszer>/<ügynök> uzenet.txt
+bash scripts/alfred-api.sh message ${id.mainAgentId} <rendszer>/<ügynök> uzenet.txt
 \`\`\`
 
 (Az \`uzenet.txt\` az üzenet szövege: előbb írd meg a Write eszközzel. Kivétel: a \`message\`
@@ -141,7 +141,7 @@ This system is connected to other instances of the same framework. Address remot
 as \`<system>/<agent>\` through the USUAL message API — for example:
 
 \`\`\`bash
-bash scripts/marveen-api.sh message ${id.mainAgentId} <system>/<agent> message.txt
+bash scripts/alfred-api.sh message ${id.mainAgentId} <system>/<agent> message.txt
 \`\`\`
 
 (\`message.txt\` is the message text: write it with your file tool first. Exception:
@@ -198,7 +198,7 @@ ${FEDERATION_BLOCK_END}`
 export function renderSubAgentFederationBlock(id: OnboardingIdentity): string {
   // A sub-agent's working directory is agents/<name>, not the project root: the helper path is absolute,
   // and one shell word even when PROJECT_ROOT holds a space.
-  const helper = shellWord(join(PROJECT_ROOT, 'scripts', 'marveen-api.sh'))
+  const helper = shellWord(join(PROJECT_ROOT, 'scripts', 'alfred-api.sh'))
   const hu = `${FEDERATION_BLOCK_BEGIN}
 ### Föderáció: társrendszerből érkező feladat
 

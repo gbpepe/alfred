@@ -84,7 +84,7 @@ def comment(card_id, text, extra=()):
         f.write(text)
     env = dict(os.environ)
     env['KARTYA_DB'] = DB_PATH
-    env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['ALFRED_ROOT'] = SANDBOX_ROOT
     return subprocess.run(
         # KOMMENTERTESITES922: ez a suite a MEZOMOZGATAST meri; az ertesites-kapunak sajat
         # suite-ja van (kartya-komment-ertesites). A kapcsolo kimondja a kihagyast.
@@ -167,9 +167,9 @@ def main():
     # valtozata pontosan ezt tette: letrehozott egy valodi sort a sorban.)
     env = dict(os.environ)
     env['KARTYA_DB'] = DB_PATH
-    env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_API'] = 'http://127.0.0.1:1/api/messages'
-    p = subprocess.run([sys.executable, SCRIPT, '--id', 'UJKARTYA906', '--assignee', 'marveen', '--author', 'Boni',
+    p = subprocess.run([sys.executable, SCRIPT, '--id', 'UJKARTYA906', '--assignee', 'alfred', '--author', 'Boni',
                         '--title', 'UJKARTYA906 uj kartya teszt', '--no-msg'],
                        capture_output=True, text=True, env=env, timeout=30)
     check('7 letrehozo ag lefutott', p.returncode == 0, p.stdout + p.stderr)
@@ -180,7 +180,7 @@ def main():
     d = tempfile.mkdtemp(prefix='kartya-m3-')
     mf = os.path.join(d, 'm.txt')
     open(mf, 'w', encoding='utf-8').write('Kartya ELLENT906: ellentmondo kapcsolok.')
-    p = subprocess.run([sys.executable, SCRIPT, '--id', 'ELLENT906', '--assignee', 'marveen', '--author', 'Boni',
+    p = subprocess.run([sys.executable, SCRIPT, '--id', 'ELLENT906', '--assignee', 'alfred', '--author', 'Boni',
                         '--title', 'ellentmondas teszt', '--msg-file', mf, '--no-msg'],
                        capture_output=True, text=True, env=env, timeout=30)
     # A puszta nem-nulla exit itt NEM eleg: a kapu nelkul is elbukna az uzenetkuldesen (a
@@ -218,21 +218,21 @@ def main():
     open(cf, 'w', encoding='utf-8').write('Kartya MOZGA906: rossz gyokerrol.')
     env = dict(os.environ)
     env.pop('KARTYA_DB', None)
-    env['CLAUDECLAW_ROOT'] = ures
+    env['ALFRED_ROOT'] = ures
     env['KARTYA_API'] = 'http://127.0.0.1:1/api/messages'
     p = subprocess.run([sys.executable, SCRIPT, '--id', 'MOZGA906', '--comment-file', cf,
                         '--author', 'Boni'], capture_output=True, text=True, env=env, timeout=30)
     ki = p.stdout + p.stderr
     check('11 megtagadva a hianyzo DB-nel', p.returncode != 0 and 'nem letezik' in ki, ki)
     check('11 kimondja a feloldott utvonalat', ures in ki, ki)
-    check('11 NEM hozott letre ures DB-t', not os.path.exists(os.path.join(ures, 'store', 'claudeclaw.db')))
+    check('11 NEM hozott letre ures DB-t', not os.path.exists(os.path.join(ures, 'store', 'alfred.db')))
 
-    # 12. Az env SORRENDJE: a KARTYA_DB felulirja a CLAUDECLAW_ROOT-ot (a worktree-futas ki
+    # 12. Az env SORRENDJE: a KARTYA_DB felulirja a ALFRED_ROOT-ot (a worktree-futas ki
     #     tudja mondani, hogy az ELO tablat irja).
     env2 = dict(env); env2['KARTYA_DB'] = DB_PATH
     p = subprocess.run([sys.executable, SCRIPT, '--id', 'MOZGA906', '--comment-file', cf,
                         '--author', 'Boni'], capture_output=True, text=True, env=env2, timeout=30)
-    check('12 a KARTYA_DB gyoz a CLAUDECLAW_ROOT felett', p.returncode == 0, p.stdout + p.stderr)
+    check('12 a KARTYA_DB gyoz a ALFRED_ROOT felett', p.returncode == 0, p.stdout + p.stderr)
 
     # 13. A visszaolvasas MONDJA KI, melyik tarolobol olvasott (Boni kikotese): egy rossz gyoker
     #     mellett a visszaolvasas onmagaban konzisztens lenne, csak nem az eles tablan.
@@ -256,7 +256,7 @@ def main():
               for c in comments('FELELOSA906')), f'kapott: {comments("FELELOSA906")}')
 
     # 15. A KEVERES-KAPU HATARA. Ki kellett engedni az --assignee-hoz (ha visszazarul, a 14.
-    #     teszt bukik), 2026-09-19 ota pedig a --desc-file-hoz is (EKEZETKAPU919, Marveen
+    #     teszt bukik), 2026-09-19 ota pedig a --desc-file-hoz is (EKEZETKAPU919, Alfred
     #     dontese): a leiras volt az egyetlen mezo, amit letrehozas utan senki nem tudott
     #     javitani. EZ A SOR KORABBAN A TILTAST ROGZITETTE, es SZANDEKOSAN, a viselkedes-
     #     valtassal EGY PR-ben irodott at -- egy kiadott regresszio-kontrollt nem hagyunk
@@ -334,9 +334,9 @@ def main():
     # 22. UGYANAZ A KAPU A LETREHOZO AGON. Ha csak a mozgatason allna, a horgony nelkuli cim
     #     egyszeruen a letrehozaskor kerulne be, es a kapu semmit nem vedene.
     env = dict(os.environ)
-    env['KARTYA_DB'] = DB_PATH; env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['KARTYA_DB'] = DB_PATH; env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_API'] = 'http://127.0.0.1:1/api/messages'
-    p = subprocess.run([sys.executable, SCRIPT, '--id', 'HORGONYUJ906', '--assignee', 'marveen', '--author', 'Boni',
+    p = subprocess.run([sys.executable, SCRIPT, '--id', 'HORGONYUJ906', '--assignee', 'alfred', '--author', 'Boni',
                         '--title', 'cim azonosito nelkul', '--no-msg'],
                        capture_output=True, text=True, env=env, timeout=30)
     check('22 a letrehozo ag is megtagadja a horgony nelkuli cimet',
@@ -364,7 +364,7 @@ def main():
 
     # 24. Az --assignee-uj a LETREHOZO agon ertelmetlen -- egy nem hato kapcsolo pont az a
     #     hibaosztaly, amit ez az eszkoz ket kore zar (a --status csendes elvesztese).
-    p = subprocess.run([sys.executable, SCRIPT, '--id', 'UJFLAG906', '--assignee', 'marveen', '--author', 'Boni',
+    p = subprocess.run([sys.executable, SCRIPT, '--id', 'UJFLAG906', '--assignee', 'alfred', '--author', 'Boni',
                         '--title', 'UJFLAG906 teszt', '--no-msg', '--assignee-uj'],
                        capture_output=True, text=True, env=env, timeout=30)
     check('24 megtagadva az --assignee-uj a letrehozo agon',
@@ -438,7 +438,7 @@ def main():
           p.stdout + p.stderr)
 
     # 32. A SZERZO KIMONDOTT (KARTYADRYRUN907, 2026-09-08). Komment-modban az --author korabban
-    #     CSENDBEN 'Marveen'-re esett: a kimenet OK-t mondott, a kartyan pedig MAS neve allt.
+    #     CSENDBEN 'Alfred'-re esett: a kimenet OK-t mondott, a kartyan pedig MAS neve allt.
     #     A javitas 2026-09-07-en egy VERZIOKOVETETLEN peldanyba ment, es a v1.37.0 kiadas
     #     nemán visszaallitotta -- ezert all ITT, a repoban, egy teszt: enelkul a kovetkezo
     #     kiadas ugyanugy vissza tudja hozni, es semmi nem szol rola.
@@ -464,9 +464,9 @@ def main():
     p = comment('SZERZO907', 'Kartya SZERZO907: kimondott szerzovel.')
     check('33 kimondott --author-ral zold', p.returncode == 0, p.stdout + p.stderr)
     c = comments('SZERZO907')
-    check('33 a fejlec Boni-t nevezi, nem Marveent',
+    check('33 a fejlec Boni-t nevezi, nem Alfredet',
           c and c[-1].startswith('[Boni '), f'kapott: {c[-1][:40] if c else None!r}')
-    # A FEJLEC ES AZ OSZLOP KET KULON HELY: 2026-09-07-en MINDKETTO 'Marveen'-re esett, tehat
+    # A FEJLEC ES AZ OSZLOP KET KULON HELY: 2026-09-07-en MINDKETTO 'Alfred'-re esett, tehat
     # egy fejlec-only ellenorzes zold maradna, ha csak az oszlop romlana el.
     _db = sqlite3.connect(DB_PATH)
     _szerzo = _db.execute("SELECT author FROM kanban_comments WHERE card_id='SZERZO907'"

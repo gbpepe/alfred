@@ -2,7 +2,7 @@
 
 ## 🎯 What it means, why it matters
 
-When Marveen runs on a Mac, the agents write all day: logs, jsonl transcripts (`~/.claude/projects`) and the sqlite database (`store/`). macOS Spotlight indexes these as well. With constant writes the index on the Data volume can grow to tens of GiB, and on every index merge macOS temporarily writes a full new copy on top.
+When Alfred runs on a Mac, the agents write all day: logs, jsonl transcripts (`~/.claude/projects`) and the sqlite database (`store/`). macOS Spotlight indexes these as well. With constant writes the index on the Data volume can grow to tens of GiB, and on every index merge macOS temporarily writes a full new copy on top.
 
 In System Settings this shows up as growing **"System Data"** that partly disappears on a reboot.
 
@@ -28,7 +28,7 @@ sudo lsof -c mds_stores | grep -iE 'merge|indexPositions'
 ## Fix (recommended)
 
 **System Settings > Spotlight > Search Privacy**: add
-1. the Marveen install folder (the one that holds `scripts/doctor.sh`; the doctor prints its exact path);
+1. the Alfred install folder (the one that holds `scripts/doctor.sh`; the doctor prints its exact path);
 2. the `~/.claude` folder.
 
 **The cost:** these two folders no longer show up in Cmd+Space search. You reach the logs, the jsonl and the database through the dashboard and the memory search anyway. Everything else (apps, documents, mail) stays searchable.

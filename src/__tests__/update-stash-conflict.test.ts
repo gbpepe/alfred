@@ -61,7 +61,7 @@ function repo(opts: { conflict: boolean }): string {
   expect(sh(dir, 'git init -q && git add -A && git commit -qm base').code).toBe(0)
   writeFileSync(join(dir, SETTINGS), LOCAL)
   writeFileSync(join(dir, 'other.txt'), 'local\n')
-  expect(sh(dir, 'git stash push -q -u -m "marveen-update-auto-stash 20261102-115215"').code).toBe(0)
+  expect(sh(dir, 'git stash push -q -u -m "alfred-update-auto-stash 20261102-115215"').code).toBe(0)
   if (opts.conflict) {
     writeFileSync(join(dir, SETTINGS), UPSTREAM)
     expect(sh(dir, 'git commit -qam upstream').code).toBe(0)
@@ -109,7 +109,7 @@ describe('update.sh: a conflicted auto-stash pop (ANETTUPDATESTASH1102)', () => 
   it('keeps the stash entry (the operator\'s only copy) and names the path in the warning', () => {
     const dir = repo({ conflict: true })
     const r = runBlock(dir, 'pop_auto_stash')
-    expect(git(dir, 'stash list')).toContain('marveen-update-auto-stash 20261102-115215')
+    expect(git(dir, 'stash list')).toContain('alfred-update-auto-stash 20261102-115215')
     expect(git(dir, 'show stash@{0}:.claude/settings.json')).toBe(LOCAL)
     expect(r.warn).toContain('.claude/settings.json')
     expect(r.warn).toContain('git stash list')
@@ -132,14 +132,14 @@ describe('update.sh: a conflicted auto-stash pop (ANETTUPDATESTASH1102)', () => 
     expect(sh(dir, 'git init -q && git add -A && git commit -qm base').code).toBe(0)
     writeFileSync(join(dir, 'keep.txt'), 'local\n')
     writeFileSync(join(dir, 'new.txt'), 'local new\n')
-    expect(sh(dir, 'git stash push -q -u -m "marveen-update-auto-stash 20261102-115215"').code).toBe(0)
+    expect(sh(dir, 'git stash push -q -u -m "alfred-update-auto-stash 20261102-115215"').code).toBe(0)
     writeFileSync(join(dir, 'new.txt'), 'upstream new\n')
     expect(sh(dir, 'git add new.txt && git commit -qm upstream').code).toBe(0)
     const r = runBlock(dir, 'pop_auto_stash; echo "rc=$?"')
     expect(r.out).toContain('rc=1')
     expect(readFileSync(join(dir, 'keep.txt'), 'utf-8')).toBe('local\n')
     expect(readFileSync(join(dir, 'new.txt'), 'utf-8')).toBe('upstream new\n')
-    expect(git(dir, 'stash list')).toContain('marveen-update-auto-stash')
+    expect(git(dir, 'stash list')).toContain('alfred-update-auto-stash')
     expect(r.warn).toMatch(/Visszakerult: [^.]*keep\.txt/)
     expect(r.warn).toMatch(/NEM kerult vissza, csak a stash-ben van: [^.]*new\.txt/)
     expect(r.warn).not.toContain('nem lehetett visszatenni')
@@ -174,7 +174,7 @@ describe('update.sh: a conflicted pop in a scripts/*.py file (UPDATECONFLICT1105
   const PY = 'scripts/memoria_heartbeat_gate.py'
   const PY_BASE = 'AGENT = "picard"\n\n\ndef main():\n    return AGENT\n'
   const PY_LOCAL = PY_BASE.replace('"picard"', '"tibor"')
-  const PY_UP = PY_BASE.replace('"picard"', '"marveen"')
+  const PY_UP = PY_BASE.replace('"picard"', '"alfred"')
   function pyRepo(): string {
     const dir = mkdtempSync(join(SANDBOX, 'pyrepo-'))
     mkdirSync(join(dir, 'scripts'))
@@ -183,7 +183,7 @@ describe('update.sh: a conflicted pop in a scripts/*.py file (UPDATECONFLICT1105
     expect(sh(dir, 'git init -q && git add -A && git commit -qm base').code).toBe(0)
     writeFileSync(join(dir, PY), PY_LOCAL)
     writeFileSync(join(dir, 'other.txt'), 'local\n')
-    expect(sh(dir, 'git stash push -q -u -m "marveen-update-auto-stash 20261103-201500"').code).toBe(0)
+    expect(sh(dir, 'git stash push -q -u -m "alfred-update-auto-stash 20261103-201500"').code).toBe(0)
     writeFileSync(join(dir, PY), PY_UP)
     expect(sh(dir, 'git commit -qam upstream').code).toBe(0)
     return dir

@@ -52,11 +52,11 @@ const deps = (over: Partial<LangSwitchDeps> = {}): LangSwitchDeps => ({
 function firstBoot(name: 'CLAUDE.md' | 'SOUL.md', lang: 'en' | 'hu'): string {
   const tpl = lang === 'en' ? join(root, 'templates', 'en', `${name}.template`) : join(root, 'templates', `${name}.template`)
   const script = name === 'CLAUDE.md'
-    ? '. scripts/lib/seed-refresh.sh; TZV="$(. scripts/lib/install-tz.sh; z="$(install_tz "$INSTALL_DIR")"; printf \'%s\' "${z:-UTC}")"; MAIN_AGENT_ID=marveen RENDER_CHAT_ID=0 RENDER_TIMEZONE="$TZV" render_persona_file "$1" "$2"'
+    ? '. scripts/lib/seed-refresh.sh; TZV="$(. scripts/lib/install-tz.sh; z="$(install_tz "$INSTALL_DIR")"; printf \'%s\' "${z:-UTC}")"; MAIN_AGENT_ID=alfred RENDER_CHAT_ID=0 RENDER_TIMEZONE="$TZV" render_persona_file "$1" "$2"'
     : '. scripts/lib/seed-refresh.sh; render_persona_file "$1" "$2"'
   execFileSync('bash', ['-c', script, 'fb', tpl, join(root, name)], {
     cwd: root,
-    env: { PATH: process.env.PATH ?? '/usr/bin:/bin', INSTALL_DIR: root, OWNER_NAME: 'Owner', BOT_NAME: 'Marveen', WEB_PORT: '3420' },
+    env: { PATH: process.env.PATH ?? '/usr/bin:/bin', INSTALL_DIR: root, OWNER_NAME: 'Owner', BOT_NAME: 'Alfred', WEB_PORT: '3420' },
   })
   return readFileSync(join(root, name), 'utf-8')
 }
@@ -64,7 +64,7 @@ function firstBoot(name: 'CLAUDE.md' | 'SOUL.md', lang: 'en' | 'hu'): string {
 function nameStep(bot: string, owner: string) {
   for (const name of ['CLAUDE.md', 'SOUL.md']) {
     const f = join(root, name)
-    writeFileSync(f, readFileSync(f, 'utf-8').split('Marveen').join(bot).split('Owner').join(owner))
+    writeFileSync(f, readFileSync(f, 'utf-8').split('Alfred').join(bot).split('Owner').join(owner))
   }
   env.BOT_NAME = bot
   env.OWNER_NAME = owner
@@ -81,7 +81,7 @@ beforeEach(() => {
   cpSync(join(ROOT, 'templates', 'en'), join(root, 'templates', 'en'), { recursive: true })
   mkdirSync(join(root, 'home'), { recursive: true })
   writeFileSync(join(root, '.lang'), 'en\n')
-  env = { MAIN_AGENT_ID: 'marveen', BOT_NAME: 'Marveen', OWNER_NAME: 'Owner', AGENT_TEXT_LANG: 'en', DASHBOARD_LANG: 'en', WEB_PORT: '3420' }
+  env = { MAIN_AGENT_ID: 'alfred', BOT_NAME: 'Alfred', OWNER_NAME: 'Owner', AGENT_TEXT_LANG: 'en', DASHBOARD_LANG: 'en', WEB_PORT: '3420' }
   seedRun = { code: 0, stdout: 'seed updated .claude/skills/alpha/SKILL.md\nseed kept .claude/skills/beta/SKILL.md\nseed current .claude/skills/gamma/SKILL.md\nseed-refresh: shipped skills/tasks refreshed: 1\n' }
   seedCalls = 0
 })
@@ -220,8 +220,8 @@ describe('the helpers', () => {
   })
 
   it('applyNameStep is the name step on first-boot names only', () => {
-    expect(applyNameStep('Marveen serves Owner. marveen', 'Jarvis', 'Anna')).toBe('Jarvis serves Anna. marveen')
-    expect(applyNameStep('Marveen serves Owner.', 'Marveen', 'Owner')).toBe('Marveen serves Owner.')
+    expect(applyNameStep('Alfred serves Owner. alfred', 'Jarvis', 'Anna')).toBe('Jarvis serves Anna. alfred')
+    expect(applyNameStep('Alfred serves Owner.', 'Alfred', 'Owner')).toBe('Alfred serves Owner.')
   })
 
   it('parseSeedReport maps the four outcomes and skips every other line', () => {

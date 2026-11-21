@@ -18,7 +18,7 @@ import {
 const QWEN_WELCOME_WEDGE = `
  ▐▛███▜▌   Claude Code v2.1.170
 ▝▜█████▛▘  qwen3.6:27b-192k with high effort · API Usage Billing
-  ▘▘ ▝▝    ~/ClaudeClaw/agents/qwen
+  ▘▘ ▝▝    ~/Alfred/agents/qwen
 
 
 
@@ -30,7 +30,7 @@ const QWEN_WELCOME_WEDGE = `
 
 
 ────────────────────────────────────────────────────────────────────────────────
-❯ kepet: /Users/marvin/ClaudeClaw/workspace/mbh-issue/aahe486-screenshot.png
+❯ kepet: /Users/marvin/Alfred/workspace/mbh-issue/aahe486-screenshot.png
   Olvasd be a Read tool-lal a kepfajlt, majd mondd meg: (1) mi ez az
   alkalmazas/oldal, (2) a tablazat konkret ertekei -- rendszam, tipus,
   letrehozas+modositas datumok, hany sor. Roviden a vegeredmenyt (ne

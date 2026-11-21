@@ -19,7 +19,7 @@ vi.mock('../config.js', () => ({
   get CHANNEL_CHAT_ID() { return cfg.chatId },
   get ALLOWED_CHAT_ID() { return cfg.chatId },
   ALERT_CHAT_ID: '',
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
   PROJECT_ROOT: '/tmp/notify-owner-fallback-test',
 }))
 

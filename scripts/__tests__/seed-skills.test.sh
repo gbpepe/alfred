@@ -132,7 +132,7 @@ else
   fail "MAIN_AGENT_ID NOT substituted in task-config.json"
 fi
 
-# SHTEST807: this assert used to grep for '/opt/testbot/store/claudeclaw.db',
+# SHTEST807: this assert used to grep for '/opt/testbot/store/alfred.db',
 # a recipe-content string that #870 rewrote away (sqlite3 paths -> HTTP API), so
 # it failed on every current tree. Assert the substitution MECHANISM, not the
 # recipe text, so the next recipe rewrite cannot break it again.

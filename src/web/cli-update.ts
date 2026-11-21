@@ -1,4 +1,4 @@
-// Offer a Claude Code CLI update from the Marveen update flow (CLIFRISSAJANLAS923).
+// Offer a Claude Code CLI update from the Alfred update flow (CLIFRISSAJANLAS923).
 //
 // WHY THIS EXISTS: the per-session auto-updater is disabled on EVERY host
 // (scripts/channels.sh), so a customer stays on the CLI version they installed

@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 //   2. agent-process.ts: the isolated .claude.json first-seed + gap-fill from the
 //      shared ~/.claude.json (measured: google-drive and Filesystem, i.e. the
 //      owner's Drive, in all 15 agents' configs).
-// Marveen's two controls: (i) an UNLISTED server does not arrive; (ii) a LISTED one
+// Alfred's two controls: (i) an UNLISTED server does not arrive; (ii) a LISTED one
 // does -- without (ii) a green run could just mean "we copy nothing any more".
 // And the 2026-09-05 scope-collision rule must survive the filter.
 

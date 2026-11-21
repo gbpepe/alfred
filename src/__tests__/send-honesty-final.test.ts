@@ -61,10 +61,10 @@ describe('generated prod-tree post-checkout hook: honest alert delivery', () => 
     // installed post-checkout hook, which would alert (live curl!) and
     // auto-revert back to develop, making the measured run a silent no-op --
     // exactly what the first draft of this test did. Waive the hook for the
-    // setup step (MARVEEN_PROD_CHECKOUT_OK=1) and keep the stub curl on PATH
+    // setup step (ALFRED_PROD_CHECKOUT_OK=1) and keep the stub curl on PATH
     // so no invocation can ever reach a live endpoint.
     execFileSync('git', ['-C', repo, 'checkout', '-q', '-B', 'feature-probe'], {
-      env: { ...process.env, PATH: `${bin}:/usr/bin:/bin`, MARVEEN_PROD_CHECKOUT_OK: '1' },
+      env: { ...process.env, PATH: `${bin}:/usr/bin:/bin`, ALFRED_PROD_CHECKOUT_OK: '1' },
     })
     return spawnSync('/bin/bash', [hook, 'a'.repeat(40), 'b'.repeat(40), '1'], {
       cwd: repo,

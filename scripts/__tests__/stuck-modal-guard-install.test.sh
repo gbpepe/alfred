@@ -39,11 +39,11 @@ EOF
 chmod +x "$TMP/bin/launchctl"
 : > "$TMP/launchctl.calls"
 
-PLIST="$TMP/home/Library/LaunchAgents/com.marveen.stuck-modal-guard.plist"
+PLIST="$TMP/home/Library/LaunchAgents/com.alfred.stuck-modal-guard.plist"
 PATH="$TMP/bin:$PATH" HOME="$TMP/home" bash "$INSTALLER" >/dev/null 2>&1
 assert_eq "the plist is written" "yes" "$([ -f "$PLIST" ] && echo yes || echo no)"
 P="$(cat "$PLIST" 2>/dev/null)"
-assert_contains "label" "$P" "<string>com.marveen.stuck-modal-guard</string>"
+assert_contains "label" "$P" "<string>com.alfred.stuck-modal-guard</string>"
 assert_contains "runs the guard of THIS install" "$P" "<string>$REPO/scripts/stuck-modal-guard.sh</string>"
 assert_contains "every 60 s, like the systemd timer" "$P" "<key>StartInterval</key>
   <integer>60</integer>"
@@ -116,14 +116,14 @@ install_stuck_modal_guard_launchd" 2>&1
 }
 reset_mac() { : > "$MAC/installer.calls"; : > "$MAC/loaded"; rm -f "$MAC/home/Library/LaunchAgents/"*.plist "$MAC/install/.env"; }
 
-reset_mac; write_installer "com.marveen.stuck-modal-guard"
+reset_mac; write_installer "com.alfred.stuck-modal-guard"
 OUT="$(run_fn Linux)"
 assert_eq "non-Darwin host -> installer never called" "0" "$(wc -c < "$MAC/installer.calls" | tr -d ' ')"
 assert_eq "non-Darwin host -> prints nothing" "" "$OUT"
 
 OUT="$(run_fn Darwin)"
 assert_contains "a Mac without the job: installer called with --load" "$(cat "$MAC/installer.calls")" "--load"
-assert_contains "and it says so" "$OUT" "com.marveen.stuck-modal-guard"
+assert_contains "and it says so" "$OUT" "com.alfred.stuck-modal-guard"
 
 : > "$MAC/installer.calls"
 OUT="$(run_fn Darwin)"
@@ -133,14 +133,14 @@ assert_eq "job loaded: the next run prints nothing" "" "$OUT"
 # Half-finished run (review): the plist exists but the job never loaded. Keyed on
 # the plist, every later run went quiet forever; keyed on the loaded job it is
 # retried and reported until it loads.
-reset_mac; write_installer "com.marveen.stuck-modal-guard" 1
+reset_mac; write_installer "com.alfred.stuck-modal-guard" 1
 OUT1="$(run_fn Darwin)"; OUT2="$(run_fn Darwin)"
-assert_eq "a failed load leaves the plist behind" "yes" "$([ -f "$MAC/home/Library/LaunchAgents/com.marveen.stuck-modal-guard.plist" ] && echo yes || echo no)"
+assert_eq "a failed load leaves the plist behind" "yes" "$([ -f "$MAC/home/Library/LaunchAgents/com.alfred.stuck-modal-guard.plist" ] && echo yes || echo no)"
 assert_eq "the next run retries it" "2" "$(grep -c -- --load "$MAC/installer.calls" | tr -d ' ')"
 assert_contains "and warns again, not just once" "$OUT2" "FIGYELEM"
 
 # Opt-out that survives updates (review): STUCK_MODAL_MODE=off in .env.
-reset_mac; write_installer "com.marveen.stuck-modal-guard"
+reset_mac; write_installer "com.alfred.stuck-modal-guard"
 printf 'MAIN_AGENT_ID=x\nSTUCK_MODAL_MODE=off\n' > "$MAC/install/.env"
 OUT="$(run_fn Darwin)"
 assert_eq "STUCK_MODAL_MODE=off -> never installed" "0" "$(wc -c < "$MAC/installer.calls" | tr -d ' ')"

@@ -1,6 +1,6 @@
 # `claude mcp list` és a csatornát birtokló session
 
-**Mérve: 2026-09-21, ClaudeClaw fejlesztői gépen, eldobható próba-ügynökön.**
+**Mérve: 2026-09-21, Alfred fejlesztői gépen, eldobható próba-ügynökön.**
 A rövid figyelmeztetés minden ügynök CLAUDE.md-jében áll; ez a lap a mögötte lévő mérés.
 
 ## A bejelentés

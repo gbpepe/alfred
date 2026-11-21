@@ -43,12 +43,12 @@ describe('stateObserverLaunchEnv', () => {
 
   it('exports the plugin folder, the agent name and the state folder', () => {
     const env = stateObserverLaunchEnv(true, 'alpha', shSingleQuote, '/inst/plugins/agent-state-observer', '/inst/store/mod-state')
-    expect(env).toBe("export CLAUDE_CODE_PLUGIN_DIRS='/inst/plugins/agent-state-observer' MARVEEN_AGENT_ID='alpha' MARVEEN_STATE_OBSERVER_DIR='/inst/store/mod-state' && ")
+    expect(env).toBe("export CLAUDE_CODE_PLUGIN_DIRS='/inst/plugins/agent-state-observer' ALFRED_AGENT_ID='alpha' ALFRED_STATE_OBSERVER_DIR='/inst/store/mod-state' && ")
   })
 
   it('quotes every value into one inert shell word', () => {
     const env = stateObserverLaunchEnv(true, "a'; touch /tmp/pwned; echo '", shSingleQuote, "/p a'th", '/s')
-    expect(env).toContain(`MARVEEN_AGENT_ID='a'\\''; touch /tmp/pwned; echo '\\'''`)
+    expect(env).toContain(`ALFRED_AGENT_ID='a'\\''; touch /tmp/pwned; echo '\\'''`)
     expect(env).toContain(`CLAUDE_CODE_PLUGIN_DIRS='/p a'\\''th'`)
   })
 })
@@ -83,7 +83,7 @@ describe('the launcher binding', () => {
     const hooks = JSON.parse(readFileSync(join(root, 'hooks/hooks.json'), 'utf-8'))
     expect(hooks.modules).toEqual(['./register.ts'])
     const mod = readFileSync(join(root, 'hooks/register.ts'), 'utf-8')
-    expect(mod).toContain("$.env.get('MARVEEN_AGENT_ID')")
-    expect(mod).toContain("$.env.get('MARVEEN_STATE_OBSERVER_DIR')")
+    expect(mod).toContain("$.env.get('ALFRED_AGENT_ID')")
+    expect(mod).toContain("$.env.get('ALFRED_STATE_OBSERVER_DIR')")
   })
 })

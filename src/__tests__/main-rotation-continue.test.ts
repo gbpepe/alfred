@@ -6,8 +6,8 @@ import { join } from 'node:path'
 import { encodeClaudeProjectDir } from '../claude-project-dir.js'
 import { mainRotationContinueVerdict, runMainContinueRestart } from '../web/main-rotation-continue.js'
 
-const ROOT = '/srv/marveen'
-const SHARED = '/srv/marveen/.channels-config'
+const ROOT = '/srv/alfred'
+const SHARED = '/srv/alfred/.channels-config'
 const transcriptsIn = (dir: string) => join(dir, 'projects', encodeClaudeProjectDir(ROOT))
 
 function verdict(over: Partial<Parameters<typeof mainRotationContinueVerdict>[0]> = {}, present: string[] = [transcriptsIn(SHARED)]) {

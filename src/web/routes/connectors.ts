@@ -215,7 +215,7 @@ export async function tryHandleConnectors(ctx: RouteContext): Promise<boolean> {
   // GET /api/connectors -- list every MCP server visible to Claude Code,
   // pulled from the local config files plus the cached `claude mcp list`
   // output. The CLI is not invoked here -- spawning every stdio / plugin
-  // MCP for a health check would race the live Telegram bot.
+  // MCP for a health check would race the live channel bot.
   if (path === '/api/connectors' && method === 'GET') {
     type ConnectorEntry = {
       name: string
@@ -1013,7 +1013,7 @@ export async function tryHandleConnectors(ctx: RouteContext): Promise<boolean> {
     // binding would put it into a child process. Refused before any write or sync runs.
     // Measured 2026-09-23: the live store/vault-bindings.json has 1 binding, 0 on an ssh-key.
     if (isSshPrivateKeyId(data.vaultSecretId)) {
-      // The refusal leaves a server-side trace (Marveen 29017): a binding attempt that only
+      // The refusal leaves a server-side trace (Alfred 29017): a binding attempt that only
       // gets a 400 back would be visible to the caller and to no one else. No value is read.
       const { kind, principal } = principalOf(ctx.auth)
       logger.warn({ event: 'vault-binding-refused', vaultSecretId: data.vaultSecretId, kind, principal,

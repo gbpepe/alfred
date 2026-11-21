@@ -71,27 +71,27 @@ describe('redeemSupportCode', () => {
     expect(await redeemSupportCode(CODE, { transport })).toEqual({ ok: true, token: TOKEN })
     expect(calls).toEqual([
       {
-        origin: 'https://api.marveen.io',
+        origin: 'https://api.alfred.io',
         path: '/support/v1/code-redeem',
         body: '{"code":"' + CODE + '","purpose":"support"}',
         timeoutMs: 10_000,
         maxBodyBytes: 1024,
       },
     ])
-    expect(SUPPORT_SERVICE_ORIGIN).toBe('https://api.marveen.io')
+    expect(SUPPORT_SERVICE_ORIGIN).toBe('https://api.alfred.io')
     expect(SUPPORT_REDEEM_PATH).toBe('/support/v1/code-redeem')
   })
 
   it('has no way to be pointed at another service: not by the caller, not by the environment', async () => {
     const saved = { ...process.env }
     try {
-      for (const name of ['SUPPORT_SERVICE_ORIGIN', 'MARVEEN_SUPPORT_ORIGIN', 'MARVEEN_API_ORIGIN', 'SUPABASE_URL', 'HTTPS_PROXY']) {
+      for (const name of ['SUPPORT_SERVICE_ORIGIN', 'ALFRED_SUPPORT_ORIGIN', 'ALFRED_API_ORIGIN', 'SUPABASE_URL', 'HTTPS_PROXY']) {
         process.env[name] = 'https://elsewhere.example'
       }
       const { transport, calls } = recording({ status: 200, body: '{"token":"' + TOKEN + '"}' })
       const deps = { transport, origin: 'https://elsewhere.example' } as { transport: RedeemTransport }
       await redeemSupportCode(CODE, deps)
-      expect(calls.map((c) => c.origin + c.path)).toEqual(['https://api.marveen.io/support/v1/code-redeem'])
+      expect(calls.map((c) => c.origin + c.path)).toEqual(['https://api.alfred.io/support/v1/code-redeem'])
     } finally {
       for (const name of Object.keys(process.env)) if (!(name in saved)) delete process.env[name]
       Object.assign(process.env, saved)

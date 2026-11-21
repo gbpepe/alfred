@@ -5,7 +5,7 @@ import { copyGateInstall } from './helpers/copy-gate-install.js'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-// INTERAGENTHOMOGLIF923 (decision: Marveen, msg 28870): inter-agent messages
+// INTERAGENTHOMOGLIF923 (decision: Alfred, msg 28870): inter-agent messages
 // get a HOMOGLYPH-ONLY check, and nothing else from the copy gate.
 //
 // Before this, `curl .../api/messages` was outside the gate entirely (it is not
@@ -27,14 +27,14 @@ const GATE = join(ROOT, 'scripts', 'hooks', 'outgoing-copy-gate.py')
 const CYR_A = String.fromCodePoint(0x430)
 const CLEAN = 'PROMPTCSONK923 kesz, a kartyan a reszletek, kerlek nezd meg -- koszonom'
 const HOMO = `PROMPTCSONK923 kesz, a k${CYR_A}rtyan a reszletek`
-const TOK = 'Authorization: Bearer $(cat ~/ClaudeClaw/store/.dashboard-token)'
+const TOK = 'Authorization: Bearer $(cat ~/Alfred/store/.dashboard-token)'
 const POST = `curl -s -X POST http://localhost:3420/api/messages -H "Content-Type: application/json" -H "${TOK}"`
 
 let dir: string
 beforeAll(() => { dir = mkdtempSync(join(tmpdir(), 'iahomo-')) })
 afterAll(() => { rmSync(dir, { recursive: true, force: true }) })
 
-const msg = (content: string, to = 'marveen') => JSON.stringify({ from: 'samu', to, content })
+const msg = (content: string, to = 'alfred') => JSON.stringify({ from: 'samu', to, content })
 function file(name: string, content: string): string {
   const p = join(dir, name)
   writeFileSync(p, content)

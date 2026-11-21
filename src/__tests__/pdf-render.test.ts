@@ -11,10 +11,10 @@ import http from 'node:http'
 import { Readable } from 'node:stream'
 import type { AddressInfo } from 'node:net'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-pdf-render-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-pdf-render-test-'))
 afterAll(() => rmSync(tmpRoot, { recursive: true, force: true }))
 
-vi.mock('../config.js', () => ({ STORE_DIR: join(tmpRoot, 'store'), PROJECT_ROOT: tmpRoot, MAIN_AGENT_ID: 'marveen' }))
+vi.mock('../config.js', () => ({ STORE_DIR: join(tmpRoot, 'store'), PROJECT_ROOT: tmpRoot, MAIN_AGENT_ID: 'alfred' }))
 const settings: Record<string, string> = {}
 vi.mock('../settings-store.js', () => ({ getEffectiveSettingValue: (k: string) => settings[k] ?? '' }))
 vi.mock('../web/agent-config.js', () => ({ agentDir: (n: string) => join(tmpRoot, 'agents', n) }))

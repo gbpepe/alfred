@@ -154,10 +154,10 @@ describe('decideHasPluginAlive -- slack/discord cross-tree scan', () => {
   it('slack poller alive but NOT a descendant of claude -> alive via cross-tree scan', () => {
     const SLACK_NODE = 5000
     const out = ps([
-      { pid: CLAUDE_PID, ppid: 1, command: 'claude --channels plugin:slack-channel@marveen-marketplace' },
+      { pid: CLAUDE_PID, ppid: 1, command: 'claude --channels plugin:slack-channel@alfred-marketplace' },
       // Slack node process owned by something else (e.g. an MCP server boot)
       // but matching the slack-channel plugin path.
-      { pid: SLACK_NODE, ppid: 1, command: 'node /home/user/.claude/plugins/marketplaces/marveen-marketplace/slack-channel/0.1.0/server.js' },
+      { pid: SLACK_NODE, ppid: 1, command: 'node /home/user/.claude/plugins/marketplaces/alfred-marketplace/slack-channel/0.1.0/server.js' },
     ])
     expect(decideHasPluginAlive({
       psOutput: out, claudePid: CLAUDE_PID, providerType: 'slack',
@@ -179,7 +179,7 @@ describe('decideHasPluginAlive -- slack/discord cross-tree scan', () => {
 
   it('cross-tree scan respects the matcher: synology process does NOT count as slack', () => {
     const out = ps([
-      { pid: CLAUDE_PID, ppid: 1, command: 'claude --channels plugin:slack-channel@marveen-marketplace' },
+      { pid: CLAUDE_PID, ppid: 1, command: 'claude --channels plugin:slack-channel@alfred-marketplace' },
       { pid: SYNOLOGY_BUN_PID, ppid: 1, command: SYNOLOGY_CMD },
     ])
     expect(decideHasPluginAlive({
@@ -197,11 +197,11 @@ describe('decideHasPluginAlive -- slack/discord cross-tree scan', () => {
 describe('decideHasPluginAlive -- strictTree (a provider shared with other sessions)', () => {
   const MAIN_CLAUDE = 100
   const OTHER_CLAUDE = 200
-  const SLACK_CMD = 'bun run --cwd /home/user/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0 --silent start'
+  const SLACK_CMD = 'bun run --cwd /home/user/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0 --silent start'
   const mainTelegramOtherSlack = ps([
-    { pid: MAIN_CLAUDE, ppid: 1, command: 'claude --channels plugin:telegram@claude-plugins-official plugin:slack-channel@marveen-marketplace' },
+    { pid: MAIN_CLAUDE, ppid: 1, command: 'claude --channels plugin:telegram@claude-plugins-official plugin:slack-channel@alfred-marketplace' },
     { pid: 101, ppid: MAIN_CLAUDE, command: TELEGRAM_CMD },
-    { pid: OTHER_CLAUDE, ppid: 1, command: 'claude --channels plugin:slack-channel@marveen-marketplace' },
+    { pid: OTHER_CLAUDE, ppid: 1, command: 'claude --channels plugin:slack-channel@alfred-marketplace' },
     { pid: 201, ppid: OTHER_CLAUDE, command: SLACK_CMD },
   ])
 
@@ -228,7 +228,7 @@ describe('decideHasPluginAlive -- strictTree (a provider shared with other sessi
 
   it('the main session\'s own slack child IS alive under strictTree', () => {
     const out = ps([
-      { pid: MAIN_CLAUDE, ppid: 1, command: 'claude --channels plugin:telegram@claude-plugins-official plugin:slack-channel@marveen-marketplace' },
+      { pid: MAIN_CLAUDE, ppid: 1, command: 'claude --channels plugin:telegram@claude-plugins-official plugin:slack-channel@alfred-marketplace' },
       { pid: 101, ppid: MAIN_CLAUDE, command: TELEGRAM_CMD },
       { pid: 102, ppid: MAIN_CLAUDE, command: SLACK_CMD },
       { pid: OTHER_CLAUDE, ppid: 1, command: 'claude' },

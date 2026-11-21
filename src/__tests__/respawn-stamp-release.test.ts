@@ -64,7 +64,7 @@ describe('channel-monitor wiring', () => {
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'web', 'channel-monitor.ts'), 'utf-8')
 
   it('the gave_up branch calls the guarded release, not a bare rmSync', () => {
-    const start = src.indexOf("marveenDownState.stage = 'gave_up'")
+    const start = src.indexOf("alfredDownState.stage = 'gave_up'")
     expect(start).toBeGreaterThan(0)
     const branch = src.slice(start, src.indexOf('return', start))
     expect(branch).toContain('tryReleaseOwnRespawnStamp(now)')
@@ -72,9 +72,9 @@ describe('channel-monitor wiring', () => {
   })
 
   it('every hard-restart success path records our own stamp', () => {
-    const fn = src.slice(src.indexOf('export function hardRestartMarveenChannels'), src.indexOf('\n}\n', src.indexOf('export function hardRestartMarveenChannels')))
+    const fn = src.slice(src.indexOf('export function hardRestartAlfredChannels'), src.indexOf('\n}\n', src.indexOf('export function hardRestartAlfredChannels')))
     // The launchd reload (pid changed), the launchd reload whose fresh supervisor is still
     // rebuilding the session (CHANNELSDUP1023), and the respawn-pane fallback.
-    expect(fn.match(/noteOwnHardRestartStamp\(marveenLastHardRestart\)/g)?.length).toBe(3)
+    expect(fn.match(/noteOwnHardRestartStamp\(alfredLastHardRestart\)/g)?.length).toBe(3)
   })
 })

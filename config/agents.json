@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "global": {
+    "defaultProvider": "deepseek",
+    "defaultModel": "deepseek-chat",
+    "dailyBudgetUsd": 15.0,
+    "workspacesRoot": "workspaces"
+  },
+  "agents": [
+    {
+      "id": "alfred-architect",
+      "displayName": "Alfred Architect",
+      "channelName": "#alfred-hq",
+      "discordChannelId": "${DISCORD_CHANNEL_ALFRED_HQ}",
+      "provider": "deepseek",
+      "model": "deepseek-reasoner",
+      "workspace": "workspaces/alfred-architect",
+      "memoryNamespace": "alfred-architect",
+      "dailyBudgetUsd": 5.0,
+      "allowedUserIds": [],
+      "tools": ["fs_read", "memory"],
+      "soulFile": "agents/alfred-architect/SOUL.md",
+      "systemPrompt": "Te vagy Alfred Architect, a rendszer vezető szoftverarchitektje és tervező ágense."
+    },
+    {
+      "id": "alfred-coder-hypatia",
+      "displayName": "Alfred Coder (Hypatia)",
+      "channelName": "#proj-hypatia",
+      "discordChannelId": "${DISCORD_CHANNEL_PROJ_HYPATIA}",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "workspace": "workspaces/hypatia",
+      "memoryNamespace": "alfred-coder-hypatia",
+      "dailyBudgetUsd": 8.0,
+      "allowedUserIds": [],
+      "tools": ["bash", "fs_read", "fs_write", "git", "memory"],
+      "soulFile": "agents/alfred-coder-hypatia/SOUL.md",
+      "systemPrompt": "Te vagy Alfred Coder a Hypatia projekten. Kizárólag a saját elszigetelt workspace könyvtáradban dolgozol."
+    },
+    {
+      "id": "alfred-qa",
+      "displayName": "Alfred QA",
+      "channelName": "#alfred-qa",
+      "discordChannelId": "${DISCORD_CHANNEL_ALFRED_QA}",
+      "provider": "vertex-eu",
+      "model": "gemini-3.8-flash",
+      "workspace": "workspaces/alfred-qa",
+      "memoryNamespace": "alfred-qa",
+      "dailyBudgetUsd": 2.0,
+      "allowedUserIds": [],
+      "tools": [],
+      "soulFile": "agents/alfred-qa/SOUL.md",
+      "systemPrompt": "Te vagy Alfred QA, a minőségbiztosítási, kódreview és GDPR-megfelelőségi ágens. Zero-tool módban futsz."
+    },
+    {
+      "id": "alfred-self-coder",
+      "displayName": "Alfred Self-Coder",
+      "channelName": "#alfred-self-dev",
+      "discordChannelId": "${DISCORD_CHANNEL_ALFRED_SELF_DEV}",
+      "provider": "deepseek",
+      "model": "deepseek-reasoner",
+      "workspace": ".",
+      "memoryNamespace": "alfred-self-coder",
+      "dailyBudgetUsd": 5.0,
+      "allowedUserIds": [],
+      "tools": ["bash", "fs_read", "fs_write", "git", "memory"],
+      "maxToolIterations": 12,
+      "protectedPaths": [
+        "src/alfred/circuit-breaker.ts",
+        "src/alfred/tool-executor.ts",
+        "src/alfred/agents-config.ts",
+        "config/agents.json",
+        ".env",
+        ".env.example",
+        "store/",
+        "deploy/",
+        "vitest.config.ts",
+        "vitest.alfred.config.ts",
+        "tsconfig.alfred.json",
+        "tsconfig.alfred.build.json",
+        "package.json"
+      ],
+      "soulFile": "agents/alfred-self-coder/SOUL.md",
+      "systemPrompt": "Te vagy Alfred Self-Coder, az Alfred keretrendszer önfejlesztő ágense. Kizárólag új feat/self-* vagy fix/self-* ágon dolgozol, minden módosítást typecheck-kel és vitesttel ellenőrzöl, és tiszteletben tartod a protectedPaths védelmet."
+    },
+    {
+      "id": "alfred-ops",
+      "displayName": "Alfred Ops",
+      "channelName": "#alfred-ops",
+      "discordChannelId": "${DISCORD_CHANNEL_ALFRED_OPS}",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "workspace": ".",
+      "memoryNamespace": "alfred-ops",
+      "dailyBudgetUsd": 2.0,
+      "allowedUserIds": [],
+      "tools": ["bash", "fs_read", "memory"],
+      "protectedPaths": [
+        ".env",
+        ".env.example",
+        ".env.test",
+        "store/",
+        "deploy/",
+        "config/agents.json",
+        "src/alfred/circuit-breaker.ts",
+        "src/alfred/tool-executor.ts",
+        "src/alfred/agents-config.ts"
+      ],
+      "allowedBashCommands": [
+        "bash deploy/spinup-test.sh <self-branch>",
+        "bash deploy/reload-test.sh",
+        "bash deploy/teardown-test.sh",
+        "bash deploy/check-health.sh",
+        "bash deploy/promote-to-prod.sh <self-branch>",
+        "bash deploy/rollback-prod.sh"
+      ],
+      "bashTimeoutMs": 180000,
+      "soulFile": "agents/alfred-ops/SOUL.md",
+      "systemPrompt": "Te vagy Alfred Ops, az Alfred infrastruktúra és életciklus-kezelő DevOps ágense. Kizárólag a jóváhagyott deploy/* scripteket futtatod."
+    }
+  ]
+}

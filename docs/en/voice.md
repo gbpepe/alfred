@@ -60,7 +60,7 @@ Each transcription is a local faster-whisper run, so enabling it for many agents
 
 ### Voice models
 
-TTS uses Piper ONNX models. Models are stored in `~/.local/share/marveen-voice/voices/`.
+TTS uses Piper ONNX models. Models are stored in `~/.local/share/alfred-voice/voices/`.
 
 Included by default (Hungarian):
 - `hu_HU-imre-medium` — male voice (default)

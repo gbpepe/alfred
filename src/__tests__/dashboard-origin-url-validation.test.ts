@@ -1,6 +1,6 @@
 // DASHBOARD_PUBLIC_URL and AGENT_API_ORIGIN are the two values the agents' dashboard origin is resolved from
 // (resolveDashboardOrigin, agent-scaffold.ts). Measured 2026-11-16 on a live install: DASHBOARD_PUBLIC_URL had been
-// saved as "marveen" (a name, no scheme), and every generated recipe read `curl ... marveen/api/messages`. The Settings
+// saved as "alfred" (a name, no scheme), and every generated recipe read `curl ... alfred/api/messages`. The Settings
 // route accepted it because the key was a plain string. Both keys now take an empty value or an absolute http(s) URL;
 // anything else is refused with 400 before it reaches the overrides file.
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
@@ -26,29 +26,29 @@ const { SESSION_COOKIE_NAME } = await import('../web/auth-gate.js')
 
 const KEYS = ['DASHBOARD_PUBLIC_URL', 'AGENT_API_ORIGIN']
 const VALID = [
-  'https://marveen.example.com',
-  'https://marveen.example.com/',
+  'https://alfred.example.com',
+  'https://alfred.example.com/',
   'http://localhost:3420',
   'http://127.0.0.1:3420',
   'http://[::1]:3420',
-  'http://marveen-dashboard.default.svc:3420',
-  'https://example.com/marveen',
-  'HTTPS://Marveen.Example.com',
+  'http://alfred-dashboard.default.svc:3420',
+  'https://example.com/alfred',
+  'HTTPS://Alfred.Example.com',
 ]
 const INVALID = [
-  'marveen',
-  'marveen.example.com',
+  'alfred',
+  'alfred.example.com',
   'localhost:3420',
-  '//marveen.example.com',
-  'ftp://marveen.example.com',
-  'file:///srv/marveen',
+  '//alfred.example.com',
+  'ftp://alfred.example.com',
+  'file:///srv/alfred',
   'javascript:alert(1)',
-  'http:marveen.example.com',
+  'http:alfred.example.com',
   'http://',
   'https:///api',
-  ' https://marveen.example.com',
-  'https://marveen.example.com ',
-  'https://marveen example.com',
+  ' https://alfred.example.com',
+  'https://alfred.example.com ',
+  'https://alfred example.com',
 ]
 
 async function post(body: unknown) {

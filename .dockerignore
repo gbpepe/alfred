@@ -1,5 +1,5 @@
 # HOSTINGERDOCKER1107: the build context is the code only. Everything the .gitignore keeps out as runtime state stays
-# out of the image too (it lives in the /opt/marveen volume), and no secret is ever baked in.
+# out of the image too (it lives in the /opt/alfred volume), and no secret is ever baked in.
 
 .git
 node_modules

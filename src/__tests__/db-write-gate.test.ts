@@ -161,7 +161,7 @@ describe('1. SQL writes on the security tables', () => {
     ['an inter-agent message (quoted heredoc on stdin)', `curl -s -X POST http://localhost:3420/api/messages --data-binary @- <<'JSON'\n{"content":"denied: UPDATE approvals SET status=1, and \`.claude/settings.json\`"}\nJSON`],
     ['a message whose reply goes to a file', `curl -s -X POST http://localhost:3420/api/messages -d '{"content":"UPDATE approvals is gated"}' > /tmp/reply.json`],
     ['a kanban comment through the API', `curl -s -X POST http://localhost:3420/api/kanban/X/comments -d '{"content":"INSERT INTO approvals is now gated"}'`],
-    ['the kanban tool with a title', `python3 @ROOT@/scripts/kartya-es-ertesites.py --id X --title "Update approvals flow" --comment-file /tmp/c.txt --author Marveen`],
+    ['the kanban tool with a title', `python3 @ROOT@/scripts/kartya-es-ertesites.py --id X --title "Update approvals flow" --comment-file /tmp/c.txt --author Alfred`],
     ['a commit message', `git commit -m "fix: deny UPDATE approvals in every spelling"`],
     ['a commit message from stdin', `git commit -F - <<'EOF'\nfix: deny DELETE FROM auth_sessions\nEOF`],
     ['a PR body', `gh pr create --title "db gate" --body "blocks UPDATE approvals SET status"`],
@@ -173,7 +173,7 @@ describe('1. SQL writes on the security tables', () => {
     expect(bash(`python3 -c "x" @ROOT@/scripts/kartya-es-ertesites.py --title "UPDATE approvals SET y=1"`)).toEqual(DENY_DB)
     expect(bash(`python3 @ROOT@/scripts/kartya-es-ertesites.py --title "x" --id "UPDATE approvals SET y=1"`)).toEqual(DENY_DB)
   })
-  // Marveen 56653: a message or comment file written by a heredoc is text; it is a script only when the same command
+  // Alfred 56653: a message or comment file written by a heredoc is text; it is a script only when the same command
   // then runs or feeds it (laterRuns).
   it.each([
     ['sqlite3 on its stdin', `cat > /tmp/m.sql <<'EOF'\nUPDATE approvals SET status=1\nEOF\nsqlite3 ${DB} < /tmp/m.sql`],
@@ -188,7 +188,7 @@ describe('1. SQL writes on the security tables', () => {
   })
   it.each([
     ['a comment file in a variable directory', `cat > $S/kc.txt <<'EOF'\nthe gate denies UPDATE approvals SET status=1\nEOF`],
-    ['then the kanban tool reads it', `cat > $S/kc.txt <<'EOF'\nUPDATE approvals is gated\nEOF\npython3 @ROOT@/scripts/kartya-es-ertesites.py --id X --comment-file $S/kc.txt --author Marveen`],
+    ['then the kanban tool reads it', `cat > $S/kc.txt <<'EOF'\nUPDATE approvals is gated\nEOF\npython3 @ROOT@/scripts/kartya-es-ertesites.py --id X --comment-file $S/kc.txt --author Alfred`],
     ['then curl sends it', `cat > /tmp/m.json <<'EOF'\n{"content":"DELETE FROM auth_sessions is denied"}\nEOF\ncurl -s -X POST http://localhost:3420/api/messages --data-binary @/tmp/m.json`],
     ['printf to a file', `printf 'UPDATE approvals is gated' > /tmp/note.txt`],
     ['grep to a file', `grep -h "UPDATE approvals" notes.txt > /tmp/hits.txt`],
@@ -243,7 +243,7 @@ describe('3. this install\'s gate wiring and autonomy levels', () => {
       // ENVRELAXGATE1104 (Samu 67797): every agent's own Claude settings, one-segment patterns
       'agents/*/.claude/settings.json', 'agents/*/.claude/settings.local.json', 'agents/*/.claude-config/settings.json',
       // SUPPORTKULCS1109 D5: the support state of this machine, one folder
-      '~/.marveen/support'])
+      '~/.alfred/support'])
   })
   for (const rel of REL) {
     it.each(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])(`%s on the install's ${rel} is denied`, (tool) => {
@@ -593,7 +593,7 @@ describe('3. this install\'s gate wiring and autonomy levels', () => {
     expect(bash(`tar -xf /tmp/x.tar`, join(root, 'workspace'))).toEqual(ALLOW)
   })
 
-  // Marveen 56653: the main agent's message and comment files mention these paths all the time
+  // Alfred 56653: the main agent's message and comment files mention these paths all the time
   it.each([
     ['a comment file in a variable directory', `cat > $S/x.txt <<'EOF'\nthe gate reads .claude/settings.json and scripts/hooks/\nEOF`],
     ['with the directory assigned first', `S=/private/tmp/claude-501/x/scratchpad; cat > $S/x.txt <<'EOF'\nsee @ROOT@/store/autonomy-config.json\nEOF`],
@@ -613,18 +613,18 @@ describe('3. this install\'s gate wiring and autonomy levels', () => {
     expect(bash(`cat > $S/m.sql <<'EOF'\nsee .claude/settings.json\nEOF\nsqlite3 store/claude${'claw.db'} < $S/m.sql`)).toEqual(DENY_FILE)
   })
   it('(d) the note handed to the kanban tool as --comment-file or --msg-file passes', () => {
-    expect(bash(`${NOTE}python3 @ROOT@/scripts/kartya-es-ertesites.py --id X --comment-file $S/m.txt --author Marveen`)).toEqual(ALLOW)
-    expect(bash(`${NOTE}python3 @ROOT@/scripts/kartya-es-ertesites.py --id X --assignee samu --title T --desc-file $S/m.txt --msg-file $S/m.txt --author Marveen --from marveen`)).toEqual(ALLOW)
+    expect(bash(`${NOTE}python3 @ROOT@/scripts/kartya-es-ertesites.py --id X --comment-file $S/m.txt --author Alfred`)).toEqual(ALLOW)
+    expect(bash(`${NOTE}python3 @ROOT@/scripts/kartya-es-ertesites.py --id X --assignee samu --title T --desc-file $S/m.txt --msg-file $S/m.txt --author Alfred --from alfred`)).toEqual(ALLOW)
   })
 
   it('a running hook script with the protected path as its OUTPUT is denied', () => {
     expect(bash(`python3 scripts/hooks/gate.py --out .claude/settings.json`)).toEqual(DENY_FILE)
   })
 
-  // Marveen 57083, Samu 57104: an unresolved quoting failed closed on ANY mention, the install root's own path too (a
+  // Alfred 57083, Samu 57104: an unresolved quoting failed closed on ANY mention, the install root's own path too (a
   // directory on the way to a protected path), so a reading loop that started with a cd to the root was denied.
   it.each([
-    ['Marveen\'s loop', 'cd @ROOT@; for d in agents/*/*/; do [ -e "$d/.git" ] && echo "$(cd $d; git remote get-url origin 2>/dev/null) $d"; done 2>/dev/null | sort -u -k1,1 | head -30'],
+    ['Alfred\'s loop', 'cd @ROOT@; for d in agents/*/*/; do [ -e "$d/.git" ] && echo "$(cd $d; git remote get-url origin 2>/dev/null) $d"; done 2>/dev/null | sort -u -k1,1 | head -30'],
     ['the minimal shape', 'cd @ROOT@; echo "$(echo $x)"'],
     ['the root as an argument', 'echo @ROOT@ "$(cd $d; pwd)"'],
     ['git -C in the substitution', 'cd @ROOT@; for d in agents/*/*/; do echo "$(git -C $d remote get-url origin) $d"; done'],
@@ -740,7 +740,7 @@ describe('4. git: the main checkout and the remote it pulls from', () => {
   ])('%s is denied in the install', (_, cmd) => {
     expect(bash(cmd)).toEqual(DENY_GIT)
   })
-  // APPROVALDBGATE1030 scope (Marveen 60242, Dani 60251, measured through the install's hook: probes/dbgate-git-scope.sh):
+  // APPROVALDBGATE1030 scope (Alfred 60242, Dani 60251, measured through the install's hook: probes/dbgate-git-scope.sh):
   // an own worktree OUTSIDE the install is free, also from an agent's dir inside it, when the target is a literal path;
   // a variable, a substitution or a cd chained with ";" leaves the target unknown, and that is the install.
   it('an own worktree outside the install, from an agent\'s dir: a literal target passes, an unknown one is the install', () => {
@@ -945,7 +945,7 @@ describe('4. git: the main checkout and the remote it pulls from', () => {
   it('the deny text names the rescue section by its file', () => {
     // Samu 60400 (APPROVALDBGATE1030): a sqlite3 in a $(...) stays denied; the line names the way round it.
     expect(DB_GATE_MSG).toContain('Olvasni szabad (SELECT, sqlite3 -readonly), mas tablat irni is (agent_messages, daily_logs). Egy $(...) behelyettesitesben allo sqlite3-at (idezojellel benne) viszont a kapu nem olvassa, es tiltja: futtasd a sqlite3-at kulon parancskent, behelyettesites nelkul')
-    expect(gateDecision('Bash', { command: 'echo "x: $(sqlite3 -readonly store/claudeclaw.db "SELECT count(*) FROM agent_messages")"' }, { cwd: root, root }))
+    expect(gateDecision('Bash', { command: 'echo "x: $(sqlite3 -readonly store/alfred.db "SELECT count(*) FROM agent_messages")"' }, { cwd: root, root }))
       .toEqual({ deny: true, reason: 'db' })
     expect(GIT_GATE_MSG).toContain('docs/db-write-gate.md')
     expect(GIT_GATE_MSG).toContain('Vesz-helyreallitas')

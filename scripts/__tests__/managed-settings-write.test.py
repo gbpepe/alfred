@@ -47,9 +47,9 @@ class Helper(unittest.TestCase):
         self.assertEqual([n for n in os.listdir(self.dir) if n.endswith(".tmp")], [])
 
     def test_create_when_missing(self):
-        rc, _ = run(self.file, "--create", "--channels-enabled", "--add-plugin", "slack-channel@marveen-marketplace")
+        rc, _ = run(self.file, "--create", "--channels-enabled", "--add-plugin", "slack-channel@alfred-marketplace")
         self.assertEqual(rc, 0)
-        self.assertEqual(self.read(), {"allowedChannelPlugins": [{"plugin": "slack-channel", "marketplace": "marveen-marketplace"}],
+        self.assertEqual(self.read(), {"allowedChannelPlugins": [{"plugin": "slack-channel", "marketplace": "alfred-marketplace"}],
                                        "channelsEnabled": True})
         self.assertEqual(stat.S_IMODE(os.stat(self.file).st_mode), 0o644)
         self.no_tmp_left()
@@ -135,7 +135,7 @@ class Helper(unittest.TestCase):
 
     def test_a_non_list_allowlist_is_refused(self):
         self.write(json.dumps({"allowedChannelPlugins": {"x": 1}}))
-        rc, out = run(self.file, "--add-plugin", "teams@marveen-marketplace")
+        rc, out = run(self.file, "--add-plugin", "teams@alfred-marketplace")
         self.assertEqual(rc, 1)
         self.assertIn("not a list", out)
 

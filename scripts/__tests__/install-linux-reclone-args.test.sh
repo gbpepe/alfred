@@ -1,6 +1,6 @@
 #!/bin/bash
 # INSTEXECARGS1118: when install-linux.sh runs from outside a checkout, it clones (or
-# updates) ~/marveen and re-runs itself from there. The flags given on the command line
+# updates) ~/alfred and re-runs itself from there. The flags given on the command line
 # (e.g. --port) must reach that second run. The flag loop shifts every argument, so the
 # re-exec used to pass an empty list and --port was silently lost.
 # The two blocks under test are cut from the REAL script (the flag loop and the repo
@@ -26,7 +26,7 @@ run_case() {
   local existing="$1"; shift
   local d="$TMP/c$RANDOM"; mkdir -p "$d/home" "$d/outside" "$d/bin"
   # The re-run target: a checkout whose installer only reports its argv, one per line.
-  local target="$d/home/marveen"
+  local target="$d/home/alfred"
   printf '#!/bin/bash\necho "RERUN argc=$#"\nfor a in "$@"; do echo "ARG[$a]"; done\n' > "$d/rerun.sh"
   if [ "$existing" = 1 ]; then
     mkdir -p "$target"; echo '{}' > "$target/package.json"; cp "$d/rerun.sh" "$target/install-linux.sh"
@@ -46,7 +46,7 @@ RED= GREEN= ORANGE= NC= DIM= BOLD=
 warn() { echo "WARN \$*"; }
 ok() { echo "OK \$*"; }
 fail() { echo "FAIL \$*"; exit 1; }
-MARVEEN_REF=main
+ALFRED_REF=main
 INSTALL_DIR="$d/outside"
 $(cat "$TMP/flags.sh")
 $(cat "$TMP/bootstrap.sh")

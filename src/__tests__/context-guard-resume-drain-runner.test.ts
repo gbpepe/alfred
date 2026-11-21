@@ -61,9 +61,9 @@ vi.mock('../web/system-directive.js', async () => {
 })
 
 vi.mock('../web/channel-monitor.js', () => ({
-  hardRestartMarveenChannels: () => ({ ok: true }),
+  hardRestartAlfredChannels: () => ({ ok: true }),
   lastMainRespawnAt: () => null,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 0,
+  ALFRED_POST_RESPAWN_GRACE_MS: 0,
   markAgentRestartPending: () => {},
 }))
 vi.mock('../web/stuck-tool-call-watcher.js', () => ({ shouldDeferForRecentRespawn: () => false }))

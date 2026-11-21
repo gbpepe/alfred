@@ -20,16 +20,16 @@ const AGENTS = join(SANDBOX, 'agents')
 
 vi.mock('../config.js', async (orig) => {
   const actual = await orig<typeof import('../config.js')>()
-  return { ...actual, MAIN_AGENT_ID: 'marveen', PROJECT_ROOT: SANDBOX, STORE_DIR: join(SANDBOX, 'store') }
+  return { ...actual, MAIN_AGENT_ID: 'alfred', PROJECT_ROOT: SANDBOX, STORE_DIR: join(SANDBOX, 'store') }
 })
 vi.mock('../logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }))
 vi.mock('../db.js', () => ({ createAgentMessage: vi.fn() }))
 vi.mock('../web/channel-monitor.js', () => ({
-  hardRestartMarveenChannels: vi.fn(() => ({ ok: true })),
+  hardRestartAlfredChannels: vi.fn(() => ({ ok: true })),
   lastMainRespawnAt: () => null,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 0,
+  ALFRED_POST_RESPAWN_GRACE_MS: 0,
 }))
 vi.mock('../web/stuck-tool-call-watcher.js', () => ({ shouldDeferForRecentRespawn: () => false }))
 vi.mock('../web/agent-process.js', () => ({
@@ -44,7 +44,7 @@ vi.mock('../web/agent-process.js', () => ({
   sendPromptToSession: vi.fn(),
   isSessionReadyForPrompt: async () => false,
 }))
-vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'marveen-channels' }))
+vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'alfred-channels' }))
 
 const { guardSweepAgentNames } = await import('../web/context-guard-runner.js')
 const { listAgentNames, listAllAgentNames, HIDDEN_AGENT_SENTINEL } = await import('../web/agent-config.js')
@@ -69,7 +69,7 @@ describe('hidden technical workers and the saturation net', () => {
     // must still be swept.
     expect(guardSweepAgentNames()).toContain('heartbeat')
     expect(guardSweepAgentNames()).toContain('samu')
-    expect(guardSweepAgentNames()[0]).toBe('marveen') // main stays first
+    expect(guardSweepAgentNames()[0]).toBe('alfred') // main stays first
   })
 
   it('the sweep set is a SET -- the main agent is never swept twice', () => {
@@ -77,14 +77,14 @@ describe('hidden technical workers and the saturation net', () => {
     // main agent arrives from BOTH sources: the explicit head of the list and
     // the directory listing. Without the sandbox dir below this test cannot see
     // the duplicate at all, which is why it is created here explicitly.
-    agent('marveen')
+    agent('alfred')
     agent('samu')
     agent('heartbeat', true)
 
     const swept = guardSweepAgentNames()
-    expect(swept[0]).toBe('marveen')
+    expect(swept[0]).toBe('alfred')
     expect(swept).toEqual([...new Set(swept)])
-    expect(swept.filter((n) => n === 'marveen')).toHaveLength(1)
+    expect(swept.filter((n) => n === 'alfred')).toHaveLength(1)
     // and the widening still holds in the same breath
     expect(swept).toContain('heartbeat')
   })

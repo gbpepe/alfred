@@ -61,7 +61,7 @@ export type DeliveryVerdict =
   // lost (a restart mid-stream, keys eaten by a dialog), it is still parked
   // unsubmitted, or it was queued and never handed over (an 'enqueue' with no
   // queued_command after it). Without it such a run kept delivery NULL, in the same bucket
-  // as "never looked" (Marveen's #1506 review).
+  // as "never looked" (Alfred's #1506 review).
   | 'not-arrived'
   // CLOSING LOOK ONLY: no transcript directory was readable for this agent, so
   // there was nothing to compare against. Kept apart from 'not-arrived': an

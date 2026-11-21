@@ -62,7 +62,7 @@ _args = [a for a in sys.argv[1:] if a != "--json"]
 JSON_KI = "--json" in sys.argv[1:]
 ROOTS = _args if _args else _alap_gyokerek(
     os.path.expanduser("~"),
-    os.environ.get("CLAUDECLAW_ROOT", "/Users/marvin/ClaudeClaw"),
+    os.environ.get("ALFRED_ROOT", "/Users/marvin/Alfred"),
 )
 
 SKIP_DIR = {"node_modules", ".git", "dist", "build", ".next", "worktrees"}

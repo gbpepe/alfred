@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 HOOKS = os.path.join(os.path.dirname(HERE), "hooks")
 
 os.environ.pop("MAIN_AGENT_ID", None)
-os.environ.pop("MARVEEN_AGENT_ID", None)
+os.environ.pop("ALFRED_AGENT_ID", None)
 
 base = os.path.realpath(tempfile.mkdtemp(prefix="hooks-symlink-"))
 failed = []

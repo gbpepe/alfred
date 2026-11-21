@@ -83,14 +83,14 @@ describe('a fresh seed ships the references/ subdir, rendered (SEEDREFDIR1018)',
           `SCHED_TARGET_DIR="${target}"`,
           'SCHED_TOMBSTONE="$SCHED_TARGET_DIR/.removed-defaults"',
           'RESEED_FLEET=0; SCHED_NEW=0; SCHED_SKIP=0; SCHED_FORCED=0',
-          'MAIN_AGENT_ID=marveen; BOT_NAME=Bot; OWNER_NAME=Owner; WEB_PORT=3420',
+          'MAIN_AGENT_ID=alfred; BOT_NAME=Bot; OWNER_NAME=Owner; WEB_PORT=3420',
           LIB_SRC_LINE,
           sliceTplLoop(src, dirVar),
         ].join('\n') + '\n', join(base, 'probe.sh'))
         const ref = join(target, 'demo-task', 'references', 'w.md')
         expect(existsSync(ref)).toBe(true)
-        expect(readFileSync(ref, 'utf-8')).toBe(`waiting check for marveen at ${install}\n`)
-        expect(readFileSync(join(target, 'demo-task', 'SKILL.md'), 'utf-8')).toBe('step 4b: read references/w.md (marveen)\n')
+        expect(readFileSync(ref, 'utf-8')).toBe(`waiting check for alfred at ${install}\n`)
+        expect(readFileSync(join(target, 'demo-task', 'SKILL.md'), 'utf-8')).toBe('step 4b: read references/w.md (alfred)\n')
         expect(existsSync(join(target, 'demo-task', 'task-config.json'))).toBe(true)
       } finally {
         rmSync(base, { recursive: true, force: true })
@@ -151,7 +151,7 @@ function makeRefreshFixture() {
   git(install, ['add', '-A']); git(install, ['commit', '-q', '-m', 'v2'])
   const live = join(base, 'home', 'scheduled-tasks', 'demo-task')
   mkdirSync(live, { recursive: true })
-  const r = (s: string) => s.replaceAll('{{MAIN_AGENT_ID}}', 'marveen').replaceAll('{{INSTALL_DIR}}', install)
+  const r = (s: string) => s.replaceAll('{{MAIN_AGENT_ID}}', 'alfred').replaceAll('{{INSTALL_DIR}}', install)
   return { base, install, task, live, v1, refV1, r }
 }
 
@@ -159,7 +159,7 @@ function runRefresh(f: ReturnType<typeof makeRefreshFixture>): string {
   return run([
     'set -u',
     `INSTALL_DIR="${f.install}"`,
-    'MAIN_AGENT_ID=marveen; BOT_NAME=""; OWNER_NAME=""; WEB_PORT=3420',
+    'MAIN_AGENT_ID=alfred; BOT_NAME=""; OWNER_NAME=""; WEB_PORT=3420',
     'SEED_REFRESH_UPDATED=0; SEED_REFRESH_KEPT=0',
     funcs(),
     `refresh_untouched_seeds "seed-scheduled-tasks" "${join(f.base, 'home', 'scheduled-tasks')}" "template"`,

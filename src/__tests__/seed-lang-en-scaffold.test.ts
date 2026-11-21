@@ -11,7 +11,7 @@ import { join } from 'node:path'
 const tmpHome = mkdtempSync(join(tmpdir(), 'seedlang-scaffold-home-'))
 const realHome = process.env.HOME
 process.env.HOME = tmpHome
-process.env.MAIN_AGENT_ID = process.env.MAIN_AGENT_ID || 'marveen'
+process.env.MAIN_AGENT_ID = process.env.MAIN_AGENT_ID || 'alfred'
 
 const ROOT = join(__dirname, '..', '..')
 let scaffold: typeof import('../web/agent-scaffold.js')

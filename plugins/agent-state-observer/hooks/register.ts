@@ -11,8 +11,8 @@ import type { EngineInterface, Register } from 'claude-code'
 // the mod can never stall the agent.
 //
 // Identity and output come from the launcher, not from a path convention:
-//   MARVEEN_AGENT_ID           the agent's name (letters, digits, "_" and "-")
-//   MARVEEN_STATE_OBSERVER_DIR the folder it writes <agent>.json into
+//   ALFRED_AGENT_ID           the agent's name (letters, digits, "_" and "-")
+//   ALFRED_STATE_OBSERVER_DIR the folder it writes <agent>.json into
 // Without both (or with a name that does not fit) it writes nothing at all.
 // Kill switches, no restart needed: <dir>/DISABLE stops every agent,
 // <dir>/DISABLE-<agent> stops that one; the hooks then only pass through.
@@ -165,8 +165,8 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const r = await next(e)
     try {
-      agent = validAgent(await $.env.get('MARVEEN_AGENT_ID'))
-      stateDir = (await $.env.get('MARVEEN_STATE_OBSERVER_DIR'))?.replace(/\/+$/, '') || null
+      agent = validAgent(await $.env.get('ALFRED_AGENT_ID'))
+      stateDir = (await $.env.get('ALFRED_STATE_OBSERVER_DIR'))?.replace(/\/+$/, '') || null
     } catch {
       agent = null
       stateDir = null

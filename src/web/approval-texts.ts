@@ -1,13 +1,8 @@
-// APPROVALTAGEN1108 (Samu 73234, 73344): every text the server sends the OWNER about an approval, in the post's /
-// install's language (approvalTextLang(): the explicit AGENT_TEXT_LANG key). One table per text, so the English copy
-// is one list for the owner's copy round, and the Hungarian stays byte-for-byte as before (approval-texts-golden-hu).
-// The tags are [APPROVAL NEEDED] / [APPROVED IN CHAT] (Samu 73344 Q3). The words that DECIDE live in
-// src/approval-slack.ts (APPROVE_WORDS, APPROVE_WORDS_EN, ...); the English decide line names every word that decides
-// there on an English post, the Hungarian ones included (EGM design m2).
-import type { ApprovalLang } from '../approval-slack.js'
+// APPROVALTAGEN1108: every text the server sends the OWNER about an approval, in the post's /
+// install's language (approvalTextLang(): the explicit AGENT_TEXT_LANG key).
 import { APP_TZ } from '../config.js'
 
-export type { ApprovalLang }
+export type ApprovalLang = 'hu' | 'en'
 
 /** The expiry as the owner reads it: hu exactly as before; en a medium date and a short time, the same zone. */
 export function formatExpiry(timeoutAt: number | null | undefined, lang: ApprovalLang): string {
@@ -45,30 +40,17 @@ export const OWNER_TEXT = {
       both: 'Döntés: írd be válaszként: mehet (jóváhagyás) vagy nem (elutasítás), vagy reagálj ✅ / ❌ reakcióval. Csak a te válaszod számít, és csak amíg ez az üzenet változatlan.',
     },
     orOnDashboard: (pageUrl: string, id: string) => `Vagy a dashboardon: ${pageUrl} (id: ${id})`,
-    dashboardOnly: (reason: string) => `Erre a kérésre a Slackes jóváhagyás nem érhető el (${reason}); a döntés a dashboardon.`,
-    teamsCardOnly: (reason: string) => `Erre a kérésre a Teams-kártyás jóváhagyás nem érhető el (${reason}); a döntés a dashboardon.`,
-    // AGENTCREATEPR3-1119: an agent_create request too long for one Slack message: never split (a reply could not tell
-    // which part it approves); the owner decides on the dashboard, and no reply to this message approves anything.
-    agentCreateTooLong: (id: string, url: string) => `Új ügynök létrehozását kérték (${id}). A kérés túl hosszú a Slackhez, a dashboardon döntesz: ${url}`,
+    dashboardOnly: (reason: string) => `Erre a kérésre a chat-jóváhagyás nem érhető el (${reason}); a döntés a dashboardon.`,
+    agentCreateTooLong: (id: string, url: string) => `Új ügynök létrehozását kérték (${id}). A kérés túl hosszú az azonnali jóváhagyáshoz, a dashboardon döntesz: ${url}`,
     result: { approved: 'Jóváhagyva', rejected: 'Elutasítva' },
     editedNotice: 'A szerkesztett üzenetet nem veszem döntésnek. Ha döntöttél, írd be újra: mehet vagy nem.',
     refusedFeedback: (when: string, reason: string) => `Elutasítva (${when}): a döntés nem fogadható el (${reason}). Ha jóvá akartad hagyni, kérd újra.`,
     unchangedFeedback: (when: string) => `A kérés már nem volt függőben (lejárt, vagy máshol döntöttek róla), ezért nem változott (${when}).`,
     replyFeedback: (result: string, when: string, ts: string) => `${result} (${when}, a ${ts} üzeneted alapján).`,
     notMeant: (pageUrl: string) => ` Ha nem erre gondoltál: ${pageUrl}`,
-    reactionFeedback: (result: string, when: string) => `${result} (${when}, Slack-reakció).`,
-    alertReplyUsed: (id: string) => `[FIGYELEM] Egy Slack-válasz már egy másik kérést döntött el, ezért ez a kérés elutasítva (id: ${id}).`,
-    alertRefused: (reason: string, id: string) => `[FIGYELEM] Egy Slackes jóváhagyás nem volt elfogadható (${reason}), a kérés elutasítva (id: ${id}).`,
-    targetChanged: (before: string, after: string, when: string) => [
-      `[FIGYELEM] A gazda-értesítések és jóváhagyás-kérések Slack-célja megváltozott: ${before} -> ${after || '(nincs)'} (${when}).`,
-      'Ide ezután nem jönnek a kérések.',
-      'Ha nem te változtattál, a Dashboard -> Beállítások -> NOTIFY_SLACK_TARGET alatt állítsd vissza, és szólj.',
-    ].join('\n'),
-    ownerChanged: (before: string, after: string | null, when: string) => [
-      `[FIGYELEM] A jóváhagyó Slack-azonosító megváltozott: ${before} -> ${after ?? '(nincs)'} (${when}).`,
-      'Mostantól nem a te Slack-reakciód hagyja jóvá a kéréseket.',
-      'Ha nem te változtattál, a Dashboard -> Beállítások -> SLACK_OWNER_USER_ID alatt állítsd vissza, és szólj.',
-    ].join('\n'),
+    reactionFeedback: (result: string, when: string) => `${result} (${when}, chat-reakció).`,
+    alertReplyUsed: (id: string) => `[FIGYELEM] Egy chat-válasz már egy másik kérést döntött el, ezért ez a kérés elutasítva (id: ${id}).`,
+    alertRefused: (reason: string, id: string) => `[FIGYELEM] Egy chat-jóváhagyás nem volt elfogadható (${reason}), a kérés elutasítva (id: ${id}).`,
   },
   en: {
     requestTag: '[APPROVAL NEEDED]',
@@ -84,28 +66,17 @@ export const OWNER_TEXT = {
       both: 'To decide: reply with approve or go (approve), or reject or no (reject); mehet, jóváhagyom, nem and elutasítom work too; or react with ✅ / ❌. Only your reply counts, and only while this message is unchanged.',
     },
     orOnDashboard: (pageUrl: string, id: string) => `Or on the dashboard: ${pageUrl} (id: ${id})`,
-    dashboardOnly: (reason: string) => `Slack approval is not available for this request (${reason}); decide on the dashboard.`,
-    teamsCardOnly: (reason: string) => `Teams card approval is not available for this request (${reason}); decide on the dashboard.`,
-    agentCreateTooLong: (id: string, url: string) => `A new agent was requested (${id}). The request is too long for Slack; decide on the dashboard: ${url}`,
+    dashboardOnly: (reason: string) => `Chat approval is not available for this request (${reason}); decide on the dashboard.`,
+    agentCreateTooLong: (id: string, url: string) => `A new agent was requested (${id}). The request is too long for chat approval; decide on the dashboard: ${url}`,
     result: { approved: 'Approved', rejected: 'Rejected' },
     editedNotice: 'An edited message does not count as a decision. If you decided, write it again: approve or reject.',
     refusedFeedback: (when: string, reason: string) => `Rejected (${when}): the decision could not be accepted (${reason}). If you meant to approve, ask again.`,
     unchangedFeedback: (when: string) => `The request was no longer pending (it expired, or was decided elsewhere), so nothing changed (${when}).`,
     replyFeedback: (result: string, when: string, ts: string) => `${result} (${when}, based on your message ${ts}).`,
     notMeant: (pageUrl: string) => ` If this is not what you meant: ${pageUrl}`,
-    reactionFeedback: (result: string, when: string) => `${result} (${when}, Slack reaction).`,
-    alertReplyUsed: (id: string) => `[WARNING] A Slack reply had already decided another request, so this request was rejected (id: ${id}).`,
-    alertRefused: (reason: string, id: string) => `[WARNING] A Slack approval could not be accepted (${reason}), so the request was rejected (id: ${id}).`,
-    targetChanged: (before: string, after: string, when: string) => [
-      `[WARNING] The Slack target of owner notifications and approval requests changed: ${before} -> ${after || '(none)'} (${when}).`,
-      'Requests no longer come here.',
-      'If you did not change it, set it back under Dashboard -> Settings -> NOTIFY_SLACK_TARGET, and say so.',
-    ].join('\n'),
-    ownerChanged: (before: string, after: string | null, when: string) => [
-      `[WARNING] The Slack user id that approves requests changed: ${before} -> ${after ?? '(none)'} (${when}).`,
-      'From now on your Slack reaction does not approve requests.',
-      'If you did not change it, set it back under Dashboard -> Settings -> SLACK_OWNER_USER_ID, and say so.',
-    ].join('\n'),
+    reactionFeedback: (result: string, when: string) => `${result} (${when}, chat reaction).`,
+    alertReplyUsed: (id: string) => `[WARNING] A chat reply had already decided another request, so this request was rejected (id: ${id}).`,
+    alertRefused: (reason: string, id: string) => `[WARNING] A chat approval could not be accepted (${reason}), so the request was rejected (id: ${id}).`,
   },
 }
 

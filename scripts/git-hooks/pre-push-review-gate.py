@@ -76,9 +76,9 @@ Env (the first group is read from the environment, then from <install>/.env):
   REVIEW_GATE_REVIEWER    reviewer agent id (letters, digits, - and _). Unset = gate inactive.
   REVIEW_GATE_TRACE_WORD  the word that starts the trace line (default REVIEW-GREEN)
 The rest (same names as scripts/agent-msg.sh):
-  MARVEEN_API_BASE    full base URL (overrides host+port)
-  MARVEEN_WEB_PORT    dashboard port (then WEB_PORT in the env, then in <install>/.env, then 3420)
-  MARVEEN_TOKEN_FILE  bearer token file (default <install>/store/.dashboard-token)
+  ALFRED_API_BASE    full base URL (overrides host+port)
+  ALFRED_WEB_PORT    dashboard port (then WEB_PORT in the env, then in <install>/.env, then 3420)
+  ALFRED_TOKEN_FILE  bearer token file (default <install>/store/.dashboard-token)
 """
 import json
 import os
@@ -150,17 +150,17 @@ def cfg(name):
 
 
 def api_base():
-    base = os.environ.get("MARVEEN_API_BASE")
+    base = os.environ.get("ALFRED_API_BASE")
     if base:
         return base.rstrip("/")
-    port = os.environ.get("MARVEEN_WEB_PORT") or cfg("WEB_PORT")
+    port = os.environ.get("ALFRED_WEB_PORT") or cfg("WEB_PORT")
     return "http://localhost:%s" % (port or "3420")
 
 
 def green_hashes(reviewer, word):
     """Every hash the reviewer has greened, newest first. Raises on anything that is not a clean answer."""
     trace_re = re.compile(r"^[ \t]*%s[ \t]+([0-9a-fA-F]{8,40})[ \t]*$" % re.escape(word), re.MULTILINE)
-    token_file = Path(os.environ.get("MARVEEN_TOKEN_FILE") or STORE / ".dashboard-token")
+    token_file = Path(os.environ.get("ALFRED_TOKEN_FILE") or STORE / ".dashboard-token")
     token = token_file.read_text().strip()
     if not token:
         raise RuntimeError("token file %s is empty" % token_file)

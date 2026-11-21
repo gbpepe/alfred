@@ -5,10 +5,10 @@
 set -euo pipefail
 # Resolve the toolkit dir (must contain BOTH _vtools.py AND a usable venv).
 # The source tree (scripts/voice) has _vtools.py but NO venv -- the venv lives
-# in the installed toolkit at ~/.local/share/marveen-voice. Prefer whichever dir
+# in the installed toolkit at ~/.local/share/alfred-voice. Prefer whichever dir
 # has both, so the source-tree wrapper falls back to the installed venv.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INSTALL_DIR="${MARVEEN_VOICE_DIR:-$HOME/.local/share/marveen-voice}"
+INSTALL_DIR="${ALFRED_VOICE_DIR:-$HOME/.local/share/alfred-voice}"
 if [[ -f "$SCRIPT_DIR/_vtools.py" && -x "$SCRIPT_DIR/venv/bin/python" ]]; then
   DEST="$SCRIPT_DIR"
 elif [[ -f "$INSTALL_DIR/_vtools.py" && -x "$INSTALL_DIR/venv/bin/python" ]]; then

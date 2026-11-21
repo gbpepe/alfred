@@ -10,7 +10,7 @@ vi.mock('../config.js', async () => {
   const actual = await vi.importActual<typeof import('../config.js')>('../config.js')
   return {
     ...actual,
-    MAIN_AGENT_ID: 'marveen',
+    MAIN_AGENT_ID: 'alfred',
     STORE_DIR: actual.STORE_DIR,
     DB_FILENAME: actual.DB_FILENAME,
   }
@@ -54,7 +54,7 @@ function makeToolCallLine(toolName: string, ts: string): string {
 }
 
 beforeAll(() => {
-  // In-memory DB so the test never writes to the real store/claudeclaw.db
+  // In-memory DB so the test never writes to the real store/alfred.db
   // (previously test rows leaked into the live token_usage table).
   process.env.NODE_ENV = 'test'
   initDatabase(':memory:')
@@ -65,7 +65,7 @@ beforeAll(() => {
   db.exec("DELETE FROM token_usage_cursors WHERE file_path LIKE '/tmp/%'")
 
   // Set up fake project dirs
-  const mainDir = join(PROJECTS_DIR, '-home-testuser-marveen')
+  const mainDir = join(PROJECTS_DIR, '-home-testuser-alfred')
   const agentDir = join(PROJECTS_DIR, '-home-testuser-agents-samu')
   const subagentDir = join(mainDir, 'subagents', 'sub-session-1')
   mkdirSync(subagentDir, { recursive: true })

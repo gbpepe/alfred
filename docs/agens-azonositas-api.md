@@ -197,6 +197,6 @@ ismeretlen azonosítóra is, így a FELHASZNÁLÁS válasza nem árulja el, lét
 `GET /api/approvals/:id` lekérdezés ettől még megmutatja). A közös token
 viselkedése nem változik.
 
-Ismert korlátok: a szigorú profilú (`dontAsk`) ügynökök receptjei a `scripts/marveen-api.sh`
+Ismert korlátok: a szigorú profilú (`dontAsk`) ügynökök receptjei a `scripts/alfred-api.sh`
 segéden mennek, ami a közös tokent olvassa, ezért ők a közös tokenen maradnak. A hookok és a
 flotta-szintű szkriptek szintén a közös tokent olvassák.

@@ -28,7 +28,7 @@ const REAUTH_MARKERS: { rx: RegExp; reason: string }[] = [
   // box can complete. Same first-run-gate family, same restart heal.
   { rx: /Use the url below to sign in|Paste code here if prompted/i, reason: 'Browser sign-in screen (first-run gate)' },
   { rx: /Invalid authentication credentials/i, reason: 'Invalid authentication credentials (401)' },
-  // ISSUE2817 (marveen#2817, measured on a customer install): the main session failed ~10 h with
+  // ISSUE2817 (alfred#2817, measured on a customer install): the main session failed ~10 h with
   // "OAuth token revoked · Please run /login". Ahead of the generic "/login" marker, so the reason names the cause
   // (a revoked token needs a new setup-token, not a quota wait).
   { rx: /OAuth token (?:has been )?revoked/i, reason: 'OAuth token revoked' },
@@ -125,7 +125,7 @@ export function detectReauthNeeded(pane: string | null | undefined): ReauthState
 //   (blank)
 //   ──────── (the input box)
 // liveStatusRegion() reads only the one line above the box (here a blank), so the failure was invisible and a
-// customer's main session failed ~10 h with no owner alert (marveen#2817). So the LAST turn's reply (the lines
+// customer's main session failed ~10 h with no owner alert (alfred#2817). So the LAST turn's reply (the lines
 // between the last submitted prompt and the box) is read too, under two conditions together (Dani's review of
 // #2823: an agent's own reply line such as "⏺ API Error: 401 came back from Stripe" or a "● Not logged in: ..."
 // bullet must not count):

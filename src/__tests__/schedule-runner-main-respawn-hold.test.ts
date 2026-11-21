@@ -59,7 +59,7 @@ vi.mock('../web/schedule-registry.js', () => ({
 vi.mock('../web/scheduled-tasks-io.js', () => ({
   listScheduledTasks: () => mockListScheduledTasks(),
   readScheduledTask: (n: string) => (mockListScheduledTasks() as Array<{ name: string }>).find(t => t.name === n) ?? null,
-  SCHEDULED_TASKS_DIR: '/tmp/marveen-main-respawn-hold-no-tasks-dir',
+  SCHEDULED_TASKS_DIR: '/tmp/alfred-main-respawn-hold-no-tasks-dir',
   SCHEDULED_TASK_INLINE_MAX_CHARS: 1_500,
   SCHEDULED_TASK_BODY_WARN_CHARS: 20_000,
   MAX_SCHEDULED_TASK_PROMPT_LEN: 50_000,

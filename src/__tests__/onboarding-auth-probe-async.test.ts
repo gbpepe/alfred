@@ -29,7 +29,7 @@ const L = vi.hoisted(() => ({
 }))
 vi.mock('../web/channel-monitor.js', async (orig) => {
   const a = await orig<typeof import('../web/channel-monitor.js')>()
-  return { ...a, createMainChannelsSession: L.create, hardRestartMarveenChannels: L.restart }
+  return { ...a, createMainChannelsSession: L.create, hardRestartAlfredChannels: L.restart }
 })
 
 const tmpRoot = mkdtempSync(join(tmpdir(), 'onb-probe-'))

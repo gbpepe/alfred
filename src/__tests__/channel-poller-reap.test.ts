@@ -13,9 +13,9 @@ import {
 // node server, and a shell - the env-var match must select ONLY the
 // bun poller and only when the state dir matches.
 const PS_SAMPLE = [
-  '  90798 s000  S+     0:00.01 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x PATH=/opt/homebrew/bin CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/ClaudeClaw/agents/samu/.claude/channels/telegram CLAUDE_CODE_SESSION_ID=abc',
-  '  90799 s000  S+     0:00.15 node /Users/x/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0/server.ts HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0 SLACK_STATE_DIR=/Users/x/ClaudeClaw/agents/samu/.claude/channels/slack',
-  '  90800 s000  S+     0:00.05 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/ClaudeClaw/agents/boni/.claude/channels/telegram',
+  '  90798 s000  S+     0:00.01 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x PATH=/opt/homebrew/bin CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/Alfred/agents/samu/.claude/channels/telegram CLAUDE_CODE_SESSION_ID=abc',
+  '  90799 s000  S+     0:00.15 node /Users/x/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0/server.ts HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0 SLACK_STATE_DIR=/Users/x/Alfred/agents/samu/.claude/channels/slack',
+  '  90800 s000  S+     0:00.05 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/Alfred/agents/boni/.claude/channels/telegram',
   '   1234 s000  Ss     0:00.00 /bin/zsh HOME=/Users/x SHELL=/bin/zsh',
 ].join('\n')
 
@@ -24,7 +24,7 @@ describe('parsePollerPidsFromPs', () => {
     const pids = parsePollerPidsFromPs(
       PS_SAMPLE,
       'TELEGRAM_STATE_DIR',
-      '/Users/x/ClaudeClaw/agents/samu/.claude/channels/telegram',
+      '/Users/x/Alfred/agents/samu/.claude/channels/telegram',
     )
     expect(pids).toEqual([90798])
   })
@@ -33,7 +33,7 @@ describe('parsePollerPidsFromPs', () => {
     const pids = parsePollerPidsFromPs(
       PS_SAMPLE,
       'SLACK_STATE_DIR',
-      '/Users/x/ClaudeClaw/agents/samu/.claude/channels/slack',
+      '/Users/x/Alfred/agents/samu/.claude/channels/slack',
     )
     expect(pids).toEqual([90799])
   })
@@ -44,7 +44,7 @@ describe('parsePollerPidsFromPs', () => {
     const pids = parsePollerPidsFromPs(
       PS_SAMPLE,
       'TELEGRAM_STATE_DIR',
-      '/Users/x/ClaudeClaw/agents/samu/.claude/channels/telegram',
+      '/Users/x/Alfred/agents/samu/.claude/channels/telegram',
     )
     expect(pids).not.toContain(90800)
   })
@@ -56,13 +56,13 @@ describe('parsePollerPidsFromPs', () => {
     // MCP server. With `ps axeww` such tty-less jobs are visible on macOS; the
     // reap must not take them.
     const rows = [
-      '  41001 ??  S   0:01.00 node long-script.js HOME=/Users/x TELEGRAM_STATE_DIR=/Users/x/ClaudeClaw/agents/samu/.claude/channels/telegram',
-      '  41002 ??  S   0:00.20 node /Users/x/mcp/gitnexus/server.js HOME=/Users/x TELEGRAM_STATE_DIR=/Users/x/ClaudeClaw/agents/samu/.claude/channels/telegram',
+      '  41001 ??  S   0:01.00 node long-script.js HOME=/Users/x TELEGRAM_STATE_DIR=/Users/x/Alfred/agents/samu/.claude/channels/telegram',
+      '  41002 ??  S   0:00.20 node /Users/x/mcp/gitnexus/server.js HOME=/Users/x TELEGRAM_STATE_DIR=/Users/x/Alfred/agents/samu/.claude/channels/telegram',
     ].join('\n')
     const pids = parsePollerPidsFromPs(
       rows,
       'TELEGRAM_STATE_DIR',
-      '/Users/x/ClaudeClaw/agents/samu/.claude/channels/telegram',
+      '/Users/x/Alfred/agents/samu/.claude/channels/telegram',
     )
     expect(pids).toEqual([])
   })
@@ -71,7 +71,7 @@ describe('parsePollerPidsFromPs', () => {
     const pids = parsePollerPidsFromPs(
       PS_SAMPLE,
       'TELEGRAM_STATE_DIR',
-      '/Users/x/ClaudeClaw/agents/nobody/.claude/channels/telegram',
+      '/Users/x/Alfred/agents/nobody/.claude/channels/telegram',
     )
     expect(pids).toEqual([])
   })
@@ -80,13 +80,13 @@ describe('parsePollerPidsFromPs', () => {
     // Two bun pollers against the same channel dir - the bug that triggered
     // this work item. Both must be reaped.
     const orphans = [
-      '  29932 ttys001  S+   77:09.33 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/ClaudeClaw/.claude/channels/telegram',
-      '  91234 ttys002  S+    0:00.01 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/ClaudeClaw/.claude/channels/telegram',
+      '  29932 ttys001  S+   77:09.33 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/Alfred/.claude/channels/telegram',
+      '  91234 ttys002  S+    0:00.01 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/Alfred/.claude/channels/telegram',
     ].join('\n')
     const pids = parsePollerPidsFromPs(
       orphans,
       'TELEGRAM_STATE_DIR',
-      '/Users/x/ClaudeClaw/.claude/channels/telegram',
+      '/Users/x/Alfred/.claude/channels/telegram',
     )
     expect(pids).toEqual([29932, 91234])
   })
@@ -95,13 +95,13 @@ describe('parsePollerPidsFromPs', () => {
     // Defensive: a row that *mentions* the state dir in its --cwd argv must
     // not be confused with one that actually has the env var. argv values
     // are not preceded by the literal `TELEGRAM_STATE_DIR=` prefix.
-    const argvMention = '  55555 s000  S+   0:00.00 grep TELEGRAM_STATE_DIR /Users/x/ClaudeClaw/.claude/channels/telegram'
+    const argvMention = '  55555 s000  S+   0:00.00 grep TELEGRAM_STATE_DIR /Users/x/Alfred/.claude/channels/telegram'
     const pids = parsePollerPidsFromPs(
       argvMention,
       'TELEGRAM_STATE_DIR',
-      '/Users/x/ClaudeClaw/.claude/channels/telegram',
+      '/Users/x/Alfred/.claude/channels/telegram',
     )
-    // The needle `TELEGRAM_STATE_DIR=/Users/x/ClaudeClaw/.claude/channels/telegram`
+    // The needle `TELEGRAM_STATE_DIR=/Users/x/Alfred/.claude/channels/telegram`
     // is NOT present in this row (the argv has space, not `=`), so no match.
     expect(pids).toEqual([])
   })
@@ -114,14 +114,14 @@ describe('parsePollerPidsFromPs', () => {
 })
 
 // Rows modeled on the live 2026-06-03 incident snapshot. The tmux SERVER pid
-// is 35874; the live marveen-channels pane leader is the claude at 76621
+// is 35874; the live alfred-channels pane leader is the claude at 76621
 // (claudePid == panePid for the main session). 57158 + the 70xxx claudes are
 // detached --continue leftovers reparented to the tmux server (ppid 35874).
 // A live sub-agent is modeled as a pane shell (77189) with a claude child.
 const CLAUDE = '/opt/homebrew/bin/claude'
 const PROCS: ProcRow[] = [
   // tmux server: argv EMBEDS the claude --channels string -> must NOT match.
-  { pid: 35874, ppid: 1, command: '/opt/homebrew/bin/tmux new-session -d -s marveen-channels -c /Users/x/ClaudeClaw /opt/homebrew/bin/claude --dangerously-skip-permissions --channels plugin:telegram@claude-plugins-official' },
+  { pid: 35874, ppid: 1, command: '/opt/homebrew/bin/tmux new-session -d -s alfred-channels -c /Users/x/Alfred /opt/homebrew/bin/claude --dangerously-skip-permissions --channels plugin:telegram@claude-plugins-official' },
   // live main session: claude is the pane leader (pid == panePid 76621).
   { pid: 76621, ppid: 35874, command: `${CLAUDE} --dangerously-skip-permissions --model claude-opus-4-8[1m] --channels plugin:telegram@claude-plugins-official` },
   // live sub-agent: pane leader is the shell (77189), claude is its child.
@@ -130,7 +130,7 @@ const PROCS: ProcRow[] = [
   { pid: 57158, ppid: 35874, command: `${CLAUDE} --dangerously-skip-permissions --model claude-opus-4-8[1m] --channels plugin:telegram@claude-plugins-official` },
   { pid: 70459, ppid: 35874, command: `${CLAUDE} --continue --dangerously-skip-permissions --model deepseek-v4-pro --channels plugin:telegram@claude-plugins-official` },
   // unrelated processes that must be ignored.
-  { pid: 90000, ppid: 1, command: '/opt/homebrew/bin/node /Users/x/ClaudeClaw/dist/web.js' },
+  { pid: 90000, ppid: 1, command: '/opt/homebrew/bin/node /Users/x/Alfred/dist/web.js' },
   { pid: 90001, ppid: 1, command: `${CLAUDE} --dangerously-skip-permissions --model claude-opus-4-8[1m]` }, // claude, but no --channels
 ]
 const LIVE_PANES = new Set<number>([76621, 77189, 44349])
@@ -160,7 +160,7 @@ describe('findOrphanChannelClaudes', () => {
   it('honors a channelNeedle filter (only telegram orphans, not slack)', () => {
     const withSlack: ProcRow[] = [
       ...PROCS,
-      { pid: 71000, ppid: 35874, command: `${CLAUDE} --continue --channels plugin:slack-channel@marveen-marketplace` },
+      { pid: 71000, ppid: 35874, command: `${CLAUDE} --continue --channels plugin:slack-channel@alfred-marketplace` },
     ]
     const tg = findOrphanChannelClaudes(withSlack, LIVE_PANES, 'plugin:telegram@claude-plugins-official')
     expect(tg).not.toContain(71000)
@@ -186,7 +186,7 @@ describe('findOrphanChannelClaudes', () => {
 const PS_EWW_MAIN = [
   '  35352 ??  S   0:01.00 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6',
   '  44001 ??  S   0:00.20 bun run --cwd /Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/.claude/plugins/cache/claude-plugins-official/telegram/0.0.6',
-  '  30067 ??  S   0:00.30 bun run --cwd /Users/x/marveen/agents/plutus/.claude-config/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/marveen/agents/plutus/.claude-config/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/marveen/agents/plutus/.claude/channels/telegram',
+  '  30067 ??  S   0:00.30 bun run --cwd /Users/x/alfred/agents/plutus/.claude-config/plugins/cache/claude-plugins-official/telegram/0.0.6 --silent start HOME=/Users/x CLAUDE_PLUGIN_ROOT=/Users/x/alfred/agents/plutus/.claude-config/plugins/cache/claude-plugins-official/telegram/0.0.6 TELEGRAM_STATE_DIR=/Users/x/alfred/agents/plutus/.claude/channels/telegram',
   '   1234 ??  Ss  0:00.00 /bin/zsh HOME=/Users/x',
 ].join('\n')
 
@@ -213,7 +213,7 @@ describe('nearestClaudeAncestor', () => {
     [35352, { pid: 35352, ppid: 35346, command: 'bun server.ts' }],
     [35346, { pid: 35346, ppid: 35264, command: 'bun run --cwd .../telegram/0.0.6 start' }],
     [35264, { pid: 35264, ppid: 1135, command: '/opt/homebrew/bin/claude --channels plugin:telegram@claude-plugins-official' }],
-    [1135, { pid: 1135, ppid: 1, command: 'tmux new-session -d -s marveen-channels' }],
+    [1135, { pid: 1135, ppid: 1, command: 'tmux new-session -d -s alfred-channels' }],
   ])
 
   it('walks up to the owning claude', () => {
@@ -242,7 +242,7 @@ describe('findForeignMainPollers', () => {
     { pid: 44001, ppid: 44050, command: 'bun server.ts' },
     { pid: 44050, ppid: 44000, command: 'bun run --cwd .../telegram/0.0.6 start' },
     { pid: 44000, ppid: 35264, command: '/opt/homebrew/bin/claude' },
-    { pid: 1135, ppid: 1, command: 'tmux new-session -d -s marveen-channels' },
+    { pid: 1135, ppid: 1, command: 'tmux new-session -d -s alfred-channels' },
   ]
 
   it('spares the legit main poller, kills the thief', () => {

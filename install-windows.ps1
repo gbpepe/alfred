@@ -1,4 +1,4 @@
-﻿# Marveen - Windows telepítő (WSL alapú)
+﻿# Alfred - Windows telepítő (WSL alapú)
 # Futtatás: PowerShell-ben: .\install-windows.ps1
 
 # NOTE: wsl.exe emits its output as UTF-16LE, so PowerShell captures each char
@@ -11,7 +11,7 @@
 # on Windows PowerShell 5.1; the targeted null-strip is side-effect-free.
 
 Write-Host ""
-Write-Host "  ▐▛███▜▌   Marveen" -ForegroundColor Cyan
+Write-Host "  ▐▛███▜▌   Alfred" -ForegroundColor Cyan
 Write-Host " ▝▜█████▛▘  AI csapatod, ami fut amíg te alszol." -ForegroundColor Cyan
 Write-Host "   ▘▘ ▝▝" -ForegroundColor DarkCyan
 Write-Host ""
@@ -33,7 +33,7 @@ try {
 if (-not $wslInstalled) {
     Write-Host "  ✗ WSL nem található" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  A Marveen WSL-ben fut (Windows Subsystem for Linux)." -ForegroundColor Yellow
+    Write-Host "  A Alfred WSL-ben fut (Windows Subsystem for Linux)." -ForegroundColor Yellow
     Write-Host "  Telepítéshez futtasd rendszergazdaként:" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "    wsl --install" -ForegroundColor Cyan
@@ -104,10 +104,10 @@ if ($go) {
     # No double quotes and no `$` inside this string on purpose: nothing for
     # PowerShell to strip or expand on its way to bash. The script is saved to
     # a file first so bash gets the terminal as stdin and the prompts work.
-    wsl -d $distroName -- bash -c "curl -fsSL https://raw.githubusercontent.com/Szotasz/marveen/main/install-linux.sh -o /tmp/marveen-install.sh && bash /tmp/marveen-install.sh"
+    wsl -d $distroName -- bash -c "curl -fsSL https://raw.githubusercontent.com/gbpepe/alfred/main/install-linux.sh -o /tmp/alfred-install.sh && bash /tmp/alfred-install.sh"
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
-        Write-Host "  ✓ Marveen telepítve az Ubuntu-ban (install-linux.sh)." -ForegroundColor Green
+        Write-Host "  ✓ Alfred telepítve az Ubuntu-ban (install-linux.sh)." -ForegroundColor Green
         exit 0
     }
     Write-Host ""
@@ -119,7 +119,7 @@ if ($go) {
 Write-Host ""
 Write-Host "  Fejezd be így: indítsd el az Ubuntu-t (Start menü -> Ubuntu), állítsd" -ForegroundColor Yellow
 Write-Host "  be a felhasználót ha még nem tetted, majd az Ubuntu shellben futtasd:" -ForegroundColor Yellow
-Write-Host "    curl -fsSL https://raw.githubusercontent.com/Szotasz/marveen/main/install-linux.sh -o install.sh && bash install.sh" -ForegroundColor Cyan
+Write-Host "    curl -fsSL https://raw.githubusercontent.com/gbpepe/alfred/main/install-linux.sh -o install.sh && bash install.sh" -ForegroundColor Cyan
 Write-Host "  (vagy indítsd újra ezt a PowerShell scriptet, ha kell a gép-újraindítás)" -ForegroundColor DarkGray
 if ($go) { exit 1 }
 exit 0

@@ -1,6 +1,6 @@
 // DOCKERHTTPS1119: the public (domain) access path of a Docker install, and its one-time setup code.
 //
-// With MARVEEN_DOMAIN set, Caddy serves the dashboard on the internet. It proxies to a SECOND listener
+// With ALFRED_DOMAIN set, Caddy serves the dashboard on the internet. It proxies to a SECOND listener
 // (WEB_PUBLIC_PORT, 3421), reachable on the compose network only and never published to the host; the usual 3420
 // stays the internal path (the agents, an SSH tunnel, the Bridge). Which listener a request came in on is a fact of
 // the socket, not of a header a client could forge (X-Forwarded-For) or of the source address (behind Docker's NAT a
@@ -35,7 +35,7 @@ export function isPublicRequest(req: http.IncomingMessage | undefined): boolean 
   return req !== undefined && publicRequests.has(req)
 }
 
-/** The public listener's port from the environment (first-boot writes WEB_PUBLIC_PORT with MARVEEN_DOMAIN), or null. */
+/** The public listener's port from the environment (first-boot writes WEB_PUBLIC_PORT with ALFRED_DOMAIN), or null. */
 export function publicListenerPort(env: NodeJS.ProcessEnv = process.env): number | null {
   const raw = (env.WEB_PUBLIC_PORT ?? '').trim()
   if (!/^\d{1,5}$/.test(raw)) return null

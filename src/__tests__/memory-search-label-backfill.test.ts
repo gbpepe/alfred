@@ -16,12 +16,12 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-memlabel-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-memlabel-test-'))
 
 vi.mock('../config.js', () => ({
   // agent-scaffold imports settings-store (MCPOROKLES923), which derives a path from
   // STORE_DIR at import time. A never-created dir: nothing here reads the store.
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -204,12 +204,12 @@ describe('buildMemorySearchLabelBody, the curl fallback (a profile that denies t
   })
 })
 
-// VOICETOKENLEAK1101 PR-A1: every agent whose settings allow scripts/marveen-api.sh gets the helper recipe, so the
+// VOICETOKENLEAK1101 PR-A1: every agent whose settings allow scripts/alfred-api.sh gets the helper recipe, so the
 // token is never on a curl argv; the helper prints the label header as the FIRST line and encodes the query itself.
 describe('buildMemorySearchLabelBody, the helper recipe (the default)', () => {
   it('searches through the helper with the agent name, no token, no curl', () => {
     const b = buildMemorySearchLabelBody('agent-b')
-    expect(b).toMatch(/marveen-api\.sh memory-search agent-b KULCSSZO/)
+    expect(b).toMatch(/alfred-api\.sh memory-search agent-b KULCSSZO/)
     for (const s of ['$(cat', '.dashboard-token', 'Authorization', 'curl']) expect(b, s).not.toContain(s)
   })
 

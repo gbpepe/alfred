@@ -23,7 +23,7 @@ const T_SRC = (() => {
   return APP.slice(APP.indexOf('function t(', i), end + 4)
 })()
 function makeT(lang: 'hu' | 'en') {
-  const window = { _lang: lang, _i18n: I18N, _brandTokens: { brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' } }
+  const window = { _lang: lang, _i18n: I18N, _brandTokens: { brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' } }
   return new Function('window', 'localStorage', `return ${T_SRC}`)(window, { getItem: () => null }) as (k: string, p?: Record<string, unknown>) => string
 }
 
@@ -42,7 +42,7 @@ function arrowAfter(anchor: string): string {
 
 const WIZARD_NEXT = arrowAfter("document.getElementById('wizardNextBtn').addEventListener('click', ")
 const WIZARD_CREATE = arrowAfter("document.getElementById('wizardCreateBtn').addEventListener('click', ")
-const RESTART_MAIN = arrowAfter("document.getElementById('marveenRestartBtn').addEventListener('click', ")
+const RESTART_MAIN = arrowAfter("document.getElementById('alfredRestartBtn').addEventListener('click', ")
 const START = arrowAfter("document.getElementById('agentStartBtn').addEventListener('click', ")
 const STOP = arrowAfter("document.getElementById('agentStopBtn').addEventListener('click', ")
 const EXPORT_ONE = arrowAfter("document.getElementById('exportAgentBtn').onclick = ")

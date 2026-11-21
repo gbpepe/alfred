@@ -35,7 +35,7 @@ git log --format='  %h %s' "${TARGET_SHA}..HEAD"
 echo "content_hash: $HASH"
 echo
 echo "1. Ask the owner (category $UPDATE_REBASE_CATEGORY; the description file says what and why):"
-echo "   bash scripts/marveen-api.sh approval-request <agent> $UPDATE_REBASE_CATEGORY 3600 <description-file> --content-hash $HASH"
+echo "   bash scripts/alfred-api.sh approval-request <agent> $UPDATE_REBASE_CATEGORY 3600 <description-file> --content-hash $HASH"
 echo "2. After the owner approved it (within 30 minutes of the approval):"
 echo "   UPDATE_REBASE_APPROVAL=<approval-id> bash update.sh"
 echo "A new local or upstream commit before step 2 changes the hash: the approval is then refused, ask again."

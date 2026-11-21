@@ -2,25 +2,24 @@
 //
 // The coordinator is a SEPARATE process from the dashboard, so it cannot share
 // the dashboard's better-sqlite3 singleton (src/db.ts). It opens its OWN handle
-// to the same store/claudeclaw.db file. That is safe because the DB runs in WAL
+// to the same store/alfred.db file. That is safe because the DB runs in WAL
 // mode (a writer never blocks readers, and two processes can write to a WAL DB
 // as long as each sets busy_timeout). We assert busy_timeout=5000 on our handle
 // because db.ts does not set it -- without it a concurrent dashboard write would
 // surface as SQLITE_BUSY instead of a short wait.
 //
 // Two tables live here:
-//   incoming_events -- every inbound Telegram update, deduped on (source,update_id)
-//   poll_offset     -- the persisted getUpdates offset (one row), so a restart
-//                      resumes instead of replaying or skipping.
-// The handoff to Marveen reuses the existing agent_messages table + the proven
+//   incoming_events -- inbound channel events, deduped on (source,update_id)
+//   poll_offset     -- persisted update offset (one row), so a restart resumes.
+// The handoff to Alfred reuses the existing agent_messages table + the proven
 // message-router (5s tick, tmux injection, wrapUntrusted) -- we just INSERT a
-// pending row from 'telegram-coordinator' to the main agent.
+// pending row from 'channel-coordinator' to the main agent.
 
 import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { STORE_DIR, DB_FILENAME, MAIN_AGENT_ID, VOICE_CHANNEL_ID } from '../config.js'
 
-export const COORDINATOR_AGENT_ID = 'telegram-coordinator'
+export const COORDINATOR_AGENT_ID = 'channel-coordinator'
 
 // Voice channel (HANGCSATORNA918, owner request 2026-09-18). The owner dictates
 // into an external voice assistant, which POSTs the transcript to /api/messages.
@@ -54,7 +53,7 @@ export function initIngestDb(dbPath = join(STORE_DIR, DB_FILENAME)): Database.Da
   handle.exec(`
     CREATE TABLE IF NOT EXISTS incoming_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source TEXT NOT NULL DEFAULT 'telegram',
+      source TEXT NOT NULL DEFAULT 'discord',
       update_id INTEGER NOT NULL,
       chat_id INTEGER,
       user_id INTEGER,
@@ -201,7 +200,7 @@ export function markEventFailed(eventId: number, error: string): void {
 //       insert and createHandoffMessage -> agent_message_id IS NULL), or
 //   (b) they were handed off but the message-router abandoned the agent_message
 //       after its retry window (am.status = 'failed') -- the user's message
-//       never actually reached Marveen.
+//       never actually reached Alfred.
 // Events whose handoff is still in-flight (am.status pending/delivered/done) are
 // NOT returned, so we never double-deliver a message that is merely waiting.
 // Idempotency against re-handoff is further guaranteed by UNIQUE(source,update_id)
@@ -231,7 +230,7 @@ export function getOffset(source: string): number {
 
 // UPSERT the offset. Called ONLY after a batch is fully processed (handoff +
 // markEventDelivered for every update), so a crash before this leaves the
-// offset behind and Telegram re-delivers the batch -- at-least-once, deduped.
+// offset behind and the source re-delivers the batch -- at-least-once, deduped.
 export function setOffset(source: string, lastUpdateId: number): void {
   const now = Math.floor(Date.now() / 1000)
   requireDb().prepare(`

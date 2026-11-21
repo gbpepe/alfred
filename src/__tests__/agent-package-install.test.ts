@@ -14,8 +14,8 @@ import {
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-agent-package-install-'))
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-agent-package-install-'))
+process.env.ALFRED_ENV_DIR = tmpRoot
 const STORE = join(tmpRoot, 'store')
 const AGENTS = join(tmpRoot, 'agents')
 
@@ -228,7 +228,7 @@ describe('a folder swapped for a symlink before the package files land (PRI3HARD
   for (const [what, link, step] of [['.claude (step 5, the skills)', '.claude', I.step5Files], ['.package (step 7, the record)', '.package', I.step7Manifest]] as const) {
     it(`${what}: the write is refused and nothing lands outside the agent folder`, () => {
       const c = ctxOf()
-      const outside = mkdtempSync(join(tmpdir(), 'marveen-pri3-outside-'))
+      const outside = mkdtempSync(join(tmpdir(), 'alfred-pri3-outside-'))
       try {
         // every step before the one under test (steps 1 to 4, or 1 to 6)
         for (const [, s] of STEPS.slice(0, link === '.claude' ? 5 : 7)) s(c)

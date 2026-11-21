@@ -25,7 +25,7 @@ const T_SRC = (() => {
   return APP.slice(APP.indexOf('function t(', i), end + 4)
 })()
 function makeT(lang: 'hu' | 'en') {
-  const window = { _lang: lang, _i18n: I18N, _brandTokens: { brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' } }
+  const window = { _lang: lang, _i18n: I18N, _brandTokens: { brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' } }
   return new Function('window', 'localStorage', `return ${T_SRC}`)(window, { getItem: () => null }) as (k: string, p?: Record<string, unknown>) => string
 }
 
@@ -93,7 +93,7 @@ describe('the Channels tab toasts come from the language files', () => {
         () => '/api/agents/anna/channel',
         async () => ({ status: reply.status, ok: reply.status < 300, json: async () => reply.data }),
         () => {}, makeT(lang), (m: string) => { toasts.push(m) },
-        () => 'Telegram', () => 'marveen', async () => {}, async () => {}, () => {},
+        () => 'Telegram', () => 'alfred', async () => {}, async () => {}, () => {},
       ) as () => Promise<void>
       await handler()
       return toasts

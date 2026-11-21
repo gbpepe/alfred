@@ -40,14 +40,14 @@ describe('the channel-save route returns restartError on both main-agent branche
 
   it('bot-token branch: the restart goes through the helper and the error reaches the response', () => {
     const botBranch = route.slice(route.indexOf('const { botToken'))
-    expect(botBranch).toMatch(/mainChannelsRestartOutcome\(hardRestartMarveenChannels\(\)\)/)
+    expect(botBranch).toMatch(/mainChannelsRestartOutcome\(hardRestartAlfredChannels\(\)\)/)
     expect(botBranch).toMatch(/\.\.\.\(restartError \? \{ restartError, restartCommand: channelsRestartCommand\(\) \} : \{\}\)/)
     expect(botBranch).not.toMatch(/restarted = r\.ok/)
   })
 
   it('Google Chat branch: same', () => {
     const gcBranch = between(route, "if (provider === 'googlechat')", 'const { botToken')
-    expect(gcBranch).toMatch(/mainChannelsRestartOutcome\(hardRestartMarveenChannels\(\)\)/)
+    expect(gcBranch).toMatch(/mainChannelsRestartOutcome\(hardRestartAlfredChannels\(\)\)/)
     expect(gcBranch).toMatch(/restartError: gcRestartError, restartCommand: channelsRestartCommand\(\)/)
     expect(gcBranch).not.toMatch(/gcRestarted = r\.ok/)
   })
@@ -69,7 +69,7 @@ describe('onboarding step 3 (bot token) surfaces restartError at once', () => {
 })
 
 // Follow-up (Dani's measurement on #1921): the messages hardcoded
-// `systemctl --user restart marveen-channels` (wrong unit on a renamed install,
+// `systemctl --user restart alfred-channels` (wrong unit on a renamed install,
 // no macOS form), and the agent-detail page toasted "connected" on a failed restart.
 describe('channelsRestartCommand: this install\'s unit, per platform', () => {
   it('Linux: the user unit named after SERVICE_ID', () => {
@@ -79,7 +79,7 @@ describe('channelsRestartCommand: this install\'s unit, per platform', () => {
     const cmd = channelsRestartCommand('darwin', 'jarvis')
     expect(cmd).toContain('launchctl kickstart -k gui/$(id -u)/com.jarvis.channels')
     expect(cmd).toContain('~/Library/LaunchAgents/com.jarvis.channels.plist')
-    expect(cmd).not.toContain('marveen')
+    expect(cmd).not.toContain('alfred')
   })
 })
 
@@ -92,7 +92,7 @@ describe('every restart-failed response carries the command, every message uses 
       for (const key of ['identity', 'step1', 'step2']) {
         const m = langSource(lang).match(new RegExp(`'onboarding\\.${key}\\.saved_restart_failed':\\s*'([^']+)'`))
         expect(m?.[1], `${lang} ${key}`).toContain('{cmd}')
-        expect(m?.[1], `${lang} ${key}`).not.toMatch(/systemctl|marveen-channels/)
+        expect(m?.[1], `${lang} ${key}`).not.toMatch(/systemctl|alfred-channels/)
       }
       expect(langSource(lang)).toMatch(/'agents\.channel\.saved_restart_failed':\s*'[^']*\{provider\}[^']*\{cmd\}[^']*'/)
     }

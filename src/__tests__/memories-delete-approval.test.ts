@@ -1,4 +1,4 @@
-// MARVEENGAPS1020 (a): below data_delete level 3 a memory DELETE runs only with
+// ALFREDGAPS1020 (a): below data_delete level 3 a memory DELETE runs only with
 // an approved, unused data_delete approval bound to that memory in that content
 // state. Without one the server files the request itself (owner notified, its
 // own wording) and answers 409. Real route, real in-memory DB, real approvals

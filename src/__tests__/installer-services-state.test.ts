@@ -4,7 +4,7 @@
 // only the end, saw a healthy install. The fix keeps the outcome in SERVICES_STATE,
 // prints the success banner only when both units were seen running, repeats the
 // state and the remedy last, and exits 3 -- except in the machine progress mode
-// (MARVEEN_JSON_PROGRESS=1), where the Bridge installer's derived script appends
+// (ALFRED_JSON_PROGRESS=1), where the Bridge installer's derived script appends
 // its final emit_result AFTER the last line and an exit would break it.
 //
 // The cases run the REAL script text: the start block with a stubbed launchd
@@ -47,7 +47,7 @@ function run(script: string, env: Record<string, string> = {}): { out: string; c
     writeFileSync(f, script)
     const r = spawnSync('bash', [f], {
       encoding: 'utf-8',
-      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: dir, MARVEEN_LANG: 'en', INSTALL_DIR: dir, ...env },
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: dir, ALFRED_LANG: 'en', INSTALL_DIR: dir, ...env },
     })
     return { out: (r.stdout ?? '') + (r.stderr ?? ''), code: r.status }
   } finally {
@@ -107,7 +107,7 @@ describe('the closing section (real text from "# Done!" to the end, real strings
   it('ok: the success banner, no services block, exit 0', () => {
     const r = tail('ok', {}, 'DASHBOARD_PID=1; CHANNELS_PID=2')
     expect(r.code).toBe(0)
-    expect(r.out).toContain('Marveen successfully installed!')
+    expect(r.out).toContain('Alfred successfully installed!')
     expect(r.out).not.toContain('NOT running')
     expect(r.out).not.toContain('A SZOLGÁLTATÁSOK NEM FUTNAK')
   })
@@ -115,8 +115,8 @@ describe('the closing section (real text from "# Done!" to the end, real strings
   it('down: no success banner; the state and the remedy are repeated last; exit 3', () => {
     const r = tail('down', {}, 'DASHBOARD_PID=; CHANNELS_PID=2')
     expect(r.code).toBe(3)
-    expect(r.out).not.toContain('Marveen successfully installed!')
-    expect(r.out).toContain('Marveen is installed, but its services are NOT running yet')
+    expect(r.out).not.toContain('Alfred successfully installed!')
+    expect(r.out).toContain('Alfred is installed, but its services are NOT running yet')
     const last = r.out.slice(r.out.lastIndexOf('A SZOLGÁLTATÁSOK NEM FUTNAK'))
     expect(last).toContain('com.test.dashboard: nem fut')
     expect(last).not.toContain('com.test.channels: nem fut')
@@ -126,10 +126,10 @@ describe('the closing section (real text from "# Done!" to the end, real strings
   })
 
   it('down in the machine progress mode (Bridge): the block still prints, but exit 0 so its appended emit_result runs', () => {
-    const r = tail('down', { MARVEEN_JSON_PROGRESS: '1' }, 'DASHBOARD_PID=; CHANNELS_PID=')
+    const r = tail('down', { ALFRED_JSON_PROGRESS: '1' }, 'DASHBOARD_PID=; CHANNELS_PID=')
     expect(r.code).toBe(0)
     expect(r.out).toContain('A SZOLGÁLTATÁSOK NEM FUTNAK')
-    expect(r.out).not.toContain('Marveen successfully installed!')
+    expect(r.out).not.toContain('Alfred successfully installed!')
   })
 
   it('down with a broken auth too: both verdicts are repeated, exit 3', () => {
@@ -142,7 +142,7 @@ describe('the closing section (real text from "# Done!" to the end, real strings
   it('an unknown state (the block never ran) is not reported as a failure', () => {
     const r = tail('unknown')
     expect(r.code).toBe(0)
-    expect(r.out).toContain('Marveen successfully installed!')
+    expect(r.out).toContain('Alfred successfully installed!')
   })
 })
 

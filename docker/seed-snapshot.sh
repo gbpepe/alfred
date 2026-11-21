@@ -1,13 +1,13 @@
 #!/bin/bash
 # DOCKERSEEDREFRESH1108: before code-sync swaps the code tree, keep the seed SOURCES of the tree this volume ran in
-# /opt/marveen/.seed-prev. After the swap, first-boot refreshes every installed seed copy that equals what this old
+# /opt/alfred/.seed-prev. After the swap, first-boot refreshes every installed seed copy that equals what this old
 # tree would have seeded (docker/seed-refresh-docker.sh); a copy the operator edited equals nothing and is kept.
 # Taken only when the image changes, never of a half-swapped tree (.code-sync-pending), and never over a snapshot that
 # was not applied yet (an image skipped while its refresh failed still compares against the tree that seeded the copy).
 # A failure here only means no refresh this time: entrypoint.sh goes on.
 set -u
-INSTALL_DIR="${MARVEEN_INSTALL_DIR:-/opt/marveen}"
-META="${MARVEEN_DOCKER_DIR:-/opt/marveen-docker}"
+INSTALL_DIR="${ALFRED_INSTALL_DIR:-/opt/alfred}"
+META="${ALFRED_DOCKER_DIR:-/opt/alfred-docker}"
 say() { printf 'seed-snapshot: %s\n' "$*"; }
 
 have="$(cat "$INSTALL_DIR/.image-id" 2>/dev/null || true)"

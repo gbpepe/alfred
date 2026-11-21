@@ -136,7 +136,7 @@ def script_refs(command, project_dir):
 
 
 def hook_name(group, project_dir):
-    """Stem of the first script a group runs (the MARVEEN_DISABLED_HOOKS name)."""
+    """Stem of the first script a group runs (the ALFRED_DISABLED_HOOKS name)."""
     for h in group.get("hooks") or []:
         if isinstance(h, dict):
             for token, _ in script_refs(handler_payload(h), project_dir):
@@ -484,7 +484,7 @@ def build_metadata(events, old_meta, project_dir, locked_set, carried=None, keep
                      "group, same event and index. After editing hooks run: python3 scripts/hook-metadata.py "
                      "--update, review the printed diff, fix any TODO purpose, commit both files. "
                      "Optional top-level %r: extra hook names (this install's own gates / audit "
-                     "ledgers) that MARVEEN_DISABLED_HOOKS may never switch off; it can only add to "
+                     "ledgers) that ALFRED_DISABLED_HOOKS may never switch off; it can only add to "
                      "the built-in list in scripts/hooks/hook_switches.py." % hook_switches.SIDECAR_LOCK_KEY),
     }
     for key, value in (carried or {}).items():

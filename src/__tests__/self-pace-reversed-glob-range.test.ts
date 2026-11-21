@@ -31,7 +31,7 @@ const decide = (command: string, cwd?: string) =>
 
 // The command exactly as the gate stopped it (transcript 5ef0d90f, 2026-11-19T10:43:26Z): ffmpeg, then a python3
 // heredoc with an UNQUOTED delimiter. The line that matched is the print with `row[x-1000]`.
-const DENIED_COMMAND = String.raw`S=/tmp/claude-1000/-home-szonam-marveen-agents-kodolo2/5ef0d90f-1c3a-40d1-9eb1-30f8964f4fba/scratchpad; IMG="/mnt/c/Stalker Anomaly alapjáték/appdata/screenshots/ss_szonam_11-19-26_11-30-50_(la_cordon_bunker).jpg"; ffmpeg -v error -y -i "$IMG" -f rawvideo -pix_fmt rgb24 $S/ss.rgb && python3 - <<EOF
+const DENIED_COMMAND = String.raw`S=/tmp/claude-1000/-home-szonam-alfred-agents-kodolo2/5ef0d90f-1c3a-40d1-9eb1-30f8964f4fba/scratchpad; IMG="/mnt/c/Stalker Anomaly alapjáték/appdata/screenshots/ss_szonam_11-19-26_11-30-50_(la_cordon_bunker).jpg"; ffmpeg -v error -y -i "$IMG" -f rawvideo -pix_fmt rgb24 $S/ss.rgb && python3 - <<EOF
 import numpy as np
 a=np.fromfile("$S/ss.rgb",dtype=np.uint8).reshape(1440,3440,3).astype(int)
 lum=a.sum(axis=2)/3

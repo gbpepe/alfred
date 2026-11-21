@@ -51,7 +51,7 @@ describe('includeArguments', () => {
       '  include   a.conf   b.conf',
       'INCLUDE=/x/y.conf',
       'Include = /p/q.conf',
-      'Match User marveen',
+      'Match User alfred',
       '    Include /m/*.conf',
       'PasswordAuthentication no',
       'Includes /not/a/keyword.conf',
@@ -192,7 +192,7 @@ describe('the daemon', () => {
     ['sshd: /usr/sbin/sshd -De [listener] 0 of 10-100 startups', 'sshd_daemon_options'],
     ['sshd: /usr/sbin/sshd -D', 'sshd_daemon_unknown'],
     ['/usr/sbin/sshd -D', 'sshd_daemon_unknown'],
-    ['sshd: marveen [priv]', 'sshd_daemon_unknown'],
+    ['sshd: alfred [priv]', 'sshd_daemon_unknown'],
     ['sshd: usr/sbin/sshd -D [listener] 0 of 10', 'sshd_daemon_unknown'],
     // Dani's review of #2769, S2: another sshd binary has other built-in defaults than the one the probe asks.
     ['sshd: /usr/local/sbin/sshd -D [listener] 0 of 10-100 startups', 'sshd_daemon_unknown'],

@@ -329,8 +329,8 @@ export async function tryHandleMessages(ctx: RouteContext): Promise<boolean> {
     // (sanitizeAgentIdent), NOT from.trim(). The router does
     // CHANNEL_COORDINATOR_AGENTS.has(sanitizeAgentIdent(from)), and
     // sanitizeAgentIdent STRIPS [^a-zA-Z0-9_-] rather than trimming. A bypass
-    // like from="@telegram-coordinator" / "telegram-coordinator." survives
-    // .trim() (!= the constant) yet sanitizes to "telegram-coordinator" in the
+    // like from="@channel-coordinator" / "channel-coordinator." survives
+    // .trim() (!= the constant) yet sanitizes to "channel-coordinator" in the
     // router -> channel-inbound with an attacker-controlled body. Matching the
     // router's normalization here closes that asymmetry.
     if (sanitizeAgentIdent(from) === COORDINATOR_AGENT_ID) {

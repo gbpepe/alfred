@@ -39,8 +39,8 @@ const PARKED_BARE_SCHEDULED_TAG = [
 const PARKED_INTERAGENT = [
   '',
   SEP,
-  '❯ [Uzenet @marveen-tol -- trusted team member, msg_id:42]: <trusted-peer',
-  '  source="agent:marveen"> Kérlek nézd át a PR-t. </trusted-peer>',
+  '❯ [Uzenet @alfred-tol -- trusted team member, msg_id:42]: <trusted-peer',
+  '  source="agent:alfred"> Kérlek nézd át a PR-t. </trusted-peer>',
   SEP,
   FOOTER,
 ].join('\n')
@@ -58,7 +58,7 @@ const PARKED_CHANNEL_COMPLETE = [
 const PARKED_HUMAN_DRAFT = [
   '',
   SEP,
-  '❯ Szia Marveen, ezt még átgondolom: a holnapi meetingen szerintem',
+  '❯ Szia Alfred, ezt még átgondolom: a holnapi meetingen szerintem',
   '  SCHEDULED TASK NOTICE témát is hozzuk fel, meg a soak-ot',
   SEP,
   FOOTER,
@@ -107,7 +107,7 @@ const PARKED_SCHEDULED_REFERENCE = [
   '',
   SEP,
   '❯ <scheduled-task source="scheduled-task:kanban-audit"',
-  '  body-file="/opt/marveen/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md"',
+  '  body-file="/opt/alfred/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md"',
   '  body-sha256="deadbeef" body-chars="48745"> A feladat teljes szovege a',
   '  body-file fajlban van. Olvasd be TELJESEN (Read), es azt hajtsd vegre.',
   '  </scheduled-task>',

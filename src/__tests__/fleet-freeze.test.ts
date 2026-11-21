@@ -14,7 +14,7 @@ const ROOT = mkdtempSync(join(tmpdir(), 'fleet-freeze-'))
 mkdirSync(join(ROOT, 'store'), { recursive: true })
 afterAll(() => rmSync(ROOT, { recursive: true, force: true }))
 
-vi.mock('../config.js', async (orig) => ({ ...(await orig<typeof import('../config.js')>()), PROJECT_ROOT: ROOT, MAIN_AGENT_ID: 'marveen' }))
+vi.mock('../config.js', async (orig) => ({ ...(await orig<typeof import('../config.js')>()), PROJECT_ROOT: ROOT, MAIN_AGENT_ID: 'alfred' }))
 const running = new Set<string>()
 const stopSpy = vi.hoisted(() => vi.fn())
 const startSpy = vi.hoisted(() => vi.fn())
@@ -25,7 +25,7 @@ vi.mock('../web/agent-process.js', () => ({
   stopAgentProcess: async (n: string) => { stopSpy(n); running.delete(n); return { ok: true } },
   startAgentProcess: async (n: string, o: unknown) => { startSpy(n, o); running.add(n); return { ok: true } },
 }))
-vi.mock('../web/agent-config.js', async (orig) => ({ ...(await orig<typeof import('../web/agent-config.js')>()), listAgentNames: () => ['samu', 'zara', 'iris', 'marveen', 'kint'], readAgentRemoteHost: (n: string) => (n === 'kint' ? 'vps.example' : null) }))
+vi.mock('../web/agent-config.js', async (orig) => ({ ...(await orig<typeof import('../web/agent-config.js')>()), listAgentNames: () => ['samu', 'zara', 'iris', 'alfred', 'kint'], readAgentRemoteHost: (n: string) => (n === 'kint' ? 'vps.example' : null) }))
 const notifySpy = vi.hoisted(() => vi.fn(async (_text: string) => {}))
 vi.mock('../notify.js', async (orig) => ({ ...(await orig<typeof import('../notify.js')>()), notifyOwner: notifySpy }))
 
@@ -84,13 +84,13 @@ describe('switching it on', () => {
   })
 
   it('freeze keeps every session; stop stops the running sub-agents, never the main agent', async () => {
-    running.add('samu'); running.add('zara'); running.add('marveen')
+    running.add('samu'); running.add('zara'); running.add('alfred')
     await freeze(TOKEN)
     expect(stopSpy).not.toHaveBeenCalled()
     const r = await freeze(SESSION, { reason: 'mindent le', mode: 'stop' })
     expect(r.json.state.mode).toBe('stop')
     expect(stopSpy.mock.calls.map((c) => c[0]).sort()).toEqual(['samu', 'zara'])
-    expect(running.has('marveen')).toBe(true)
+    expect(running.has('alfred')).toBe(true)
     expect(readFleetFreeze()!.stoppedAgents!.sort()).toEqual(['samu', 'zara'])
     // the first reason stays; a later 'freeze' never downgrades a stop
     expect(readFleetFreeze()!.reason).toBe('teszt')

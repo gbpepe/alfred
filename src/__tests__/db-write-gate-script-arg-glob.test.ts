@@ -1,4 +1,4 @@
-// GATESCRIPTARG1111 (Samu 75780 A, Boni 75773, Marveen 75775): since GATEFILES1110 (#2681) a sub-agent's own directory
+// GATESCRIPTARG1111 (Samu 75780 A, Boni 75773, Alfred 75775): since GATEFILES1110 (#2681) a sub-agent's own directory
 // holds a protected name without a leading dot (agents/*/agent-config.json, noBareGlob), and a python/node SCRIPT FILE
 // run counted as re-shelling, so its quoted `count(*)` argument was read as a bare glob there and denied a read-only
 // measurement (`python3 scripts/supabase-logs.py <ref> "select count(*) ..."`). The shell never expands a glob in
@@ -31,7 +31,7 @@ afterEach(() => { rmSync(base, { recursive: true, force: true }) })
 const run = (command: string) => gateDecision('Bash', { command }, { cwd: agent, root, subAgent: true, projectDir: agent })
 const FREE = { deny: false }
 
-const BONI = `python3 /x/scripts/supabase-logs.py ymljpjpjrwbmkfvtahtn "select count(*) c from logs where source = 'function_logs' and event_message like '%Looking up tax number%'" --hours 24 --vault-key MARVEEN-CONNECTORS-PAT`
+const BONI = `python3 /x/scripts/supabase-logs.py ymljpjpjrwbmkfvtahtn "select count(*) c from logs where source = 'function_logs' and event_message like '%Looking up tax number%'" --hours 24 --vault-key ALFRED-CONNECTORS-PAT`
 
 describe('a quoted argument of a python/node script file is data', () => {
   it.each([

@@ -3,7 +3,7 @@
  *
  * Why it exists: on 2026-07-22 an ElevenLabs API key reached this PUBLIC repo in
  * commit 48638cb6. It was not written into code -- it sat inside a QUOTED
- * TELEGRAM MESSAGE in our own `.pre-ship-evidence` artifact. Nothing looked at
+ * CHANNEL MESSAGE in our own `.pre-ship-evidence` artifact. Nothing looked at
  * that file, because nothing looked at anything. The key is dead and that case
  * is closed; this module closes the mechanism.
  *
@@ -81,7 +81,7 @@ export const SECRET_PATTERNS: { name: string; pattern: RegExp }[] = [
   { name: 'bearer token literal', pattern: /\bBearer\s+[A-Za-z0-9_-]{24,}\.?[A-Za-z0-9_.-]*/ },
   { name: 'JWT', pattern: /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/ },
   { name: 'GitHub token', pattern: /\bgh[pousr]_[A-Za-z0-9]{30,}/ },
-  { name: 'Slack token', pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}/ },
+  { name: 'Workspace bot token', pattern: /\bxox[baprs]-[A-Za-z0-9-]{10,}/ },
   { name: 'OpenAI project key', pattern: /\bsk-proj-[A-Za-z0-9_-]{20,}/ },
   // BOTH separators, on purpose. Boni's first detector looked for `sk-` only
   // and returned zero on a key that used `sk_` -- and zero looks reassuring.
@@ -89,21 +89,10 @@ export const SECRET_PATTERNS: { name: string; pattern: RegExp }[] = [
   // around "32 hex" would have missed it.
   { name: 'generic vendor secret key (sk_ or sk-)', pattern: /\bsk[-_][A-Za-z0-9_-]{24,}/ },
   { name: 'AWS access key id', pattern: /\bAKIA[0-9A-Z]{16}\b/ },
-  // TGBOTPAT915: a Telegram bot token MINDHAROM alakban atment ezen a keszleten
-  // (teljes `<id>:<titok>`, csak a titkos fel, es a `TELEGRAM_BOT_TOKEN=` env-sor)
-  // -- merve a keszlet ELO peldanyan, harom ismert alak pozitiv kontrollja mellett.
-  // Nem elmeleti: 2026-09-15-en pontosan ez a token volt olvashato egy oktatovideo
-  // nyers felvetelen, es a maszkolo kapu is atengedte, mert az OCR a KETTOSPONTNAL
-  // vagta kette a sztringet, igy egyetlen token-minta sem illeszkedett.
-  // A ket ag KULON kell: a teljes alak a kettospont miatt nem illeszkedik a
-  // titkos felre irt mintara, a titkos fel pedig onmagaban is titok (az OCR-ut
-  // pont azt allitja elo). A titkos resz a Telegram formatuma szerint pontosan
-  // 35 karakter [A-Za-z0-9_-] halmazbol.
-  // Lookarounds, not \b (review #1347, Dani): in the Bot API URL form
-  // (`api.telegram.org/bot<id>:<secret>/...`) there is no word boundary between
-  // `bot` and the id, and a secret ending in `-` (about 1 in 64) has none after it.
-  { name: 'Telegram bot token', pattern: /(?<![0-9])[0-9]{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/ },
-  { name: 'Telegram bot token secret half', pattern: /(?:TELEGRAM[A-Z_]*TOKEN|bot_token|botToken)["'\s:=]+[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/i },
+  // Bot-token pattern (2026-09-15 incident: `<id>:<secret>`, secret half alone,
+  // and env-var lines): keeps all three shapes guarded without false gaps.
+  { name: 'Colon-prefixed bot token', pattern: /(?<![0-9])[0-9]{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/ },
+  { name: 'Bot token secret half', pattern: /(?:BOT_[A-Z_]*TOKEN|bot_token|botToken)["'\s:=]+[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/i },
   { name: 'Supabase service_role JWT hint', pattern: /service_role["'\s:=]+eyJ/ },
   // SBPMINTAHIANY914 (2026-09-14): a Supabase PERSONAL ACCESS TOKEN alakja. A sor
   // FOLOTT mar allt egy Supabase-tetel (a service_role JWT), amitol a Supabase
@@ -116,13 +105,13 @@ export const SECRET_PATTERNS: { name: string; pattern: RegExp }[] = [
 ];
 
 /**
- * Channel material. The 2026-07 leak was a pasted Telegram message; the secret
+ * Channel material. The 2026-07 leak was a pasted channel message; the secret
  * inside it was incidental. Quoted channel traffic does not belong in the repo
  * whatever it happens to contain, so this detector does not look at the payload.
  */
 export const TRANSCRIPT_PATTERNS: { name: string; pattern: RegExp }[] = [
   { name: 'quoted channel message', pattern: /\bmessage_id\s*[:=]?\s*\d{2,}\s*[:\-]/ },
-  { name: 'telegram update dump', pattern: /"(update_id|from_user|chat_id)"\s*:\s*\d+/ },
+  { name: 'channel update dump', pattern: /"(update_id|from_user|chat_id)"\s*:\s*\d+/ },
   { name: 'quoted agent transcript header', pattern: /^\s*\[Uzenet \\?@[a-z0-9_-]+-tol/im },
   // Same trap on the transcript side: this repo's evidence files use
   // `message_id NNN:`, but a wrapper tag is just as much channel material.
@@ -152,7 +141,7 @@ export const ALLOWLISTED_PATHS: { path: string; reason: string }[] = [
   { path: 'src/__tests__/channel-inbound-framing.test.ts', reason: 'channel framing test: synthetic wrapper frames with sample ids are the subject under test' },
   { path: 'scripts/__tests__/conversation-ledger.test.sh', reason: 'ledger test: synthetic wrapper frames with sample ids' },
   { path: 'src/__tests__/agent-terminal-mask-keys.test.ts', reason: 'terminal masking test: a hand-written sk-ant- shaped fixture IS the input under test -- the assertion is that no fragment of it reaches the audit line, so a different shape would stop measuring the thing' },
-  // MIOCLISKILL831 -- a `marveen skill` szkennerenek fixture-jei. A fajl
+  // MIOCLISKILL831 -- a `alfred skill` szkennerenek fixture-jei. A fajl
   // TARGYA egy kulcs-alaku string: a mio-scan `api-key-shaped` szabalyanak
   // kell valamin tuznie, es az aranyfajl ugyanazt a szoveget tartalmazza,
   // mert az EREDETI Python szkenner kimenete.

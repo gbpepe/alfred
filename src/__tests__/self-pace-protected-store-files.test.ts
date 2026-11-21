@@ -121,7 +121,7 @@ describe('Bash is fail-closed on the protected files', () => {
   }
   it.each([
     // talking about a file is not writing it
-    `curl -X POST http://localhost:3420/api/messages -d '{"to":"marveen","content":"add x to store/egress-vendor-hosts.json"}'`,
+    `curl -X POST http://localhost:3420/api/messages -d '{"to":"alfred","content":"add x to store/egress-vendor-hosts.json"}'`,
     'git commit -m "docs: store/config-overrides.json is owner-managed"',
     "cat > /tmp/note.md <<'EOF'\nsub-agents may not edit store/email-standing-recipients.json\nEOF",
     // source and test files with the same stem are not the store object

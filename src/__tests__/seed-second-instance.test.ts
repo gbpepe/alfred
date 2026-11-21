@@ -59,8 +59,8 @@ describe('the default task seed runs only in the instance that owns the install'
     expect(shouldRegisterHooks({ projectRoot: '/Users/x/repo/.claude/worktrees/wt1', webOnly: false, isGitFile: notAGitFile }).register).toBe(false)
     expect(shouldRegisterHooks({ projectRoot: '/Users/x/abel-wt-bridgemeasure', webOnly: false, isGitFile: () => true }).register).toBe(false)
     expect(shouldRegisterHooks({ projectRoot: '/private/tmp/canary', webOnly: false, isGitFile: notAGitFile, tmpDir: '/var/folders/zz/T' }).register).toBe(false)
-    expect(shouldRegisterHooks({ projectRoot: '/Users/x/ClaudeClaw', webOnly: true, isGitFile: notAGitFile, tmpDir: '/var/folders/zz/T' }).register).toBe(false)
+    expect(shouldRegisterHooks({ projectRoot: '/Users/x/Alfred', webOnly: true, isGitFile: notAGitFile, tmpDir: '/var/folders/zz/T' }).register).toBe(false)
     // The install itself still seeds.
-    expect(shouldRegisterHooks({ projectRoot: '/Users/x/ClaudeClaw', webOnly: false, isGitFile: notAGitFile, tmpDir: '/var/folders/zz/T' }).register).toBe(true)
+    expect(shouldRegisterHooks({ projectRoot: '/Users/x/Alfred', webOnly: false, isGitFile: notAGitFile, tmpDir: '/var/folders/zz/T' }).register).toBe(true)
   })
 })

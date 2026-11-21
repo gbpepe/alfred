@@ -31,7 +31,7 @@ async function open(page: Page, firstFails = false) {
     await later(n === 1 ? 300 : 800) // A answers first, B after A has built its panels
     await r.fulfill(json({ settings: [SETTING], overridesFile: null }))
   })
-  await page.addInitScript(() => { try { localStorage.setItem('marveen.lang', 'en'); localStorage.setItem('marveen-dashboard-token', 'a'.repeat(64)) } catch { /* ignore */ } })
+  await page.addInitScript(() => { try { localStorage.setItem('alfred.lang', 'en'); localStorage.setItem('alfred-dashboard-token', 'a'.repeat(64)) } catch { /* ignore */ } })
   await page.goto('/index.html')
   await page.waitForFunction(() => typeof (window as unknown as { loadSettings?: unknown }).loadSettings === 'function')
   await page.waitForLoadState('networkidle')

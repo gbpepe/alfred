@@ -17,7 +17,7 @@ export function skBlob(
   const type = parts.type ?? 'sk-ssh-ed25519@openssh.com'
   const key = parts.key ?? Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1))
   const fields = [str(Buffer.from(type, 'latin1')), str(key)]
-  if (parts.application !== null) fields.push(str(Buffer.from(parts.application ?? 'ssh:marveen-support-test', 'latin1')))
+  if (parts.application !== null) fields.push(str(Buffer.from(parts.application ?? 'ssh:alfred-support-test', 'latin1')))
   if (parts.trailing) fields.push(parts.trailing)
   return Buffer.concat(fields).toString('base64')
 }

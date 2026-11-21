@@ -30,15 +30,15 @@ function scratch(prefix: string): string {
   return dir
 }
 const testRoot = scratch('resume-drain-install-')
-const previousEnvDir = process.env.CLAUDECLAW_ENV_DIR
+const previousEnvDir = process.env.ALFRED_ENV_DIR
 // Keep the real rollout reader and agent lookup independent of the checkout's
 // .env and agents. Only config is mocked; classification and wrapping are real.
-process.env.CLAUDECLAW_ENV_DIR = testRoot
+process.env.ALFRED_ENV_DIR = testRoot
 vi.mock('../config.js', () => ({
   MAIN_AGENT_ID: 'main-agent',
   PROJECT_ROOT: testRoot,
   STORE_DIR: join(testRoot, 'store'),
-  DB_FILENAME: 'claudeclaw.db',
+  DB_FILENAME: 'alfred.db',
   DEFAULT_AGENT_MODEL: 'test-model',
   VOICE_CHANNEL_ID: null,
 }))
@@ -61,7 +61,7 @@ function newInstall(opts: { rules?: unknown; db?: string; env?: string } = {}): 
   const hook = hookOf(root)
   copyFileSync(SRC_HOOK, hook)
   if (opts.rules !== undefined) writeFileSync(join(store, 'provenance-gate-rules.json'), JSON.stringify(opts.rules))
-  if (opts.db && existsSync(opts.db)) copyFileSync(opts.db, join(store, 'claudeclaw.db'))
+  if (opts.db && existsSync(opts.db)) copyFileSync(opts.db, join(store, 'alfred.db'))
   if (opts.env !== undefined) writeFileSync(join(root, '.env'), opts.env)
   return { root, store, hook }
 }
@@ -91,7 +91,7 @@ function makeDb(rows: Array<[number, string, string, string, string, number?]>):
 function runDirective(prompt: string, cwd: string, db: string, storeDir?: string, env: Record<string, string> = {}): { out: string; log: string } {
   const dir = storeDir ?? newInstall().store
   const root = dirname(dir)
-  if (existsSync(db)) copyFileSync(db, join(dir, 'claudeclaw.db'))
+  if (existsSync(db)) copyFileSync(db, join(dir, 'alfred.db'))
   let out = ''
   try {
     out = execFileSync('python3', [hookOf(root)], {
@@ -124,8 +124,8 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllEnvs() })
 afterAll(() => {
-  if (previousEnvDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = previousEnvDir
+  if (previousEnvDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = previousEnvDir
   for (const dir of scratchDirs) rmSync(dir, { recursive: true, force: true })
 })
 

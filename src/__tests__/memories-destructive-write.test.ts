@@ -28,7 +28,7 @@ vi.mock('../logger.js', () => ({
 }))
 
 // These cases pin the tier guard and the version purge of a delete that RUNS.
-// Since MARVEENGAPS1020 (a) a delete below data_delete level 3 needs an approval
+// Since ALFREDGAPS1020 (a) a delete below data_delete level 3 needs an approval
 // first (memories-delete-approval.test.ts); level 3 is the path measured here.
 vi.mock('../web/autonomy-level.js', () => ({
   readAutonomyLevel: () => ({ level: 3, source: 'config' }),

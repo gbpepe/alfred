@@ -116,7 +116,7 @@ export function runChromePdf(target: string, lockdown: string[] | null, opts: { 
   if (!existsSync(chrome)) return Promise.resolve({ ok: false, error: `Chrome not found at ${chrome}` })
   if (running >= MAX_CONCURRENT_RENDERS) return Promise.resolve({ ok: false, error: 'renderer busy, retry shortly', busy: true })
   running++
-  const work = mkdtempSync(join(tmpdir(), 'marveen-pdf-'))
+  const work = mkdtempSync(join(tmpdir(), 'alfred-pdf-'))
   const out = join(work, 'out.pdf')
   return new Promise((resolve) => {
     execFile(chrome, chromeArgs(join(work, 'profile'), out, target, lockdown),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""marveen.io FEED-POSZT bekuldese -- a mio-feed-comment.py szerkezetet koveti.
+"""alfred.io FEED-POSZT bekuldese -- a mio-feed-comment.py szerkezetet koveti.
 
 Miert ilyen alakban (es nem ad-hoc fetch-csel):
 a szentesitett komment-szkript doktrinaja szerint a szuksegesseget a SZERKEZET adja, nem az
@@ -9,10 +9,10 @@ igeret. Ezert itt is:
   - a kapuk a kuldes FUGGVENYEI: bukas eseten a POST el sem indul,
   - a kozzetetel visszavonhatatlan, ezert explicit --confirm kell.
 A sema a SAJAT doksinkbol: POST /feed/posts -> channel_id (UUID), title (3-200),
-content (1-20000). Forras: https://api.marveen.io/agent/v1/docs, olvasva 2026-09-22.
+content (1-20000). Forras: https://api.alfred.io/agent/v1/docs, olvasva 2026-09-22.
 
 CSATOLMANY (MIOFEEDATTACH1014): --attach <fajl> egy .md fajlt kuld a poszt melle, a
-marveen.io #312-es multipart alakjaban (ugyanaz a harom mezo + egy "file" resz). A fajl
+alfred.io #312-es multipart alakjaban (ugyanaz a harom mezo + egy "file" resz). A fajl
 TARTALMA ugyanazokon a tartalmi kapukon megy at, mint a torzs (gondolatjel, nem-latin
 karakter, agens-nev), mert ugyanugy nyilvanos; a hossz-kapu ra nem vonatkozik. A rossz
 fajl HELYBEN all meg (kiterjesztes, meret, UTF-8, ures), nem a szerver 413/415-je fogja meg.
@@ -26,9 +26,9 @@ directory olvasasa): PK-magia, meret-plafon, legfeljebb ZIP_MAX_ENTRIES bejegyze
 osszmeret legfeljebb ZIP_MAX_UNCOMPRESSED, bejegyzesenkent a tomoritesi arany legfeljebb
 ZIP_MAX_RATIO, nincs abszolut ut, "..", backslash, symlink vagy titkositott bejegyzes, minden
 local header neve egyezik a central directory nevevel, es egyetlen end-of-central-directory
-rekord van (a marveen-io zip-kapujaval iker).
+rekord van (a alfred-io zip-kapujaval iker).
 
-KET SZUK KIVETEL (MIOFEEDMARVEEN1014, Marveen dontese): a "Marveen" TERMEKNEV a csatolmany
+KET SZUK KIVETEL (MIOFEEDALFRED1014, Alfred dontese): a "Alfred" TERMEKNEV a csatolmany
 tartalmaban es neveben nem bukik az agens-nev kapun (egy termek-leiras kenytelen kimondani);
 a cimben es a torzsben igen, valtozatlanul. A magyar idezojel (U+201E es U+201D) mindenhol
 atmegy; minden mas nem-latin karakter tovabbra is bukik. Futasonkenti felulbiralo kapcsolo
@@ -36,11 +36,11 @@ SZANDEKOSAN nincs.
 """
 import hashlib, json, os, re, stat, sys, urllib.request, urllib.error, uuid, zipfile
 
-HOST = "https://api.marveen.io"      # EGYETLEN megengedett host, nem parameter
+HOST = "https://api.alfred.io"      # EGYETLEN megengedett host, nem parameter
 PATH = "/agent/v1/feed/posts"        # ZART vegpont-lista: egyetlen iro utvonal
 CONTENT_MAX = 20000
 TITLE_MIN, TITLE_MAX = 3, 200
-# A csatolmany felso hatara a szerver alapertelmezese: marveen-io main,
+# A csatolmany felso hatara a szerver alapertelmezese: alfred-io main,
 # supabase/functions/_shared/md-upload-gate.ts uploadLimits(), maxBytes =
 # envInt('MAX_WEB_UPLOAD_BYTES', 1_000_000); a /docs "Csatolmany" szakasza ugyanezt
 # irja ("alapertelmezesben legfeljebb 1 000 000 bajt"). Olvasva 2026-10-14, d077eb3a.
@@ -49,14 +49,14 @@ TITLE_MIN, TITLE_MAX = 3, 200
 ATTACH_MAX_BYTES = 1_000_000
 ATTACH_EXT = ".md"
 ZIP_EXT = ".zip"
-# A szerver zip-kapujanak hatarai (marveen-io MIOFEEDZIP1016): helyben ugyanezek, hogy a rossz
+# A szerver zip-kapujanak hatarai (alfred-io MIOFEEDZIP1016): helyben ugyanezek, hogy a rossz
 # zip itt alljon meg, ne a szerver 422-je fogja meg.
 ZIP_MAX_ENTRIES = 500
 ZIP_MAX_UNCOMPRESSED = 20 * 1024 * 1024  # 20 MiB, a szerver DEFAULT_ZIP_LIMITS-ével azonosan
 ZIP_MAX_RATIO = 100
 # A csatolmany nev-kapujabol kivett nevek (lasd a modul-docstringet). Csak itt, csak ez.
-ATTACH_NEV_KIVETEL = ("Marveen",)
-AGENT_NEVEK = ("Marveen", "Mira", "Orsi", "Samu", "Dani", "Geri", "Boni", "Iris", "Zara",
+ATTACH_NEV_KIVETEL = ("Alfred",)
+AGENT_NEVEK = ("Alfred", "Mira", "Orsi", "Samu", "Dani", "Geri", "Boni", "Iris", "Zara",
                "Tomi", "Vera", "Jumanji", "Deeper", "Qwen")
 
 _RAG_BASE = ("ként", "nak", "nek", "val", "vel", "ról", "ről", "ból", "ből", "ban", "ben",
@@ -244,7 +244,7 @@ def multipart(fields: list, file_name: str, file_bytes: bytes):
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 def vault(key: str) -> str:
-    tok = open(os.path.expanduser("~/ClaudeClaw/store/.dashboard-token")).read().strip()
+    tok = open(os.path.expanduser("~/Alfred/store/.dashboard-token")).read().strip()
     req = urllib.request.Request(f"http://localhost:3420/api/vault/{key}",
                                  headers={"Authorization": f"Bearer {tok}"})
     with urllib.request.urlopen(req, timeout=10) as r:
@@ -292,7 +292,7 @@ def main() -> int:
               file=sys.stderr)
         return 3
 
-    key = vault("MARVEEN_IO_API_KULCS")
+    key = vault("ALFRED_IO_API_KULCS")
     if not key:
         print("STOP: nincs API-kulcs a vaultban", file=sys.stderr)
         return 4

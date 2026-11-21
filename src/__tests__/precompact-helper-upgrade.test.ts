@@ -14,7 +14,7 @@ import {
 // `curl -X POST ... -H "Authorization: Bearer $(cat <token>)"` lines. A strict profile runs
 // under `dontAsk`, where a command substitution never matches the allow-list, and the
 // researcher profile denies `curl -X POST` outright, so their pre-compaction save was refused
-// without a word. The template now names scripts/marveen-api.sh, and
+// without a word. The template now names scripts/alfred-api.sh, and
 // upgradePreCompactRecipesToHelper brings an existing agent's prompt along.
 
 type Hooks = { PreCompact: Array<{ hooks: Array<{ type?: string; prompt?: string; command?: string; timeout?: number }> }> }
@@ -35,7 +35,7 @@ function pre2338Prompt(): string {
 // skill section 2, frozen. upgradePreCompactRecipesToHelper on its own turns a curl prompt
 // into this one, with VOICETOKENLEAK1101 PR-C's per-kind payload files (perKind);
 // ensureAgentHooks' retired-list pass then takes it to the template prompt.
-const H = 'bash {{PROJECT_ROOT}}/scripts/marveen-api.sh'
+const H = 'bash {{PROJECT_ROOT}}/scripts/alfred-api.sh'
 const PER_KIND: Array<[string, string]> = [
   ['Használd a segédet (előtte a mentendő szöveget írd az api-payload.txt fájlba a munkamappádban):', PRECOMPACT_PAYLOAD_INTRO],
   [`  ${H} memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-payload.txt`, `  ${H} memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-memoria.txt`],
@@ -103,12 +103,12 @@ describe('upgradePreCompactRecipesToHelper', () => {
     expect(promptOf(hooks)).toBe(render(post2340Prompt()))
   })
 
-  it('the "A Marveen" intro line (before BOT_NAME) is upgraded on an install with another bot name', () => {
+  it('the "A Alfred" intro line (before BOT_NAME) is upgraded on an install with another bot name', () => {
     const render = (s: string) => substituteTemplatePlaceholders(s, {
       projectRoot: '/opt/install', mainAgentId: 'agent', botName: 'Bot', ownerName: 'Owner', webPort: 3420,
     })
-    const old = render(pre2338Prompt().replace('A {{BOT_NAME}} /api/* Bearer tokenes.', 'A Marveen /api/* Bearer tokenes.'))
-    expect(old).toContain('A Marveen /api/* Bearer tokenes.')
+    const old = render(pre2338Prompt().replace('A {{BOT_NAME}} /api/* Bearer tokenes.', 'A Alfred /api/* Bearer tokenes.'))
+    expect(old).toContain('A Alfred /api/* Bearer tokenes.')
     const hooks = hooksWith(old)
     expect(upgradePreCompactRecipesToHelper(hooks, render)).toBe(true)
     expect(promptOf(hooks)).toBe(render(post2340Prompt()))
@@ -152,18 +152,18 @@ describe('upgradePreCompactRecipesToHelper', () => {
     expect(promptOf(hooks)).toBe(withUnknown)
   })
 
-  it('the ~/ClaudeClaw-era prompt (b8e4ff8e6, still on live agents): every recipe line is upgraded, none left as curl', () => {
+  it('the ~/Alfred-era prompt (b8e4ff8e6, still on live agents): every recipe line is upgraded, none left as curl', () => {
     // Frozen from the template's history; byte-equal to a live agent's prompt measured on 2026-10-29.
     const old = readFileSync(join(PROJECT_ROOT, 'src', '__tests__', 'fixtures', 'precompact-prompt-b8e4ff8e6.txt'), 'utf-8')
-    expect(old).toContain('cat ~/ClaudeClaw/store/.dashboard-token')
+    expect(old).toContain('cat ~/Alfred/store/.dashboard-token')
     const hooks = hooksWith(old)
     expect(upgradePreCompactRecipesToHelper(hooks)).toBe(true)
     const p = promptOf(hooks)
     expect(p).not.toMatch(/curl\b.*\/api\//)
     expect(p).not.toContain('.dashboard-token')
     expect(p).not.toContain('Használd a curl parancsokat:')
-    expect(p).toContain('/scripts/marveen-api.sh memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-memoria.txt')
-    expect(p).toContain('/scripts/marveen-api.sh daily-log SAJAT_NEVED api-naplo.txt')
+    expect(p).toContain('/scripts/alfred-api.sh memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-memoria.txt')
+    expect(p).toContain('/scripts/alfred-api.sh daily-log SAJAT_NEVED api-naplo.txt')
     expect(p.split("\n")).toContain(PRECOMPACT_PAYLOAD_INTRO)
     expect(p).not.toContain('api-payload.txt')
   })

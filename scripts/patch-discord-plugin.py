@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Marveen's version of the Discord channel plugin, put in place over the cached
+Alfred's version of the Discord channel plugin, put in place over the cached
 official one (DCEXT1111; replaces the DCBTN1023 anchor patch, whose answer
 buttons it carries).
 
@@ -18,7 +18,7 @@ cache: the one this install launches from ($CLAUDE_CONFIG_DIR/plugins/cache, or
 What a cached server.ts is decides what happens, never its folder name:
 - the vendored upstream file (sha256), or that file with the old DCBTN1023
   tagged lines in it: ours goes in ("overlaid");
-- a file this script wrote (its sha256 in the .marveen-overlay.json manifest
+- a file this script wrote (its sha256 in the .alfred-overlay.json manifest
   next to it, or byte-identical to a vendored overlay server.ts): brought to the current overlay and settings ("upgraded"), or
   left alone when already current ("already");
 - anything else (a plugin update): left alone, one loud line, the plugin runs
@@ -27,7 +27,7 @@ What a cached server.ts is decides what happens, never its folder name:
 DISCORD_PLUGIN_EXT=off puts the vendored upstream file back, byte-identical,
 and removes everything else this script wrote ("restored"): the plugin is the
 official one again after the next channel start. DISCORD_OWNER_USER_ID and
-DISCORD_BACKFILL go to marveen-ext.json next to server.ts, which the overlay
+DISCORD_BACKFILL go to alfred-ext.json next to server.ts, which the overlay
 reads at start, together with the dashboard's command menu (the slash commands,
 read with the install's dashboard token; null when that is not possible). Settings are read as the dashboard's settings store answers
 them (the first two are overrides-only: the owner's override, never .env);
@@ -55,11 +55,11 @@ VENDOR = os.path.join(INSTALL_DIR, "vendor", "discord-plugin")
 
 # The old anchor patch tagged every line it added; a file still carrying them
 # is the upstream file plus our buttons, and is taken over like the upstream one.
-DCBTN_TAG = "// MARVEEN-PATCH(dcbtn1023)"
-MANIFEST = ".marveen-overlay.json"
-EXT_CONFIG = "marveen-ext.json"
+DCBTN_TAG = "// ALFRED-PATCH(dcbtn1023)"
+MANIFEST = ".alfred-overlay.json"
+EXT_CONFIG = "alfred-ext.json"
 SNOWFLAKE = re.compile(r"^[1-9][0-9]{16,19}$")
-# The overlay's id shape for channels and roles (marveen-ext.ts SNOWFLAKE_ID).
+# The overlay's id shape for channels and roles (alfred-ext.ts SNOWFLAKE_ID).
 SNOWFLAKE_ID = re.compile(r"^[0-9]{15,20}\Z")
 # DISCORD_CHANNEL_POLICY's on/off keys per channel, as the overlay's parseChannelPolicy reads them.
 CHANNEL_POLICY_FLAGS = ("history", "autoThread")
@@ -122,7 +122,7 @@ def override_value(install_dir, key):
 
 
 def settings(install_dir):
-    """(ext on?, marveen-ext.json content). DISCORD_PLUGIN_EXT and DISCORD_OWNER_USER_ID are overrides-only
+    """(ext on?, alfred-ext.json content). DISCORD_PLUGIN_EXT and DISCORD_OWNER_USER_ID are overrides-only
     (src/config-registry.ts: switching the overlay off, or naming another owner, loosens who approves a tool);
     DISCORD_BACKFILL is a plain flag (override, then .env, then on)."""
     tg = _telegram_helpers()
@@ -134,7 +134,7 @@ def settings(install_dir):
         owner = ""
     backfill = tg.flag_setting(install_dir, "DISCORD_BACKFILL", True)
     # DISCORD_CHANNEL_POLICY (overrides-only): per-channel extras, e.g. {"<channel>": {"allowRoles": ["<role>"], "history": true}}.
-    # Passed through as parsed JSON; the overlay keeps only well-formed entries (marveen-ext.ts parseChannelPolicy).
+    # Passed through as parsed JSON; the overlay keeps only well-formed entries (alfred-ext.ts parseChannelPolicy).
     policy = {}
     raw_policy = (override_value(install_dir, "DISCORD_CHANNEL_POLICY") or "").strip(tg.JS_TRIM)
     if raw_policy:
@@ -171,7 +171,7 @@ def slash_commands(install_dir):
                     port = line.split("=", 1)[1].strip()
         except OSError:
             pass
-    base = os.environ.get("MARVEEN_API_BASE") or f"http://127.0.0.1:{port}"
+    base = os.environ.get("ALFRED_API_BASE") or f"http://127.0.0.1:{port}"
     try:
         req = urllib.request.Request(base + "/api/commands/menu?channel=discord", headers={"Authorization": "Bearer " + tok})
         with urllib.request.urlopen(req, timeout=5) as r:
@@ -186,7 +186,7 @@ def slash_commands(install_dir):
 
 
 def channel_policy_drops(policy):
-    """What the overlay's parseChannelPolicy (marveen-ext.ts) will silently drop, one line each. The object
+    """What the overlay's parseChannelPolicy (alfred-ext.ts) will silently drop, one line each. The object
     itself is passed on unchanged; this only makes the drop visible (a role NAME instead of its id, say)."""
     out = []
     for ch, v in policy.items():
@@ -248,7 +248,7 @@ def identify(dirpath, text_bytes, vendor):
 
 
 def write_atomic(path, data):
-    tmp = path + ".marveen-tmp"
+    tmp = path + ".alfred-tmp"
     # A leftover (or planted) temp entry is unlinked, never followed: os.remove on a symlink removes the link.
     if os.path.lexists(tmp):
         os.remove(tmp)
@@ -273,7 +273,7 @@ def desired_files(entry, ext):
 
 def manifest_old_files(manifest, vendor):
     """The manifest's file names that may be removed: plain basenames of the vendored overlay set (or
-    marveen-ext.json). The manifest is a file in the plugin folder, not ours to trust: anything else
+    alfred-ext.json). The manifest is a file in the plugin folder, not ours to trust: anything else
     (a path, ../, an absolute name) is skipped loudly and never handed to os.remove. (names, rejected?)"""
     known = {n for e in vendor.values() for n in e["overlay"]} | {EXT_CONFIG}
     names, rejected = set(), False
@@ -299,7 +299,7 @@ def apply_file(path, vendor, ext_on, ext):
     if kind == "unknown":
         if vendor:
             log(f"LOUD: {path} is not a plugin version this install knows (plugin updated?) -- "
-                "left as shipped, Marveen's Discord additions are off until vendor/discord-plugin catches up")
+                "left as shipped, Alfred's Discord additions are off until vendor/discord-plugin catches up")
         else:
             log(f"LOUD: vendor/discord-plugin missing or empty -- {path} left as shipped")
         return "unknown"
@@ -351,7 +351,7 @@ def apply_file(path, vendor, ext_on, ext):
         log(f"cannot write in {dirpath}: {type(e).__name__} -- left as it was")
         return "unwritable"
     status = "upgraded" if kind == "ours" else "overlaid"
-    log(f"{status} {path} (Marveen's Discord plugin {entry['version']}, from {kind})")
+    log(f"{status} {path} (Alfred's Discord plugin {entry['version']}, from {kind})")
     return status
 
 

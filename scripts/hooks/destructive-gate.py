@@ -121,7 +121,7 @@ def _live_install(root):
     A nem-eldontheto eset itt a SZIGORU fele esik: ha a jelolot nem tudjuk megnezni
     (jogosultsag, I/O), eles telepitesnek vesszuk.
     """
-    for marker in ('claudeclaw.db', '.dashboard-token'):
+    for marker in ('alfred.db', '.dashboard-token'):
         try:
             if os.path.exists(os.path.join(root, 'store', marker)):
                 return True
@@ -360,7 +360,7 @@ def _script_arg_ranges(text):
     return out
 
 
-# marveen #2482: a burkolok PARANCSSZTRINGJE is futo kod, nem proza. `flock FILE -c '...'`,
+# alfred #2482: a burkolok PARANCSSZTRINGJE is futo kod, nem proza. `flock FILE -c '...'`,
 # `env -S '...'`, es a `watch` / `parallel` maradek szavai (shell-sztringkent futnak).
 # A rovid alak OSSZEIRVA is (flock -c'...', env -S"...", egy rovid-kapcsolo-csoport vegen is),
 # a hosszu alak = jellel vagy kulon szoban (Samu review, #2484).
@@ -515,7 +515,7 @@ _SHELLS = ('sh', 'bash', 'zsh', 'dash', 'ksh')
 # parancsot a kapu nem tud vegigkovetni, es amit nem lat at, azt nem engedi.
 _MAX_NEST = 8
 
-# ---- Burkolok: BURKOLONKENTI kapcsolo-ismeret (marveen #2482, ISSUE2482GATE1103) ----------
+# ---- Burkolok: BURKOLONKENTI kapcsolo-ismeret (alfred #2482, ISSUE2482GATE1103) ----------
 # A regi atlepes egyetlen lapos kapcsolo-tablaval (a xargs-ei) es egy szam-atlepessel dolgozott,
 # a "lathatatlan" elotagok (env, time, command, exec) pedig EGYETLEN szot leptek at. Igy egy
 # kapcsolo erteke (`ionice -c idle`, `stdbuf -o L`, `timeout --signal KILL`, `env -u FOO`),
@@ -989,7 +989,7 @@ def _hooks_tamper_git(toks, argstart=0):
 # A pre-push dispatcher jelolo sora: scripts/install-secret-gate-hook.sh PUSH_MARK irja a
 # <common-dir>/hooks/pre-push fajlba. Ebbol tudja a kapu, hogy a repo-ban EGYALTALAN telepitve
 # vannak-e a push-kapuk, es hogy a git tenylegesen hasznalt hook-konyvtara az-e, amelyikben.
-_PUSH_DISPATCHER_MARK = 'marveen-pre-push-dispatcher'
+_PUSH_DISPATCHER_MARK = 'alfred-pre-push-dispatcher'
 
 
 def _dispatcher_installed(hooks_dir):

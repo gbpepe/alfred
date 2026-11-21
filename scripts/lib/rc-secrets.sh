@@ -41,7 +41,7 @@ remove_secret_export_from_rc() {
 ensure_secret_reader_in_rc() {
   local var="$1" file="$2" kind="$3" q marker line
   q="'$(printf '%s' "$file" | sed "s/'/'\\\\''/g")'"
-  marker="# marveen: ${var} from the install's 0600 file"
+  marker="# alfred: ${var} from the install's 0600 file"
   if [ "$kind" = "env" ]; then
     line="${marker}"$'\n'"_mv=\"\$(grep -m1 '^${var}=' ${q} 2>/dev/null | cut -d= -f2-)\"; [ -n \"\$_mv\" ] && export ${var}=\"\$_mv\"; unset _mv"
   else

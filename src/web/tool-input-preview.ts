@@ -26,7 +26,7 @@ const SECRET_PATTERNS: Array<{ re: RegExp; hasGroup: boolean }> = [
   { re: /(\b\w*(?:token|secret|passw(?:or)?d|api[_\-]?key|apikey|auth|credential|_key)['"]?\s*[=:]\s*['"]?)(?!\$)[^\s,'";&|]{6,}/gi, hasGroup: true },
   // Known token prefixes (the prefix is kept as the label)
   { re: /\b(ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|sbp_|sk-ant-|sk-|xoxb-|xoxp-|xapp-|sk_live_|sk_test_|rk_live_|rk_test_|whsec_)[A-Za-z0-9_\-]{10,}/g, hasGroup: true },
-  // Telegram bot token (<bot id>:<secret>), bare or inside an api.telegram.org URL
+  // Colon-prefixed bot token (<bot id>:<secret>), bare or inside an API URL
   { re: /(\b(?:bot)?\d{6,12}:)[A-Za-z0-9_\-]{30,}/g, hasGroup: true },
   // AWS access key id
   { re: /\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, hasGroup: true },

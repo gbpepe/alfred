@@ -6,7 +6,7 @@
 # Deliberately NOT a required status check yet: flipping it to required at
 # introduction would block every open PR whose head predates the workflow
 # (the required-check-never-ran class). The switch to required is a separate
-# owner/Marveen decision, gated on measuring how many open PRs run it green
+# owner/Alfred decision, gated on measuring how many open PRs run it green
 # (decision msg 14205, recorded on the MARVCI822 card).
 name: test
 
@@ -32,7 +32,7 @@ jobs:
       - run: npm ci
       # INSTALLDIRTYTREE1103: a non-canonical package-lock.json is rewritten by any
       # fresh `npm install` on a customer machine, which leaves the install tree
-      # dirty and sends every later update down the stash path (marveen2, 11-03).
+      # dirty and sends every later update down the stash path (alfred2, 11-03).
       - run: bash scripts/check-lockfile-canonical.sh
       # #1565 item 4: the channel-image-resize tests build a REAL >500KB JPEG
       # with ffmpeg (a Buffer.alloc fixture let the hook claim a resize it never
@@ -81,7 +81,7 @@ jobs:
       # TASKEGRESSDRIFT913: the egress-drift scan is a gate instrument; a guard that
       # only runs by hand rots (the #1316 class), so its tests run here too.
       - run: python3 scripts/__tests__/egress-drift-scan.test.py
-      # marveen #2482: the destructive gate's wrapper handling (and its whole regression set)
+      # alfred #2482: the destructive gate's wrapper handling (and its whole regression set)
       # ran only by hand; a gate test that is not in CI rots.
       - run: python3 scripts/__tests__/destructive-gate.test.py
       # INSTALLDIRTYTREE1103: the install-drift repair restores files on customer

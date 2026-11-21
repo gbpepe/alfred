@@ -11,7 +11,7 @@
 # So every override form gets its own case, and the `--author=` one is the point.
 #
 # CASE 8 IS THE ONE A REVIEWER SHOULD READ FIRST. The first version of this gate
-# resolved its expected value as `${MARVEEN_BOT_EMAIL:-<baked>}` at RUNTIME, which
+# resolved its expected value as `${ALFRED_BOT_EMAIL:-<baked>}` at RUNTIME, which
 # meant one environment variable let a commit through while printing NOTHING -- a
 # silent way around a gate whose other two exits are loud. Sam found it by reading
 # the generated hook, measured 2026-09-27. The expected value now has no runtime
@@ -81,7 +81,7 @@ git config user.email "$BOT"
 
 # NO BOT IDENTITY CONFIGURED = NOT OPTED IN: the installer must say so in ONE line, exit 0 and
 # install NOTHING. sync-hooks.sh runs every install-*-hook.sh on each update, so an install that
-# never set MARVEEN_BOT_EMAIL must not get an error block and a non-zero exit every time. There
+# never set ALFRED_BOT_EMAIL must not get an error block and a non-zero exit every time. There
 # is still no default identity: a baked-in default would be the identity of the fleet this file
 # came from, which is why the answer is "skip", not "guess".
 OUT="$(bash scripts/install-commit-identity-hook.sh 2>&1)"
@@ -91,8 +91,8 @@ RC=$?
 [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = "1" ] && pass "and says so in exactly one line" \
   || fail "the skip was not one line: $OUT"
 case "$OUT" in
-  *"skipped (MARVEEN_BOT_EMAIL not set"*) pass "and names the setting that enables the gate" ;;
-  *) fail "the skip line does not name MARVEEN_BOT_EMAIL: $OUT" ;;
+  *"skipped (ALFRED_BOT_EMAIL not set"*) pass "and names the setting that enables the gate" ;;
+  *) fail "the skip line does not name ALFRED_BOT_EMAIL: $OUT" ;;
 esac
 if [ -e .git/hooks/pre-commit.d/15-commit-identity ]; then
   fail "the installer skipped but left a gate behind"
@@ -110,7 +110,7 @@ sha() {
 
 # The install's .env is the supported place, and the key is read the way the
 # product's readEnvFile reads it: a leading 'export ' does NOT match.
-printf 'export MARVEEN_BOT_EMAIL=%s\n' "$BOT" > .env
+printf 'export ALFRED_BOT_EMAIL=%s\n' "$BOT" > .env
 OUT="$(bash scripts/install-commit-identity-hook.sh 2>&1)"
 RC=$?
 if [ "$RC" -eq 0 ] && [ ! -e .git/hooks/pre-commit.d/15-commit-identity ]; then
@@ -118,21 +118,21 @@ if [ "$RC" -eq 0 ] && [ ! -e .git/hooks/pre-commit.d/15-commit-identity ]; then
 else
   fail "an export-prefixed key in .env was accepted or broke the install (rc=$RC): $OUT"
 fi
-printf 'MARVEEN_BOT_EMAIL=%s\n' "$BOT" > .env
+printf 'ALFRED_BOT_EMAIL=%s\n' "$BOT" > .env
 
 # A CRLF .env must read the same as an LF one. Measured 2026-09-27 against the compiled
 # dist/env.js on 13 .env shapes: the CRLF line ending was the ONE that diverged before this
 # was fixed -- the product trims the whole line, this reader kept the \r and baked
 # "<addr>\r" into the gate, which then blocks EVERY commit while the message looks like a
 # wrong identity. This machine is WSL, so CRLF is not hypothetical.
-printf 'MARVEEN_BOT_EMAIL=%s\r\n' "$BOT" > .env
+printf 'ALFRED_BOT_EMAIL=%s\r\n' "$BOT" > .env
 bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
 if grep -q "^BOT_EMAIL=\"$BOT\"$" .git/hooks/pre-commit.d/15-commit-identity; then
   pass "a CRLF .env bakes the same identity as an LF one"
 else
   fail "a CRLF .env leaked a stray byte into the baked identity"
 fi
-printf 'MARVEEN_BOT_EMAIL=%s\n' "$BOT" > .env
+printf 'ALFRED_BOT_EMAIL=%s\n' "$BOT" > .env
 
 bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
 FIRST="$(sha .git/hooks/pre-commit.d/15-commit-identity)"
@@ -203,29 +203,29 @@ fi
 
 # 7. Another install with another bot: the expected identity is configurable, so
 #    this file does not have to be edited per fleet.
-MARVEEN_BOT_EMAIL="other@example.invalid" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
+ALFRED_BOT_EMAIL="other@example.invalid" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
 # (this also pins the precedence: the environment wins over the .env above)
 echo q >> f.txt; git add .
 if git commit -q -m x >/dev/null 2>&1; then
-  fail "after MARVEEN_BOT_EMAIL the gate still accepted the old identity"
+  fail "after ALFRED_BOT_EMAIL the gate still accepted the old identity"
 else
-  pass "MARVEEN_BOT_EMAIL changes which identity is expected"
+  pass "ALFRED_BOT_EMAIL changes which identity is expected"
 fi
 
 # 8. THE RUNTIME ENVIRONMENT MUST NOT RE-AIM THE INSTALLED GATE. This is the silent
-#    bypass: with a runtime default, `MARVEEN_BOT_EMAIL=x git -c user.email=x commit`
+#    bypass: with a runtime default, `ALFRED_BOT_EMAIL=x git -c user.email=x commit`
 #    passed and printed nothing. The install-time environment still configures the
 #    gate (case 7) -- what must not work is changing it per invocation.
 bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1 \
-  || MARVEEN_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
-MARVEEN_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
+  || ALFRED_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
+ALFRED_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
 SNEAK="sneak@example.invalid"
 BEFORE="$(git rev-parse HEAD)"
 echo r >> f.txt; git add .
-if MARVEEN_BOT_EMAIL="$SNEAK" git -c user.email="$SNEAK" -c user.name=S commit -q -m x >/dev/null 2>&1; then
-  fail "MARVEEN_BOT_EMAIL at RUNTIME re-aimed the gate (the silent bypass is back)"
+if ALFRED_BOT_EMAIL="$SNEAK" git -c user.email="$SNEAK" -c user.name=S commit -q -m x >/dev/null 2>&1; then
+  fail "ALFRED_BOT_EMAIL at RUNTIME re-aimed the gate (the silent bypass is back)"
 else
-  pass "MARVEEN_BOT_EMAIL at runtime does NOT re-aim the installed gate"
+  pass "ALFRED_BOT_EMAIL at runtime does NOT re-aim the installed gate"
 fi
 [ "$(git rev-parse HEAD)" = "$BEFORE" ] \
   && pass "and no commit was created on that attempt" \
@@ -247,7 +247,7 @@ if git commit -q -m x >/dev/null 2>&1; then
 else
   pass "an empty baked identity blocks instead of matching"
 fi
-MARVEEN_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
+ALFRED_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
 grep -q "^BOT_EMAIL=\"$BOT\"$" "$GUARDFILE" \
   && pass "re-installing restores the expected identity" \
   || fail "re-install did not restore the baked identity"
@@ -258,13 +258,13 @@ grep -q "^BOT_EMAIL=\"$BOT\"$" "$GUARDFILE" \
 #     A value that is not an address at all is refused; a non-noreply address warns and
 #     installs, because a real bot mailbox or a non-GitHub host is legitimate and this
 #     script cannot tell those from a mistake. Sam proposed the shape check.
-OUT="$(MARVEEN_BOT_EMAIL="notAnAddress" bash scripts/install-commit-identity-hook.sh 2>&1)"
+OUT="$(ALFRED_BOT_EMAIL="notAnAddress" bash scripts/install-commit-identity-hook.sh 2>&1)"
 if [ $? -eq 0 ]; then
   fail "a value that is not an e-mail address was accepted"
 else
   pass "a value that is not an e-mail address is refused"
 fi
-OUT="$(MARVEEN_BOT_EMAIL="person@example.com" bash scripts/install-commit-identity-hook.sh 2>&1)"
+OUT="$(ALFRED_BOT_EMAIL="person@example.com" bash scripts/install-commit-identity-hook.sh 2>&1)"
 RC=$?
 case "$OUT" in
   *"not a no-reply form"*) pass "a non-noreply identity warns out loud at install time" ;;
@@ -273,7 +273,7 @@ esac
 [ "$RC" -eq 0 ] \
   && pass "and it still installs (a real bot mailbox is legitimate)" \
   || fail "the warning turned into a refusal"
-MARVEEN_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
+ALFRED_BOT_EMAIL="$BOT" bash scripts/install-commit-identity-hook.sh >/dev/null 2>&1
 
 echo
 echo "$PASS passed, $FAIL failed"

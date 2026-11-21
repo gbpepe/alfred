@@ -112,16 +112,16 @@ describe('VAULTUJKULCS822: fail-closed master key handling', () => {
     expect(keychainMock.storeCalls).toHaveLength(1)
   })
 
-  // MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION=1: the headersHelper / resolver scripts only READ secrets; on macOS without a GUI
+  // ALFRED_VAULT_NO_KEYCHAIN_MIGRATION=1: the headersHelper / resolver scripts only READ secrets; on macOS without a GUI
   // session the migration's `security` call times out on every call and its warning corrupts their stdout.
-  describe('MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION=1: a read-only consumer never touches the Keychain', () => {
+  describe('ALFRED_VAULT_NO_KEYCHAIN_MIGRATION=1: a read-only consumer never touches the Keychain', () => {
     const withSwitch = async <T,>(value: string | undefined, fn: () => Promise<T>): Promise<T> => {
-      const old = process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION
-      if (value === undefined) delete process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION
-      else process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION = value
+      const old = process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION
+      if (value === undefined) delete process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION
+      else process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION = value
       try { return await fn() } finally {
-        if (old === undefined) delete process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION
-        else process.env.MARVEEN_VAULT_NO_KEYCHAIN_MIGRATION = old
+        if (old === undefined) delete process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION
+        else process.env.ALFRED_VAULT_NO_KEYCHAIN_MIGRATION = old
       }
     }
 

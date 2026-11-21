@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test: scripts/backup.sh takes the per-agent state and the systemd user units,
 # and scripts/backup-nightly.sh makes an optional second copy that is OFF unless
-# MARVEEN_BACKUP_COPY_DIR is set.
+# ALFRED_BACKUP_COPY_DIR is set.
 # Run: bash scripts/__tests__/backup-agent-state-and-nightly.test.sh
 #
 # Hermetic: a throwaway repo and HOME under one temp dir, never the live store.
@@ -28,9 +28,9 @@ cp "$REPO/scripts/lib/archive-list-has.sh" "$FAKE/scripts/lib/"
 
 # Load-bearing markers backup.sh insists on.
 if command -v sqlite3 >/dev/null 2>&1; then
-  sqlite3 "$FAKE/store/claudeclaw.db" 'CREATE TABLE t(x);'
+  sqlite3 "$FAKE/store/alfred.db" 'CREATE TABLE t(x);'
 else
-  printf 'db' > "$FAKE/store/claudeclaw.db"
+  printf 'db' > "$FAKE/store/alfred.db"
 fi
 printf 'x' > "$FHOME/.claude/skills/demo/SKILL.md"
 printf 'x' > "$FHOME/.claude/scheduled-tasks/demo/SKILL.md"
@@ -48,14 +48,14 @@ printf 'm' > "$A/.claude-config/projects/p1/memory/note.md"
 printf 't' > "$A/.claude-config/projects/p1/transcripts/log.jsonl"
 printf 'm' > "$FAKE/.channels-config/projects/p1/memory/note.md"
 printf 't' > "$FAKE/.channels-config/projects/p1/transcripts/log.jsonl"
-# This fleet's units (default prefix: marveen-), a drop-in and an enable link,
+# This fleet's units (default prefix: alfred-), a drop-in and an enable link,
 # next to another application's unit that must stay out.
 SD="$FHOME/.config/systemd/user"
-mkdir -p "$SD/marveen-channels.service.d" "$SD/default.target.wants"
-printf '[Unit]' > "$SD/marveen-channels.service"
-printf '[Unit]' > "$SD/marveen-backup.timer"
-printf '[Service]' > "$SD/marveen-channels.service.d/onfailure.conf"
-ln -s "$SD/marveen-channels.service" "$SD/default.target.wants/marveen-channels.service"
+mkdir -p "$SD/alfred-channels.service.d" "$SD/default.target.wants"
+printf '[Unit]' > "$SD/alfred-channels.service"
+printf '[Unit]' > "$SD/alfred-backup.timer"
+printf '[Service]' > "$SD/alfred-channels.service.d/onfailure.conf"
+ln -s "$SD/alfred-channels.service" "$SD/default.target.wants/alfred-channels.service"
 printf '[Service]\nEnvironment=OTHER_APP_SETTING=1\n' > "$SD/other-app.service"
 ln -s "$SD/other-app.service" "$SD/default.target.wants/other-app.service"
 printf 'SECRET=1' > "$A/.claude/skills/own/.env"
@@ -85,7 +85,7 @@ if [ "$RC" -eq 0 ]; then pass "backup.sh exits 0"; else
   fail "backup.sh exited $RC"; echo "$OUTPUT" | tail -15; fi
 if ls -d "$OUT"/.stage.* >/dev/null 2>&1; then fail "a stage folder was left in BACKUP_DIR"; else pass "no stage folder left in BACKUP_DIR"; fi
 
-ARCHIVE="$(ls -1 "$OUT"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
+ARCHIVE="$(ls -1 "$OUT"/alfred-*.tar.gz 2>/dev/null | head -1)"
 LIST="$TMP/archive.list"
 [ -n "$ARCHIVE" ] && tar -tzf "$ARCHIVE" > "$LIST" 2>/dev/null || : > "$LIST"
 
@@ -98,10 +98,10 @@ for p in repo/agents/alpha/agent-config.json \
          repo/agents/alpha/PACKAGE.md \
          repo/agents/alpha/LOCAL.md \
          repo/agents/alpha/.package/manifest.json \
-         home/.config/systemd/user/marveen-channels.service \
-         home/.config/systemd/user/marveen-backup.timer \
-         home/.config/systemd/user/marveen-channels.service.d/onfailure.conf \
-         home/.config/systemd/user/default.target.wants/marveen-channels.service; do
+         home/.config/systemd/user/alfred-channels.service \
+         home/.config/systemd/user/alfred-backup.timer \
+         home/.config/systemd/user/alfred-channels.service.d/onfailure.conf \
+         home/.config/systemd/user/default.target.wants/alfred-channels.service; do
   if grep -qx "$p" "$LIST"; then pass "in the archive: $p"; else fail "missing from the archive: $p"; fi
 done
 
@@ -120,35 +120,35 @@ done
 
 # agents/*/secrets/ is opt-in: absent by default.
 if grep -qx "repo/agents/alpha/secrets/key" "$LIST"; then
-  fail "secrets/ is in the archive although MARVEEN_BACKUP_AGENT_SECRETS is unset"
+  fail "secrets/ is in the archive although ALFRED_BACKUP_AGENT_SECRETS is unset"
 else
   pass "secrets/ is NOT in the archive by default"
 fi
 for v in 0 yes true; do
   rm -rf "$OUT"; mkdir -p "$OUT"
-  (cd "$FAKE" && HOME="$FHOME" BACKUP_DIR="$OUT" MARVEEN_BACKUP_AGENT_SECRETS="$v" bash scripts/backup.sh >/dev/null 2>&1)
-  A2="$(ls -1 "$OUT"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
+  (cd "$FAKE" && HOME="$FHOME" BACKUP_DIR="$OUT" ALFRED_BACKUP_AGENT_SECRETS="$v" bash scripts/backup.sh >/dev/null 2>&1)
+  A2="$(ls -1 "$OUT"/alfred-*.tar.gz 2>/dev/null | head -1)"
   if [ -n "$A2" ] && tar -tzf "$A2" | grep -qx "repo/agents/alpha/secrets/key"; then
-    fail "secrets/ taken with MARVEEN_BACKUP_AGENT_SECRETS=$v (only 1 enables it)"
+    fail "secrets/ taken with ALFRED_BACKUP_AGENT_SECRETS=$v (only 1 enables it)"
   else
-    pass "MARVEEN_BACKUP_AGENT_SECRETS=$v does not enable secrets/"
+    pass "ALFRED_BACKUP_AGENT_SECRETS=$v does not enable secrets/"
   fi
 done
 rm -rf "$OUT"; mkdir -p "$OUT"
-OUTPUT1="$(cd "$FAKE" && HOME="$FHOME" BACKUP_DIR="$OUT" MARVEEN_BACKUP_AGENT_SECRETS=1 bash scripts/backup.sh 2>&1)"; RC1=$?
-A1="$(ls -1 "$OUT"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
-if [ "$RC1" -eq 0 ]; then pass "backup.sh exits 0 with MARVEEN_BACKUP_AGENT_SECRETS=1"; else
-  fail "backup.sh exited $RC1 with MARVEEN_BACKUP_AGENT_SECRETS=1"; echo "$OUTPUT1" | tail -10; fi
+OUTPUT1="$(cd "$FAKE" && HOME="$FHOME" BACKUP_DIR="$OUT" ALFRED_BACKUP_AGENT_SECRETS=1 bash scripts/backup.sh 2>&1)"; RC1=$?
+A1="$(ls -1 "$OUT"/alfred-*.tar.gz 2>/dev/null | head -1)"
+if [ "$RC1" -eq 0 ]; then pass "backup.sh exits 0 with ALFRED_BACKUP_AGENT_SECRETS=1"; else
+  fail "backup.sh exited $RC1 with ALFRED_BACKUP_AGENT_SECRETS=1"; echo "$OUTPUT1" | tail -10; fi
 if [ -n "$A1" ] && tar -tzf "$A1" | grep -qx "repo/agents/alpha/secrets/key"; then
-  pass "secrets/ is in the archive with MARVEEN_BACKUP_AGENT_SECRETS=1"
+  pass "secrets/ is in the archive with ALFRED_BACKUP_AGENT_SECRETS=1"
 else
-  fail "secrets/ is missing with MARVEEN_BACKUP_AGENT_SECRETS=1"
+  fail "secrets/ is missing with ALFRED_BACKUP_AGENT_SECRETS=1"
 fi
 for f in .env deploy.key credentials.json; do
   if [ -n "$A1" ] && tar -tzf "$A1" | grep -qx "repo/agents/alpha/.claude/skills/own/$f"; then
-    pass "skills/own/$f is in the archive with MARVEEN_BACKUP_AGENT_SECRETS=1"
+    pass "skills/own/$f is in the archive with ALFRED_BACKUP_AGENT_SECRETS=1"
   else
-    fail "skills/own/$f is missing with MARVEEN_BACKUP_AGENT_SECRETS=1"
+    fail "skills/own/$f is missing with ALFRED_BACKUP_AGENT_SECRETS=1"
   fi
 done
 
@@ -157,9 +157,9 @@ printf 'SERVICE_ID=acme\n' > "$FAKE/.env"
 printf '[Unit]' > "$FHOME/.config/systemd/user/acme-dashboard.service"
 rm -rf "$OUT"; mkdir -p "$OUT"
 (cd "$FAKE" && HOME="$FHOME" BACKUP_DIR="$OUT" bash scripts/backup.sh >/dev/null 2>&1)
-A3="$(ls -1 "$OUT"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
+A3="$(ls -1 "$OUT"/alfred-*.tar.gz 2>/dev/null | head -1)"
 if [ -n "$A3" ] && tar -tzf "$A3" | grep -qx "home/.config/systemd/user/acme-dashboard.service" \
-   && ! tar -tzf "$A3" | grep -qx "home/.config/systemd/user/marveen-channels.service"; then
+   && ! tar -tzf "$A3" | grep -qx "home/.config/systemd/user/alfred-channels.service"; then
   pass "SERVICE_ID in .env selects the unit prefix"
 else
   fail "SERVICE_ID in .env did not select the unit prefix"
@@ -177,7 +177,7 @@ done
 BARE="$TMP/bare"; BHOME="$TMP/bhome"
 mkdir -p "$BARE/scripts/lib" "$BARE/store" "$BHOME/.claude/skills/demo" "$BHOME/.claude/scheduled-tasks/demo" "$TMP/bout"
 cp "$REPO/scripts/backup.sh" "$BARE/scripts/"; cp "$REPO/scripts/lib/archive-list-has.sh" "$BARE/scripts/lib/"
-cp "$FAKE/store/claudeclaw.db" "$BARE/store/"
+cp "$FAKE/store/alfred.db" "$BARE/store/"
 printf 'x' > "$BHOME/.claude/skills/demo/SKILL.md"; printf 'x' > "$BHOME/.claude/scheduled-tasks/demo/SKILL.md"
 mkdir -p "$BARE/agents/beta"
 BOUT="$(cd "$BARE" && HOME="$BHOME" BACKUP_DIR="$TMP/bout" bash scripts/backup.sh 2>&1)"; BRC=$?
@@ -192,30 +192,30 @@ BEFORE="$(ls -1 "$COPY" | wc -l | tr -d ' ')"
 nightly env >/dev/null; RC=$?
 AFTER="$(ls -1 "$COPY" | wc -l | tr -d ' ')"
 if [ "$RC" -eq 0 ]; then pass "nightly exits 0 with the copy unset"; else fail "nightly exited $RC with the copy unset"; fi
-if [ "$BEFORE" = "$AFTER" ]; then pass "nothing is copied when MARVEEN_BACKUP_COPY_DIR is unset"; else fail "a copy was made without MARVEEN_BACKUP_COPY_DIR"; fi
+if [ "$BEFORE" = "$AFTER" ]; then pass "nothing is copied when ALFRED_BACKUP_COPY_DIR is unset"; else fail "a copy was made without ALFRED_BACKUP_COPY_DIR"; fi
 
 echo "  -- second copy on, retention"
 for stamp in 20200101-000001 20200101-000002 20200101-000003; do
-  printf 'old' > "$COPY/claudeclaw-$stamp.tar.gz"
+  printf 'old' > "$COPY/alfred-$stamp.tar.gz"
 done
 printf 'keep me' > "$COPY/unrelated.txt"
-touch -d '2020-01-01 00:00:01' "$COPY/claudeclaw-20200101-000001.tar.gz"
-touch -d '2020-01-01 00:00:02' "$COPY/claudeclaw-20200101-000002.tar.gz"
-touch -d '2020-01-01 00:00:03' "$COPY/claudeclaw-20200101-000003.tar.gz"
-nightly env MARVEEN_BACKUP_COPY_DIR="$COPY" MARVEEN_BACKUP_COPY_KEEP=2 >/dev/null; RC=$?
+touch -d '2020-01-01 00:00:01' "$COPY/alfred-20200101-000001.tar.gz"
+touch -d '2020-01-01 00:00:02' "$COPY/alfred-20200101-000002.tar.gz"
+touch -d '2020-01-01 00:00:03' "$COPY/alfred-20200101-000003.tar.gz"
+nightly env ALFRED_BACKUP_COPY_DIR="$COPY" ALFRED_BACKUP_COPY_KEEP=2 >/dev/null; RC=$?
 if [ "$RC" -eq 0 ]; then pass "nightly exits 0 with the copy on"; else fail "nightly exited $RC with the copy on"; fi
-NEWEST="$(ls -1t "$OUT"/claudeclaw-*.tar.gz | head -1)"
+NEWEST="$(ls -1t "$OUT"/alfred-*.tar.gz | head -1)"
 if [ -f "$COPY/$(basename "$NEWEST")" ]; then pass "the newest archive is in the copy dir"; else fail "the newest archive was not copied"; fi
-N="$(ls -1 "$COPY"/claudeclaw-*.tar.gz | wc -l | tr -d ' ')"
+N="$(ls -1 "$COPY"/alfred-*.tar.gz | wc -l | tr -d ' ')"
 if [ "$N" = "2" ]; then pass "retention keeps 2 archives"; else fail "retention left $N archives, expected 2"; fi
 if [ -f "$COPY/unrelated.txt" ]; then pass "retention leaves other files alone"; else fail "retention deleted an unrelated file"; fi
 
 echo "  -- a requested copy that cannot be made is loud"
-OUTPUT="$(nightly env MARVEEN_BACKUP_COPY_DIR="$TMP/does-not-exist")"; RC=$?
+OUTPUT="$(nightly env ALFRED_BACKUP_COPY_DIR="$TMP/does-not-exist")"; RC=$?
 if [ "$RC" -ne 0 ]; then pass "missing copy dir: non-zero exit"; else fail "missing copy dir exited 0 (silent skip)"; fi
 if echo "$OUTPUT" | grep -q 'NOT made'; then pass "missing copy dir: says so"; else fail "missing copy dir: no message"; fi
-nightly env MARVEEN_BACKUP_COPY_DIR="$COPY" MARVEEN_BACKUP_COPY_KEEP=abc >/dev/null; RC=$?
-if [ "$RC" -ne 0 ]; then pass "bad MARVEEN_BACKUP_COPY_KEEP: non-zero exit"; else fail "bad MARVEEN_BACKUP_COPY_KEEP accepted"; fi
+nightly env ALFRED_BACKUP_COPY_DIR="$COPY" ALFRED_BACKUP_COPY_KEEP=abc >/dev/null; RC=$?
+if [ "$RC" -ne 0 ]; then pass "bad ALFRED_BACKUP_COPY_KEEP: non-zero exit"; else fail "bad ALFRED_BACKUP_COPY_KEEP accepted"; fi
 
 # Nothing host-specific may be built into either script.
 if grep -nE '/mnt/|/home/[a-z]+' "$REPO/scripts/backup-nightly.sh" "$REPO/scripts/backup.sh" >/dev/null; then

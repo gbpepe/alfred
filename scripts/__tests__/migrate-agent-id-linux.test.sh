@@ -36,25 +36,25 @@ mkdir -p "$INSTALL/scripts" "$INSTALL/store"
 cp "$REPO/scripts/migrate-main-agent-id.sh" "$INSTALL/scripts/"
 echo 'BOT_NAME="Test Bot"' > "$INSTALL/.env"
 
-oracle_exec "$INSTALL/store/claudeclaw.db" - <<'SQL'
+oracle_exec "$INSTALL/store/alfred.db" - <<'SQL'
 CREATE TABLE memories (agent_id TEXT);
 CREATE TABLE daily_logs (agent_id TEXT);
 CREATE TABLE agent_messages (from_agent TEXT, to_agent TEXT);
 CREATE TABLE kanban_cards (assignee TEXT);
-INSERT INTO memories VALUES ('marveen');
-INSERT INTO agent_messages VALUES ('marveen', 'samu');
-INSERT INTO kanban_cards VALUES ('marveen');
+INSERT INTO memories VALUES ('alfred');
+INSERT INTO agent_messages VALUES ('alfred', 'samu');
+INSERT INTO kanban_cards VALUES ('alfred');
 SQL
 
 # --- fake HOME with the installer's unit set ----------------------------------
 FAKE_HOME="$TMP/home"
 UNITS="$FAKE_HOME/.config/systemd/user"
-mkdir -p "$UNITS/marveen-dashboard.service.d" "$UNITS/marveen-channels.service.d"
+mkdir -p "$UNITS/alfred-dashboard.service.d" "$UNITS/alfred-channels.service.d"
 for unit in dashboard.service channels.service morning.service morning.timer host-watchdog.service 'notify@.service'; do
-  printf '[Unit]\nDescription=Marveen %s\n' "$unit" > "$UNITS/marveen-${unit}"
+  printf '[Unit]\nDescription=Alfred %s\n' "$unit" > "$UNITS/alfred-${unit}"
 done
-printf '[Unit]\nOnFailure=marveen-notify@%%n.service\n' > "$UNITS/marveen-dashboard.service.d/onfailure.conf"
-printf '[Unit]\nOnFailure=marveen-notify@%%n.service\n' > "$UNITS/marveen-channels.service.d/onfailure.conf"
+printf '[Unit]\nOnFailure=alfred-notify@%%n.service\n' > "$UNITS/alfred-dashboard.service.d/onfailure.conf"
+printf '[Unit]\nOnFailure=alfred-notify@%%n.service\n' > "$UNITS/alfred-channels.service.d/onfailure.conf"
 
 # --- PATH shim ----------------------------------------------------------------
 BIN="$TMP/bin"
@@ -90,16 +90,16 @@ run_migrate() {
     bash "$INSTALL/scripts/migrate-main-agent-id.sh" <<< "y" > "$TMP/out.log" 2> "$TMP/err.log"
 }
 
-# Pre-migration state again: marveen-* units, marveen rows, no MAIN_AGENT_ID.
+# Pre-migration state again: alfred-* units, alfred rows, no MAIN_AGENT_ID.
 reset_state() {
   rm -rf "$UNITS"
-  mkdir -p "$UNITS/marveen-dashboard.service.d" "$UNITS/marveen-channels.service.d"
+  mkdir -p "$UNITS/alfred-dashboard.service.d" "$UNITS/alfred-channels.service.d"
   for unit in dashboard.service channels.service morning.service morning.timer host-watchdog.service 'notify@.service'; do
-    printf '[Unit]\nDescription=Marveen %s\n' "$unit" > "$UNITS/marveen-${unit}"
+    printf '[Unit]\nDescription=Alfred %s\n' "$unit" > "$UNITS/alfred-${unit}"
   done
-  printf '[Unit]\nOnFailure=marveen-notify@%%n.service\n' > "$UNITS/marveen-dashboard.service.d/onfailure.conf"
-  printf '[Unit]\nOnFailure=marveen-notify@%%n.service\n' > "$UNITS/marveen-channels.service.d/onfailure.conf"
-  oracle_exec "$INSTALL/store/claudeclaw.db" "UPDATE kanban_cards SET assignee='marveen'"
+  printf '[Unit]\nOnFailure=alfred-notify@%%n.service\n' > "$UNITS/alfred-dashboard.service.d/onfailure.conf"
+  printf '[Unit]\nOnFailure=alfred-notify@%%n.service\n' > "$UNITS/alfred-channels.service.d/onfailure.conf"
+  oracle_exec "$INSTALL/store/alfred.db" "UPDATE kanban_cards SET assignee='alfred'"
   sed -i.bak '/^MAIN_AGENT_ID=/d' "$INSTALL/.env"
   : > "$LOG"
 }
@@ -115,11 +115,11 @@ RC=$?
 grep -q '^MAIN_AGENT_ID=test-bot$' "$INSTALL/.env" \
   && pass ".env got MAIN_AGENT_ID=test-bot" || fail ".env got MAIN_AGENT_ID=test-bot"
 
-DB_SLUG=$(oracle_query "$INSTALL/store/claudeclaw.db" "SELECT assignee FROM kanban_cards")
+DB_SLUG=$(oracle_query "$INSTALL/store/alfred.db" "SELECT assignee FROM kanban_cards")
 [ "$DB_SLUG" = "test-bot" ] && pass "DB rows rewritten to the new slug" || fail "DB rows rewritten (got '$DB_SLUG')"
 
-MSG=$(oracle_query "$INSTALL/store/claudeclaw.db" "SELECT from_agent || '>' || to_agent FROM agent_messages")
-[ "$MSG" = "test-bot>samu" ] && pass "only 'marveen' values are rewritten" || fail "only 'marveen' rewritten (got '$MSG')"
+MSG=$(oracle_query "$INSTALL/store/alfred.db" "SELECT from_agent || '>' || to_agent FROM agent_messages")
+[ "$MSG" = "test-bot>samu" ] && pass "only 'alfred' values are rewritten" || fail "only 'alfred' rewritten (got '$MSG')"
 
 grep -q 'SQLITE3-CLI-CALLED' "$LOG" \
   && fail "the sqlite3 CLI is not called (not an install dependency)" \
@@ -131,8 +131,8 @@ grep -q '^✓ DB rows rewritten: 3$' "$TMP/out.log" \
   && pass "the success line reports the rewritten row count" \
   || fail "success line with the count (out: $(grep 'DB rows' "$TMP/out.log"))"
 
-OLD_LEFT=$(find "$UNITS" -maxdepth 1 -name 'marveen-*' | wc -l | tr -d ' ')
-[ "$OLD_LEFT" = "0" ] && pass "no marveen-* unit files left behind" || fail "no marveen-* left behind ($OLD_LEFT remain)"
+OLD_LEFT=$(find "$UNITS" -maxdepth 1 -name 'alfred-*' | wc -l | tr -d ' ')
+[ "$OLD_LEFT" = "0" ] && pass "no alfred-* unit files left behind" || fail "no alfred-* left behind ($OLD_LEFT remain)"
 
 ALL_NEW=1
 for unit in dashboard.service channels.service morning.service morning.timer host-watchdog.service 'notify@.service'; do
@@ -144,7 +144,7 @@ grep -q 'test-bot-notify@%n.service' "$UNITS/test-bot-dashboard.service.d/onfail
   && pass "OnFailure drop-in renamed AND patched to the new notifier" \
   || fail "OnFailure drop-in renamed AND patched (dashboard)"
 
-grep -q 'stop marveen-channels.service' "$LOG" \
+grep -q 'stop alfred-channels.service' "$LOG" \
   && pass "old units were stopped before the rename" || fail "old units were stopped"
 
 grep -q 'daemon-reload' "$LOG" \
@@ -169,13 +169,13 @@ fi
 # --- failure honesty: a failed start must not end in Done. --------------------
 # Rebuild the pre-migration state and make enabling the channels unit fail.
 rm -rf "$UNITS"
-mkdir -p "$UNITS/marveen-dashboard.service.d" "$UNITS/marveen-channels.service.d"
+mkdir -p "$UNITS/alfred-dashboard.service.d" "$UNITS/alfred-channels.service.d"
 for unit in dashboard.service channels.service morning.service morning.timer host-watchdog.service 'notify@.service'; do
-  printf '[Unit]\nDescription=Marveen %s\n' "$unit" > "$UNITS/marveen-${unit}"
+  printf '[Unit]\nDescription=Alfred %s\n' "$unit" > "$UNITS/alfred-${unit}"
 done
-printf '[Unit]\nOnFailure=marveen-notify@%%n.service\n' > "$UNITS/marveen-dashboard.service.d/onfailure.conf"
-printf '[Unit]\nOnFailure=marveen-notify@%%n.service\n' > "$UNITS/marveen-channels.service.d/onfailure.conf"
-oracle_exec "$INSTALL/store/claudeclaw.db" "UPDATE kanban_cards SET assignee='marveen'"
+printf '[Unit]\nOnFailure=alfred-notify@%%n.service\n' > "$UNITS/alfred-dashboard.service.d/onfailure.conf"
+printf '[Unit]\nOnFailure=alfred-notify@%%n.service\n' > "$UNITS/alfred-channels.service.d/onfailure.conf"
+oracle_exec "$INSTALL/store/alfred.db" "UPDATE kanban_cards SET assignee='alfred'"
 sed -i.bak '/^MAIN_AGENT_ID=/d' "$INSTALL/.env"
 : > "$LOG"
 
@@ -204,25 +204,25 @@ RC=$?
 grep -q 'stop' "$LOG" \
   && fail "no sqlite3 module: no service was stopped" \
   || pass "no sqlite3 module: no service was stopped"
-[ -f "$UNITS/marveen-dashboard.service" ] && ! grep -q '^MAIN_AGENT_ID=' "$INSTALL/.env" \
+[ -f "$UNITS/alfred-dashboard.service" ] && ! grep -q '^MAIN_AGENT_ID=' "$INSTALL/.env" \
   && pass "no sqlite3 module: units and .env untouched" || fail "no sqlite3 module: units and .env untouched"
 grep -q 'Nothing was changed' "$TMP/err.log" \
   && pass "no sqlite3 module: stderr says nothing changed" || fail "no sqlite3 module: stderr says nothing changed"
 
 # --- a failing rewrite stops before the rename, and says the services are down -
 reset_state
-cp "$INSTALL/store/claudeclaw.db" "$TMP/good.db"
-echo "this is not a database" > "$INSTALL/store/claudeclaw.db"
+cp "$INSTALL/store/alfred.db" "$TMP/good.db"
+echo "this is not a database" > "$INSTALL/store/alfred.db"
 run_migrate ""
 RC=$?
 [ "$RC" -eq 1 ] && pass "broken DB: exit 1" || fail "broken DB: exit 1 (got $RC)"
 grep -q '✓ DB rows rewritten' "$TMP/out.log" \
   && fail "broken DB: no 'rows rewritten' claim" || pass "broken DB: no 'rows rewritten' claim"
-[ -f "$UNITS/marveen-dashboard.service" ] && ! grep -q '^MAIN_AGENT_ID=' "$INSTALL/.env" \
+[ -f "$UNITS/alfred-dashboard.service" ] && ! grep -q '^MAIN_AGENT_ID=' "$INSTALL/.env" \
   && pass "broken DB: nothing renamed, .env untouched" || fail "broken DB: nothing renamed, .env untouched"
 grep -q 'services are STOPPED' "$TMP/err.log" \
   && pass "broken DB: stderr says the services are stopped" || fail "broken DB: stderr says the services are stopped"
-cp "$TMP/good.db" "$INSTALL/store/claudeclaw.db"
+cp "$TMP/good.db" "$INSTALL/store/alfred.db"
 
 # ==============================================================================
 echo ""

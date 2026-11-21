@@ -31,11 +31,11 @@
 //      content (whitespace-normalized). A fabricated attribution cannot carry
 //      a verifiable citation.
 //
-// KNOWN LIMIT (accepted by Marveen, msg 16050): a wrong-AGENT-name in prose
+// KNOWN LIMIT (accepted by Alfred, msg 16050): a wrong-AGENT-name in prose
 // (the Dani/geri error) is not mechanically catchable; mandatory verbatim
 // citations only constrain it, they do not eliminate it.
 //
-// Failure posture (Marveen stipulation, msg 16050): an INTERNAL error while
+// Failure posture (Alfred stipulation, msg 16050): an INTERNAL error while
 // validating an in-scope POST (DB unreadable, payload file missing) DENIES
 // loudly with the error in the reason -- never fail-open, never a silent
 // swallow. Empty/malformed stdin (a non-matching hook event) allows, same as
@@ -48,7 +48,7 @@ import { dirname, join } from 'node:path'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = process.env.DIGEST_GATE_ROOT || join(SCRIPT_DIR, '..')
-const DB_PATH = process.env.DIGEST_GATE_DB || join(PROJECT_ROOT, 'store', 'claudeclaw.db')
+const DB_PATH = process.env.DIGEST_GATE_DB || join(PROJECT_ROOT, 'store', 'alfred.db')
 const HEARTBEAT_ID = process.env.HEARTBEAT_AGENT_ID || 'heartbeat'
 
 // ---- payload extraction ---------------------------------------------------

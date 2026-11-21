@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""FLEETKIVETEL922: a koordinator (marveen) kartyaja is ERTESITEST kovetel.
+"""FLEETKIVETEL922: a koordinator (alfred) kartyaja is ERTESITEST kovetel.
 
-A KOMMENTERTESITES922 kapuja a FLEET halmazra allt, es a marveen NEM volt benne. Merve a 30 napos
-ablakon (flotta-szerzo, mas felelosu kartya): marveen 1003 (51%), FLEET 656 (33%), egyeb 320 (16%).
+A KOMMENTERTESITES922 kapuja a FLEET halmazra allt, es a alfred NEM volt benne. Merve a 30 napos
+ablakon (flotta-szerzo, mas felelosu kartya): alfred 1003 (51%), FLEET 656 (33%), egyeb 320 (16%).
 A legnagyobb egyetlen celcsoport a kivetelben allt, tehat a kapu a cel-forgalom egyharmadat fedte.
 
-AMIT EZ A SUITE ROGZIT, es amiert nem eleg a "marveen benne van a halmazban" allitas: a
+AMIT EZ A SUITE ROGZIT, es amiert nem eleg a "alfred benne van a halmazban" allitas: a
 VISELKEDES mindket agon (komment ES letrehozas), plusz a SZANDEKOS kivetel, ami MARAD -- a gazda
 (szabolcs), akinek az inter-agent uzenet szerkezetileg nem kezbesitheto.
 
@@ -62,8 +62,8 @@ def fresh_db(path):
         result TEXT, created_at INTEGER NOT NULL, delivered_at INTEGER, completed_at INTEGER);
     ''')
     now = int(time.time())
-    for cid, who in (('KOORD922', 'marveen'), ('KOORD2922', 'marveen'), ('GAZDA922', 'szabolcs'),
-                     ('SAJAT922', 'marveen')):
+    for cid, who in (('KOORD922', 'alfred'), ('KOORD2922', 'alfred'), ('GAZDA922', 'szabolcs'),
+                     ('SAJAT922', 'alfred')):
         db.execute('INSERT INTO kanban_cards (id,title,assignee,status,priority,created_at,updated_at)'
                    " VALUES (?,?,?,'planned','normal',?,?)", (cid, f'teszt {cid}', who, now, now))
     db.commit(); db.close()
@@ -71,7 +71,7 @@ def fresh_db(path):
 
 def kozos_env(port):
     env = dict(os.environ)
-    env['KARTYA_DB'] = DB_PATH; env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['KARTYA_DB'] = DB_PATH; env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_TOKEN'] = 'teszt-token'; env['KARTYA_API'] = f'http://127.0.0.1:{port}/api/messages'
     return env
 
@@ -128,14 +128,14 @@ def main():
     out = p.stdout + p.stderr
     check('1 a koordinator kartyajan a komment ertesites nelkul MEGTAGADVA',
           p.returncode != 0 and 'MEGTAGADVA' in out, out)
-    check('1 a megtagadas megnevezi a koordinatort', 'marveen' in out, out)
+    check('1 a megtagadas megnevezi a koordinatort', 'alfred' in out, out)
 
     # 2. --msg-file-lal atmegy, es az ertesites A KOORDINATORHOZ megy.
     torol()
     p = komment('KOORD2922', 'Geri', port, with_msg=True)
     out = p.stdout + p.stderr
     check('2 --msg-file-lal atmegy', p.returncode == 0 and 'KOMMENT OK' in out, out)
-    check('2 es az ertesites a koordinatorhoz ment', cimzettek() == ['marveen'], f'cimzettek={cimzettek()}')
+    check('2 es az ertesites a koordinatorhoz ment', cimzettek() == ['alfred'], f'cimzettek={cimzettek()}')
 
     # 3. SZANDEKOS KIVETEL, AMI MARAD: a GAZDA kartyaja. Neki az inter-agent uzenet szerkezetileg
     # nem kezbesitheto (GAZDAUZENET921), tehat a kapu nem kovetelhet olyat, amit teljesiteni sem lehet.
@@ -146,7 +146,7 @@ def main():
           p.returncode == 0 and 'KOMMENT OK' in out, out)
     check('3 es semmi nem ment ki', cimzettek() == [], f'cimzettek={cimzettek()}')
     # SAMU KIKOTESE (28123): a gazda-kartyan a REGI nyom az EGYETLEN jel arrol, hogy a komment nem
-    # ertesitett senkit. A suite ezert ne csak azt allitsa, hogy a marveen BEKERULT, hanem azt is,
+    # ertesitett senkit. A suite ezert ne csak azt allitsa, hogy a alfred BEKERULT, hanem azt is,
     # hogy a gazda-kartya KULSOKENT viselkedik, es a nyom-sor megmaradt.
     check('3 a gazda-kartyan megmarad a regi nyom: "Ertesites: nem ment (komment-only)"',
           'Ertesites: nem ment (komment-only)' in out, out)
@@ -157,17 +157,17 @@ def main():
     p2 = komment('KOORD922', 'Geri', port, with_msg=True)
     out2 = p2.stdout + p2.stderr
     check('3 ellenproba: ertesitessel a nyom-sor MAS (nem a komment-only alak)',
-          'Ertesites: nem ment (komment-only)' not in out2 and cimzettek() == ['marveen'],
+          'Ertesites: nem ment (komment-only)' not in out2 and cimzettek() == ['alfred'],
           f'cimzettek={cimzettek()} | {out2}')
 
     # 4. SAJAT KARTYA: a koordinator a sajatjara ir -- a szerzo == felelos, tehat atmegy.
     torol()
-    p = komment('SAJAT922', 'Marveen', port)
+    p = komment('SAJAT922', 'Alfred', port)
     out = p.stdout + p.stderr
     check('4 a koordinator a SAJAT kartyajara ertesites nelkul is irhat',
           p.returncode == 0 and 'KOMMENT OK' in out, out)
 
-    # 4b. A HARMADIK ALLAPOT, MOSTANTOL KOTELEZO (Marveen, a mai A-lelet nyoman): egy kapcsolo-kapu
+    # 4b. A HARMADIK ALLAPOT, MOSTANTOL KOTELEZO (Alfred, a mai A-lelet nyoman): egy kapcsolo-kapu
     # suite-ja magatol a MEGADTA / NEM ADTA MEG tengelyen mer, es ettol VAK arra, hogy valaki
     # megadta, de URESEN. A mai lelet pont ez volt: a kapu az UTVONALAT nezte, a kuldes a
     # TARTALMAT, es egy 0 bajtos fajl befert a ketto koze -- nema kibuvo, olcsobb a kimondottnal.
@@ -215,16 +215,16 @@ def main():
     # 5. PARITAS A LETREHOZO AGON: uj kartya a koordinator nevere, ertesites nelkul -> MEGTAGADVA.
     # A valtozas a FLEET halmazt bovitette, tehat a masik ag is orokli; ezt MERJUK, nem feltetelezzuk.
     torol()
-    p = letrehoz('UJKOORD922', 'marveen', 'Geri', port)
+    p = letrehoz('UJKOORD922', 'alfred', 'Geri', port)
     out = p.stdout + p.stderr
     check('5 letrehozo agon is MEGTAGADVA a koordinator-kartya ertesites nelkul',
           p.returncode != 0 and 'MEGTAGADVA' in out, out)
-    p = letrehoz('UJKOORD922', 'marveen', 'Geri', port, with_msg=True)
+    p = letrehoz('UJKOORD922', 'alfred', 'Geri', port, with_msg=True)
     out = p.stdout + p.stderr
     check('5 ugyanaz --msg-file-lal letrejon, es az ertesites a koordinatorhoz megy',
-          p.returncode == 0 and cimzettek() == ['marveen'], f'cimzettek={cimzettek()} | {out}')
+          p.returncode == 0 and cimzettek() == ['alfred'], f'cimzettek={cimzettek()} | {out}')
 
-    # 6. A DONTES ROGZITESE, HOGY NE EGY FEJLEC-KOMMENTEN ALLJON (Marveen 28149, a sajat (a)
+    # 6. A DONTES ROGZITESE, HOGY NE EGY FEJLEC-KOMMENTEN ALLJON (Alfred 28149, a sajat (a)
     # dontesenek visszavonasa utan). A sajat magunknak nyitott kartya IS ertesitest ker, barmelyik
     # agensnel -- mert az onhurok-ag NEM azt mondja, hogy az uzenet folosleges, hanem azt, hogy MAS
     # a cimzettje: a KOORDINATOR. Az az uzenet VALODI JEL (valaki elindult valamin), es egy
@@ -232,7 +232,7 @@ def main():
     # Ha egy kesobbi kor "nyilvanvalo javitaskent" mégis betenne a tukrozest, ez a ket allitas
     # PIROSRA valt -- egy dontes, ami csak kommentben all, ugyanugy elveszik, mint egy meretlen javitas.
     torol()
-    p = letrehoz('ONHD922', 'marveen', 'Marveen', port)
+    p = letrehoz('ONHD922', 'alfred', 'Alfred', port)
     out = p.stdout + p.stderr
     check('6a a koordinator SAJAT kartyaja is ertesitest ker (a dontes rogzitve)',
           p.returncode != 0 and 'MEGTAGADVA' in out, out)

@@ -75,7 +75,7 @@ unit_path_check() {
   _upc_os="$1"; _upc_sid="$2"
   _upc_units=""
   if [ "$_upc_os" = "Darwin" ]; then
-    for _upc_f in "$HOME/Library/LaunchAgents/com.${_upc_sid}."*.plist "$HOME/Library/LaunchAgents/com.marveen.channel-outage-alarm.plist"; do
+    for _upc_f in "$HOME/Library/LaunchAgents/com.${_upc_sid}."*.plist "$HOME/Library/LaunchAgents/com.alfred.channel-outage-alarm.plist"; do
       [ -f "$_upc_f" ] || continue
       case "
 $_upc_units
@@ -107,7 +107,7 @@ $_upc_f
       [ -n "$_upc_p" ] || continue
       _upc_name="${_upc_f##*/}"; _upc_name="${_upc_name%.plist}"; _upc_name="${_upc_name%.service}"
       if [ "$_upc_os" = "Darwin" ]; then
-        _upc_sfx="${_upc_name#com.${_upc_sid}.}"; [ "$_upc_sfx" != "$_upc_name" ] || _upc_sfx="${_upc_name#com.marveen.}"
+        _upc_sfx="${_upc_name#com.${_upc_sid}.}"; [ "$_upc_sfx" != "$_upc_name" ] || _upc_sfx="${_upc_name#com.alfred.}"
       else
         _upc_sfx="${_upc_name#${_upc_sid}-}"
       fi

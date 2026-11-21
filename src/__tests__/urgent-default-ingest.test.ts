@@ -15,7 +15,7 @@ let dir = ''
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'urgent-default-ingest-'))
-  const file = join(dir, 'claudeclaw.db')
+  const file = join(dir, 'alfred.db')
   initDatabase(file)
   initIngestDb(file)
 })

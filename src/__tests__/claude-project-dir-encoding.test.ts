@@ -21,26 +21,26 @@ describe('encodeClaudeProjectDir: the measured Claude Code rule', () => {
   })
 
   it('starts with a dash because the leading "/" is encoded too', () => {
-    expect(encodeClaudeProjectDir('/Users/x/ClaudeClaw')).toBe('-Users-x-ClaudeClaw')
+    expect(encodeClaudeProjectDir('/Users/x/Alfred')).toBe('-Users-x-Alfred')
   })
 })
 
-// The GATE Marveen asked for (msg 27995): on the common subset -- every path
+// The GATE Alfred asked for (msg 27995): on the common subset -- every path
 // made only of [a-zA-Z0-9-/.] -- the shared encoder is a NO-OP relative to the
 // two rules it replaces. The fleet's own paths and the #1445 author's
-// (/Users/a.kobza/marveen) all live there, so nothing changes on any install
+// (/Users/a.kobza/alfred) all live there, so nothing changes on any install
 // that exists today by so much as one character.
 const oldSlashDot = (p: string): string => p.replace(/[/.]/g, '-')
 const oldSlashOnly = (p: string): string => p.replace(/\//g, '-')
 
 const FLEET_PATHS = [
-  '/Users/marvin/ClaudeClaw',
-  '/Users/marvin/ClaudeClaw/agents/samu',
-  '/Users/marvin/ClaudeClaw/agents/davinci-ocura',
-  '/root/marveen-develop-test',
-  '/home/marveen/marveen',
-  '/Users/a.kobza/marveen',
-  '/private/tmp/claude-501/-Users-marvin-ClaudeClaw-agents-samu/6f27da8f-66fa-4977-92fa-98b9b3b794aa/scratchpad',
+  '/Users/marvin/Alfred',
+  '/Users/marvin/Alfred/agents/samu',
+  '/Users/marvin/Alfred/agents/davinci-ocura',
+  '/root/alfred-develop-test',
+  '/home/alfred/alfred',
+  '/Users/a.kobza/alfred',
+  '/private/tmp/claude-501/-Users-marvin-Alfred-agents-samu/6f27da8f-66fa-4977-92fa-98b9b3b794aa/scratchpad',
 ]
 
 describe('encodeClaudeProjectDir: no-op on the common subset', () => {
@@ -67,10 +67,10 @@ describe('encodeClaudeProjectDir: no-op on the common subset', () => {
   })
 
   it('and DIVERGES from both old rules exactly where Claude Code does', () => {
-    const p = '/home/john_doe/my app/marveen'
-    expect(encodeClaudeProjectDir(p)).toBe('-home-john-doe-my-app-marveen')
-    expect(oldSlashDot(p)).toBe('-home-john_doe-my app-marveen')
-    expect(oldSlashOnly(p)).toBe('-home-john_doe-my app-marveen')
+    const p = '/home/john_doe/my app/alfred'
+    expect(encodeClaudeProjectDir(p)).toBe('-home-john-doe-my-app-alfred')
+    expect(oldSlashDot(p)).toBe('-home-john_doe-my app-alfred')
+    expect(oldSlashOnly(p)).toBe('-home-john_doe-my app-alfred')
   })
 })
 

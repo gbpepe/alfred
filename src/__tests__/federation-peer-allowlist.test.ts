@@ -32,19 +32,19 @@ function enabledConfig(peerOverrides: Record<string, unknown> = {}): void {
   writeConfigFile({
     enabled: true,
     systemId: 'localsys',
-    peers: [{ id: 'marveen', baseUrl: 'https://mac.example', outboundToken: OUT_TOKEN, inboundToken: IN_TOKEN, ...peerOverrides }],
+    peers: [{ id: 'alfred', baseUrl: 'https://mac.example', outboundToken: OUT_TOKEN, inboundToken: IN_TOKEN, ...peerOverrides }],
   })
 }
 
 const MANIFEST = {
-  system: 'marveen', marveenVersion: '1.49.1', federationVersion: 1,
+  system: 'alfred', alfredVersion: '1.49.1', federationVersion: 1,
   agents: [
-    { id: 'marveen', displayName: 'Marveen', model: 'm' },
+    { id: 'alfred', displayName: 'Alfred', model: 'm' },
     { id: 'bea', displayName: 'Sid', model: 'm' },
     { id: 'heni', displayName: 'Adminisztracio', model: 'm' },
   ],
   skills: [
-    { agent: 'marveen', name: 'main-skill', description: 'x' },
+    { agent: 'alfred', name: 'main-skill', description: 'x' },
     { agent: 'bea', name: 'bea-skill', description: 'y' },
   ],
 }
@@ -65,18 +65,18 @@ afterAll(() => {
   rmSync(TMP, { recursive: true, force: true })
 })
 
-const basePeer = { id: 'marveen', baseUrl: 'https://mac.example', outboundToken: OUT_TOKEN, inboundToken: IN_TOKEN }
+const basePeer = { id: 'alfred', baseUrl: 'https://mac.example', outboundToken: OUT_TOKEN, inboundToken: IN_TOKEN }
 
 describe('allowedAgents config parsing', () => {
   it('absent means no allowlist, and the field round-trips lowercase and deduped', () => {
     const none = validateFederationConfig({ enabled: true, systemId: 'localsys', peers: [basePeer] }) as FederationConfig
     expect(none.peers[0].allowedAgents).toBeUndefined()
-    const some = validateFederationConfig({ enabled: true, systemId: 'localsys', peers: [{ ...basePeer, allowedAgents: ['Marveen', 'marveen'] }] }) as FederationConfig
-    expect(some.peers[0].allowedAgents).toEqual(['marveen'])
+    const some = validateFederationConfig({ enabled: true, systemId: 'localsys', peers: [{ ...basePeer, allowedAgents: ['Alfred', 'alfred'] }] }) as FederationConfig
+    expect(some.peers[0].allowedAgents).toEqual(['alfred'])
   })
 
   it('fails closed on an empty list, a non-array or an invalid id', () => {
-    for (const bad of [[], 'marveen', ['a/b'], [''], [42]]) {
+    for (const bad of [[], 'alfred', ['a/b'], [''], [42]]) {
       expect(typeof validateFederationConfig({ enabled: true, systemId: 'localsys', peers: [{ ...basePeer, allowedAgents: bad }] })).toBe('string')
     }
     expect(parseAllowedAgents(null)).toBeUndefined()
@@ -85,8 +85,8 @@ describe('allowedAgents config parsing', () => {
   it('isPeerAgentAllowed: no list allows all, a list allows only its members (case-insensitive)', () => {
     expect(isPeerAgentAllowed({}, 'bea')).toBe(true)
     expect(isPeerAgentAllowed(undefined, 'bea')).toBe(true)
-    expect(isPeerAgentAllowed({ allowedAgents: ['marveen'] }, 'Marveen')).toBe(true)
-    expect(isPeerAgentAllowed({ allowedAgents: ['marveen'] }, 'bea')).toBe(false)
+    expect(isPeerAgentAllowed({ allowedAgents: ['alfred'] }, 'Alfred')).toBe(true)
+    expect(isPeerAgentAllowed({ allowedAgents: ['alfred'] }, 'bea')).toBe(false)
   })
 })
 
@@ -94,47 +94,47 @@ describe('status view hides agents outside the allowlist', () => {
   it('without an allowlist every published agent is visible', async () => {
     enabledConfig()
     await pollPeerManifests(NOW, fetchReturning(200, MANIFEST))
-    expect(getFederationStatus()[0].manifest?.agents.map((a) => a.id)).toEqual(['marveen', 'bea', 'heni'])
+    expect(getFederationStatus()[0].manifest?.agents.map((a) => a.id)).toEqual(['alfred', 'bea', 'heni'])
   })
 
   it('with an allowlist only the listed agents and their skills remain, and an edit applies without a re-poll', async () => {
     enabledConfig()
     await pollPeerManifests(NOW, fetchReturning(200, MANIFEST))
-    enabledConfig({ allowedAgents: ['marveen'] })
+    enabledConfig({ allowedAgents: ['alfred'] })
     const [st] = getFederationStatus()
-    expect(st.manifest?.agents.map((a) => a.id)).toEqual(['marveen'])
-    expect(st.manifest?.skills.map((s) => s.agent)).toEqual(['marveen'])
+    expect(st.manifest?.agents.map((a) => a.id)).toEqual(['alfred'])
+    expect(st.manifest?.skills.map((s) => s.agent)).toEqual(['alfred'])
   })
 })
 
 describe('outbound: the bridge refuses an agent outside the allowlist', () => {
   it('fails terminally without a network call', async () => {
-    enabledConfig({ allowedAgents: ['marveen'] })
+    enabledConfig({ allowedAgents: ['alfred'] })
     let called = false
     const spy = (async () => { called = true; return new Response('{}', { status: 202 }) }) as typeof fetch
-    const r = await sendFederatedMessage({ id: 1, from_agent: 'localsys', to_agent: 'marveen/bea', content: 'hi' }, NOW, spy)
+    const r = await sendFederatedMessage({ id: 1, from_agent: 'localsys', to_agent: 'alfred/bea', content: 'hi' }, NOW, spy)
     expect(r).toMatchObject({ kind: 'failed' })
     expect(called).toBe(false)
   })
 
   it('still sends to a listed agent', async () => {
-    enabledConfig({ allowedAgents: ['marveen'] })
-    const r = await sendFederatedMessage({ id: 2, from_agent: 'localsys', to_agent: 'marveen/marveen', content: 'hi' }, NOW, fetchReturning(202, { id: 9 }))
+    enabledConfig({ allowedAgents: ['alfred'] })
+    const r = await sendFederatedMessage({ id: 2, from_agent: 'localsys', to_agent: 'alfred/alfred', content: 'hi' }, NOW, fetchReturning(202, { id: 9 }))
     expect(r.kind).not.toBe('failed')
   })
 })
 
 describe('inbound: the inbox refuses a sender outside the allowlist', () => {
-  const cfg = validateFederationConfig({ enabled: true, systemId: 'localsys', peers: [{ ...basePeer, allowedAgents: ['marveen'] }] }) as FederationConfig
+  const cfg = validateFederationConfig({ enabled: true, systemId: 'localsys', peers: [{ ...basePeer, allowedAgents: ['alfred'] }] }) as FederationConfig
   const deps = { isKnownAgent: () => true, mainAgentId: 'localsys' }
 
   it('rejects an unlisted sender agent with 403', () => {
-    const v = validateInboxPayload({ from: 'marveen/bea', to: 'localsys', content: 'hello' }, cfg, deps, 'marveen')
+    const v = validateInboxPayload({ from: 'alfred/bea', to: 'localsys', content: 'hello' }, cfg, deps, 'alfred')
     expect(v).toMatchObject({ status: 403 })
   })
 
   it('accepts the listed sender agent', () => {
-    const v = validateInboxPayload({ from: 'marveen/marveen', to: 'localsys', content: 'hello' }, cfg, deps, 'marveen')
-    expect(v).toMatchObject({ from: 'marveen/marveen', to: 'localsys' })
+    const v = validateInboxPayload({ from: 'alfred/alfred', to: 'localsys', content: 'hello' }, cfg, deps, 'alfred')
+    expect(v).toMatchObject({ from: 'alfred/alfred', to: 'localsys' })
   })
 })

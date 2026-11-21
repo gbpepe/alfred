@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """EMAILKAPU901 PR2: the email_send level becomes a real switch on the main agent.
 
-Branches proven (Marveen msgs 17900/17936):
+Branches proven (Alfred msgs 17900/17936):
   - level 1: the send is DENIED outright.
   - level 2: denied without approval; ALLOWED against an approved, matching,
     in-window approval; the SAME send a SECOND time is denied again (one-shot
@@ -106,7 +106,7 @@ def make_store(td, level=2, max_level=None, config="ok"):
         with open(cfg_path, "w", encoding="utf-8") as fh:
             fh.write("{not json")
     # config == "missing": write nothing
-    db_path = os.path.join(store, "claudeclaw.db")
+    db_path = os.path.join(store, "alfred.db")
     con = sqlite3.connect(db_path)
     con.execute("""
       CREATE TABLE approvals (
@@ -175,11 +175,11 @@ def mcp_send(to="a@b.hu", cc=None, subject="Teszt tárgy", body="Kedves Ügyfel�
 
 
 def approve(store, anchor, resolved_ago=0, status="approved", consumed=None):
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute(
         "INSERT INTO approvals (id, agent_id, category, action_description, status,"
         " requested_at, resolved_at, resolved_by, content_hash, consumed_at)"
-        " VALUES (hex(randomblob(6)), 'marveen', 'email_send', 'Email teszt', ?,"
+        " VALUES (hex(randomblob(6)), 'alfred', 'email_send', 'Email teszt', ?,"
         f" {NOW_S}-?-60, CASE WHEN ?='pending' THEN NULL ELSE {NOW_S}-? END,"
         " 'szabi', ?, ?)",
         (status, resolved_ago, status, resolved_ago, anchor, consumed))
@@ -191,11 +191,11 @@ def activate_standing(store, addr, status="approved", resolved_ago=0):
     """Az elesites: egy MAR LEZART email_standing_recipient sor a cimre.
     A `resolved_ago` a sorrendhez kell (az utolso dontes nyer)."""
     anchor = hashlib.sha256(addr.strip().lower().encode("utf-8")).hexdigest()
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute(
         "INSERT INTO approvals (id, agent_id, category, action_description, status,"
         " requested_at, resolved_at, resolved_by, content_hash, consumed_at)"
-        " VALUES (hex(randomblob(6)), 'marveen', 'email_standing_recipient',"
+        " VALUES (hex(randomblob(6)), 'alfred', 'email_standing_recipient',"
         f" 'Allando cimzett elesitese', ?, {NOW_S}-?-60,"
         f" CASE WHEN ?='pending' THEN NULL ELSE {NOW_S}-? END, 'szabi', ?, NULL)",
         (status, resolved_ago, status, resolved_ago, anchor))
@@ -246,7 +246,7 @@ with tempfile.TemporaryDirectory() as td:
     check("the consumed-approval notice reaches the agent (additionalContext)",
           reaches_model(out, code), f"out={out[:200]!r}")
 
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     consumed = con.execute("SELECT consumed_at FROM approvals WHERE content_hash=?", (anchor,)).fetchone()[0]
     con.close()
     check("the allow CONSUMED the approval (consumed_at set in the DB)", consumed is not None)
@@ -305,7 +305,7 @@ with tempfile.TemporaryDirectory() as td:
 
     # --- FAIL-CLOSED, each branch separately --------------------------------
     store = make_store(os.path.join(td, "sf1"), level=2)
-    os.remove(os.path.join(store, "claudeclaw.db"))
+    os.remove(os.path.join(store, "alfred.db"))
     code, _, err = run_gate(store, mcp_send())
     check("fail-closed: approvals DB missing -> DENIED (undecidable != allowed)",
           code == 2 and "nem-eldontheto" in err, f"exit={code}")
@@ -335,7 +335,7 @@ with tempfile.TemporaryDirectory() as td:
     check("fail-closed: non-dict tool_input -> DENIED (exit 2, never 1)",
           code == 2, f"exit={code}")
 
-    # Marveen's #1149 review: this gate AUTHORIZES, so unlike the copy gate it
+    # Alfred's #1149 review: this gate AUTHORIZES, so unlike the copy gate it
     # must fail closed on an unparseable payload too -- the docstring and the
     # code now state the same contract.
     env = dict(os.environ)
@@ -850,7 +850,7 @@ with tempfile.TemporaryDirectory() as td:
     store13 = make_store(os.path.join(td, "sl14"), level=2)
     write_standing(store13, {"recipients": ["dani@pelda.hu"]})
     activate_standing(store13, "dani@pelda.hu")
-    os.remove(os.path.join(store13, "claudeclaw.db"))
+    os.remove(os.path.join(store13, "alfred.db"))
     code, _, err = run_gate(store13, mcp_send(to="dani@pelda.hu"))
     check("keres3: ellenorizhetetlen elesites -> fail-closed TILTVA",
           code == 2 and "elesitese nem ellenorizheto" in err, f"exit={code} err={err[:200]!r}")
@@ -1184,7 +1184,7 @@ def bash_payload(cmd, cwd=REPO):
 
 
 def unconsumed_count(store):
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     n = con.execute("SELECT COUNT(*) FROM approvals WHERE consumed_at IS NULL").fetchone()[0]
     con.close()
     return n

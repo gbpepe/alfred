@@ -47,7 +47,7 @@ const parsesPy = (dir: string, f: string) =>
 const GATE = 'scripts/memoria_heartbeat_gate.py'
 const BASE = 'import os\n\nAGENT = "picard"\n\n\ndef main():\n    return AGENT\n'
 const LOCAL = BASE.replace('"picard"', '"tibor"')
-const UPSTREAM = BASE.replace('AGENT = "picard"', 'AGENT = os.environ.get("MAIN_AGENT_ID", "marveen")')
+const UPSTREAM = BASE.replace('AGENT = "picard"', 'AGENT = os.environ.get("MAIN_AGENT_ID", "alfred")')
 const BROKEN_UPSTREAM = BASE.replace('AGENT = "picard"', 'AGENT = (')
 
 // The install as the old update.sh leaves it: base commit, local edits (the gate line = conflict, other.py = no
@@ -62,7 +62,7 @@ function conflicted(opts: { upstream?: string, deleteUpstream?: boolean, stashMs
   writeFileSync(join(dir, GATE), LOCAL)
   writeFileSync(join(dir, 'scripts/other.py'), 'X = 1\n# local note\n')
   writeFileSync(join(dir, 'note.txt'), 'mine\n')
-  expect(sh(dir, `git stash push -q -u -m "${opts.stashMsg ?? 'marveen-update-auto-stash 20261103-201500'}"`).code).toBe(0)
+  expect(sh(dir, `git stash push -q -u -m "${opts.stashMsg ?? 'alfred-update-auto-stash 20261103-201500'}"`).code).toBe(0)
   if (opts.deleteUpstream) expect(sh(dir, `git rm -q ${GATE} && git commit -qm upstream`).code).toBe(0)
   else {
     writeFileSync(join(dir, GATE), opts.upstream ?? UPSTREAM)
@@ -78,7 +78,7 @@ describe('the repro is the field state', () => {
     expect(read(dir, GATE)).toContain('<<<<<<< Updated upstream')
     expect(parsesPy(dir, GATE)).toBe(false)
     expect(git(dir, 'diff --name-only --diff-filter=U').trim()).toBe(GATE)
-    expect(git(dir, 'stash list')).toContain('marveen-update-auto-stash')
+    expect(git(dir, 'stash list')).toContain('alfred-update-auto-stash')
   })
 })
 
@@ -100,7 +100,7 @@ describe('update-conflict-guard.sh: the repair (UPDATECONFLICT1105)', () => {
     expect(git(dir, 'stash list')).toBe(before)
     expect(git(dir, `show 'stash@{0}':${GATE}`)).toBe(LOCAL)
     expect(r.out).toContain("local copies stay in 'stash@{0}'")
-    expect(state(dir).stash).toContain('marveen-update-auto-stash 20261103-201500')
+    expect(state(dir).stash).toContain('alfred-update-auto-stash 20261103-201500')
   })
 
   it('leaves the non-conflicting local edit and the untracked file exactly as they were', () => {
@@ -156,7 +156,7 @@ describe('update-conflict-guard.sh: only the update\'s own pop is repaired (Dani
     expect(sh(dir, 'git init -q && git add -A && git commit -qm base').code).toBe(0)
     // an old auto-stash entry from an earlier update
     writeFileSync(join(dir, 'old.txt'), 'old\n')
-    expect(sh(dir, 'git stash push -q -u -m "marveen-update-auto-stash 20261001-120000"').code).toBe(0)
+    expect(sh(dir, 'git stash push -q -u -m "alfred-update-auto-stash 20261001-120000"').code).toBe(0)
     expect(sh(dir, 'git checkout -q -b other && sed -i.bak "s/5/8/" x.py && rm x.py.bak && git commit -qam other && git checkout -q -').code).toBe(0)
     expect(sh(dir, 'sed -i.bak "s/5/6/" x.py && rm x.py.bak && git commit -qam main').code).toBe(0)
     expect(sh(dir, 'git merge other').code).not.toBe(0)
@@ -187,7 +187,7 @@ describe('update-conflict-guard.sh: only the update\'s own pop is repaired (Dani
     writeFileSync(join(dir, GATE), BASE)
     expect(sh(dir, 'git init -q && git add -A && git commit -qm base').code).toBe(0)
     writeFileSync(join(dir, 'old.txt'), 'old\n')
-    expect(sh(dir, 'git stash push -q -u -m "marveen-update-auto-stash 20261001-120000"').code).toBe(0)
+    expect(sh(dir, 'git stash push -q -u -m "alfred-update-auto-stash 20261001-120000"').code).toBe(0)
     writeFileSync(join(dir, GATE), LOCAL)
     expect(sh(dir, 'git stash push -q -m "my own work"').code).toBe(0)
     writeFileSync(join(dir, GATE), UPSTREAM)
@@ -197,7 +197,7 @@ describe('update-conflict-guard.sh: only the update\'s own pop is repaired (Dani
     const before = read(dir, GATE)
     const r = guard(dir)
     expect(read(dir, GATE)).toBe(before)
-    expect(r.out).toContain('stash@{0} is not a marveen-update-auto-stash entry')
+    expect(r.out).toContain('stash@{0} is not a alfred-update-auto-stash entry')
     expect(state(dir).state).toBe('refused_no_stash')
   })
 
@@ -215,13 +215,13 @@ describe('update-conflict-guard.sh: only the update\'s own pop is repaired (Dani
 })
 
 describe('update-conflict-guard.sh: when it must NOT repair', () => {
-  it('no marveen-update-auto-stash entry: the file is not touched, a warning is written', () => {
+  it('no alfred-update-auto-stash entry: the file is not touched, a warning is written', () => {
     const dir = conflicted({ stashMsg: 'something else' })
     const before = read(dir, GATE)
     const r = guard(dir)
     expect(read(dir, GATE)).toBe(before)
     expect(git(dir, 'diff --name-only --diff-filter=U').trim()).toBe(GATE)
-    expect(r.out).toContain('stash@{0} is not a marveen-update-auto-stash entry')
+    expect(r.out).toContain('stash@{0} is not a alfred-update-auto-stash entry')
     expect(state(dir)).toMatchObject({ state: 'refused_no_stash', paths: [GATE] })
     expect(backups(dir)).toHaveLength(0)
   })
@@ -292,7 +292,7 @@ describe('start.sh wiring', () => {
 describe('the dashboard side: the report and the banner text', () => {
   it('parseConflictGuard keeps a well-formed report and drops anything else', async () => {
     const { parseConflictGuard } = await import('../update-conflict-guard.js')
-    const ok = { state: 'repaired', at: 1793866000000, paths: [GATE], backup: 'store/update-conflict-backup-20261105-091500-a1B2c3', stash: 'stash@{0}: On main: marveen-update-auto-stash 20261103-201500' }
+    const ok = { state: 'repaired', at: 1793866000000, paths: [GATE], backup: 'store/update-conflict-backup-20261105-091500-a1B2c3', stash: 'stash@{0}: On main: alfred-update-auto-stash 20261103-201500' }
     expect(parseConflictGuard(ok)).toEqual(ok)
     expect(parseConflictGuard({ ...ok, state: 'hacked' })).toBeNull()
     expect(parseConflictGuard({ ...ok, at: 'x' })).toBeNull()

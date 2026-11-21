@@ -71,9 +71,9 @@ describe('main-agent detail and lifecycle guards', () => {
     expect(stopBlock.indexOf('isMainChannelsAgent(name)')).toBeLessThan(stopBlock.indexOf('removeDesiredAgent(name)'))
   })
 
-  it('routes the main id to openMarveenDetail before the generic detail fetch', () => {
+  it('routes the main id to openAlfredDetail before the generic detail fetch', () => {
     const detailBlock = sourceBetween(appSource, 'async function openAgentDetail(agentName)', 'function populateDetailAvatarGrid')
-    const redirectIndex = detailBlock.indexOf('return openMarveenDetail()')
+    const redirectIndex = detailBlock.indexOf('return openAlfredDetail()')
     const fetchIndex = detailBlock.indexOf('fetch(`/api/agents/')
 
     expect(redirectIndex).toBeGreaterThan(-1)
@@ -82,9 +82,9 @@ describe('main-agent detail and lifecycle guards', () => {
   })
 
   // #2848: the main agent's voice reply section stayed blank, only the sub-agent detail loaded it.
-  it('openMarveenDetail loads the voice config for the main id, after the read-only mode is applied', () => {
-    const block = sourceBetween(appSource, 'async function openMarveenDetail()', 'function applyMarveenReadonlyMode')
-    const readonlyAt = block.indexOf('applyMarveenReadonlyMode(true)')
+  it('openAlfredDetail loads the voice config for the main id, after the read-only mode is applied', () => {
+    const block = sourceBetween(appSource, 'async function openAlfredDetail()', 'function applyAlfredReadonlyMode')
+    const readonlyAt = block.indexOf('applyAlfredReadonlyMode(true)')
     const voiceAt = block.indexOf('loadVoiceConfig(mainAgentId())')
     expect(readonlyAt).toBeGreaterThan(-1)
     expect(voiceAt).toBeGreaterThan(readonlyAt)

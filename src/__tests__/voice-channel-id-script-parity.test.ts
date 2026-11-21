@@ -13,10 +13,10 @@ import { tmpdir } from 'node:os'
 import { PROJECT_ROOT } from '../config.js'
 import { MESSAGE_LAYER_RESERVED_AGENT_IDS } from '../web/sanitize.js'
 
-const savedDir = process.env.CLAUDECLAW_ENV_DIR
+const savedDir = process.env.ALFRED_ENV_DIR
 afterAll(() => {
-  if (savedDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = savedDir
+  if (savedDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = savedDir
   vi.resetModules()
 })
 
@@ -40,7 +40,7 @@ function scriptResolves(envDir: string): string | null {
 }
 
 async function dashboardResolves(envDir: string): Promise<string | null> {
-  process.env.CLAUDECLAW_ENV_DIR = envDir
+  process.env.ALFRED_ENV_DIR = envDir
   vi.resetModules()
   return (await import('../config.js')).VOICE_CHANNEL_ID
 }

@@ -2,7 +2,7 @@
 // PR2c adds POST .../rotate, exercised through tryHandleClaudePlans() directly
 // (mirrors approvals-notify.test.ts's fake req/res harness). PROJECT_ROOT
 // points at a real temp dir so the CRUD round-trips through the actual
-// atomic-write path. hardRestartMarveenChannels/restartAgentProcess are
+// atomic-write path. hardRestartAlfredChannels/restartAgentProcess are
 // mocked -- this test must NEVER touch a real tmux session or process.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mkdtempSync, rmSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { encodeClaudeProjectDir } from '../claude-project-dir.js'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-claude-plans-routes-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-claude-plans-routes-test-'))
 
 vi.mock('../config.js', () => ({ PROJECT_ROOT: tmpRoot, MAIN_AGENT_ID: 'agent-a', DEFAULT_AGENT_MODEL: 'claude-opus-5', APP_TZ: 'Europe/Budapest' }))
 // OWNERGATE2-1104: the route now imports the owner gate (routes/auth.js), whose import chain needs config exports this
@@ -29,13 +29,13 @@ vi.mock('../settings-store.js', () => ({
   },
 }))
 
-const hardRestartMarveenChannels = vi.fn((): { ok: boolean; error?: string } => ({ ok: true }))
+const hardRestartAlfredChannels = vi.fn((): { ok: boolean; error?: string } => ({ ok: true }))
 // 8c338dc4: the opt-in --continue restart of a main-agent rotation (its steps: main-rotation-continue.test.ts).
 const restartMainForRotationContinue = vi.fn(
   async (): Promise<{ ok: boolean; mode: 'continue' | 'fresh-fallback'; error?: string }> => ({ ok: true, mode: 'continue' }),
 )
 vi.mock('../web/channel-monitor.js', () => ({
-  hardRestartMarveenChannels: () => hardRestartMarveenChannels(),
+  hardRestartAlfredChannels: () => hardRestartAlfredChannels(),
   restartMainForRotationContinue: () => restartMainForRotationContinue(),
 }))
 
@@ -372,7 +372,7 @@ describe('tryHandleClaudePlans', () => {
     // derived id (claude-plan-token-<id>) -- nothing else, even if charset-valid.
     it('rejects a foreign tokenSecretId on POST (not the plan\'s own derived id)', async () => {
       const { ctx, out } = fakeCtx('POST', '/api/claude-plans', {
-        id: 'marketing', label: 'Marketing', tokenSecretId: 'MARVEEN-CONNECTORS-PAT',
+        id: 'marketing', label: 'Marketing', tokenSecretId: 'ALFRED-CONNECTORS-PAT',
         planType: 'personal', channelsAllowed: true,
       })
       await tryHandleClaudePlans(ctx)
@@ -383,7 +383,7 @@ describe('tryHandleClaudePlans', () => {
     it('rejects a foreign tokenSecretId on PUT too, leaving the existing plan/secret untouched', async () => {
       await tryHandleClaudePlans(fakeCtx('POST', '/api/claude-plans', tokenPlan()).ctx)
       const { ctx, out } = fakeCtx('PUT', '/api/claude-plans/marketing', {
-        label: 'Marketing', tokenSecretId: 'MARVEEN-CONNECTORS-PAT', planType: 'personal', channelsAllowed: true,
+        label: 'Marketing', tokenSecretId: 'ALFRED-CONNECTORS-PAT', planType: 'personal', channelsAllowed: true,
       })
       await tryHandleClaudePlans(ctx)
       expect(out.status).toBe(400)
@@ -408,10 +408,10 @@ describe('tryHandleClaudePlans', () => {
 
     it('never calls deleteSecret for an id that is not the plan\'s own derived id', async () => {
       const { deleteOwnTokenSecret } = await import('../web/routes/claude-plans.js')
-      vaultSecrets.set('MARVEEN-CONNECTORS-PAT', 'live-prod-db-credential')
-      deleteOwnTokenSecret('marketing', 'MARVEEN-CONNECTORS-PAT')
+      vaultSecrets.set('ALFRED-CONNECTORS-PAT', 'live-prod-db-credential')
+      deleteOwnTokenSecret('marketing', 'ALFRED-CONNECTORS-PAT')
       expect(deleteSecret).not.toHaveBeenCalled()
-      expect(vaultSecrets.has('MARVEEN-CONNECTORS-PAT')).toBe(true)
+      expect(vaultSecrets.has('ALFRED-CONNECTORS-PAT')).toBe(true)
     })
 
     it('no-ops on a null/undefined secretId', async () => {
@@ -432,7 +432,7 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
     if (existsSync(agentsDir)) rmSync(agentsDir, { recursive: true, force: true })
     rotationEnabled = '1'
     mainIsolated = '1'
-    hardRestartMarveenChannels.mockClear().mockReturnValue({ ok: true })
+    hardRestartAlfredChannels.mockClear().mockReturnValue({ ok: true })
     restartAgentProcess.mockClear().mockResolvedValue({ ok: true, pid: 123 })
     fleetEnabled = false
     runFleetLeg.mockClear()
@@ -454,7 +454,7 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
     const { ctx, out } = fakeCtx('POST', '/api/claude-plans/rotate', { targetPlanId: 'nope' })
     await tryHandleClaudePlans(ctx)
     expect(out.status).toBe(400)
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
   })
 
   it('rejects with 400 when the target plan does not allow channels', async () => {
@@ -471,7 +471,7 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
     const { ctx, out } = fakeCtx('POST', '/api/claude-plans/rotate', { targetPlanId: 'team' })
     await tryHandleClaudePlans(ctx)
     expect(out.status).toBe(409)
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
   })
 
   it('rejects with 409 for the main agent when MAIN_AGENT_ISOLATED_CONFIG is off', async () => {
@@ -480,7 +480,7 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
     const { ctx, out } = fakeCtx('POST', '/api/claude-plans/rotate', { targetPlanId: 'team' })
     await tryHandleClaudePlans(ctx)
     expect(out.status).toBe(409)
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
   })
 
   it('rejects with 409 for the main agent with fewer than 2 registered plans', async () => {
@@ -493,12 +493,12 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
   it('happy path (main agent, default agentId): writes state THEN restarts, in that order', async () => {
     await seedTwoPlans()
     const order: string[] = []
-    hardRestartMarveenChannels.mockImplementation(() => { order.push('restart'); return { ok: true } })
+    hardRestartAlfredChannels.mockImplementation(() => { order.push('restart'); return { ok: true } })
     const { ctx, out } = fakeCtx('POST', '/api/claude-plans/rotate', { targetPlanId: 'team' })
     await tryHandleClaudePlans(ctx)
     expect(out.status).toBe(200)
     expect(out.body).toEqual({ ok: true, agentId: 'agent-a', activePlanId: 'team', fleet: 'off' })
-    expect(hardRestartMarveenChannels).toHaveBeenCalledTimes(1)
+    expect(hardRestartAlfredChannels).toHaveBeenCalledTimes(1)
     // CLAUDE_ROTATION_FLEET off (default): the fleet is not touched at all.
     expect(runFleetLeg).not.toHaveBeenCalled()
 
@@ -521,7 +521,7 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
   it('CLAUDE_ROTATION_FLEET on: no fleet leg when the main restart itself failed', async () => {
     await seedTwoPlans()
     fleetEnabled = true
-    hardRestartMarveenChannels.mockReturnValue({ ok: false, error: 'boom' })
+    hardRestartAlfredChannels.mockReturnValue({ ok: false, error: 'boom' })
     const { ctx, out } = fakeCtx('POST', '/api/claude-plans/rotate', { targetPlanId: 'team' })
     await tryHandleClaudePlans(ctx)
     expect(out.status).toBe(500)
@@ -541,7 +541,7 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
 
   it('returns 500 and does not report ok when the main-agent restart fails', async () => {
     await seedTwoPlans()
-    hardRestartMarveenChannels.mockReturnValue({ ok: false, error: 'launchctl boom' })
+    hardRestartAlfredChannels.mockReturnValue({ ok: false, error: 'launchctl boom' })
     const { ctx, out } = fakeCtx('POST', '/api/claude-plans/rotate', { targetPlanId: 'team' })
     await tryHandleClaudePlans(ctx)
     expect(out.status).toBe(500)
@@ -565,7 +565,7 @@ describe('POST /api/claude-plans/rotate (PR2c)', () => {
     expect(out.body).toEqual({ ok: true, agentId: 'devy', activePlanId: 'team' })
     // RESTARTWAKE927: the plan switch may cut a running turn, so it asks for the wake.
     expect(restartAgentProcess).toHaveBeenCalledWith('devy', { wake: { reason: 'plan-switch' } })
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
 
     const state = fakeCtx('GET', '/api/claude-plans/state')
     await tryHandleClaudePlans(state.ctx)
@@ -594,7 +594,7 @@ describe('rotatePlan(): the route body as a function (PLANROTATEDEADLOCK1115 P2)
     if (existsSync(agentsDir)) rmSync(agentsDir, { recursive: true, force: true })
     rotationEnabled = '1'
     mainIsolated = '1'
-    hardRestartMarveenChannels.mockClear().mockReturnValue({ ok: true })
+    hardRestartAlfredChannels.mockClear().mockReturnValue({ ok: true })
     fleetEnabled = false
   })
   const seed = async () => {
@@ -606,7 +606,7 @@ describe('rotatePlan(): the route body as a function (PLANROTATEDEADLOCK1115 P2)
     await seed()
     const r = await rotatePlan({ agentId: 'agent-a', targetPlanId: 'team', continue: false })
     expect(r).toEqual({ status: 200, payload: { ok: true, agentId: 'agent-a', activePlanId: 'team', fleet: 'off' } })
-    expect(hardRestartMarveenChannels).toHaveBeenCalledTimes(1)
+    expect(hardRestartAlfredChannels).toHaveBeenCalledTimes(1)
   })
 
   it('each refusal: the same status as the route, nothing restarted', async () => {
@@ -626,7 +626,7 @@ describe('rotatePlan(): the route body as a function (PLANROTATEDEADLOCK1115 P2)
       expect(out.status, label).toBe(direct.status)
       expect(out.body, label).toEqual(direct.payload)
     }
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
   })
 })
 
@@ -651,7 +651,7 @@ describe('POST /api/claude-plans/rotate: the lastRotationAt guard (P5)', () => {
     rotationEnabled = '1'
     mainIsolated = '1'
     fleetEnabled = false
-    hardRestartMarveenChannels.mockClear().mockReturnValue({ ok: true })
+    hardRestartAlfredChannels.mockClear().mockReturnValue({ ok: true })
     restartAgentProcess.mockClear().mockResolvedValue({ ok: true, pid: 123 })
     await tryHandleClaudePlans(fakeCtx('POST', '/api/claude-plans', plan({ id: 'pro', label: 'Personal PRO' })).ctx)
     await tryHandleClaudePlans(fakeCtx('POST', '/api/claude-plans', plan({ id: 'team', label: 'Team Seat' })).ctx)
@@ -664,7 +664,7 @@ describe('POST /api/claude-plans/rotate: the lastRotationAt guard (P5)', () => {
     const second = await post('pro')
     expect(second.status).toBe(429)
     expect(second.body).toMatchObject({ code: 'rotation_too_soon' })
-    expect(hardRestartMarveenChannels).toHaveBeenCalledTimes(1)
+    expect(hardRestartAlfredChannels).toHaveBeenCalledTimes(1)
     expect(stateOnDisk().activePlanByAgent['agent-a']).toBe('team')
   })
 
@@ -674,18 +674,18 @@ describe('POST /api/claude-plans/rotate: the lastRotationAt guard (P5)', () => {
     expect((await post('pro')).status).toBe(429)
     setLastRotationAt(Date.now() - MAIN_ROTATION_MIN_GAP_MS)
     expect((await post('pro')).status).toBe(200)
-    expect(hardRestartMarveenChannels).toHaveBeenCalledTimes(2)
+    expect(hardRestartAlfredChannels).toHaveBeenCalledTimes(2)
     expect(stateOnDisk().activePlanByAgent['agent-a']).toBe('pro')
   })
 
   it('rotatePlan() called directly (the backend tick) is guarded the same way', async () => {
     expect((await rotatePlan({ agentId: 'agent-a', targetPlanId: 'team', continue: false })).status).toBe(200)
     expect((await rotatePlan({ agentId: 'agent-a', targetPlanId: 'pro', continue: false })).status).toBe(429)
-    expect(hardRestartMarveenChannels).toHaveBeenCalledTimes(1)
+    expect(hardRestartAlfredChannels).toHaveBeenCalledTimes(1)
   })
 
   it('a failed restart records nothing, so the next try is not held back', async () => {
-    hardRestartMarveenChannels.mockReturnValueOnce({ ok: false, error: 'boom' })
+    hardRestartAlfredChannels.mockReturnValueOnce({ ok: false, error: 'boom' })
     expect((await post('team')).status).toBe(500)
     expect(stateOnDisk().backend?.lastRotationAt).toBeUndefined()
     expect((await post('team')).status).toBe(200)
@@ -727,7 +727,7 @@ describe('POST /api/claude-plans/rotate with "continue" (8c338dc4)', () => {
     activeRotatedTokenId = null
     fleetTokenPresent = true
     vaultSecrets.clear()
-    hardRestartMarveenChannels.mockClear().mockReturnValue({ ok: true })
+    hardRestartAlfredChannels.mockClear().mockReturnValue({ ok: true })
     restartMainForRotationContinue.mockClear().mockResolvedValue({ ok: true, mode: 'continue' })
     restartAgentProcess.mockClear().mockResolvedValue({ ok: true, pid: 123 })
     runFleetLeg.mockClear()
@@ -755,7 +755,7 @@ describe('POST /api/claude-plans/rotate with "continue" (8c338dc4)', () => {
     expect(out.body).toEqual({ ok: true, agentId: 'agent-a', activePlanId: 'tok-b', fleet: 'off', mode: 'continue' })
     expect(planAtRestart).toBe('tok-b')
     expect(restartMainForRotationContinue).toHaveBeenCalledTimes(1)
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
   })
 
   it('continue: false is the plain rotation: the fresh restart, and the response has no mode', async () => {
@@ -765,7 +765,7 @@ describe('POST /api/claude-plans/rotate with "continue" (8c338dc4)', () => {
     await tryHandleClaudePlans(ctx)
     expect(out.status).toBe(200)
     expect(out.body).toEqual({ ok: true, agentId: 'agent-a', activePlanId: 'tok-b', fleet: 'off' })
-    expect(hardRestartMarveenChannels).toHaveBeenCalledTimes(1)
+    expect(hardRestartAlfredChannels).toHaveBeenCalledTimes(1)
     expect(restartMainForRotationContinue).not.toHaveBeenCalled()
   })
 
@@ -777,7 +777,7 @@ describe('POST /api/claude-plans/rotate with "continue" (8c338dc4)', () => {
     expect(out.status).toBe(400)
     expect(out.body.error).toContain('continue must be a JSON boolean')
     expect(stateOnDisk()).toBeNull()
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
     expect(restartMainForRotationContinue).not.toHaveBeenCalled()
   })
 
@@ -790,7 +790,7 @@ describe('POST /api/claude-plans/rotate with "continue" (8c338dc4)', () => {
     expect(out.status).toBe(409)
     expect(out.body.error).toContain('config-dir-changes')
     expect(stateOnDisk()).toBeNull()
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
     expect(restartMainForRotationContinue).not.toHaveBeenCalled()
   })
 
@@ -813,7 +813,7 @@ describe('POST /api/claude-plans/rotate with "continue" (8c338dc4)', () => {
     expect(out.status).toBe(409)
     expect(out.body.error).toContain('config-dir-changes')
     expect(stateOnDisk()).toBeNull()
-    expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+    expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
     expect(restartMainForRotationContinue).not.toHaveBeenCalled()
   })
 

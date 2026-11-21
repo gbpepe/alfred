@@ -6,7 +6,7 @@
 // - CLAUDE.md and SOUL.md (here, not in scripts/lib/seed-refresh.sh, whose persona branch stays as it is): untouched
 //   means that after the dashboard's generated blocks are cut out (they come back, in the new language, when the main
 //   agent starts), the text is the old language's template rendered as first-boot renders it, with EITHER the current
-//   names, OR the first-boot names (Owner / Marveen) and the wizard's name step applied to it (the same plain
+//   names, OR the first-boot names (Owner / Alfred) and the wizard's name step applied to it (the same plain
 //   replace as renameInPersonaFile: the agent's name, then the owner's). The new render takes the same form, so a
 //   switch there and back gives the same bytes. The render is scripts/lib/seed-refresh.sh's render_seed_template,
 //   the function render_persona_file writes with, fed what docker/first-boot.sh feeds it.
@@ -33,7 +33,7 @@ export interface RunResult {
 export interface LangSwitchDeps {
   /** The install (PROJECT_ROOT). */
   readonly root: string
-  /** The image's own scripts (/opt/marveen-docker). */
+  /** The image's own scripts (/opt/alfred-docker). */
   readonly dockerDir: string
   /** The login user's home: the seeded skills and tasks are under its .claude. */
   readonly home: string
@@ -51,7 +51,7 @@ export interface LangSwitchDeps {
 
 /** The first-boot names, before the wizard's name step. */
 export const FIRST_BOOT_OWNER = 'Owner'
-export const FIRST_BOOT_BOT = 'Marveen'
+export const FIRST_BOOT_BOT = 'Alfred'
 
 /** The install's language as the persona helper reads it: the key, hu without it. */
 export function installLang(readEnv: (key: string) => string | null): InstallLang {
@@ -191,8 +191,8 @@ export async function switchInstallLanguage(lang: InstallLang, deps: LangSwitchD
     PATH: '/usr/local/bin:/usr/bin:/bin',
     LC_ALL: 'C.UTF-8',
     HOME: deps.home,
-    MARVEEN_INSTALL_DIR: deps.root,
-    MARVEEN_DOCKER_DIR: deps.dockerDir,
+    ALFRED_INSTALL_DIR: deps.root,
+    ALFRED_DOCKER_DIR: deps.dockerDir,
   })
   files.push(...parseSeedReport(seeds.stdout))
   if (seeds.code !== 0) return { ok: false, error: 'seed_refresh_failed', lang, files }

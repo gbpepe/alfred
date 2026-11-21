@@ -24,7 +24,7 @@ interface ShapeRule { shape: SensitiveShape; label: string; re: RegExp }
 const RULES: ShapeRule[] = [
   { shape: 'private-key', label: 'private key block', re: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/ },
   // Vendor-prefixed tokens: OpenAI/Anthropic (sk-, sk-ant-), GitHub (ghp_/gho_/ghu_/ghs_/ghr_,
-  // github_pat_), Slack (xoxa-/xoxb-/xoxp-/xoxr-/xoxs-, xapp-), GitLab (glpat-), AWS access key
+  // github_pat_), workspace bot tokens (xoxa-/xoxb-/xoxp-/xoxr-/xoxs-, xapp-), GitLab (glpat-), AWS access key
   // ids (AKIA/ASIA), Google API keys (AIza), Stripe-style live/test keys.
   { shape: 'secret-token', label: 'vendor token', re: /(?<![A-Za-z0-9])(?:sk-(?:ant-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|xapp-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{16,}|A[KS]IA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|[rs]k_(?:live|test)_[A-Za-z0-9]{16,})/ },
   { shape: 'secret-token', label: 'bearer token', re: /\bBearer\s+[A-Za-z0-9._~+/-]{12,}=*/i },

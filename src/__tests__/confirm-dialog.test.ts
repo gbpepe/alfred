@@ -1,7 +1,7 @@
 /**
  * The app's own confirmation dialog (web/app.js confirmDialog), in place of the native confirm(), and the
  * actions moved onto it, block by block: the agent's stop and delete buttons (the main-agent restart button
- * has its own handler test, marveen-restart-button-force.test.ts), then the channel page's remove, revoke
+ * has its own handler test, alfred-restart-button-force.test.ts), then the channel page's remove, revoke
  * and disconnect.
  *
  * The SHIPPED function runs against a small fake DOM: only the explicit confirm button resolves true;
@@ -139,7 +139,7 @@ describe('confirmDialog', () => {
 // `if (!confirmed) return` removed, "Mégse" would still send the request and every test stayed green.
 // So for each call site: the answer of THIS confirmDialog is checked, and returns, before the first
 // request the handler sends. (The main-agent restart button proves the same by running its handler:
-// marveen-restart-button-force.test.ts, "the first confirm declined: no request at all".)
+// alfred-restart-button-force.test.ts, "the first confirm declined: no request at all".)
 describe('a "no" stops the action: the answer is checked before the request', () => {
   const site = (anchor: string, request: string) => {
     const i = APP.indexOf(anchor)
@@ -171,7 +171,7 @@ describe('the agent actions use it', () => {
   }
   const STOP = handler("document.getElementById('agentStopBtn').addEventListener('click'", 'try {')
   const DELETE = handler("document.getElementById('deleteAgentBtn').onclick = async () => {", 'try {')
-  const RESTART = handler("document.getElementById('marveenRestartBtn').addEventListener('click'", 'finally {')
+  const RESTART = handler("document.getElementById('alfredRestartBtn').addEventListener('click'", 'finally {')
 
   it.each([
     ['stop', STOP, 'agents.confirm.stop'],
@@ -1330,7 +1330,7 @@ describe('the Gromzo agent switches use it', () => {
       }
       expect(line(lang, 'gromzo.agents.confirm_off')).toContain('"{name}"')
     }
-    // The main agent's restart is a fresh one (hardRestartMarveenChannels), and a busy pane is not cut off.
+    // The main agent's restart is a fresh one (hardRestartAlfredChannels), and a busy pane is not cut off.
     for (const key of ['main.confirm_on', 'main.confirm_off', 'main.confirm_restart']) {
       expect(line(HU, `gromzo.agents.${key}`)).toMatch(/új beszélgetés/iu)
       expect(line(HU, `gromzo.agents.${key}`)).toMatch(/[ns]em szakítjuk meg/u)
@@ -1736,7 +1736,7 @@ describe('the federation questions use it, and the pairing token is no prompt() 
       // The hint is a dialog text now, not a prompt() label ending in a colon.
       expect(line(lang, 'federation.modal.minted_token_hint')).not.toMatch(/:',$/)
     }
-    // The apply is a gated hard restart (hardRestartMarveenChannels behind gateManualRestart).
+    // The apply is a gated hard restart (hardRestartAlfredChannels behind gateManualRestart).
     expect(line(HU, 'federation.confirm.apply')).toContain('Új beszélgetéssel indul')
     expect(line(HU, 'federation.confirm.apply')).toContain('nem szakítjuk meg')
     // A rotation answers with the new token; a deleted peer takes its token along; removal deletes the store.

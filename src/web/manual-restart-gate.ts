@@ -1,7 +1,7 @@
 // Manual-restart gate for the main agent.
 //
 // The scheduled restart already refuses a busy pane (restartBlockedBy in auto-restart.ts), but the
-// manual restart routes called hardRestartMarveenChannels() with no check at all, so a click could
+// manual restart routes called hardRestartAlfredChannels() with no check at all, so a click could
 // cut a running turn. This gate sits in front of both manual routes. Principle: never cut live
 // work; when the pane cannot be read, refuse (fail-closed). A session that does not exist has no
 // turn to cut, so restarting a dead session stays allowed.
@@ -37,7 +37,7 @@ export function decideManualRestart(samples: ReadonlyArray<boolean | null>): Man
  */
 export const MANUAL_RESTART_FORCE_HINT =
   'Restart refused: the main agent\'s pane is busy. To restart anyway (this cuts the running turn), ' +
-  'send POST /api/marveen/restart with the JSON body {"force": true}.'
+  'send POST /api/alfred/restart with the JSON body {"force": true}.'
 
 /**
  * True only for an explicit {"force": true} body. The dashboard button sends no body, so it never

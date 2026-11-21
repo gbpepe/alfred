@@ -46,7 +46,7 @@ const EXPECTED: Record<string, string[]> = {
     'ledger-capture.py', 'inbox-drain.py', 'telegram-reply-directive.py',
     'provenance-gate.py', 'staleness-guard.py', 'memory-lookup-nudge.py', 'channel-inbox-drain.py',
     'voice-reply-directive.py', 'telegram_progress.py', 'slack_progress.py',
-    'marveen-commands.py',
+    'alfred-commands.py',
     // PELENKAGCHAT1113 (Google Chat thread guard, the recording half), a reviewed
     // decision: it only reads the prompt and writes its own state file under the
     // Google Chat plugin's state dir (ids only), no network call, no subprocess;
@@ -69,7 +69,7 @@ const EXPECTED: Record<string, string[]> = {
     // walked straight past it. PostToolUse is the event that cannot be
     // dodged by choosing a different tool.
     'persona-change-notify.py',
-    // MARVEENGAPS1020 (c): WebSearch and WebFetch results reach the main agent
+    // ALFREDGAPS1020 (c): WebSearch and WebFetch results reach the main agent
     // framed as untrusted content (an allowlisted host's text is still external).
     'browser-content-notice.py @ WebSearch|WebFetch|mcp__(gmail|gmail-v2|google-calendar|google-drive|playwright|stripe)__.*',
   ],
@@ -111,11 +111,11 @@ const EXPECTED: Record<string, string[]> = {
     // so it cannot silence the channel or trap a session.
     'googlechat-thread-guard.py @ mcp__plugin_googlechat_googlechat__reply',
   ],
-  Stop: ['marveen-commands.py', 'telegram-reply-guard.py', 'telegram_progress_clear.py', 'slack_progress_clear.py', 'login-lost-alert.py'],
+  Stop: ['alfred-commands.py', 'telegram-reply-guard.py', 'telegram_progress_clear.py', 'slack_progress_clear.py', 'login-lost-alert.py'],
   StopFailure: ['ledger-turn-failure.py', 'login-lost-alert.py'],
   SessionStart: [
     'ledger-replay.py @ startup|resume|clear', 'taskstate-replay.py @ compact|resume|clear',
-    'clear-replay.py @ clear', 'marveen-commands.py',
+    'clear-replay.py @ clear', 'alfred-commands.py',
   ],
   SessionEnd: ['clear-capture.py'],
 }

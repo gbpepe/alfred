@@ -193,7 +193,7 @@ describe('isSshPrivateKeyId: one predicate for every writer', () => {
     expect(isSshPrivateKeyId('  ssh-key-abc123 ')).toBe(true)
     expect(isSshPrivateKeyId('ssh-keys')).toBe(false)
     expect(isSshPrivateKeyId('EXISTS')).toBe(false)
-    expect(isSshPrivateKeyId('MARVEEN-CONNECTORS-PAT')).toBe(false)
+    expect(isSshPrivateKeyId('ALFRED-CONNECTORS-PAT')).toBe(false)
   })
 })
 

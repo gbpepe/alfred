@@ -1,0 +1,36 @@
+[Unit]
+Description=Alfred DevOps Control Plane (alfred-ops — Always-On)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alfred
+Group=alfred
+WorkingDirectory=/opt/alfred-ops
+EnvironmentFile=/opt/alfred-ops/.env
+Environment=NODE_ENV=production
+Environment=ALFRED_ENV=ops
+Environment=ALFRED_ENABLED_AGENTS=alfred-ops
+Environment=ALFRED_DB_PATH=store/alfred-ops.db
+Environment=NODE_OPTIONS=--max-old-space-size=128
+ExecStart=/usr/bin/node /opt/alfred-ops/dist/alfred/run.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+
+# Ultra-lightweight control plane for 2 GB RAM VPS
+MemoryHigh=160M
+MemoryMax=256M
+CPUQuota=25%
+
+# Note: NoNewPrivileges=true is intentionally omitted so `alfred` can invoke scoped
+# `sudo systemctl` on alfred-test / alfred-prod as defined in `deploy/alfred-ops.sudoers.example`.
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/alfred-ops /opt/alfred-test /opt/alfred-prod
+SyslogIdentifier=alfred-ops
+
+[Install]
+WantedBy=multi-user.target

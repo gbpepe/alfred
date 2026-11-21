@@ -17,7 +17,7 @@ const AGENTS = join(SANDBOX, 'agents')
 
 vi.mock('../config.js', async (orig) => {
   const actual = await orig<typeof import('../config.js')>()
-  return { ...actual, MAIN_AGENT_ID: 'marveen', PROJECT_ROOT: SANDBOX, STORE_DIR: join(SANDBOX, 'store') }
+  return { ...actual, MAIN_AGENT_ID: 'alfred', PROJECT_ROOT: SANDBOX, STORE_DIR: join(SANDBOX, 'store') }
 })
 vi.mock('../logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },

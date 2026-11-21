@@ -65,7 +65,7 @@ CLAUDE_CODE_DISABLE_AGENT_VIEW=1 $CLAUDE --dangerously-skip-permissions \
   -p "Reggeli napindito"
 CTRL
 cat > "$TMP/control2.sh" <<'CTRL'
-"${CLAUDE_BIN}" --print "x" --channels plugin:slack-channel@marveen-marketplace && echo done
+"${CLAUDE_BIN}" --print "x" --channels plugin:slack-channel@alfred-marketplace && echo done
 CTRL
 cat > "$TMP/negative.sh" <<'CTRL'
 $CLAUDE --dangerously-skip-permissions --channels plugin:telegram@claude-plugins-official

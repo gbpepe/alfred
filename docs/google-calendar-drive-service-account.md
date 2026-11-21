@@ -25,9 +25,9 @@ mailbox without Google Workspace domain-wide delegation, so Gmail stays on OAuth
    and save the file as:
 
    ```bash
-   mkdir -p ~/.config/marveen
-   mv ~/Downloads/<downloaded-key>.json ~/.config/marveen/google-service-account.json
-   chmod 600 ~/.config/marveen/google-service-account.json
+   mkdir -p ~/.config/alfred
+   mv ~/Downloads/<downloaded-key>.json ~/.config/alfred/google-service-account.json
+   chmod 600 ~/.config/alfred/google-service-account.json
    ```
 
    The `chmod 600` is enforced: a key file readable by group or others is

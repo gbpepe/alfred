@@ -128,7 +128,7 @@ vi.mock('../channel-provider.js', async (importOriginal) => {
 vi.mock('../web/scheduled-tasks-io.js', () => ({
   listScheduledTasks: () => mockListScheduledTasks(),
   readScheduledTask: (n: string) => mockReadScheduledTask(n),
-  SCHEDULED_TASKS_DIR: '/tmp/marveen-worksource-fire-no-tasks-dir',
+  SCHEDULED_TASKS_DIR: '/tmp/alfred-worksource-fire-no-tasks-dir',
   SCHEDULED_TASK_INLINE_MAX_CHARS: 1_500,
   SCHEDULED_TASK_BODY_WARN_CHARS: 20_000,
   MAX_SCHEDULED_TASK_PROMPT_LEN: 50_000,
@@ -180,7 +180,7 @@ vi.mock('../owner-chat.js', async (importOriginal) => {
 
 vi.mock('../web/worksource-queue.js', () => ({
   enqueueWorksourceItem: (...a: unknown[]) => mockEnqueue(...a),
-  worksourceRootFor: (agent: string) => `/tmp/marveen-worksource-test-${agent}`,
+  worksourceRootFor: (agent: string) => `/tmp/alfred-worksource-test-${agent}`,
   worksourceItemId: (id: number | string) => `msg-${String(id).replace(/[^A-Za-z0-9._-]/g, '')}`,
   worksourceItemStage: (_agent: string, id: string) => {
     const byId = worksourceStageById != null ? worksourceStageById(id) : undefined

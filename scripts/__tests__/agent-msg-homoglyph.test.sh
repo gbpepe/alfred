@@ -54,7 +54,7 @@ CY="$(python3 -c 'print(chr(0x43E))')"   # CYRILLIC SMALL LETTER O
 send() {  # send <content-or-dash> [extra env assignments via ENVX]
   : > "$SANDBOX/calls.txt"
   OUT="$(env PATH="$BIN:$PATH" CURL_CALLS="$SANDBOX/calls.txt" \
-             MARVEEN_TOKEN_FILE="$SANDBOX/token" ${ENVX:-} \
+             ALFRED_TOKEN_FILE="$SANDBOX/token" ${ENVX:-} \
              /bin/bash "$HELPER" igor hex "$1" 2>"$SANDBOX/err.txt")"
   RC=$?
   ERR="$(cat "$SANDBOX/err.txt")"
@@ -87,7 +87,7 @@ ok "  ...and the report masks the letter instead of pasting it" \
 # STDIN form takes the same route -- it is the form used for long messages.
 : > "$SANDBOX/calls.txt"
 OUT="$(printf 'stdin sz%sveg' "$CY" | env PATH="$BIN:$PATH" CURL_CALLS="$SANDBOX/calls.txt" \
-        MARVEEN_TOKEN_FILE="$SANDBOX/token" /bin/bash "$HELPER" igor hex - 2>/dev/null)"
+        ALFRED_TOKEN_FILE="$SANDBOX/token" /bin/bash "$HELPER" igor hex - 2>/dev/null)"
 ok "the STDIN form is gated too" "$([ "$?" = "3" ] && [ ! -s "$SANDBOX/calls.txt" ] && echo 0 || echo 1)"
 
 # --- THE RULE IS THE MIXED-SCRIPT WORD, not the presence of a script --------
@@ -205,7 +205,7 @@ import sys
 sys.stdin.read()
 sys.exit(0)
 EC
-ENVX="MARVEEN_HOMOGLYPH_BIN=$SANDBOX/empty-checker.py" send "ezt a szoveget kell elkuldeni"
+ENVX="ALFRED_HOMOGLYPH_BIN=$SANDBOX/empty-checker.py" send "ezt a szoveget kell elkuldeni"
 ok "a checker with empty stdout does NOT empty the message" \
    "$([ "$RC" = "0" ] && [ "$CALLED" = "yes" ] && echo 0 || echo 1)" "rc=$RC"
 ok "  ...the ORIGINAL text reaches the payload" \
@@ -228,7 +228,7 @@ cat > "$SANDBOX/crash-checker.py" <<'CC'
 import sys
 raise SystemExit(9)
 CC
-ENVX="MARVEEN_HOMOGLYPH_BIN=$SANDBOX/crash-checker.py" send "tiszta szoveg torott checkerrel"
+ENVX="ALFRED_HOMOGLYPH_BIN=$SANDBOX/crash-checker.py" send "tiszta szoveg torott checkerrel"
 ok "a CRASHING checker is not reported as a refusal" \
    "$([ "$RC" = "4" ] && [ "$CALLED" = "no" ] && echo 0 || echo 1)" "rc=$RC (expected 4) curl-called=$CALLED"
 ok "  ...and it says the checker crashed, not that the text was refused" \
@@ -237,7 +237,7 @@ ok "  ...and it says the checker crashed, not that the text was refused" \
 # A missing checker must FAIL OPEN -- this helper is the fleet's mandated route,
 # and blocking every message on an install without the lib file would be a new,
 # worse failure. But it must not be silent: that silence is today's bug.
-ENVX="MARVEEN_HOMOGLYPH_BIN=$SANDBOX/nincs-ilyen.py" send "tiszta szoveg checker nelkul"
+ENVX="ALFRED_HOMOGLYPH_BIN=$SANDBOX/nincs-ilyen.py" send "tiszta szoveg checker nelkul"
 ok "a missing checker still sends (fail-open)" "$([ "$RC" = "0" ] && [ "$CALLED" = "yes" ] && echo 0 || echo 1)" "rc=$RC"
 ok "  ...but says so out loud" "$(printf '%s' "$ERR" | grep -q 'UNCHECKED' && echo 0 || echo 1)" "stderr: $ERR"
 

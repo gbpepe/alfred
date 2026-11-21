@@ -25,7 +25,7 @@ const T_SRC = (() => {
 })()
 type T = (k: string, p?: Record<string, unknown>) => string
 function makeT(lang: 'hu' | 'en'): T {
-  const window = { _lang: lang, _i18n: I18N, _brandTokens: { brand: 'Marveen', bot: 'Marveen', agentId: 'marveen' } }
+  const window = { _lang: lang, _i18n: I18N, _brandTokens: { brand: 'Alfred', bot: 'Alfred', agentId: 'alfred' } }
   return new Function('window', 'localStorage', `return ${T_SRC}`)(window, { getItem: () => null }) as T
 }
 

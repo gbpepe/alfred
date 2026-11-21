@@ -77,7 +77,7 @@ describe('isScheduledPromptStuck on a reference-delivered prompt (test 7)', () =
     const marker = '[Utemezett feladat: kanban-audit]'
     const referenceBlock = wrapScheduledTaskByReference(
       'scheduled-task:kanban-audit',
-      '/opt/marveen/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md',
+      '/opt/alfred/store/scheduled-runs/20260917-080000-kanban-audit-a3f9.md',
       'a'.repeat(64),
       48745,
     )
@@ -105,7 +105,7 @@ describe('wiring: attemptFireTask uses the snapshot/reference path above the thr
 
 describe('buildScheduledTaskBlock (#1396 review: remote host, rejected reference)', () => {
   const big = 'x'.repeat(SCHEDULED_TASK_INLINE_MAX_CHARS + 1)
-  const snapPath = '/opt/marveen/store/scheduled-runs/20260921-160000-kanban-audit-a3f9.md'
+  const snapPath = '/opt/alfred/store/scheduled-runs/20260921-160000-kanban-audit-a3f9.md'
   function deps(valid = true) {
     return {
       writeSnapshot: vi.fn(() => ({ filePath: snapPath, sha256: 'a'.repeat(64), chars: big.length })),

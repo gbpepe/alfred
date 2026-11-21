@@ -138,7 +138,7 @@ function containsAwait(root: ts.Node): boolean {
 }
 
 // R2: no agent start/stop/restart or prompt/keystroke send inside the region.
-const FORBIDDEN = ['restartAgentProcess', 'stopAgentProcess', 'startAgentProcess', 'sendPromptToSession', 'resumeMarveenSession', 'recoverStuckInputForSession']
+const FORBIDDEN = ['restartAgentProcess', 'stopAgentProcess', 'startAgentProcess', 'sendPromptToSession', 'resumeAlfredSession', 'recoverStuckInputForSession']
 function containsForbiddenCall(root: ts.Node): boolean {
   return containsNode(root, (n) => {
     if (ts.isCallExpression(n)) {
@@ -160,7 +160,7 @@ for (const a of listAgentNames()) {
 if (isAgentRunning(a) && agentHasChannel(a)) {
 targets.push({
 session: agentSessionName(a),
-isMarveen: false,
+isAlfred: false,
 agentName: a,
 provider: resolveAgentProvider(a),
 })
@@ -171,7 +171,7 @@ provider: resolveAgentProvider(a),
 const ORIGINAL_MENU_TARGETS_LOOP = `
 for (const a of listAgentNames()) {
 if (agentHasChannel(a) || !readAgentWorksourceChannel(a) || readAgentRemoteHost(a) || !isAgentRunning(a)) continue
-menuTargets.push({ session: agentSessionName(a), isMarveen: false, agentName: a, gateOnly: true })
+menuTargets.push({ session: agentSessionName(a), isAlfred: false, agentName: a, gateOnly: true })
 }
 `.trim()
 

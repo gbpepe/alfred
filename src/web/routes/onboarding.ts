@@ -12,17 +12,14 @@ import { sessionExistsOnHost } from '../agent-process.js'
 import { channelsRestartCommand, MAIN_CHANNELS_SESSION } from '../main-agent.js'
 import { getClaudePidForSession, hasChannelPluginAlive } from '../../channel-coordinator/liveness.js'
 import {
-  hardRestartMarveenChannels,
+  hardRestartAlfredChannels,
   mainChannelsSessionExists,
   createMainChannelsSession,
 } from '../channel-monitor.js'
 import { liveProbeAuth, stampTokenVerified } from '../claude-credentials-guard.js'
-import { json, readBodyOrRefuse } from '../http-helpers.js'
-import { isManagedSettingsReady, getManagedSettingsSudoCommand } from './agents.js'
+import { readBodyOrRefuse, json } from '../http-helpers.js'
 import { mayActAsOwner, mayActAsOwnerOrFirstRun, refuseOwner, OWNER_SESSION_REQUIRED } from './auth.js'
 import { assertEnvEntry } from '../../env.js'
-import { mainGromzoPrimaryReady } from '../main-gromzo-launch.js'
-import { teamsAllowlistIds, TEAMS_ALLOWLIST_FILE } from '../../owner-chat.js'
 import type { RouteContext } from './types.js'
 import { deployment } from '../deployment.js'
 import { installLang, switchInstallLanguage, type RunResult } from '../install-lang-switch.js'
@@ -173,68 +170,19 @@ async function claudeAuthPresent(): Promise<boolean> {
   return runningSessionAuthenticated()
 }
 
-// Active-channel checks, provider-aware (NOT hardcoded to Telegram). A
-// Discord-switched (or Slack/etc.) install has no telegram/ state dir, so a
-// telegram-only probe would report "not configured" forever and pop the wizard
-// over a working dashboard. readChannelToken knows each provider's env key.
-//
-// Slack also needs the managed-settings.json plugin allowlist (see isManagedSettingsReady in agents.ts) before its
-// channel session can ever come up. A token saved on a machine where that allowlist is still missing
-// must NOT read as "configured" -- otherwise step 3 skips straight to Pairing, the wizard never re-surfaces the 
-// sudo-command prompt (it only fires from the step-3 save handler), and the operator is left staring at
-// an empty pairing list with no explanation for why Slack never connects.
-// GROMZONOPROVIDER1108: a gromzo install has no token and no access.json. Its channel is "configured" and "paired" once
-// the main agent is enrolled in mxd (mainGromzoPrimaryReady: socket usable and its token file present): mxd issues that
-// token only for an agent it runs, which needs the owner's consent in the Gromzo app, so the owner is the paired one.
-function gromzoEnrolled(): boolean {
-  return mainGromzoPrimaryReady(MAIN_AGENT_ID)
-}
-
+// Active-channel checks for Discord (readChannelToken reads DISCORD_BOT_TOKEN).
 function channelConfigured(): boolean {
-  if (CHANNEL_PROVIDER === 'gromzo') return gromzoEnrolled()
-  const hasToken = readChannelToken(CHANNEL_PROVIDER, join(channelStateDir(CHANNEL_PROVIDER), '.env')) != null
-  if (!hasToken) return false
-  if (CHANNEL_PROVIDER === 'slack') return isManagedSettingsReady()
-  return true
+  return readChannelToken(CHANNEL_PROVIDER, join(channelStateDir(CHANNEL_PROVIDER), '.env')) != null
 }
 
-// Step 3 pre-fill: a bot (and, for Slack, app) token can already sit in the provider's .env from a prior save whose
-// managed-settings.json gate wasn't satisfied yet (channelConfigured() reads that as "not configured"  -- see the
-// comment above it). Without this the operator has to dig the token back out of ~/.claude/channels/<provider>/.env
-// and repaste it just to get past a  step that already has it on disk. Presence-only elsewhere in this file stays
-// presence-only; this is the one spot that hands the value back, and only to the already dashboard-token-gated status
-// endpoint the operator is looking at.
-function existingChannelTokens(): { botToken: string | null; appToken: string | null } {
+// Step 3 pre-fill: a bot token can already sit in the provider's .env from a prior save.
+function existingChannelTokens(): { botToken: string | null } {
   const envPath = join(channelStateDir(CHANNEL_PROVIDER), '.env')
   const botToken = readChannelToken(CHANNEL_PROVIDER, envPath)
-  let appToken: string | null = null
-  if (CHANNEL_PROVIDER === 'slack') {
-    try {
-      for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
-        if (line.startsWith('SLACK_APP_TOKEN=')) {
-          const v = line.slice('SLACK_APP_TOKEN='.length).trim()
-          appToken = v.length > 0 ? v : null
-          break
-        }
-      }
-    } catch { /* no .env yet */ }
-  }
-  return { botToken, appToken }
-}
-
-// TEAMSPAIRED1115: the Teams plugin (claude-channel-teams 0.3.0, src/pairing/allowlist.ts) keeps its paired users
-// in <stateDir>/allowlist.json as {"version":1,"entries":[{"aad_object_id":"<uuid>",...}]} and writes no access.json.
-// Paired = at least one entry with an object id; any other shape the plugin itself treats as empty.
-// The parser is owner-chat.ts teamsAllowlistIds, shared with the owner-alert target (TEAMSAPPROVECARD1118).
-function teamsPaired(): boolean {
-  try {
-    return teamsAllowlistIds(JSON.parse(readFileSync(join(channelStateDir('teams'), TEAMS_ALLOWLIST_FILE), 'utf-8'))).length > 0
-  } catch { return false }
+  return { botToken }
 }
 
 function paired(): boolean {
-  if (CHANNEL_PROVIDER === 'gromzo') return gromzoEnrolled()
-  if (CHANNEL_PROVIDER === 'teams') return teamsPaired()
   try {
     const a = JSON.parse(readFileSync(join(channelStateDir(CHANNEL_PROVIDER), 'access.json'), 'utf-8')) as {
       allowFrom?: unknown[]; groups?: Record<string, unknown>
@@ -322,17 +270,9 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
     // channel is configured there is nothing to pre-fill and no reason to hand the value back over the wire.
     // DOCKERHTTPS1119 Dani n2 (81264): a setup session (the public listener before the first login) never gets a saved
     // channel token back; the wizard reaches the channel step only after the password, on the owner session.
-    const existingTokens = !ch && ctx.auth?.kind !== 'setup' ? existingChannelTokens() : { botToken: null, appToken: null }
-    // Slack pre-flight, surfaced passively (GET, no probe/write/restart): when  a token is already on disk
-    // but the managed-settings.json plugin allowlist isn't, the wizard can show the sudo command immediately
-    // instead of making the operator hit Save just to learn it's needed. Kept null whenever there's nothing to
-    // say (no provider/no token/already ready), so the frontend's check stays a single truthiness test.
-    const managedSettingsReady = CHANNEL_PROVIDER === 'slack' && existingTokens.botToken
-      ? isManagedSettingsReady()
-      : null
-    const sudoCommand = managedSettingsReady === false ? getManagedSettingsSudoCommand() : null
+    const existingTokens = !ch && ctx.auth?.kind !== 'setup' ? existingChannelTokens() : { botToken: null }
     // WIZFLOW809: measured channel liveness for the wizard's step-3 wait.
-    // hardRestartMarveenChannels() answers `restarted: true` when the restart
+    // hardRestartAlfredChannels() answers `restarted: true` when the restart
     // COMMAND was dispatched, not when the channel is up -- and the cold path
     // is a ~minutes start. The wizard used to advance after a fixed 4s and
     // opened the pairing step against a still-booting session (three field
@@ -349,7 +289,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
     }
     json(res, {
       identityConfirmed: identityConfirmed(),
-      currentAgentName: readEnvValue('BRAND_NAME') || readEnvValue('BOT_NAME') || 'Marveen',
+      currentAgentName: readEnvValue('BRAND_NAME') || readEnvValue('BOT_NAME') || 'Alfred',
       currentOwnerName: readEnvValue('OWNER_NAME') || '',
       claudeAuthPresent: claude,
       agentsRunning: running,
@@ -358,9 +298,6 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
       channelProvider: CHANNEL_PROVIDER,
       agentId: MAIN_AGENT_ID,
       existingBotToken: existingTokens.botToken,
-      existingAppToken: existingTokens.appToken,
-      managedSettingsReady,
-      sudoCommand,
       paired: pr,
       // The identity step never re-opens the wizard on an already-configured
       // install: it only participates while first-run setup is incomplete.
@@ -430,7 +367,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
     try {
       const result = await switchInstallLanguage(lang, {
         root: PROJECT_ROOT,
-        dockerDir: process.env.MARVEEN_DOCKER_DIR || '/opt/marveen-docker',
+        dockerDir: process.env.ALFRED_DOCKER_DIR || '/opt/alfred-docker',
         home: homedir(),
         readEnv: readEnvValue,
         setEnv: setEnvKey,
@@ -497,7 +434,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
     // NOT the IDENTITY_CONFIRMED flag -- a pre-wizard-era install lacks that
     // flag while its running session is a live working agent (#758 review).
     const freshSetup = !(await claudeAuthPresent()) || !channelConfigured() || !paired()
-    const prevAgentName = readEnvValue('BOT_NAME') || 'Marveen'
+    const prevAgentName = readEnvValue('BOT_NAME') || 'Alfred'
     const prevOwnerName = readEnvValue('OWNER_NAME') || ''
     const nameChanged = agentName !== prevAgentName
     try {
@@ -533,7 +470,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
     const plan = identitySavePlan(servicesUp, freshSetup, nameChanged)
     const restartNeeded = plan.restartNeeded
     if (plan.restart) {
-      const r = hardRestartMarveenChannels()
+      const r = hardRestartAlfredChannels()
       restarted = r.ok
       if (!r.ok) restartError = r.error || 'restart failed'
       if (r.ok) logger.info('onboarding: channels restarted so the new identity is picked up')
@@ -630,7 +567,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
     let restarted = false
     let restartError: string | null = null
     if (!hadAuthBefore && agentsRunning()) {
-      const r = hardRestartMarveenChannels()
+      const r = hardRestartAlfredChannels()
       restarted = r.ok
       if (!r.ok) restartError = r.error || 'restart failed'
       if (r.ok) logger.info('onboarding: channels restarted so the fresh auth is picked up')
@@ -646,7 +583,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
     if (agentsRunning()) { json(res, { ok: true, alreadyRunning: true }); return true }
     if (!(await claudeAuthPresent())) { json(res, { error: 'Eloszor allitsd be a Claude-autentikaciot.', reason: 'no-auth' }, 409); return true }
     // ONBTMUX1: on a fresh install the channels session does NOT exist yet, and
-    // `tmux respawn-pane` (what hardRestartMarveenChannels does on Linux) cannot
+    // `tmux respawn-pane` (what hardRestartAlfredChannels does on Linux) cannot
     // bring back a session that was never there -- it fails with "respawn-pane
     // failed" and the wizard's step 2 dead-ends. When the session is ABSENT the
     // correct action is to CREATE it via channels.sh (createMainChannelsSession),
@@ -672,7 +609,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
       json(res, { ok: true, starting: true })
       return true
     }
-    const r = hardRestartMarveenChannels()
+    const r = hardRestartAlfredChannels()
     if (!r.ok) { json(res, { error: r.error || 'Nem sikerult eletre kelteni az agenteket.', reason: 'launch-failed' }, 500); return true }
     logger.info('onboarding: fleet launched (channels session)')
     json(res, { ok: true, started: true })

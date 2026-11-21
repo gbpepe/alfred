@@ -91,7 +91,7 @@ trap 'pkill -P "$PROBE_WATCHDOG_PID" 2>/dev/null; kill "$PROBE_WATCHDOG_PID" 2>/
 recovery_owner_installed() {
   if [ "$(uname -s)" = "Darwin" ]; then
     launchctl list 2>/dev/null \
-      | grep -qE '(com\.marveen\.channel-watchdog|com\.marveen\.channel-outage-alarm)$'
+      | grep -qE '(com\.alfred\.channel-watchdog|com\.alfred\.channel-outage-alarm)$'
   else
     # The systemd units on a renamed install are agent-prefixed
     # (<agent>-channel-watchdog.timer, the way <agent>-channels.service is);
@@ -105,7 +105,7 @@ recovery_owner_installed() {
 
 # --- resolve the channels session (launch-order / rename independent) ---
 MAIN_AGENT_ID="$(grep -E '^MAIN_AGENT_ID=' "$INSTALL_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2-)"
-MAIN_AGENT_ID="${MAIN_AGENT_ID:-marveen}"
+MAIN_AGENT_ID="${MAIN_AGENT_ID:-alfred}"
 MAIN_AGENT_ID="${MAIN_AGENT_ID//[^a-zA-Z0-9_-]/}"
 SESSION="${MAIN_AGENT_ID}-channels"
 

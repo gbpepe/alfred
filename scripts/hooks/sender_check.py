@@ -67,7 +67,7 @@ def _gate():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     mod.STORE_DIR = STORE
-    mod.DB_PATH = os.path.join(STORE, "claudeclaw.db")
+    mod.DB_PATH = os.path.join(STORE, "alfred.db")
     mod.CONFIG_PATH = os.path.join(STORE, "autonomy-config.json")
     mod.STANDING_PATH = os.path.join(STORE, "email-standing-recipients.json")
     mod.STANDING_LOG = os.path.join(STORE, "email-standing-sends.log")

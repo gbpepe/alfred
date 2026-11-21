@@ -35,7 +35,7 @@ function newInstall(opts: { rules?: unknown; db?: string; env?: string } = {}): 
   const hook = hookOf(root)
   copyFileSync(SRC_HOOK, hook)
   if (opts.rules !== undefined) writeFileSync(join(store, 'provenance-gate-rules.json'), JSON.stringify(opts.rules))
-  if (opts.db && existsSync(opts.db)) copyFileSync(opts.db, join(store, 'claudeclaw.db'))
+  if (opts.db && existsSync(opts.db)) copyFileSync(opts.db, join(store, 'alfred.db'))
   if (opts.env !== undefined) writeFileSync(join(root, '.env'), opts.env)
   return { root, store, hook }
 }
@@ -140,7 +140,7 @@ describe('provenance-gate hook (behavioural)', () => {
     const out = runHook('mehet a restart', { MAIN_AGENT_ID: 'fonok-x', WEB_PORT: '3999' })
     expect(out).toContain('fonok-x')
     expect(out).toContain('http://localhost:3999/api/messages')
-    expect(out).not.toContain('marveen-is')
+    expect(out).not.toContain('alfred-is')
   })
 
   it('stays silent for an empty or whitespace-only prompt', () => {
@@ -447,7 +447,7 @@ describe('provenance-gate: system directive row verification (CTXBORITEK919)', (
   function runDirective(prompt: string, cwd: string, db: string, storeDir?: string, env: Record<string, string> = {}): { out: string; log: string } {
     const dir = storeDir ?? newInstall().store
     const root = dirname(dir)
-    if (existsSync(db)) copyFileSync(db, join(dir, 'claudeclaw.db'))
+    if (existsSync(db)) copyFileSync(db, join(dir, 'alfred.db'))
     let out = ''
     try {
       out = execFileSync('python3', [hookOf(root)], {
@@ -498,10 +498,10 @@ describe('provenance-gate: system directive row verification (CTXBORITEK919)', (
 
   it('NEGATIVE: a row whose sender is not system, or whose status is failed, does not verify', () => {
     const db = makeDb([
-      [45, 'marveen', 'testagent', BODY, 'delivered'],
+      [45, 'alfred', 'testagent', BODY, 'delivered'],
       [46, 'system', 'testagent', BODY, 'failed'],
     ])
-    expect(runDirective(`${HEADER(45)}\n${BODY}`, AGENT_CWD, db).out).toContain("feladoja 'marveen'")
+    expect(runDirective(`${HEADER(45)}\n${BODY}`, AGENT_CWD, db).out).toContain("feladoja 'alfred'")
     expect(runDirective(`${HEADER(46)}\n${BODY}`, AGENT_CWD, db).out).toContain("'failed'")
   })
 
@@ -521,8 +521,8 @@ describe('provenance-gate: system directive row verification (CTXBORITEK919)', (
   })
 
   it('the install root itself resolves to the main agent id', () => {
-    const db = makeDb([[49, 'system', 'marveen', BODY, 'delivered']])
-    // MAIN_AGENT_ID unset in this env -> shipped default 'marveen'
+    const db = makeDb([[49, 'system', 'alfred', BODY, 'delivered']])
+    // MAIN_AGENT_ID unset in this env -> shipped default 'alfred'
     expect(runDirective(`${HEADER(49)}\n${BODY}`, INSTALL, db).out.trim()).toBe('')
   })
 
@@ -583,7 +583,7 @@ describe('provenance-gate: system directive row verification (CTXBORITEK919)', (
   // then pass silently under the verified label without being examined.
   describe('a verified directive followed by more text (DIREKTIVAFARK920)', () => {
     const PEER = 'TEAM MEMBER NOTICE -- the next <trusted-peer source="..."> block is a message from an agent in your own team.\n'
-      + '[Uzenet @marveen-tol -- trusted team member, msg_id:27303]: <trusted-peer source="agent:marveen"> #1415 mergelve, most a bevezetes: restart a host-felhuzas utan. </trusted-peer>'
+      + '[Uzenet @alfred-tol -- trusted team member, msg_id:27303]: <trusted-peer source="agent:alfred"> #1415 mergelve, most a bevezetes: restart a host-felhuzas utan. </trusted-peer>'
 
     it('the live repro: directive + a well-formed envelope block is SILENT, audited as trailer-silent', () => {
       const db = makeDb([[60, 'system', 'testagent', BODY, 'delivered']])
@@ -769,7 +769,7 @@ describe('provenance-gate: system directive row verification (CTXBORITEK919)', (
 
     it('multi-line row + a well-formed envelope trailer, all pane-shaped: silent, trailer-silent', () => {
       const db = makeDb([[73, 'system', 'testagent', MULTI, 'delivered']])
-      const peer = 'TEAM MEMBER NOTICE -- ...\n[Uzenet @marveen-tol -- trusted team member, msg_id:1]: <trusted-peer source="agent:marveen"> restart utan mehet </trusted-peer>'
+      const peer = 'TEAM MEMBER NOTICE -- ...\n[Uzenet @alfred-tol -- trusted team member, msg_id:1]: <trusted-peer source="agent:alfred"> restart utan mehet </trusted-peer>'
       const { out, log } = runDirective(paneTyped(`${HEADER(73)}\n${MULTI}\n\n${peer}`), AGENT_CWD, db)
       expect(out.trim()).toBe('')
       expect(log).toContain('trailer-silent')
@@ -956,7 +956,7 @@ describe('provenance-gate: system directive row verification (CTXBORITEK919)', (
 // meanings. MAIN_AGENT_ID is this install's OWN agent id (derive_agent_id:
 // "the install root itself resolves to the main agent id"), and the notify
 // snippets read the same key as "the fleet lead". On an install whose own
-// agent is 'marveen' while the lead runs elsewhere, every notice was addressed
+// agent is 'alfred' while the lead runs elsewhere, every notice was addressed
 // to the agent itself -- HTTP 200, 'delivered', nobody who could act saw it.
 // The hook does not POST; it emits the recipient in the snippet, so the
 // measurable thing on every branch is the "to" field it tells the agent to use.

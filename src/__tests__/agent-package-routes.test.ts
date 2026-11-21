@@ -8,7 +8,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-agent-package-routes-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-agent-package-routes-'))
 const STORE = join(tmpRoot, 'store')
 mkdirSync(STORE, { recursive: true })
 vi.mock('../config.js', async (importOriginal) => ({ ...(await importOriginal<object>()), PROJECT_ROOT: tmpRoot, STORE_DIR: join(tmpRoot, 'store') }))
@@ -77,7 +77,7 @@ describe('the released build', () => {
   })
 
   it('(11) the origin is the Remote\'s own, whatever the environment says', async () => {
-    const names = ['PACKAGE_ORIGIN', 'AGENT_PACKAGE_ORIGIN', 'MARVEEN_PACKAGE_ORIGIN']
+    const names = ['PACKAGE_ORIGIN', 'AGENT_PACKAGE_ORIGIN', 'ALFRED_PACKAGE_ORIGIN']
     const before = names.map((n) => process.env[n])
     for (const n of names) process.env[n] = 'https://elsewhere.test'
     try {
@@ -434,8 +434,8 @@ describe('GET /api/agent-packages/catalog', () => {
     ['403 not_entitled with a bad pick', { status: 403, body: '{"error":"not_entitled","reason":"trial_limit","trial_pick":"Bad Slug"}' }, 502, { error: 'download_failed', reason: 'upstream' }],
     ['403 not_entitled with an unknown reason', { status: 403, body: '{"error":"not_entitled","reason":"other","trial_pick":null}' }, 502, { error: 'download_failed', reason: 'upstream' }],
     ['404 not_found', { status: 404, body: '{"error":"not_found"}' }, 404, { error: 'package_not_found' }],
-    ['409 incompatible', { status: 409, body: '{"error":"incompatible","min_marveen_version":"1.4.0"}' }, 409, { error: 'incompatible', minMarveenVersion: '1.4.0' }],
-    ['409 incompatible with a bad version', { status: 409, body: '{"error":"incompatible","min_marveen_version":"1.4"}' }, 502, { error: 'download_failed', reason: 'upstream' }],
+    ['409 incompatible', { status: 409, body: '{"error":"incompatible","min_alfred_version":"1.4.0"}' }, 409, { error: 'incompatible', minAlfredVersion: '1.4.0' }],
+    ['409 incompatible with a bad version', { status: 409, body: '{"error":"incompatible","min_alfred_version":"1.4"}' }, 502, { error: 'download_failed', reason: 'upstream' }],
     ['429 Retry-After 3600', { status: 429, headers: { 'retry-after': '3600' }, body: '{"error":"rate_limited"}' }, 429, { error: 'rate_limited', retryAfterSeconds: 3600 }],
     ['429 Retry-After over a day', { status: 429, headers: { 'retry-after': '999999' } }, 429, { error: 'rate_limited', retryAfterSeconds: 86400 }],
     ['429 without Retry-After', { status: 429 }, 429, { error: 'rate_limited', retryAfterSeconds: null }],

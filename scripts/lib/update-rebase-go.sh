@@ -40,8 +40,8 @@ UPDATE_REBASE_CATEGORY='update_rebase'
 # its first argument (no curlrc at all), the hash tool is called by absolute path, the PATH holds only
 # root-owned system directories (no /usr/local/bin, no /opt/homebrew/bin: those are user-writable), and
 # the rebase gets an explicit committer identity instead of one from a config file.
-UPDATE_REBASE_COMMITTER_NAME='Marveen update'
-UPDATE_REBASE_COMMITTER_EMAIL='update@marveen.invalid'
+UPDATE_REBASE_COMMITTER_NAME='Alfred update'
+UPDATE_REBASE_COMMITTER_EMAIL='update@alfred.invalid'
 
 # stdin -> 64 lowercase hex, or rc 1 (never an empty or truncated fingerprint).
 update_rebase_sha256() {
@@ -113,10 +113,10 @@ update_rebase_will_fail() {
   fi
 }
 
-# The recovery ref before the rewrite (Dani F4, N1): refs/marveen/pre-update/<UTC YYYYMMDDTHHMMSSZ>, not a
+# The recovery ref before the rewrite (Dani F4, N1): refs/alfred/pre-update/<UTC YYYYMMDDTHHMMSSZ>, not a
 # branch and not under refs/remotes. Keeps the newest 5, deleting older ones one by one with their exact old
 # sha (update-ref -d <ref> <sha>, no glob). Prints the ref name; rc 1 when it could not be written.
-UPDATE_REBASE_BACKUP_NS='refs/marveen/pre-update'
+UPDATE_REBASE_BACKUP_NS='refs/alfred/pre-update'
 UPDATE_REBASE_BACKUP_KEEP=5
 update_rebase_backup() {
   local head="$1" name ref n=1 line old_ref old_sha kept=0

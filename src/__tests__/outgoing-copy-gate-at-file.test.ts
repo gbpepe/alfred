@@ -131,7 +131,7 @@ describe('copy gate reads a curl @file payload (GATEBINVAK916)', () => {
     expect(extract(resend(`--data-binary @${p}`))).toEqual([CLEAN, null])
   })
 
-  // Marveen's #1507 review: five more shapes send a FILE as the body. Before
+  // Alfred's #1507 review: five more shapes send a FILE as the body. Before
   // this they fell to the generic "no inspectable text" -- the very message
   // this change retires -- and `--data-urlencode name@file` LOOKED handled.
   const FIVE = (p: string): Array<[string, string]> => [
@@ -194,7 +194,7 @@ describe('copy gate reads a curl @file payload (GATEBINVAK916)', () => {
     const post = (p: string) =>
       `curl -s -X POST http://localhost:3420/api/messages -H "Content-Type: application/json" --data-binary @${p}`
     const body = `${accentless} ${dashed} ${named}`
-    expect(gate(post(file('msg.json', JSON.stringify({ from: 'samu', to: 'marveen', content: body }))), rules).code).toBe(0)
+    expect(gate(post(file('msg.json', JSON.stringify({ from: 'samu', to: 'alfred', content: body }))), rules).code).toBe(0)
     const controls: [string, RegExp][] = [[accentless, /HIANYZO EKEZETEK/], [dashed, /DUPLA KOTOJEL/], [named, /HELYTELEN NEV/]]
     for (const [i, [text, reason]] of controls.entries()) {
       const letter = file(`ctl${i}.json`, JSON.stringify({ to: 'c@d.hu', subject: 'Számla', text }))

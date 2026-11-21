@@ -68,7 +68,7 @@ describe('detectsUsageLimit', () => {
   })
 
   it('ISSUE2817: does NOT match a prompt line that quotes the phrase, only Claude Code\'s own banner line', () => {
-    // The customer's scheduled prompt, as it stayed in the live region after a failed turn (marveen#2817): the
+    // The customer's scheduled prompt, as it stayed in the live region after a failed turn (alfred#2817): the
     // owner got an hourly "out of quota" notice while the real cause was a revoked OAuth token.
     expect(detectsUsageLimit("  elfogy ('Usage limit reached' egy pane-ben), szólj <owner>-nek Telegramon")).toBe(false)
     expect(detectsUsageLimit('> If a pane shows Usage limit reached, tell the owner.')).toBe(false)

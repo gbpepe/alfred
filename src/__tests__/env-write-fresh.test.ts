@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 // Same sandbox hook as env.test.ts: env.ts must never resolve the live repo .env.
 const SANDBOX = mkdtempSync(join(tmpdir(), 'env-write-fresh-'))
-process.env.CLAUDECLAW_ENV_DIR = SANDBOX
+process.env.ALFRED_ENV_DIR = SANDBOX
 const { writeEnvFileFresh } = await import('../env.js')
 
 afterAll(() => { rmSync(SANDBOX, { recursive: true, force: true }) })

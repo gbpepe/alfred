@@ -75,7 +75,7 @@ function writeExe(path: string, text: string): void {
 function setup(opts: { line?: string | null; extraLines?: string[] } = {}): void {
   home = mkdtempSync(join(tmpdir(), 'dispatch-'))
   bin = join(home, 'fakebin')
-  kit = join(home, '.marveen', 'support', 'kit')
+  kit = join(home, '.alfred', 'support', 'kit')
   install = join(home, 'install')
   mkdirSync(bin, { recursive: true })
   mkdirSync(kit, { recursive: true, mode: 0o700 })
@@ -97,7 +97,7 @@ function setup(opts: { line?: string | null; extraLines?: string[] } = {}): void
     join(kit, 'manifest'),
     formatKitManifest({ files: { 'support-dispatch.sh': 'a'.repeat(64) }, installRoot: install, nodePath: '/bin/echo', nodeMin: 20, release: 'abcdef1' }),
   )
-  writeFileSync(join(home, '.marveen', 'support', 'support-access.token'), TOKEN + '\n', { mode: 0o600 })
+  writeFileSync(join(home, '.alfred', 'support', 'support-access.token'), TOKEN + '\n', { mode: 0o600 })
   const line = opts.line === undefined
     ? buildSupportLine({ key: KEY, grantId: GRANT, consentVersion: 1, dispatchPath: dispatch, fromCidrs: TEST_ONLY_FROM, sshd: { major: 9, minor: 6 } })
     : opts.line
@@ -171,8 +171,8 @@ describe('Y1-Y6: anything but a complete yes for THIS key refuses, and no subcom
     ['HTTP 401 token_revoked (only refuses here)', () => { writeFileSync(join(bin, 'code'), '401'); writeFileSync(join(bin, 'body'), '{"error":"token_revoked"}') }, 'access_check_failed'],
     ['HTTP 500', () => writeFileSync(join(bin, 'code'), '500'), 'access_check_failed'],
     ['network error', () => { writeFileSync(join(bin, 'fail'), ''); writeFileSync(join(bin, 'code'), '000') }, 'access_check_failed'],
-    ['no token', () => rmSync(join(home, '.marveen', 'support', 'support-access.token')), 'no_token'],
-    ['a token of another shape', () => writeFileSync(join(home, '.marveen', 'support', 'support-access.token'), 'mst_short\n'), 'no_token'],
+    ['no token', () => rmSync(join(home, '.alfred', 'support', 'support-access.token')), 'no_token'],
+    ['a token of another shape', () => writeFileSync(join(home, '.alfred', 'support', 'support-access.token'), 'mst_short\n'), 'no_token'],
     ['the connection is 60 min 1 s old', () => writeFileSync(join(bin, 'etime'), '01:00:01\n'), 'connection_too_old'],
     ['no sshd ancestor', () => writeFileSync(join(bin, 'sshd_comm'), 'bash\n'), 'connection_unknown'],
     ['an etime of another shape', () => writeFileSync(join(bin, 'etime'), 'x\n'), 'connection_unknown'],
@@ -200,7 +200,7 @@ describe('the own line: exactly one line binding THIS command', () => {
     ['an option added (no-touch-required)', (l) => l.replace(',verify-required', ',no-touch-required,verify-required')],
     ['an option added (pty)', (l) => l.replace('restrict,', 'restrict,pty,')],
     ['verify-required dropped', (l) => l.replace(',verify-required', '')],
-    ['another comment', (l) => l.replace('marveen-support:', 'marveen-supporx:')],
+    ['another comment', (l) => l.replace('alfred-support:', 'alfred-supporx:')],
     ['another key type', (l) => l.replace('sk-ssh-ed25519@openssh.com', 'ssh-ed25519')],
     // Options, key type and blob cut out, leaving a "from" text that would pass both character checks on its own.
     ['the option tail and the key cut out', (l) => l.replace(/from="[^"]*",verify-required sk-ssh-ed25519@openssh\.com [A-Za-z0-9+/=]+/, 'from="abcd')],
@@ -281,7 +281,7 @@ describe('logs go through the redactor', () => {
 })
 
 describe('the self-probe never opens anything', () => {
-  it('reaches marveen.io and prints one line; a command in the environment does not run', () => {
+  it('reaches alfred.io and prints one line; a command in the environment does not run', () => {
     writeFileSync(join(bin, 'body'), allowBody([FP], [], { decision: 'deny', armed: 'false' }))
     const r = run('status', [dispatch, '--probe-fp', FP])
     expect(r.stdout).toBe('probe=reached\n')
@@ -294,7 +294,7 @@ describe('the self-probe never opens anything', () => {
 
 describe('restart is limited', () => {
   it('a restart already done on this connection: refused before anything runs', () => {
-    const spool = join(home, '.marveen', 'support', 'support-access.spool')
+    const spool = join(home, '.alfred', 'support', 'support-access.spool')
     mkdirSync(spool, { recursive: true })
     writeFileSync(join(spool, '1.1.0.evt'), 'time=' + Math.floor(Date.now() / 1000) + '\nevent=restart\nreason=conn-424242\n')
     const r = run('restart')
@@ -302,14 +302,14 @@ describe('restart is limited', () => {
     expect(reason(r.stderr)).toBe('restart_limit')
   })
   it('three restarts in the last day from other connections: refused', () => {
-    const spool = join(home, '.marveen', 'support', 'support-access.spool')
+    const spool = join(home, '.alfred', 'support', 'support-access.spool')
     mkdirSync(spool, { recursive: true })
     const now = Math.floor(Date.now() / 1000)
     for (let i = 0; i < 3; i++) writeFileSync(join(spool, now + '.' + i + '.0.evt'), 'time=' + (now - 600 * i) + '\nevent=restart\nreason=conn-' + (1000 + i) + '\n')
     expect(reason(run('restart').stderr)).toBe('restart_limit')
   })
   it('restarts older than a day do not count; a spool time with a leading zero is ignored', () => {
-    const spool = join(home, '.marveen', 'support', 'support-access.spool')
+    const spool = join(home, '.alfred', 'support', 'support-access.spool')
     mkdirSync(spool, { recursive: true })
     const now = Math.floor(Date.now() / 1000)
     for (let i = 0; i < 3; i++) writeFileSync(join(spool, 'old.' + i + '.evt'), 'time=' + (now - 90000 - i) + '\nevent=restart\nreason=conn-' + (2000 + i) + '\n')
@@ -324,7 +324,7 @@ describe('restart is limited', () => {
 describe('events in the spool carry only enumerated values', () => {
   it('a refusal leaves one event with its reason and no client text', () => {
     run('status; cat /etc/passwd')
-    const spool = join(home, '.marveen', 'support', 'support-access.spool')
+    const spool = join(home, '.alfred', 'support', 'support-access.spool')
     const files = readdirSync(spool)
     expect(files.length).toBeGreaterThan(0)
     const text = files.map((f) => readFileSync(join(spool, f), 'utf8')).join('')

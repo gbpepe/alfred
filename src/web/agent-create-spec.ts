@@ -8,18 +8,10 @@
 //   - a secret field is never a value: { vault_ref, value_sha256 }. The hash binds the value's sha256 too, so a vault
 //     value swapped between the approval and the creation is caught when the consumer recomputes it. The text shows
 //     only "set (vault: <id>)" for it: no value, prefix or length.
-// Spec version 1 carries what POST /api/agents takes plus a Telegram channel and its bot token (Samu 81152, A).
-// AGENTCREATEPR2B-1119, spec version 2 (Samu 81360), adds what the owner's dashboard session sets up today:
-//   - the channel on Slack (bot and app token) and Discord (bot token and channel id), and an allowFrom list (the
-//     "pairing" of a spec: the ids let in; a code pairing needs a live bot and stays on the dashboard);
-//   - the team block (role, reports-to, delegates, auto-delegation, trusted peers, tagline); a name dropped by the
-//     team sanitizer or a reporting cycle is refused here, never dropped in silence;
-//   - MCP servers ALREADY on this install, by name; the server's config is bound by its sha256. Neither the stored spec
-//     (agents can read it) nor the text holds its arguments, a URL's query, fragment or user info, or any env or header
-//     value (Dani #2940 B1): the text shows the type, the command and how many arguments, the URL's origin and path, the
-//     keys of its environment and headers, and the file it came from, marked when an agent can write that file (n1);
-//   - an invite: the consumer issues it after the channel; its link is shown only on the owner's dashboard.
-// Version 1 requests stay accepted exactly as before; a version-2 field in a version-1 request is an unknown field.
+// Spec version 1 and 2 carry Discord channel setup.
+//   - Discord (bot token and channel id), and an allowFrom list;
+//   - the team block (role, reports-to, delegates, auto-delegation, trusted peers, tagline);
+//   - MCP servers ALREADY on this install, by name;
 import { createHash } from 'node:crypto'
 import { resolveModelId } from './agent-config.js'
 import { sanitizeAgentName } from './sanitize.js'
@@ -29,17 +21,17 @@ import { checkAgentCreatable } from './agent-create.js'
 import { launchableInstallDefault } from './default-model-guard.js'
 import { readAgentTeam, reportsToCreatesCycle, sanitizeTeamConfig } from './agent-team.js'
 import { MAIN_AGENT_ID } from '../config.js'
-import { isManagedSettingsReady, validateDiscordChannelId } from './routes/agents.js'
+import { validateDiscordChannelId } from './routes/agents.js'
 import { findConnectorConfigWithSource } from './routes/connectors.js'
 
 export const AGENT_SPEC_VERSION = 2
 export const AGENT_SPEC_VERSIONS = [1, 2] as const
-/** Version 1: the channels whose setup is the bot token alone (Telegram). */
-export const SPEC_BOT_TOKEN_PROVIDERS = ['telegram'] as const
-/** Version 2: Slack also takes its app token, Discord its channel id. */
-export const SPEC_V2_PROVIDERS = ['telegram', 'slack', 'discord'] as const
-/** The providers an invite can be issued on (the invite monitor approves on these two). */
-export const SPEC_INVITE_PROVIDERS = ['telegram', 'slack'] as const
+/** Version 1: bot token alone (Discord). */
+export const SPEC_BOT_TOKEN_PROVIDERS = ['discord'] as const
+/** Version 2: Discord also takes its channel id. */
+export const SPEC_V2_PROVIDERS = ['discord'] as const
+/** Providers supporting channel invites. */
+export const SPEC_INVITE_PROVIDERS = [] as const
 type SpecProvider = typeof SPEC_BOT_TOKEN_PROVIDERS[number]
 type SpecV2Provider = typeof SPEC_V2_PROVIDERS[number]
 
@@ -254,7 +246,7 @@ export async function canonicalAgentSpec(body: unknown, opts: { vaultReadable?: 
     if (typeof provider !== 'string' || !(SPEC_V2_PROVIDERS as readonly string[]).includes(provider)) {
       return bad(`channel.provider must be one of: ${SPEC_V2_PROVIDERS.join(', ')}`)
     }
-    if (provider !== 'slack' && c.appToken !== undefined) return bad('channel.appToken is for slack only')
+    if (c.appToken !== undefined) return bad('unknown field: channel.appToken')
     if (provider !== 'discord' && c.channelId !== undefined) return bad('channel.channelId is for discord only')
     let channelId: string | null = null
     if (provider === 'discord') {
@@ -263,9 +255,6 @@ export async function canonicalAgentSpec(body: unknown, opts: { vaultReadable?: 
       if (!cid.ok) return bad(`channel.channelId: ${cid.error ?? 'invalid'}`)
       channelId = c.channelId.trim()
     }
-    // Slack's channel plugin needs the managed settings the owner installs with sudo: a request is refused before it
-    // reaches the owner, never approved into a create that cannot set its channel up (Samu 81360, A)
-    if (provider === 'slack' && !isManagedSettingsReady()) return bad('the Slack channel needs the managed settings set up on this machine first (the dashboard\'s Slack setup shows the command)', 409)
     let allowFrom: string[] = []
     if (c.allowFrom !== undefined) {
       if (!Array.isArray(c.allowFrom) || !c.allowFrom.every((x) => typeof x === 'string' && ALLOW_FROM_RX.test(x))) return bad('channel.allowFrom must be an array of user ids')
@@ -273,14 +262,7 @@ export async function canonicalAgentSpec(body: unknown, opts: { vaultReadable?: 
     }
     const tok = secretRef('channel.botToken', c.botToken, readable)
     if (isBad(tok)) return tok
-    let app: SecretRef | null = null
-    if (provider === 'slack') {
-      if (c.appToken === undefined) return bad('channel.appToken is required for slack')
-      const a = secretRef('channel.appToken', c.appToken, readable)
-      if (isBad(a)) return a
-      app = a
-    }
-    channel = { provider: provider as SpecV2Provider, bot_token: tok, app_token: app, channel_id: channelId, allow_from: allowFrom }
+    channel = { provider: provider as SpecV2Provider, bot_token: tok, app_token: null, channel_id: channelId, allow_from: allowFrom }
   }
   let team: SpecTeam | null = null
   if (body.team !== undefined && body.team !== null) {
@@ -350,7 +332,6 @@ export function renderAgentSpec(spec: AgentSpec, hash: string, lang: 'hu' | 'en'
     if (!c) lines.push(`- ${hu ? 'csatorna' : 'channel'}: ${none}`)
     else {
       lines.push(`- ${hu ? 'csatorna' : 'channel'}: ${c.provider}, ${hu ? 'bot-token' : 'bot token'}: ${set(c.bot_token)}`)
-      if (c.app_token) lines.push(`- ${hu ? 'Slack app-token' : 'Slack app token'}: ${set(c.app_token)}`)
       if (c.channel_id) lines.push(`- ${hu ? 'Discord-csatorna' : 'Discord channel'}: ${c.channel_id}`)
       lines.push(c.allow_from.length
         ? `- ${hu ? 'beengedett azonosítók (kódos párosítás nélkül)' : 'ids let in (no code pairing)'}: ${c.allow_from.join(', ')}`

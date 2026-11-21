@@ -1,4 +1,4 @@
-// Skill quarantine (MARVEENGAPS1020 (b)).
+// Skill quarantine (ALFREDGAPS1020 (b)).
 //
 // A skill is an instruction set that every agent loading it follows, and the
 // global root (~/.claude/skills) is loaded by EVERY agent of the fleet. Until
@@ -305,7 +305,7 @@ export function parseProposedFiles(raw: unknown, skillMdBytes: number): { ok: tr
   return { ok: true, files }
 }
 
-// Where a proposal of `name` goes (SKILLPROPOSESCOPE1104, Marveen 68194): the project root when the name lives there
+// Where a proposal of `name` goes (SKILLPROPOSESCOPE1104, Alfred 68194): the project root when the name lives there
 // (replaced in place, its scripts/ and references/ kept, the same hash binding), else the global root. A name that
 // lives in BOTH is refused: a proposal must not pick one of two live copies, nor make a third state; removing the
 // duplicate is the owner's or the main agent's decision.
@@ -482,7 +482,7 @@ function hasSymlink(root: string): boolean {
 // approval no longer applies.
 export function skillDirHash(root: string, meta?: Pick<PendingMeta, 'name' | 'target' | 'source' | 'replaces'>): string {
   const h = createHash('sha256')
-  h.update('marveen-pending-skill-v2\n')
+  h.update('alfred-pending-skill-v2\n')
   const metaJson = JSON.stringify(meta ? { name: meta.name, target: meta.target, source: meta.source, ...(meta.replaces ? { replaces: meta.replaces } : {}) } : null)
   h.update(`meta\0${Buffer.byteLength(metaJson)}\0${metaJson}`)
   for (const rel of filesUnder(root)) {
@@ -938,7 +938,7 @@ export function approvePending(id: string, hash: unknown): ApproveResult {
 }
 
 // --- The switch (SKILLAPPROVALOFF1101) ------------------------------------------------------------------------
-// The owner (Slack 2026-11-01 22:35): "switchable, and off by default". OFF: a queued skill goes live at once, on the
+// The owner (2026-11-01): "switchable, and off by default". OFF: a queued skill goes live at once, on the
 // SAME path an approval takes: queued into the pending area, scanned, then approvePending() with the hash of exactly
 // the content the scan read (hashed before and after the scan; a change in between keeps it pending). What the scan
 // cannot show in full (approvePending's own bounds) stays pending for a decision, as with the switch on. Every

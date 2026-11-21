@@ -93,15 +93,15 @@ def never_kill_table(root):
     mkproc(root, 101, "claude", ["/home/user/.local/bin/claude", "--continue"], 3600)
     mkproc(root, 102, "tmux: server", ["/usr/bin/tmux", "new-session", "-d", "-s", "main-channels"], 900)
     mkproc(root, 103, "node", ["/usr/bin/node", os.path.join(rvf.ROOT, "dist", "index.js")], 3000,
-           cgroup=APP + "marveen-dashboard.service")
+           cgroup=APP + "alfred-dashboard.service")
     mkproc(root, 104, "bun", ["/home/user/.bun/bin/bun", "server.ts"], 2500)
     mkproc(root, 105, "systemd", ["/usr/lib/systemd/systemd", "--user"], 2000, cgroup=APP[:-9] + "init.scope")
     mkproc(root, 106, "sshd", ["sshd: user@pts/0"], 2000)
     mkproc(root, 107, "bash", ["/bin/bash", "/opt/app/scripts/channels.sh"], 2000,
-           cgroup=APP + "marveen-channels.service")
+           cgroup=APP + "alfred-channels.service")
     # an ffmpeg inside the dashboard cgroup (voice transcoding) is protected by cgroup
     mkproc(root, 108, "ffmpeg", ["ffmpeg", "-i", "voice.ogg", "out.wav"], 2200,
-           cgroup=APP + "marveen-dashboard.service")
+           cgroup=APP + "alfred-dashboard.service")
     mkproc(root, 109, "python3", ["python3", "/opt/app/scripts/ram-emergency-brake.py"], 1900)
     # a claude binary launched with a weird comm is still caught via argv
     mkproc(root, 110, "MainThread", ["/home/user/.local/bin/claude", "-p", "x"], 3500)
@@ -611,14 +611,14 @@ def _drive_brake(m, td, alert, rounds):
     return b
 
 
-ALERT_SAMPLE = "Marveen RAM-vészfék: leállítva: <x> & y"
+ALERT_SAMPLE = "Alfred RAM-vészfék: leállítva: <x> & y"
 
 
 def sc_notify_slack_only(m):
     """No Telegram on the install (no TELEGRAM_BOT_TOKEN), a Slack target present:
     the brake's alert reaches Slack, poll -> ok, and the Bot API is never called."""
     with tempfile.TemporaryDirectory() as td:
-        inst, env, rec = notify_install(td, "MAIN_AGENT_ID=marveen\n", "ok")
+        inst, env, rec = notify_install(td, "MAIN_AGENT_ID=alfred\n", "ok")
         res = _send(_notify_alert(m, inst, env), ALERT_SAMPLE)
         node_args, curl = _rec(rec, "node-args"), _rec(rec, "curl-args")
         default_is_notify = isinstance(m.Brake(echo=False, log_path=os.devnull).alert, m.NotifyAlert)
@@ -638,7 +638,7 @@ def sc_notify_no_channel(m):
     """Neither channel delivers (Slack fails, no Telegram token): poll -> NOT ok, and
     the brake retries ALERT_MAX_ATTEMPTS times, then logs a terminal alert_gave_up."""
     with tempfile.TemporaryDirectory() as td:
-        inst, env, rec = notify_install(td, "MAIN_AGENT_ID=marveen\n", "fail")
+        inst, env, rec = notify_install(td, "MAIN_AGENT_ID=alfred\n", "fail")
         res = _send(_notify_alert(m, inst, env), ALERT_SAMPLE)
         sub = os.path.join(td, "brake")
         os.makedirs(sub)

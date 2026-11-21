@@ -7,8 +7,8 @@
 #   seed <current|updated|kept|added> <path under $HOME>
 # Anything else on stdout is the refresh's own text. The exit code is docker_seed_refresh's (0 = finished).
 set -u
-INSTALL_DIR="${MARVEEN_INSTALL_DIR:-/opt/marveen}"
-DOCKER_DIR="${MARVEEN_DOCKER_DIR:-/opt/marveen-docker}"
+INSTALL_DIR="${ALFRED_INSTALL_DIR:-/opt/alfred}"
+DOCKER_DIR="${ALFRED_DOCKER_DIR:-/opt/alfred-docker}"
 cd "$INSTALL_DIR" || exit 1
 . scripts/lib/seed-lang.sh || exit 1
 . scripts/lib/seed-refresh.sh || exit 1

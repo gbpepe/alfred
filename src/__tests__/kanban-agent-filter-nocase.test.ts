@@ -1,7 +1,7 @@
 // Review on PR #1408: the unknown-agent 400 compared the raw `agent=` value case-sensitively
 // against {OWNER_NAME, BOT_NAME, ...listAgentNames()}, and the SQL filter was a case-sensitive
-// `assignee = ?`. A real install configures capitalised names (BOT_NAME=Marveen,
-// OWNER_NAME=Szabolcs) while the board stores lowercase assignees (`marveen`, `szabolcs`), so
+// `assignee = ?`. A real install configures capitalised names (BOT_NAME=Alfred,
+// OWNER_NAME=Szabolcs) while the board stores lowercase assignees (`alfred`, `szabolcs`), so
 // the main bot and the owner could not filter their own board with either spelling, and an
 // assignee that exists on the board but is not an agent (an external contributor) could never
 // be filtered at all. A genuinely unknown name must still 400.
@@ -10,7 +10,7 @@ import { Readable } from 'node:stream'
 
 vi.mock('../config.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../config.js')>()
-  return { ...actual, BOT_NAME: 'Marveen', OWNER_NAME: 'Szabolcs' }
+  return { ...actual, BOT_NAME: 'Alfred', OWNER_NAME: 'Szabolcs' }
 })
 
 import { initDatabase, createKanbanCard, archiveKanbanCard } from '../db.js'
@@ -38,12 +38,12 @@ async function get(query: string) {
 describe('GET /api/kanban?agent= -- case-insensitive, and any assignee on the board is filterable', () => {
   beforeEach(() => {
     initDatabase(':memory:')
-    createKanbanCard({ id: 'bot', title: 'Bot card', assignee: 'marveen' })
+    createKanbanCard({ id: 'bot', title: 'Bot card', assignee: 'alfred' })
     createKanbanCard({ id: 'own', title: 'Owner card', assignee: 'szabolcs' })
     createKanbanCard({ id: 'ext', title: 'External card', assignee: 'mogganhun' })
   })
 
-  it.each(['marveen', 'Marveen', 'MARVEEN'])('capitalised BOT_NAME, lowercase stored assignee: ?agent=%s -> 200 with that card', async (name) => {
+  it.each(['alfred', 'Alfred', 'ALFRED'])('capitalised BOT_NAME, lowercase stored assignee: ?agent=%s -> 200 with that card', async (name) => {
     const out = await get(`?agent=${name}`)
     expect(out.status).toBe(200)
     expect(out.body.map((c: any) => c.id)).toEqual(['bot'])
@@ -88,7 +88,7 @@ describe('GET /api/kanban?agent= -- configured name, different case, empty board
     initDatabase(':memory:')
   })
 
-  it.each(['marveen', 'MARVEEN', 'szabolcs', 'SZABOLCS'])('?agent=%s with zero cards -> 200 and []', async (name) => {
+  it.each(['alfred', 'ALFRED', 'szabolcs', 'SZABOLCS'])('?agent=%s with zero cards -> 200 and []', async (name) => {
     const out = await get(`?agent=${name}`)
     expect(out.status).toBe(200)
     expect(out.body).toEqual([])

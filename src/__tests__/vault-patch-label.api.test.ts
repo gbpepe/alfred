@@ -26,8 +26,8 @@ vi.mock('../logger.js', () => ({
   PRETTY_OPTIONS: {},
 }))
 
-const savedEnvDir = process.env.CLAUDECLAW_ENV_DIR
-process.env.CLAUDECLAW_ENV_DIR = STORE
+const savedEnvDir = process.env.ALFRED_ENV_DIR
+process.env.ALFRED_ENV_DIR = STORE
 const { tryHandleConnectors } = await import('../web/routes/connectors.js')
 const { listSecrets } = await import('../web/vault.js')
 
@@ -38,8 +38,8 @@ const VALUE = 'SECRET-VALUE-patch-label-7f3a'
 afterAll(() => {
   // Guard: the mocked keychain never stored a key, and the file key lives in the temp store.
   expect(keychainCalls.store).toBe(0)
-  if (savedEnvDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = savedEnvDir
+  if (savedEnvDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = savedEnvDir
   rmSync(ROOT, { recursive: true, force: true })
 })
 

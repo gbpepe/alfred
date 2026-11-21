@@ -12,7 +12,7 @@ import { join, relative } from 'node:path'
 
 const ROOT = join(__dirname, '..', '..')
 
-const TS_SENDERS = ['sendAlert', 'notifyOwner', 'notifyChannel', 'sendRoutineAlert', 'sendOwnerActionAlert', 'sendOwnerSlackDm', 'sendOwnerMessage', 'sendMarveenAlert']
+const TS_SENDERS = ['sendAlert', 'notifyOwner', 'notifyChannel', 'sendRoutineAlert', 'sendOwnerActionAlert', 'sendOwnerSlackDm', 'sendOwnerMessage', 'sendAlfredAlert']
 const SH_SENDERS = ['alert_owner', 'send_alert', 'send_alarm', 'notify\\.sh"?']
 
 /** Unambiguous Hungarian words (none of them an English word), for rule (a). */

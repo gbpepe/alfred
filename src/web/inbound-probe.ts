@@ -1,20 +1,17 @@
 /**
  * Inbound-probe: active deafness watchdog for the main main channels session.
  *
- * Architecture note: the actual Telegram ping is sent by a Python script
- * (scripts/watchdog-inbound-prober.py) using the existing telethon session.
- * Rationale: telethon's asyncio event loop, StringSession handling, and
- * FloodWait back-off are already Python-shaped (see watchdog-userbot-login.py).
- * Re-implementing MTProto session handling in TS for a 30-line prober is
- * disproportionate. This TS module manages the Python prober's lifecycle and
+ * Architecture note: the actual channel ping is sent by a Python script
+ * (scripts/watchdog-inbound-prober.py).
+ * This TS module manages the Python prober's lifecycle and
  * implements the pure decision logic.
  *
- * MANUAL GATE: the prober account must be /telegram:access allowlisted by
+ * MANUAL GATE: the prober account must be /discord:access allowlisted by
  * the operator before the probe pings reach the main session. Until then the
  * Python prober's sends still succeed and write the probe-last-sent marker,
  * but the channel plugin drops the pings. The allowlist is not something the
  * prober can see: it exits 0 (no-op) only when it cannot run at all (missing
- * credentials, session or owner chat, an unauthorised telethon session, a
+ * credentials, session or owner chat, an unauthorised session, a
  * connection error). No respawn is triggered by
  * the TS side when the session file is absent, nor before a probe
  * ping has been seen arriving in the transcript at least once (see
@@ -41,7 +38,7 @@ import type { PaneState } from '../pane-state.js'
 // Mirrors KEEPALIVE_RESPAWN_GRACE_MS from channel-monitor.ts (15 min).
 // Not imported directly to avoid a circular module dependency: channel-monitor.ts
 // lazy-imports inbound-probe.ts; inbound-probe.ts uses dynamic import() of
-// channel-monitor.ts to call hardRestartMarveenChannels at respawn time.
+// channel-monitor.ts to call hardRestartAlfredChannels at respawn time.
 const RESPAWN_GRACE_MS = 15 * 60 * 1000
 
 const SESSION_FILE = join(PROJECT_ROOT, 'store', '.watchdog-userbot.session')
@@ -113,13 +110,13 @@ export function mainConfigRoots(): string[] {
 // local `PROJECT_ROOT.replace(/\//g, '-')` that only strips slashes, while
 // Claude Code itself also replaces dots with '-' (the character class is
 // `[/.]`, not `/` alone). On this host PROJECT_ROOT is
-// /Users/a.kobza/marveen -- the dot in the username meant the computed directory
-// (.../-Users-a.kobza-marveen) never existed on disk (the real one is
-// .../-Users-a-kobza-marveen), so readLastIngestionTimestampAcross() always
+// /Users/a.kobza/alfred -- the dot in the username meant the computed directory
+// (.../-Users-a.kobza-alfred) never existed on disk (the real one is
+// .../-Users-a-kobza-alfred), so readLastIngestionTimestampAcross() always
 // returned null. shouldRefreshKeepaliveFromInbound() is `lastInboundTs !=
 // null && ...`, so it was permanently false: refreshKeepaliveFromInbound()
 // never advanced store/.channel-keepalive's mtime, no matter how much real
-// Telegram traffic or inter-agent processing occurred. The file aged out
+// channel traffic or inter-agent processing occurred. The file aged out
 // past KEEPALIVE_STALE_MS forever, and once past KEEPALIVE_RESPAWN_GRACE_MS
 // (15 min) the very next non-busy poll tick force-respawned the session --
 // measured live at 63 respawns in one day, each one wiping the running
@@ -194,9 +191,9 @@ const PROBE_TIMEOUT_MULTIPLIER = 2
 // W4: env-derived values cached once at startInboundProber() startup.
 // Reading .env from disk every tick is unnecessary and wasteful.
 let _cachedProbeIntervalMs: number | null = null
-let _cachedAllowedChatId: string | null | undefined = undefined // undefined = not yet read
+let _cachedChannelChatId: string | null | undefined = undefined // undefined = not yet read
 
-// W3: one-shot flags to avoid repeating "session missing" / "ALLOWED_CHAT_ID absent" warnings every tick.
+// W3: one-shot flags to avoid repeating "session missing" / "CHANNEL_CHAT_ID absent" warnings every tick.
 let _warnedSessionMissing = false
 let _warnedChatIdAbsent = false
 
@@ -207,7 +204,7 @@ let proberProcess: ChildProcess | null = null
 // respawn counts, and
 // the latch re-arms only when a probe ping is found in the scanned transcript
 // tail (see the startInboundProber docstring). lastInboundRespawn is separate
-// from marveenLastKeepaliveRespawn in channel-monitor.ts so the two paths do
+// from alfredLastKeepaliveRespawn in channel-monitor.ts so the two paths do
 // not interfere with each other's grace windows.
 let probeLoopState: ProbeLoopState = { tick: { pendingSince: null, probeHeard: false, disarmedAt: 0, respawnTimes: [], dayRespawnTimes: [] }, lastInboundRespawn: 0, warnedAmbiguous: false }
 
@@ -395,7 +392,7 @@ export function backscanStart(
  * session's active log. Returns null when the directory does not exist or
  * no JSONL files are present.
  *
- * NOTE: Do NOT log line contents — JSONL lines may contain full Telegram
+ * NOTE: Do NOT log line contents — JSONL lines may contain full channel
  * message text (PII). Only the extracted timestamp is ever logged.
  */
 export function readLastIngestionTimestamp(transcriptDir: string): number | null {
@@ -727,14 +724,14 @@ function readProbeIntervalMs(): number {
 }
 
 // W4: read once at startup; subsequent calls return the cached value.
-function readAllowedChatId(): string | null {
-  if (_cachedAllowedChatId !== undefined) return _cachedAllowedChatId
+function readChannelChatId(): string | null {
+  if (_cachedChannelChatId !== undefined) return _cachedChannelChatId
   // Goes through the shared resolver so the installer placeholder "0" counts
   // as "not set" here too, and so a wizard install falls back to the paired
   // channel instead of probing a chat that cannot exist.
-  const env = readEnvFile(['ALLOWED_CHAT_ID'])
-  _cachedAllowedChatId = resolveOwnerChatId(undefined, env['ALLOWED_CHAT_ID'] ?? null)
-  return _cachedAllowedChatId
+  const env = readEnvFile(['CHANNEL_CHAT_ID'])
+  _cachedChannelChatId = resolveOwnerChatId(undefined, env['CHANNEL_CHAT_ID'] ?? null)
+  return _cachedChannelChatId
 }
 
 function spawnProber(): void {
@@ -751,15 +748,15 @@ function spawnProber(): void {
   // Reset session-missing flag if the file now exists.
   _warnedSessionMissing = false
 
-  const allowedChatId = readAllowedChatId()
-  if (!allowedChatId) {
-    // CW addendum D3: if ALLOWED_CHAT_ID is absent/empty, log warning and skip.
+  const channelChatId = readChannelChatId()
+  if (!channelChatId) {
+    // CW addendum D3: if CHANNEL_CHAT_ID is absent/empty, log warning and skip.
     // W3: one-shot via logger.warn; subsequent ticks use logger.debug.
     if (!_warnedChatIdAbsent) {
-      logger.warn('inbound-prober: ALLOWED_CHAT_ID absent in .env -- prober skipped')
+      logger.warn('inbound-prober: CHANNEL_CHAT_ID absent in .env -- prober skipped')
       _warnedChatIdAbsent = true
     } else {
-      logger.debug('inbound-prober: ALLOWED_CHAT_ID still absent -- skipping')
+      logger.debug('inbound-prober: CHANNEL_CHAT_ID still absent -- skipping')
     }
     return
   }
@@ -853,7 +850,7 @@ export const defaultProbeTickDeps: ProbeTickDeps = {
   loadState: () => probeLoopState,
   saveState: (state) => { probeLoopState = state },
   respawnSide: async () => {
-    const [{ hardRestartMarveenChannels, lastMainRespawnAt }, { detectPaneState }, { MAIN_CHANNELS_SESSION }] = await Promise.all([
+    const [{ hardRestartAlfredChannels, lastMainRespawnAt }, { detectPaneState }, { MAIN_CHANNELS_SESSION }] = await Promise.all([
       import('./channel-monitor.js'),
       import('../pane-state.js'),
       import('./main-agent.js'),
@@ -865,7 +862,7 @@ export const defaultProbeTickDeps: ProbeTickDeps = {
         const paneContent = capturePane(MAIN_CHANNELS_SESSION)
         return paneContent != null ? detectPaneState(paneContent) : null
       },
-      restart: hardRestartMarveenChannels,
+      restart: hardRestartAlfredChannels,
     }
   },
   log: logger,
@@ -971,7 +968,7 @@ export async function runInboundProbeTick(probeIntervalMs: number, deps: ProbeTi
     return
   }
 
-  // Inbound-path self-rate-cap (covers the period before marveenLastHardRestart
+  // Inbound-path self-rate-cap (covers the period before alfredLastHardRestart
   // is set by the async call completing).
   const lastInboundRespawn = deps.loadState().lastInboundRespawn
   if (lastInboundRespawn && nowAfterImport - lastInboundRespawn < RESPAWN_GRACE_MS) {
@@ -989,7 +986,7 @@ export async function runInboundProbeTick(probeIntervalMs: number, deps: ProbeTi
 
   deps.log.warn({ markerTs, pendingSince, lastIngestionTs, nowMs }, 'Inbound deafness detected -- triggering respawn')
 
-  // hardRestartMarveenChannels sets marveenLastHardRestart on success, which
+  // hardRestartAlfredChannels sets alfredLastHardRestart on success, which
   // automatically suppresses the keepalive path for KEEPALIVE_RESPAWN_GRACE_MS.
   const result = side.restart()
   if (result.ok) {
@@ -1012,10 +1009,10 @@ export async function runInboundProbeTick(probeIntervalMs: number, deps: ProbeTi
  *
  * The prober is a safe no-op when:
  *   - store/.watchdog-userbot.session is missing (account not set up)
- *   - ALLOWED_CHAT_ID is absent in .env
+ *   - CHANNEL_CHAT_ID is absent in .env
  *   - auth fails in the Python prober (exits 0 with warning)
  *
- * MANUAL GATE: the operator must run /telegram:access in the main channels session to
+ * MANUAL GATE: the operator must run /discord:access in the main channels session to
  * allowlist the prober account before messages will be delivered. Until then
  * the prober's sends still succeed and still write the probe-last-sent marker
  * (the allowlist drop happens later, in the channel plugin), so unanswered

@@ -195,10 +195,8 @@ function hasIdleFooter(lines: string[]): boolean {
 /**
  * PANEFOOTEROUTSIDE1114: the live idle footer line, or null. The ONE footer
  * anchor for consumers outside this module: channel-plugin-unlock calls it,
- * and the two ports (scripts/stuck-modal-guard.sh `footer-line`,
- * scripts/telegram-live-progress.py `live_footer_line`) re-implement exactly
- * this over plain `capture-pane -p` text; a parity test runs all three over
- * one corpus. Same lines as idleFooterIndex: no background-agent split, so a
+ * and `scripts/stuck-modal-guard.sh` (`footer-line`) re-implements it over
+ * plain `capture-pane -p` text. Same lines as idleFooterIndex: no background-agent split, so a
  * port does not need one (the footer sits above that block and under the last
  * separator, where the search finds it).
  */
@@ -792,7 +790,7 @@ export function detectsThinkingBlockError(pane: string): boolean {
 // spinner / token counter) and not 'idle' (the input box is gone), so
 // detectPaneState classifies it 'unknown' and the scheduler/router just skip
 // it. Observed 2026-06-12: the main channels session sat in /mcp for ~6h, deaf
-// on Telegram, with nothing alerting. detectsBlockingMenu recognises the modal
+// on the channel, with nothing alerting. detectsBlockingMenu recognises the modal
 // so the monitor can pop back to the prompt with a single Escape.
 //
 // Guards against a healthy session that merely quotes menu chrome in a reply
@@ -2577,7 +2575,7 @@ const NO_STUCK_INPUT: StuckInputState = {
  * stuckInputSignature), the previous persisted state and a clock, get
  * back whether to send Enter plus the next state to persist.
  *
- * The channel-notification path (inbound Telegram/Slack delivered by the
+ * The channel-notification path (inbound channel messages delivered by the
  * plugin) does not go through sendPromptToSession, so its post-send
  * Enter-retry budget cannot cover a swallowed Enter there. This watcher
  * is the backstop: it detects the symptom (text stranded in the prompt
@@ -2838,10 +2836,10 @@ export function parkedMainInputHasRemedy(pane: string, recordedMatch = false): b
 // Stuck tool-call watcher (2026-06-02 incident, Worked-for >Ns freeze)
 // =============================================================================
 //
-// Symptom: Marveen's TUI shows "Worked for 31s" (or "Brewed for", "Baked for")
+// Symptom: Alfred's TUI shows "Worked for 31s" (or "Brewed for", "Baked for")
 // indefinitely. The claude process is at 0.3% CPU (IO-wait, no progress), bun
 // poller is alive, hasChannelPluginAlive() returns true -- so the recovery
-// cascade gated on bun absence (#240) never fires. Real cause: the Telegram
+// cascade gated on bun absence (#240) never fires. Real cause: the channel
 // reply tool-call hung server-side without a client-side timeout, taking the
 // TUI render loop with it.
 //

@@ -2,19 +2,19 @@
 //
 // Background (2026-06-02): the historical heartbeat path (src/heartbeat.ts
 // -- the native hourly module that called the claude-agent-sdk's
-// runAgent() and notifyTelegram()) routinely crashed the main agent's
+// runAgent() and channel delivery) routinely crashed the main agent's
 // channel plugin within 2-3 minutes of every fire. After a long
 // isolation-chain attempt (#237 / #250 / #252 / #253 / #255) the
 // remaining failure mode was a TUI-level freeze, suspected to be caused
 // by the main agent's own poller picking up the heartbeat's
-// `notifyTelegram` sendMessage as a regular inbound and entering a
+// direct message as a regular inbound and entering a
 // tool-call loop on it.
 //
 // Architectural fix: stop calling the SDK from inside the dashboard
 // process. Run the heartbeat in a SEPARATE channel-less tmux agent
 // (named "heartbeat"), driven by the existing scheduled-task system,
 // and have IT send the formatted summary to the main agent via
-// inter-agent message rather than directly to Telegram. The main agent
+// inter-agent message rather than directly to the channel. The main agent
 // then decides if it relays to the operator -- so the heartbeat output
 // never spawns a main-agent-token sendMessage, never produces a
 // self-inbound event, and the channel plugin stays untouched.
@@ -138,7 +138,7 @@ export function shouldBootHeartbeatAgent(opts: { respawnEnabled: boolean; agentE
 // supplied identity, so the same renderer produces a correct file on any
 // deployment and the unit tests can assert the output without fs or
 // config. Critical contract:
-//   - NEVER call the Telegram reply tool. The whole point is to keep the
+//   - NEVER call any channel reply tool. The whole point is to keep the
 //     heartbeat output OUT of any bot-API call from this process, so the
 //     main agent's poller never sees a self-generated inbound.
 //   - The output goes to the main agent via inter-agent message; the main
@@ -160,7 +160,7 @@ inter-agent message; you NEVER contact ${id.ownerName} directly.
 ## Why this agent exists
 
 The previous heartbeat ran from inside the dashboard process and
-called the Telegram Bot API directly. Every fire caused the main
+called the chat channel directly. Every fire caused the main
 agent's channel plugin to fall over 2-3 minutes later -- the bot's
 outbound sendMessage was being read back as an inbound by the main
 agent's own poller and triggered a tool-call freeze. Splitting the
@@ -250,13 +250,13 @@ When you receive the heartbeat prompt:
      -d '{"from":"heartbeat","to":"${id.mainAgentId}","content":"<the formatted text>"}'
    \`\`\`
 
-4. **Stop.** Do not Telegram-reply, do not Slack, do not message
+4. **Stop.** Do not send a Discord message or any external channel reply, do not message
    anyone else. The handoff to the main agent is the entire job. The
    main agent handles the human-facing relay decision.
 
 ## Hard rules (never break)
 
-- **NEVER** call \`reply\` / Telegram / Slack tools.
+- **NEVER** call \`reply\` / Discord / channel tools.
 - **NEVER** contact a chat_id directly.
 - **NEVER** include API tokens, OAuth state, or any Bearer key in the
   message body. The dashboard token in the example above goes in the
@@ -280,7 +280,7 @@ When you receive the heartbeat prompt:
 
 ## You are headless
 
-You do not own a Telegram channel and the operator never reaches you
+You do not own a Discord channel and the operator never reaches you
 directly. The only inputs you ever process are heartbeat prompts
 from the scheduler. If you receive anything else, hand it off to the
 main agent with a brief "received off-pattern input, please advise"

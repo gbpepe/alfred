@@ -210,7 +210,7 @@ describe('decideOwnOauthToken: the whole decision', () => {
 
 describe('ownOauthTokenExport: the fleet shape, only the file differs', () => {
   it('is the fleet export with the path swapped, and never names the fleet file', () => {
-    const p = '/home/u/.config/marveen/tokens/a.token'
+    const p = '/home/u/.config/alfred/tokens/a.token'
     const fleetShape = (file: string) => `export CLAUDE_CODE_OAUTH_TOKEN="$(cat '${file}')" && `
     expect(ownOauthTokenExport(p)).toBe(fleetShape(p))
     expect(ownOauthTokenExport(p)).not.toContain(fleet)
@@ -218,7 +218,7 @@ describe('ownOauthTokenExport: the fleet shape, only the file differs', () => {
 })
 
 describe('ownOauthExportMissing: an ok decision must reach the launch env', () => {
-  const p = '/home/u/.config/marveen/tokens/a.token'
+  const p = '/home/u/.config/alfred/tokens/a.token'
   const ok = { kind: 'ok' as const, path: p, fingerprint: 'abcd1234' }
   const fleetEnv = `export CLAUDE_CODE_OAUTH_TOKEN="$(cat '${fleet}')" && `
   it('ok + its own export -> not missing', () => {
@@ -240,7 +240,7 @@ describe('ownOauthExportMissing: an ok decision must reach the launch env', () =
 // the refusal and the "own setup-token exported" log, so these cases are the
 // launcher's behaviour for every decision/env pair it can end up with.
 describe('ownOauthLaunchVerdict: the decision and the actual export cannot diverge', () => {
-  const p = '/home/u/.config/marveen/tokens/a.token'
+  const p = '/home/u/.config/alfred/tokens/a.token'
   const ok = { kind: 'ok' as const, path: p, fingerprint: 'abcd1234' }
   const fleetEnv = () => `export CLAUDE_CODE_OAUTH_TOKEN="$(cat '${fleet}')" && `
   const envs = () => ({

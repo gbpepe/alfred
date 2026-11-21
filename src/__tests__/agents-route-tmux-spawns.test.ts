@@ -162,7 +162,7 @@ describe('tmux spawns of the agents read paths', () => {
   }
 
   it('preserves blank lines, trailing newlines and a marker with another nonce', async () => {
-    const marker = '__marveen_capture_0123456789abcdef0123456789abcdef_2__'
+    const marker = '__alfred_capture_0123456789abcdef0123456789abcdef_2__'
     panes['agent-beta'] = `${marker}\n\n${IDLE_PLAIN}\n\n`
     const expected = expectedActivity()
     expected[2].tail[0] = marker

@@ -98,18 +98,18 @@ PY
 # is the second consistent path (python3 is an install dependency); the raw
 # copy is the last resort.
 DB_MODE="no database in this install"
-if [ -f "$STORE/claudeclaw.db" ]; then
+if [ -f "$STORE/alfred.db" ]; then
   if command -v sqlite3 >/dev/null 2>&1 \
-     && sqlite3 "$STORE/claudeclaw.db" ".backup '$DEST/claudeclaw.db'" 2>/dev/null \
-     && [ -s "$DEST/claudeclaw.db" ]; then
+     && sqlite3 "$STORE/alfred.db" ".backup '$DEST/alfred.db'" 2>/dev/null \
+     && [ -s "$DEST/alfred.db" ]; then
     DB_MODE="sqlite3 .backup"
     echo "  db: consistent snapshot ok"
   # A failed sqlite3 .backup may leave a partial file and its sidecars, so the
   # python3 path starts from a clean destination.
   elif command -v python3 >/dev/null 2>&1 \
-       && { rm -f "$DEST/claudeclaw.db" "$DEST/claudeclaw.db-journal" "$DEST/claudeclaw.db-wal" "$DEST/claudeclaw.db-shm" \
-            && _py_sqlite_backup "$STORE/claudeclaw.db" "$DEST/claudeclaw.db"; } 2>/dev/null \
-       && [ -s "$DEST/claudeclaw.db" ]; then
+       && { rm -f "$DEST/alfred.db" "$DEST/alfred.db-journal" "$DEST/alfred.db-wal" "$DEST/alfred.db-shm" \
+            && _py_sqlite_backup "$STORE/alfred.db" "$DEST/alfred.db"; } 2>/dev/null \
+       && [ -s "$DEST/alfred.db" ]; then
     DB_MODE="python3 sqlite3 backup"
     echo "  db: consistent snapshot ok (python3 sqlite3 backup)"
   else
@@ -120,14 +120,14 @@ if [ -f "$STORE/claudeclaw.db" ]; then
     # rebuilt. Copying the db without its -wal would silently lose everything
     # written since the last checkpoint.
     # Stale sidecars from a failed attempt must not sit next to the raw copy.
-    rm -f "$DEST/claudeclaw.db" "$DEST/claudeclaw.db-journal" "$DEST/claudeclaw.db-wal" "$DEST/claudeclaw.db-shm" 2>/dev/null
-    cp -p "$STORE/claudeclaw.db" "$DEST/claudeclaw.db" 2>/dev/null
+    rm -f "$DEST/alfred.db" "$DEST/alfred.db-journal" "$DEST/alfred.db-wal" "$DEST/alfred.db-shm" 2>/dev/null
+    cp -p "$STORE/alfred.db" "$DEST/alfred.db" 2>/dev/null
     for _sfx in -wal -shm; do
-      if [ -f "$STORE/claudeclaw.db$_sfx" ]; then
-        cp -p "$STORE/claudeclaw.db$_sfx" "$DEST/claudeclaw.db$_sfx" 2>/dev/null
+      if [ -f "$STORE/alfred.db$_sfx" ]; then
+        cp -p "$STORE/alfred.db$_sfx" "$DEST/alfred.db$_sfx" 2>/dev/null
       fi
     done
-    if [ -s "$DEST/claudeclaw.db" ]; then
+    if [ -s "$DEST/alfred.db" ]; then
       DB_MODE="raw db+wal+shm copy -- NOT a consistent snapshot"
       echo "  db: WARNING no consistent snapshot (neither sqlite3 .backup nor python3) -- copied db+wal+shm as-is (may be mid-write)"
     else
@@ -231,8 +231,8 @@ git -C "$REPO" branch --show-current   > "$DEST/git-branch.txt"  2>/dev/null
 # already gone from the live tree is a warning about the tree, not a failed
 # backup (and NOSUM keeps its own exit 3 below).
 MISSING=""
-if [ -f "$STORE/claudeclaw.db" ] && [ ! -s "$DEST/claudeclaw.db" ]; then
-  MISSING="$MISSING claudeclaw.db"
+if [ -f "$STORE/alfred.db" ] && [ ! -s "$DEST/alfred.db" ]; then
+  MISSING="$MISSING alfred.db"
 fi
 for f in $CRITICAL_FILES; do
   if [ -f "$STORE/$f" ] && [ ! -e "$DEST/$f" ]; then

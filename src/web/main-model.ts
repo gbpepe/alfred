@@ -479,7 +479,7 @@ function rejectedText(modelId: string, why: string): string {
 }
 
 // A hold that expired while the session was busy: the Stop hook reports the
-// end of every main-session turn (marveen-commands.py --stop -> POST
+// end of every main-session turn (alfred-commands.py --stop -> POST
 // /api/commands/turn-ended). The revert then gets ONE retry, once the turn has
 // been quiet for the switch window -- an event, not a poll; the 5-minute sweep
 // stays the fallback.

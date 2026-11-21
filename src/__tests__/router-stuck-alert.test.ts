@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import { BUSY_TRANSCRIPT_EXEMPT_CAP_MS, formatStuckSessionAlert, quotaWallEscalation, shouldEscalateStuckSession, type QuotaWallAlertRecord } from '../web/message-router.js'
 import { detectPaneState, detectQuotaWall } from '../pane-state.js'
 
-const MAIN = 'marveen'
+const MAIN = 'alfred'
 
 const SEP = '─'.repeat(80)
 const MIN = 60 * 1000
@@ -61,7 +61,7 @@ describe('formatStuckSessionAlert: silent stall becomes a main-agent alert', () 
   it('never alerts the main agent about itself (no self-loop)', () => {
     // Messages TO the main agent use the pull model and never enter the stuck
     // branch; this guards the invariant if that ever changes.
-    expect(formatStuckSessionAlert(MAIN, MAIN, 'marveen-channels', 20 * 60 * 1000, 5)).toBeNull()
+    expect(formatStuckSessionAlert(MAIN, MAIN, 'alfred-channels', 20 * 60 * 1000, 5)).toBeNull()
   })
 
   it('PANEFOOTEROUTSIDE1114: names a footer seen off its live place instead of a bare not-ready', () => {

@@ -52,9 +52,9 @@ mkdir -p "$FAKE/scripts/lib" && cp "$(dirname "$SCRIPT")/lib/archive-list-has.sh
 
 # Load-bearing markers backup.sh insists on, plus one rarely-read file.
 if command -v sqlite3 >/dev/null 2>&1; then
-  sqlite3 "$FAKE/store/claudeclaw.db" 'CREATE TABLE t(x);'
+  sqlite3 "$FAKE/store/alfred.db" 'CREATE TABLE t(x);'
 else
-  printf 'db' > "$FAKE/store/claudeclaw.db"
+  printf 'db' > "$FAKE/store/alfred.db"
 fi
 printf 'x' > "$FHOME/.claude/skills/demo/SKILL.md"
 printf 'x' > "$FHOME/.claude/scheduled-tasks/demo/SKILL.md"
@@ -90,7 +90,7 @@ RC=$?
 if [ "$RC" -eq 0 ]; then pass "backup.sh exits 0 under the sweep"; else
   fail "backup.sh exited $RC under the sweep"; echo "$OUTPUT" | tail -15; fi
 
-ARCHIVE="$(ls -1 "$OUT"/claudeclaw-*.tar.gz 2>/dev/null | head -1)"
+ARCHIVE="$(ls -1 "$OUT"/alfred-*.tar.gz 2>/dev/null | head -1)"
 if [ -n "$ARCHIVE" ] && tar -tzf "$ARCHIVE" | grep -qx "repo/store/$PLANT"; then
   pass "the old-atime file is in the archive"
 else

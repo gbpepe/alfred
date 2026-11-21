@@ -66,7 +66,7 @@ run_installer() {
   printf 'SERVICE_ID=bpt\nCHANNEL_PROVIDER=%s\n' "$4" > "$TMP/.env"
   mkdir -p "$2/.claude/channels/telegram-coordinator"
   printf 'TELEGRAM_BOT_TOKEN=x\n' > "$2/.claude/channels/telegram-coordinator/.env"
-  HOME="$2" PATH="$3" MARVEEN_ENV_FILE="$TMP/.env" /bin/bash "$ROOT/scripts/$1" >"$TMP/out" 2>&1 || { echo "RC-HIBA $(cat "$TMP/out")"; return; }
+  HOME="$2" PATH="$3" ALFRED_ENV_FILE="$TMP/.env" /bin/bash "$ROOT/scripts/$1" >"$TMP/out" 2>&1 || { echo "RC-HIBA $(cat "$TMP/out")"; return; }
   n="$(find "$2/Library/LaunchAgents" -name '*.plist' 2>/dev/null | wc -l | tr -d ' ')"
   [ "$n" = 1 ] || { echo "PLIST-SZAM=$n"; return; }
   p="$(find "$2/Library/LaunchAgents" -name '*.plist' | head -1)"

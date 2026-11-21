@@ -33,10 +33,10 @@ vi.mock('../web/vault.js', async (orig) => ({
   deleteSecret: vi.fn((id: string) => vaultSecrets.delete(id)),
   getSecret: vi.fn((id: string) => vaultSecrets.get(id) ?? null),
 }))
-const hardRestartMarveenChannels = vi.fn(() => ({ ok: true }))
+const hardRestartAlfredChannels = vi.fn(() => ({ ok: true }))
 vi.mock('../web/channel-monitor.js', async (orig) => ({
   ...(await orig<typeof import('../web/channel-monitor.js')>()),
-  hardRestartMarveenChannels: () => hardRestartMarveenChannels(),
+  hardRestartAlfredChannels: () => hardRestartAlfredChannels(),
 }))
 let agentRunning = true
 const sendPromptToSession = vi.fn(async () => {})
@@ -178,7 +178,7 @@ const noChildProcess = () => {
   expect(spawnMock).not.toHaveBeenCalled()
   expect(sendPromptToSession).not.toHaveBeenCalled()
   expect(capturePane).not.toHaveBeenCalled()
-  expect(hardRestartMarveenChannels).not.toHaveBeenCalled()
+  expect(hardRestartAlfredChannels).not.toHaveBeenCalled()
 }
 
 beforeAll(() => {
@@ -197,7 +197,7 @@ beforeEach(() => {
   writeTerminalInputEnabled(true)
   vaultSecrets.clear()
   vaultSecrets.set('openrouter-fleet-key', 'sk-or-og3-test')
-  for (const m of [execFileMock, spawnMock, sendPromptToSession, capturePane, hardRestartMarveenChannels]) m.mockClear()
+  for (const m of [execFileMock, spawnMock, sendPromptToSession, capturePane, hardRestartAlfredChannels]) m.mockClear()
 })
 afterAll(() => {
   for (const d of [DIR, PEER_DIR, MAIN_SKILL_DIR]) rmSync(d, { recursive: true, force: true })

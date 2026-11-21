@@ -24,7 +24,7 @@
 // its own instruction, so it does not get a second one ~25 s later.
 //
 // MAINRESTARTWAKE1115: the MANUAL restart of the main agent is the one fresh
-// restart that had no directive of its own. POST /api/marveen/restart (and the
+// restart that had no directive of its own. POST /api/alfred/restart (and the
 // main branch of POST /api/agents/<name>/restart) respawn the channels session
 // with no --continue and typed nothing into it, so the fresh session sat at an
 // empty prompt until some other input arrived. Measured 2026-11-14: a manual
@@ -32,7 +32,7 @@
 // 23:15:12. Those two routes now owe the main agent one wake with its own text
 // (mainRestartWakePrompt: the conversation is NOT back, so it points at
 // HANDOFF.md and the kanban instead of "your last steps"). Every other caller
-// of hardRestartMarveenChannels() stays without one: the context guard and the
+// of hardRestartAlfredChannels() stays without one: the context guard and the
 // restart gate inject their own directive, and the recovery paths (reauth,
 // inbound probe, stuck input, onboarding, rotation) restart a session that had
 // nothing to resume. The pending wake is an in-memory timer: a dashboard
@@ -47,7 +47,7 @@
 // missing one is not mentioned at all. (C2) The text says not to post about the
 // restart to the channel: an owner who restarts on purpose with nothing running
 // must not get a message after every button press. (C3) Any restart of the main
-// session drops a pending main wake (hardRestartMarveenChannels calls
+// session drops a pending main wake (hardRestartAlfredChannels calls
 // cancelRestartWake first), so a guard or recovery restart inside the grace does
 // not get this wake next to its own directive; the two manual routes schedule
 // after that call.
@@ -245,7 +245,7 @@ export function scheduleRestartWake(
 
 /**
  * Owe the main agent the fresh-restart wake. Called by the two manual restart
- * routes only, after hardRestartMarveenChannels() answered ok. Same timer map
+ * routes only, after hardRestartAlfredChannels() answered ok. Same timer map
  * as the sub-agents (keyed by the agent id), so two manual restarts inside the
  * grace still end in one wake. The handoff's freshness is read when the wake is
  * SENT (`now` / `mtimeMs` are the test seams of that read).

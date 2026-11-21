@@ -41,7 +41,7 @@ export type PeerPollState = 'ok' | 'auth-or-disabled' | 'error' | 'unreachable' 
 
 export interface PeerManifest {
   system: string
-  marveenVersion: string
+  alfredVersion: string
   federationVersion: number
   agents: Array<{ id: string; displayName: string; model: string; capabilitySummary?: string }>
   skills: Array<{ agent: string; name: string; description: string }>
@@ -132,7 +132,7 @@ export function sanitizeManifest(raw: unknown, expectedSystem: string): PeerMani
   })
   return {
     system,
-    marveenVersion: truncate(m.marveenVersion, MAX_SHORT_FIELD) || 'unknown',
+    alfredVersion: truncate(m.alfredVersion, MAX_SHORT_FIELD) || 'unknown',
     federationVersion: typeof m.federationVersion === 'number' ? m.federationVersion : 0,
     agents,
     skills,

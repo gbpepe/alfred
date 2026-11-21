@@ -153,7 +153,7 @@ export const ROTATION_GATE = {
    *  that actually took whole fleets down (every recorded outage was 7d). */
   switchAtSevenDayPercent: 90,
   /** "About to reset anyway" -- rotating for less than this is not worth the
-   *  Telegram noise + session interruption. Same value and rationale as
+   *  notification noise + session interruption. Same value and rationale as
    *  quota-gate.ts's nearResetMs. Applied per window: a 7d window resetting
    *  in 3 days is never "near". */
   nearResetMs: 30 * 60_000,

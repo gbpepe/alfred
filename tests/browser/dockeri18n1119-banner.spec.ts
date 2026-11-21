@@ -1,7 +1,7 @@
 // DOCKERI18N1119 browser verification (Geri, v1.50.1): on an en install the "no channel configured" banner stayed
-// Hungarian. Its text is drawn from /api/marveen with the language of that moment; on a fresh install (nothing stored in
+// Hungarian. Its text is drawn from /api/alfred with the language of that moment; on a fresh install (nothing stored in
 // the browser) that answer can come before the server's DASHBOARD_LANG, and the language change that follows did not
-// redraw it. Static web/ with the API stubbed: /api/marveen answers at once, /api/settings late.
+// redraw it. Static web/ with the API stubbed: /api/alfred answers at once, /api/settings late.
 import { test, expect, type Page } from '@playwright/test'
 
 const KEY = 'a'.repeat(64)
@@ -15,7 +15,7 @@ async function open(page: Page, opts: { dashboardLang: 'en' | 'hu'; settingsDela
   // the catch-all FIRST: Playwright gives the last matching handler priority
   await page.route('**/api/**', (r) => r.fulfill(json({})))
   await page.route('**/api/onboarding/status', (r) => r.fulfill(json({ needsOnboarding: false })))
-  await page.route('**/api/marveen', (r) => r.fulfill(json({ mainChannelUnconfigured: 'telegram', channelProvider: 'telegram' })))
+  await page.route('**/api/alfred', (r) => r.fulfill(json({ mainChannelUnconfigured: 'discord', channelProvider: 'discord' })))
   let settingsServed = false
   await page.route('**/api/settings', async (r) => {
     await new Promise((res) => setTimeout(res, opts.settingsDelayMs))
@@ -25,8 +25,8 @@ async function open(page: Page, opts: { dashboardLang: 'en' | 'hu'; settingsDela
   await page.addInitScript(([k, stored]) => {
     try {
       if (!sessionStorage.getItem('seeded')) {
-        localStorage.setItem('marveen-dashboard-token', k)
-        if (stored) localStorage.setItem('marveen.lang', stored)
+        localStorage.setItem('alfred-dashboard-token', k)
+        if (stored) localStorage.setItem('alfred.lang', stored)
         sessionStorage.setItem('seeded', '1')
       }
     } catch { /* ignore */ }

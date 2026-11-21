@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { initDatabase, logConfigChange, getRecentConfigChanges } from '../db.js'
 
-// In-memory DB, never touches the real store/claudeclaw.db (same pattern as
+// In-memory DB, never touches the real store/alfred.db (same pattern as
 // db.test.ts) -- this table only matters as a background audit trail, no UI
 // reads it yet.
 beforeAll(() => {

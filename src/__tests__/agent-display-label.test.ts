@@ -1,4 +1,4 @@
-// DASHNAME1109: the overview's activity feed showed the main agent's routing id ("marveen") on an install whose agent
+// DASHNAME1109: the overview's activity feed showed the main agent's routing id ("alfred") on an install whose agent
 // is called "Patex" (the Bridge path: headless install with the default name, then the wizard renames BOT_NAME only).
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -6,24 +6,24 @@ import { join } from 'node:path'
 import { agentDisplayLabel, type AgentDisplayLabelDeps } from '../web/agent-display-label.js'
 
 const deps = (over: Partial<AgentDisplayLabelDeps> = {}): AgentDisplayLabelDeps => ({
-  mainAgentId: 'marveen',
+  mainAgentId: 'alfred',
   botName: () => 'Patex',
-  isKnownAgent: (id) => id === 'marveen' || id === 'samu' || id === 'dani',
+  isKnownAgent: (id) => id === 'alfred' || id === 'samu' || id === 'dani',
   displayName: (id) => (id === 'samu' ? 'Samu, a tech lead' : id.charAt(0).toUpperCase() + id.slice(1)),
   ...over,
 })
 
 describe('agentDisplayLabel', () => {
   it('the main agent routing id shows the current display name (the Bridge-path rename)', () => {
-    expect(agentDisplayLabel('marveen', deps())).toBe('Patex')
+    expect(agentDisplayLabel('alfred', deps())).toBe('Patex')
   })
 
   it('reads the name fresh each call (the wizard writes .env while the dashboard runs)', () => {
-    let name = 'Marveen'
+    let name = 'Alfred'
     const d = deps({ botName: () => name })
-    expect(agentDisplayLabel('marveen', d)).toBe('Marveen')
+    expect(agentDisplayLabel('alfred', d)).toBe('Alfred')
     name = 'Patex'
-    expect(agentDisplayLabel('marveen', d)).toBe('Patex')
+    expect(agentDisplayLabel('alfred', d)).toBe('Patex')
   })
 
   it('a known sub-agent shows its display name', () => {
@@ -34,14 +34,14 @@ describe('agentDisplayLabel', () => {
   it('anything else is shown as it is: system, an unknown id, a federated peer/agent id, empty', () => {
     expect(agentDisplayLabel('system', deps())).toBe('system')
     expect(agentDisplayLabel('segito', deps())).toBe('segito')
-    expect(agentDisplayLabel('kovacs-rendszer/marveen', deps({ isKnownAgent: () => true }))).toBe('kovacs-rendszer/marveen')
+    expect(agentDisplayLabel('kovacs-rendszer/alfred', deps({ isKnownAgent: () => true }))).toBe('kovacs-rendszer/alfred')
     expect(agentDisplayLabel('', deps())).toBe('')
     expect(agentDisplayLabel(null, deps())).toBe('')
     expect(agentDisplayLabel(undefined, deps())).toBe('')
   })
 
   it('an empty display name or a throwing lookup falls back to the id, never to nothing', () => {
-    expect(agentDisplayLabel('marveen', deps({ botName: () => '' }))).toBe('marveen')
+    expect(agentDisplayLabel('alfred', deps({ botName: () => '' }))).toBe('alfred')
     expect(agentDisplayLabel('samu', deps({ displayName: () => '' }))).toBe('samu')
     expect(agentDisplayLabel('samu', deps({ isKnownAgent: () => { throw new Error('fs') } }))).toBe('samu')
   })

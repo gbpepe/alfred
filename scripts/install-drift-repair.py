@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Restore the tracked files that a Marveen INSTALL itself dirtied (INSTALLDIRTYTREE1103).
+"""Restore the tracked files that a Alfred INSTALL itself dirtied (INSTALLDIRTYTREE1103).
 
 Why this exists
 ---------------
 Up to v1.46.0 a fresh install changed three tracked files, and a tracked change
-sends every later update down the stash path (marveen2, 2026-11-03: the stash pop
+sends every later update down the stash path (alfred2, 2026-11-03: the stash pop
 conflicted inside .claude/settings.json and left it invalid JSON):
 
   .claude/settings.json   the installers' `claude plugin enable --scope project`
@@ -35,12 +35,12 @@ match the path is checked out from HEAD. The stash entry is never dropped.
 Usage: install-drift-repair.py --install-dir DIR [--resolve-conflicts] [--dry-run] [--backup-dir DIR] [--json | --lines]
 
 It never needs its own location: the Bridge runs it from stdin, with no file on
-the target:  python3 -I - --install-dir "$HOME/marveen" --resolve-conflicts --lines < it
+the target:  python3 -I - --install-dir "$HOME/alfred" --resolve-conflicts --lines < it
 
   --resolve-conflicts  the Bridge "repair install" mode (BRIDGEREPAIR1103): first
                        check out EVERY unmerged path from HEAD, then `git reset -q`,
                        then the narrow cleanup below. Allowed only while a
-                       marveen-update-auto-stash entry exists, because the local side
+                       alfred-update-auto-stash entry exists, because the local side
                        of every conflict lives on in it. update.sh and the dashboard
                        do NOT pass it.
   --lines              the Bridge's line protocol on stdout, nothing else:
@@ -55,7 +55,7 @@ the target:  python3 -I - --install-dir "$HOME/marveen" --resolve-conflicts --li
                        %XX-encoded. Under --dry-run the same lines say what WOULD happen.
   --backup-dir DIR     every file is copied here BEFORE it is overwritten (conflict
                        markers included); must be outside the tree. Default
-                       ~/.marveen-repair/backup-<UTC timestamp>. A dry run writes none.
+                       ~/.alfred-repair/backup-<UTC timestamp>. A dry run writes none.
   --json               one JSON object (version 1): {version, ok, state, exitCode, dryRun,
                        resolvedConflicts[{path, action, reason, backup}], results[{path,
                        status, action, reason, pattern, backup?}], unmergedLeft[],
@@ -96,13 +96,13 @@ KNOWN_PATHS = (SETTINGS,) + INSTALL_SCRIPTS + (LOCK,)
 CHANNEL_KEYS = frozenset((
     "telegram@claude-plugins-official",
     "discord@claude-plugins-official",
-    "slack-channel@marveen-marketplace",
-    "whatsapp@marveen-marketplace",
-    "teams@marveen-marketplace",
+    "slack-channel@alfred-marketplace",
+    "whatsapp@alfred-marketplace",
+    "teams@alfred-marketplace",
 ))
-# The key the installers ADDED: `claude plugin enable "$PLUGIN_SHORT@marveen-marketplace"`
+# The key the installers ADDED: `claude plugin enable "$PLUGIN_SHORT@alfred-marketplace"`
 # with PLUGIN_SHORT in {telegram, discord, slack-channel}, always set to true.
-GENERATED_NEW_KEY = re.compile(r"(telegram|discord|slack-channel)@marveen-marketplace")
+GENERATED_NEW_KEY = re.compile(r"(telegram|discord|slack-channel)@alfred-marketplace")
 # The Bridge's derived headless installer carries this line (derive-headless.mjs).
 INSTWIZ_MARKER = "# --- INSTWIZ1 headless-install helpers (contract) BEGIN ---"
 HAS_INSTALL_SCRIPT = re.compile(r'\s*"hasInstallScript": true,?\s*')
@@ -313,7 +313,7 @@ def operation_in_progress(cwd):
     return None
 
 
-AUTO_STASH_TAG = "marveen-update-auto-stash"
+AUTO_STASH_TAG = "alfred-update-auto-stash"
 
 # Pattern ids, as the --lines protocol names them (REPAIR_CLEANED <path> <id>).
 PATTERN_ID = {
@@ -413,7 +413,7 @@ def resolve_all_conflicts(cwd, dry_run, backup_dir):
 
 
 def default_backup_dir():
-    return os.path.join(os.path.expanduser("~"), ".marveen-repair",
+    return os.path.join(os.path.expanduser("~"), ".alfred-repair",
                         "backup-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()))
 
 
@@ -553,9 +553,9 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true", help="decide and report, change nothing")
     ap.add_argument("--resolve-conflicts", action="store_true",
                     help="first check out EVERY unmerged path from HEAD and `git reset -q` "
-                         "(only with a marveen-update-auto-stash entry present; it is never dropped)")
+                         "(only with a alfred-update-auto-stash entry present; it is never dropped)")
     ap.add_argument("--backup-dir", help="where every overwritten file is copied first (outside the tree; "
-                                        "default ~/.marveen-repair/backup-<UTC timestamp>)")
+                                        "default ~/.alfred-repair/backup-<UTC timestamp>)")
     fmt = ap.add_mutually_exclusive_group()
     fmt.add_argument("--json", action="store_true", help="one JSON object on stdout (version 1)")
     fmt.add_argument("--lines", action="store_true", help="the REPAIR_* line protocol on stdout (the Bridge)")

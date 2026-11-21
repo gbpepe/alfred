@@ -16,12 +16,12 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-curlquote-test-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-curlquote-test-'))
 
 vi.mock('../config.js', () => ({
   // agent-scaffold imports settings-store (MCPOROKLES923), which derives a path from
   // STORE_DIR at import time. A never-created dir: nothing here reads the store.
-  STORE_DIR: '/nonexistent/claudeclaw-test-store',
+  STORE_DIR: '/nonexistent/alfred-test-store',
   PROJECT_ROOT: tmpRoot,
   OWNER_NAME: 'TestOwner',
   MAIN_AGENT_ID: 'agent-a',
@@ -53,7 +53,7 @@ const MARKER_END = '<!-- END GENERATED: autonomy-wiring -->'
 // A payload the shell expands: -d / --data followed by a double quote.
 const SHELL_EXPANDING_PAYLOAD = /(?:^|\s)(?:-d|--data|--data-raw)\s+"/
 
-// VOICETOKENLEAK1101 PR-A1: an agent gets the helper recipes unless its settings deny scripts/marveen-api.sh; the curl
+// VOICETOKENLEAK1101 PR-A1: an agent gets the helper recipes unless its settings deny scripts/alfred-api.sh; the curl
 // examples this file guards are that fallback, so by default the agent's settings deny the helper here.
 function writtenAutonomyBlock(agentName: string, denyHelper = true): string {
   const dir = join(tmpRoot, 'agents', agentName)
@@ -75,9 +75,9 @@ describe('generated autonomy block, the helper recipes (the default, VOICETOKENL
     for (const s of ['$(cat', '.dashboard-token', 'Authorization']) expect(block, s).not.toContain(s)
     expect(block).not.toMatch(/\bcurl\b/)
     const own = join(tmpRoot, 'agents', 'helper-agent')
-    expect(block).toContain(`marveen-api.sh message helper-agent agent-a ${join(own, 'api-uzenet.txt')}`)
-    expect(block).toContain(`marveen-api.sh approval-request helper-agent CATEGORY_KEY 3600 ${join(own, 'api-jovahagyas.txt')}`)
-    expect(block).toContain('marveen-api.sh approval-consume <id> CATEGORY_KEY helper-agent')
+    expect(block).toContain(`alfred-api.sh message helper-agent agent-a ${join(own, 'api-uzenet.txt')}`)
+    expect(block).toContain(`alfred-api.sh approval-request helper-agent CATEGORY_KEY 3600 ${join(own, 'api-jovahagyas.txt')}`)
+    expect(block).toContain('alfred-api.sh approval-consume <id> CATEGORY_KEY helper-agent')
     // the pointer to the strict-profile section is only for a strict agent
     expect(block).not.toContain('strict profilodban')
   })

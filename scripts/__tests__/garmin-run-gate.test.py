@@ -155,8 +155,8 @@ def scenario_sender_is_the_agent_id() -> None:
     way. Measured on the live dashboard 2026-09-25:
       from=garmin-gate -> HTTP 403,  from=<the install's main agent> -> 200
     A readable label reads well and is rejected. And the fallback has to be
-    "marveen", because src/config.ts resolves MAIN_AGENT_ID as
-    `env['MAIN_AGENT_ID'] ?? 'marveen'`: on an install without the key that IS
+    "alfred", because src/config.ts resolves MAIN_AGENT_ID as
+    `env['MAIN_AGENT_ID'] ?? 'alfred'`: on an install without the key that IS
     the registered agent, so anything else we invented would be a 403 too.
 
     Every other scenario replaces notify_main_agent outright, so this is the only
@@ -179,15 +179,15 @@ def scenario_sender_is_the_agent_id() -> None:
         tmp = Path(d)
         wire(tmp, fake_analysis_script(tmp, 0, None))
         gate.notify_main_agent = VALODI_NOTIFY
-        eredeti_env, eredeti_urlopen = gate.MARVEEN_DIR, gate.urllib.request.urlopen
-        gate.MARVEEN_DIR = tmp                      # nincs .env -> a termek alapertelmezese
+        eredeti_env, eredeti_urlopen = gate.ALFRED_DIR, gate.urllib.request.urlopen
+        gate.ALFRED_DIR = tmp                      # nincs .env -> a termek alapertelmezese
         gate.urllib.request.urlopen = hamis
         try:
             gate.notify_main_agent("333")
         finally:
-            gate.MARVEEN_DIR, gate.urllib.request.urlopen = eredeti_env, eredeti_urlopen
-    check("from is the agent id", kuldott.get("from"), "marveen")
-    check("to is the agent id", kuldott.get("to"), "marveen")
+            gate.ALFRED_DIR, gate.urllib.request.urlopen = eredeti_env, eredeti_urlopen
+    check("from is the agent id", kuldott.get("from"), "alfred")
+    check("to is the agent id", kuldott.get("to"), "alfred")
     check("not a descriptive label", kuldott.get("from") in {"garmin-gate", "geordi"}, False)
 
 
@@ -204,7 +204,7 @@ def scenario_env_reader_shapes() -> None:
     print("the .env reader is a LINE-FOR-LINE mirror of the product (parity)")
     esetek = [
         # PARITAS-TABLAZAT a termek src/env.ts readEnvFile-javal + a config.ts
-        # `?? 'marveen'` fallbackjaval. Merve 2026-09-27 a LEFORDITOTT dist/env.js
+        # `?? 'alfred'` fallbackjaval. Merve 2026-09-27 a LEFORDITOTT dist/env.js
         # ellen, tizenharom alakon; minden elvart ertek ONNAN jon, nem attol, ami
         # kenyelmes lenne. Az elozo valtozat itt az ENGEDEKENY alakot pinnelte
         # helyesnek, es ezzel ot ponton a termektol ELTERO viselkedest rogzitett.
@@ -212,14 +212,14 @@ def scenario_env_reader_shapes() -> None:
         # a termek kulcsa `export MAIN_AGENT_ID` lesz, tehat a kulcs HIANYZIK ->
         # fallback. Ez a legfontosabb sor: epp ez a felreiranyitas, amiert a
         # BEEGETETT913 keszult.
-        ("export MAIN_AGENT_ID=exportalt\n", "marveen"),
+        ("export MAIN_AGENT_ID=exportalt\n", "alfred"),
         ('MAIN_AGENT_ID="idezett"\n', "idezett"),
         # a sorvegi komment az ERTEK RESZE a termeknel
         ("MAIN_AGENT_ID=kommentes  # ez itt megjegyzes\n", "kommentes  # ez itt megjegyzes"),
         # idezojel csak akkor jon le, ha MINDKET veg az; itt a veg a komment
         ('MAIN_AGENT_ID="ra#cs"  # a kettes a kommentben\n', '"ra#cs"  # a kettes a kommentben'),
-        ("  export   MAIN_AGENT_ID = 'mind'   \n", "marveen"),
-        ("BOT_NAME=Valami\n", "marveen"),
+        ("  export   MAIN_AGENT_ID = 'mind'   \n", "alfred"),
+        ("BOT_NAME=Valami\n", "alfred"),
         # URES ertek: a termek `??`-ja NULLISH-only, tehat az ures sztring ATMEGY
         ("MAIN_AGENT_ID=\n", ""),
         # a termek minden sort feldolgoz es FELULIRJA a kulcsot: az UTOLSO nyer
@@ -230,7 +230,7 @@ def scenario_env_reader_shapes() -> None:
         ("MAIN_AGENT_ID='egyoldalu\n", "'egyoldalu"),
         # --- A 2026-09-27 TOVABBI NEGY ALAK (a review merese a termek sajat readEnvFile-ja ellen) ---
         # UTF-8 BOM az elso soron: a termek JS trim()-je a U+FEFF-et is levagja, a Python strip()-je
-        # nem, es ez nema felreiranyitas lett volna (a riasztas a `marveen`-nek menne).
+        # nem, es ez nema felreiranyitas lett volna (a riasztas a `alfred`-nek menne).
         ("\ufeffMAIN_AGENT_ID=bomos\n", "bomos"),
         # ervenytelen UTF-8 bajt egy megjegyzesben: a termek U+FFFD-re cserel es megy tovabb; a kapu
         # eddig UnicodeDecodeError-ral meghalt (a memoria-kapu importkor oldja fel az azonositot).
@@ -245,12 +245,12 @@ def scenario_env_reader_shapes() -> None:
         # es amit a JS trim() levag, de a Python strip() nem: a BOM az ertek vegen
         ("MAIN_AGENT_ID=vegen\ufeff\n", "vegen"),
     ]
-    eredeti = gate.MARVEEN_DIR
+    eredeti = gate.ALFRED_DIR
     try:
         with tempfile.TemporaryDirectory() as d:
-            gate.MARVEEN_DIR = Path(d)
+            gate.ALFRED_DIR = Path(d)
             for tartalom, vart in esetek:
-                env_fajl = gate.MARVEEN_DIR / ".env"
+                env_fajl = gate.ALFRED_DIR / ".env"
                 if isinstance(tartalom, bytes):
                     env_fajl.write_bytes(tartalom)
                 else:
@@ -259,7 +259,7 @@ def scenario_env_reader_shapes() -> None:
                 cimke = ascii(tartalom).replace("\\n", " ")[:46]
                 check(f"{cimke} -> {vart!r}", kapott, vart)
     finally:
-        gate.MARVEEN_DIR = eredeti
+        gate.ALFRED_DIR = eredeti
 
 
 if __name__ == "__main__":

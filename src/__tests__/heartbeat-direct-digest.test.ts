@@ -79,7 +79,7 @@ function fakeDeps(over: Partial<DirectDigestDeps> = {}) {
     warn: (_o, msg) => { warns.push(msg) },
     tz: 'Europe/Budapest',
     nowLabel: () => '2026-10-04 12:00',
-    mainAgentId: 'marveen',
+    mainAgentId: 'alfred',
     ...over,
   }
   return { deps, sent, runs, warns }
@@ -91,7 +91,7 @@ describe('(A) sendHeartbeatDigestDirect', () => {
     expect(await sendHeartbeatDigestDirect('hourly-heartbeat', 'heartbeat', f.deps)).toBe(true)
     expect(f.sent).toHaveLength(1)
     expect(f.sent[0].from).toBe('heartbeat')
-    expect(f.sent[0].to).toBe('marveen')
+    expect(f.sent[0].to).toBe('alfred')
     expect(f.sent[0].content.startsWith('## Heartbeat 2026-10-04 12:00')).toBe(true)
     expect(f.runs).toEqual([DIRECT_DIGEST_RUN_STATUS])
   })
@@ -110,7 +110,7 @@ describe('(A) sendHeartbeatDigestDirect', () => {
   })
 })
 
-describe('(A) which tasks the runner sends itself -- flag-less tasks are untouched (Marveen, 3.)', () => {
+describe('(A) which tasks the runner sends itself -- flag-less tasks are untouched (Alfred, 3.)', () => {
   const base = { type: 'heartbeat' as const, injectMetrics: true, agent: 'heartbeat' }
   it('only heartbeat + injectMetrics + sendDigestDirect, never "all"', () => {
     expect(isDirectDigestTask({ ...base, sendDigestDirect: true })).toBe(true)
@@ -121,7 +121,7 @@ describe('(A) which tasks the runner sends itself -- flag-less tasks are untouch
     expect(isDirectDigestTask({ ...base, agent: 'all', sendDigestDirect: true })).toBe(false)
   })
 
-  // Marveen, 1.: the direct send must not fall under skipIfBusy / the session
+  // Alfred, 1.: the direct send must not fall under skipIfBusy / the session
   // path. The branch sits before the quota gate and before attemptFireTask in
   // the tick, so a busy main agent cannot hold it back.
   // Geri's #1687 verify: removing the direct branch from runScheduledTaskNow
@@ -163,7 +163,7 @@ function gapDeps(over: Partial<GapGuardDeps> = {}) {
   return { deps, notes }
 }
 
-describe('(B) the gap guard (Marveen, 2.)', () => {
+describe('(B) the gap guard (Alfred, 2.)', () => {
   const task = [{ name: 'hourly-heartbeat', agent: 'heartbeat', schedule: '0 9-22 * * *' }]
 
   it('NEGATIVE CONTROL: a slot whose digest arrived does not report', () => {
@@ -200,7 +200,7 @@ describe('(B) the gap guard (Marveen, 2.)', () => {
     const tasks = digestGapTasks([
       { name: 'hourly-heartbeat', agent: 'heartbeat', schedule: '0 9-22 * * *', enabled: true, type: 'heartbeat', injectMetrics: true },
       { name: 'direct-hb', agent: 'heartbeat', schedule: '0 * * * *', enabled: true, type: 'heartbeat', injectMetrics: true },
-      { name: 'memoria-heartbeat', agent: 'marveen', schedule: '0 */4 * * *', enabled: true, type: 'heartbeat' },
+      { name: 'memoria-heartbeat', agent: 'alfred', schedule: '0 */4 * * *', enabled: true, type: 'heartbeat' },
       { name: 'off', agent: 'heartbeat', schedule: '0 * * * *', enabled: false, type: 'heartbeat', injectMetrics: true },
       { name: 'a-task', agent: 'samu', schedule: '0 * * * *', enabled: true, type: 'task', injectMetrics: true },
     ])
@@ -236,7 +236,7 @@ describe('(B) the DB side of the guard (real queries)', () => {
   })
 })
 
-describe('(A)+(B) a direct send that did not land is caught by the guard (Marveen, 1.)', () => {
+describe('(A)+(B) a direct send that did not land is caught by the guard (Alfred, 1.)', () => {
   it('send fails -> no digest row -> the guard reports that slot; send works -> the guard stays silent', async () => {
     initDatabase(':memory:')
     const slot = Date.now() - HEARTBEAT_DIGEST_GRACE_MS - 60_000

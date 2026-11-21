@@ -52,7 +52,7 @@ describe('decideManualRestart (pure)', () => {
 describe('gateManualRestart (sampler)', () => {
   it('allows a restart of a session that does not exist (no turn to cut) without capturing', async () => {
     sessionExistsOnHost.mockReturnValue(false)
-    const verdict = await gateManualRestart('marveen-channels', null, async () => {})
+    const verdict = await gateManualRestart('alfred-channels', null, async () => {})
     expect(verdict).toEqual({ allow: true, reason: 'no-session' })
     expect(capturePane).not.toHaveBeenCalled()
   })
@@ -60,7 +60,7 @@ describe('gateManualRestart (sampler)', () => {
   it('takes MANUAL_RESTART_SAMPLES captures spaced by the interval, and allows when all are idle', async () => {
     capturePane.mockReturnValue('IDLE')
     const sleep = vi.fn(async () => {})
-    const verdict = await gateManualRestart('marveen-channels', null, sleep)
+    const verdict = await gateManualRestart('alfred-channels', null, sleep)
     expect(verdict).toEqual({ allow: true, reason: 'idle' })
     expect(capturePane).toHaveBeenCalledTimes(MANUAL_RESTART_SAMPLES)
     expect(sleep).toHaveBeenCalledTimes(MANUAL_RESTART_SAMPLES - 1)
@@ -69,13 +69,13 @@ describe('gateManualRestart (sampler)', () => {
 
   it('refuses when the pane turns busy partway through the samples (a running turn is never cut)', async () => {
     capturePane.mockReturnValueOnce('IDLE').mockReturnValueOnce('working ( 12s )').mockReturnValueOnce('IDLE')
-    const verdict = await gateManualRestart('marveen-channels', null, async () => {})
+    const verdict = await gateManualRestart('alfred-channels', null, async () => {})
     expect(verdict).toEqual({ allow: false, reason: 'busy' })
   })
 
   it('refuses when the pane is unreadable while the session exists', async () => {
     capturePane.mockReturnValue(null)
-    const verdict = await gateManualRestart('marveen-channels', null, async () => {})
+    const verdict = await gateManualRestart('alfred-channels', null, async () => {})
     expect(verdict).toEqual({ allow: false, reason: 'no-pane' })
   })
 })
@@ -96,6 +96,6 @@ describe('force override (an operator decision that cuts the running turn)', () 
 
   it('the refusal hint tells the caller how to force', () => {
     expect(MANUAL_RESTART_FORCE_HINT).toContain('{"force": true}')
-    expect(MANUAL_RESTART_FORCE_HINT).toContain('/api/marveen/restart')
+    expect(MANUAL_RESTART_FORCE_HINT).toContain('/api/alfred/restart')
   })
 })

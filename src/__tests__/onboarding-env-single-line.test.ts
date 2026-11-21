@@ -31,7 +31,7 @@ const L = vi.hoisted(() => ({
 }))
 vi.mock('../web/channel-monitor.js', async (orig) => {
   const a = await orig<typeof import('../web/channel-monitor.js')>()
-  return { ...a, createMainChannelsSession: L.create, hardRestartMarveenChannels: L.restart }
+  return { ...a, createMainChannelsSession: L.create, hardRestartAlfredChannels: L.restart }
 })
 
 const tmpRoot = mkdtempSync(join(tmpdir(), 'onb-envline-'))
@@ -62,7 +62,7 @@ afterAll(() => {
 
 const envFile = join(tmpRoot, '.env')
 beforeEach(() => {
-  writeFileSync(envFile, 'MAIN_AGENT_ID=marveen\n')
+  writeFileSync(envFile, 'MAIN_AGENT_ID=alfred\n')
   rmSync(probeLog, { force: true })
   U.users = 0
 })
@@ -87,7 +87,7 @@ describe('onboarding .env writes are single-line (ENVINJECT1028)', () => {
     expect(r.status).toBe(400)
     const env = readFileSync(envFile, 'utf-8')
     expect(env).not.toMatch(/INJECTED_KEY/)
-    expect(env).toBe('MAIN_AGENT_ID=marveen\n')
+    expect(env).toBe('MAIN_AGENT_ID=alfred\n')
     expect(existsSync(probeLog)).toBe(false)
   })
 })
@@ -98,7 +98,7 @@ describe('claude-auth needs the owner once a dashboard login exists (ENVINJECT10
     const r = await post('/api/onboarding/claude-auth', { token: 'sk-ant-oat01-abc' })
     expect(r.status).toBe(403)
     expect(r.json.code).toBe('owner_session_required')
-    expect(readFileSync(envFile, 'utf-8')).toBe('MAIN_AGENT_ID=marveen\n')
+    expect(readFileSync(envFile, 'utf-8')).toBe('MAIN_AGENT_ID=alfred\n')
     expect(existsSync(probeLog)).toBe(false)
   })
 
@@ -159,7 +159,7 @@ describe('onboarding routes refuse a body that did not arrive in full', () => {
     const r = await postCutOff('/api/onboarding/identity', '{"agentName":"Ada","ownerName":"Kis')
     expect(r.status).toBe(400)
     expect(r.json.code).toBe('incomplete-body')
-    expect(readFileSync(envFile, 'utf-8')).toBe('MAIN_AGENT_ID=marveen\n')
+    expect(readFileSync(envFile, 'utf-8')).toBe('MAIN_AGENT_ID=alfred\n')
     expect(L.create).not.toHaveBeenCalled()
   })
 
@@ -167,7 +167,7 @@ describe('onboarding routes refuse a body that did not arrive in full', () => {
     const r = await postCutOff('/api/onboarding/claude-auth', '{"token":"sk-ant-oat01-ab')
     expect(r.status).toBe(400)
     expect(r.json.code).toBe('incomplete-body')
-    expect(readFileSync(envFile, 'utf-8')).toBe('MAIN_AGENT_ID=marveen\n')
+    expect(readFileSync(envFile, 'utf-8')).toBe('MAIN_AGENT_ID=alfred\n')
     expect(existsSync(probeLog)).toBe(false)
   })
 })

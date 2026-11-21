@@ -22,7 +22,7 @@
 //      not cost the code);
 //   7. the code is redeemed for the narrow token;
 //   8. the token, 9. the group record, 10. the lines are written;
-//  11. the host key is sent to marveen.io with the token. Only 200 is "stored";
+//  11. the host key is sent to alfred.io with the token. Only 200 is "stored";
 //      any other answer does not stop the enable: the daily reconcile sends it again.
 //
 // If 8-10 fail, everything that was written goes again (the lines, the record,

@@ -12,7 +12,7 @@ describe('skill propose instructions', () => {
     const hook = j.hooks.PreCompact.flatMap((h: any) => h.hooks ?? [h]).find((h: any) => h.type === 'agent')
     expect(hook).toBeTruthy()
     const prompt: string = hook.prompt
-    expect(prompt).toContain('bash {{PROJECT_ROOT}}/scripts/marveen-api.sh skill-propose SKILL-NEV skill-javaslat.md --reason-file skill-javaslat-indok.txt')
+    expect(prompt).toContain('bash {{PROJECT_ROOT}}/scripts/alfred-api.sh skill-propose SKILL-NEV skill-javaslat.md --reason-file skill-javaslat-indok.txt')
     expect(prompt).not.toContain('/api/skills/propose')
     expect(prompt).not.toContain('$(cat')
     expect(prompt).toContain('mkdir -p .claude/skills/SKILL-NEV')

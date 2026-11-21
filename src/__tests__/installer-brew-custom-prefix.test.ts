@@ -1,7 +1,7 @@
 // BREWPREFIXREST1107 C: install-macos.sh's brew probe and a Homebrew in a custom prefix.
 // Measured on develop 88b54702b: with brew only in a custom prefix and not on PATH (a non-interactive SSH install),
 // the dependency checks failed and the installer went to the Homebrew install step. Now an explicit
-// MARVEEN_BREW_PREFIX, or the #2578 rule (the prefix of a node@NN keg entry on PATH), finds that brew first.
+// ALFRED_BREW_PREFIX, or the #2578 rule (the prefix of a node@NN keg entry on PATH), finds that brew first.
 //
 // The cases run the REAL block (check_cmd .. the dependency install) with a temp HOME. /opt/homebrew and /usr/local
 // in the block are rewritten to temp dirs, so the host's real Homebrew is never seen or run; curl and brew are stubs
@@ -74,7 +74,7 @@ function run(
     writeFileSync(f, script)
     const r = spawnSync('/bin/bash', [f], {
       encoding: 'utf-8',
-      env: { PATH: pathFor({ stub, custom, keg }), HOME: join(dir, 'home'), MARVEEN_LANG: 'en', ...envFor({ custom }) },
+      env: { PATH: pathFor({ stub, custom, keg }), HOME: join(dir, 'home'), ALFRED_LANG: 'en', ...envFor({ custom }) },
     })
     return { out: (r.stdout ?? '') + (r.stderr ?? ''), code: r.status, calls: readFileSync(log, 'utf-8'), custom }
   } finally {
@@ -85,12 +85,12 @@ function run(
 const SYS = '/usr/bin:/bin'
 
 describe('install-macos.sh brew probe (real block, stubbed brew and curl)', () => {
-  it('custom prefix, brew off PATH, explicit MARVEEN_BREW_PREFIX: that brew, no Homebrew install', () => {
+  it('custom prefix, brew off PATH, explicit ALFRED_BREW_PREFIX: that brew, no Homebrew install', () => {
     // without the hint: the measured behaviour (MEASURE-C S1), which this fix does not reach
     const r = run({ custom: true }, (d) => `${d.stub}:${SYS}`)
     expect(r.out).toContain('Homebrew not found')
     expect(r.calls).toContain('curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')
-    const r2 = run({ custom: true }, (d) => `${d.stub}:${SYS}`, (d) => ({ MARVEEN_BREW_PREFIX: d.custom }))
+    const r2 = run({ custom: true }, (d) => `${d.stub}:${SYS}`, (d) => ({ ALFRED_BREW_PREFIX: d.custom }))
     expect(r2.code).toBe(0)
     expect(r2.out).not.toContain('ERRTRAP')
     expect(r2.out).not.toContain('Homebrew not found')
@@ -139,15 +139,15 @@ describe('install-macos.sh brew probe (real block, stubbed brew and curl)', () =
     expect(r.calls).not.toContain('curl')
   })
 
-  it('MARVEEN_BREW_PREFIX without a brew falls back to the defaults', () => {
-    const r = run({ arm: true }, (d) => `${d.stub}:${SYS}`, () => ({ MARVEEN_BREW_PREFIX: '/nonexistent-prefix' }))
+  it('ALFRED_BREW_PREFIX without a brew falls back to the defaults', () => {
+    const r = run({ arm: true }, (d) => `${d.stub}:${SYS}`, () => ({ ALFRED_BREW_PREFIX: '/nonexistent-prefix' }))
     expect(r.code).toBe(0)
     expect(r.calls).toMatch(/def-arm\/bin\/brew shellenv/)
     expect(r.calls).not.toContain('curl')
   })
 
-  it('MARVEEN_BREW_PREFIX is honoured before a default /opt/homebrew', () => {
-    const r = run({ custom: true, arm: true }, (d) => `${d.stub}:${SYS}`, (d) => ({ MARVEEN_BREW_PREFIX: d.custom }))
+  it('ALFRED_BREW_PREFIX is honoured before a default /opt/homebrew', () => {
+    const r = run({ custom: true, arm: true }, (d) => `${d.stub}:${SYS}`, (d) => ({ ALFRED_BREW_PREFIX: d.custom }))
     expect(r.code).toBe(0)
     expect(r.calls).toContain(`${r.custom}/bin/brew shellenv`)
     expect(r.calls).not.toMatch(/def-arm\/bin\/brew/)

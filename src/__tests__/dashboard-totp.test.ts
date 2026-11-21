@@ -170,7 +170,7 @@ describe('RFC 6238 / 4226 primitives', () => {
   })
 
   it('the otpauth URI names the issuer and the account', () => {
-    expect(otpauthUri('alice', 'ABC')).toBe('otpauth://totp/Marveen%3Aalice?secret=ABC&issuer=Marveen&algorithm=SHA1&digits=6&period=30')
+    expect(otpauthUri('alice', 'ABC')).toBe('otpauth://totp/Alfred%3Aalice?secret=ABC&issuer=Alfred&algorithm=SHA1&digits=6&period=30')
   })
 })
 

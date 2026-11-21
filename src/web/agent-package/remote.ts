@@ -76,7 +76,7 @@ export interface Remote {
   redeem(code: string, deps: CallDeps): Promise<RedeemResult>
   /** GET agent-packages with the stored credential. */
   catalog(deps: CallDeps): Promise<CatalogResult>
-  /** POST agent-package-download for `slug`, with X-Marveen-Version: `ownVersion` and the stored credential. */
+  /** POST agent-package-download for `slug`, with X-Alfred-Version: `ownVersion` and the stored credential. */
   download(slug: string, ownVersion: string, deps: CallDeps): Promise<DownloadResult>
   /** False when the origin is not a usable https origin (every call answers not_configured). */
   configured(): boolean
@@ -132,9 +132,9 @@ export function refusalFor(kind: CallKind, status: number, headers: Headers, bod
     }
   }
   if (status === 404 && error === 'not_found') return { status: 404, body: { error: 'package_not_found' } }
-  if (status === 409 && error === 'incompatible' && typeof o.min_marveen_version === 'string'
-    && VERSION_RE.test(o.min_marveen_version)) {
-    return { status: 409, body: { error: 'incompatible', minMarveenVersion: o.min_marveen_version } }
+  if (status === 409 && error === 'incompatible' && typeof o.min_alfred_version === 'string'
+    && VERSION_RE.test(o.min_alfred_version)) {
+    return { status: 409, body: { error: 'incompatible', minAlfredVersion: o.min_alfred_version } }
   }
   if (status === 503) return { status: 503, body: { error: 'temporarily_unavailable' } }
   return transportRefusal(kind, 'upstream')
@@ -378,7 +378,7 @@ async function downloadAt(origin: string | null, slug: string, ownVersion: strin
   if (origin === null) return { ok: false, refusal: transportRefusal('package', 'not_configured') }
   const x = await exchange(origin + DOWNLOAD_PATH, {
     method: 'POST',
-    headers: { authorization: `Bearer ${c.token}`, 'content-type': 'application/json', 'x-marveen-version': ownVersion },
+    headers: { authorization: `Bearer ${c.token}`, 'content-type': 'application/json', 'x-alfred-version': ownVersion },
     body: JSON.stringify({ slug }),
   }, REQUEST_TIMEOUT_MS, MAX_DELIVERY_BYTES, deps)
   if (!x.ok) return { ok: false, refusal: transportRefusal('package', x.reason) }

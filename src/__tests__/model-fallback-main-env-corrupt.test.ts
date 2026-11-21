@@ -1,6 +1,6 @@
 /**
  * The rebase of #1570 onto #1600 (JSONCLOBBER926) put two rules into
- * writeMainModel, in Marveen's order (32905): the .env MAIN_AGENT_MODEL write
+ * writeMainModel, in Alfred's order (32905): the .env MAIN_AGENT_MODEL write
  * first, then the settings.json fall-through through readJsonObjectForWrite.
  * What this pins, by behaviour and not by source text:
  *  - no MAIN_AGENT_MODEL in .env, and a corrupt settings.json: the write is

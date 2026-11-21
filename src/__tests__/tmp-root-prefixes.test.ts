@@ -27,12 +27,12 @@ describe('isTmpRootedPath', () => {
 
   it('refuses the exact scratchpad shape a fleet agent measures from', () => {
     // The real path from the 2026-09-12 measurement, macOS-resolved.
-    expect(isTmpRootedPath('/private/tmp/claude-501/-Users-marvin-ClaudeClaw-agents-geri/x/scratchpad/mv')).toBe(true)
+    expect(isTmpRootedPath('/private/tmp/claude-501/-Users-marvin-Alfred-agents-geri/x/scratchpad/mv')).toBe(true)
   })
 
   it('allows a home-rooted worktree', () => {
     expect(isTmpRootedPath('/Users/marvin/claw-test')).toBe(false)
-    expect(isTmpRootedPath('/home/runner/work/marveen/marveen')).toBe(false)
+    expect(isTmpRootedPath('/home/runner/work/alfred/alfred')).toBe(false)
   })
 
   it('does NOT refuse a home path that merely CONTAINS a tmp segment', () => {

@@ -36,7 +36,7 @@ export class RequestBodyTooLargeError extends Error {
 // auth-gate.ts AGENT_IDENTITY_BINDINGS). The stream is then drained, so the
 // gate stashes the bytes here and readBody() hands them to the route
 // unchanged. Without a stash readBody behaves exactly as before.
-const PRE_READ_BODY = Symbol.for('marveen.preReadBody')
+const PRE_READ_BODY = Symbol.for('alfred.preReadBody')
 
 export function stashPreReadBody(req: http.IncomingMessage, body: Buffer): void {
   (req as unknown as Record<symbol, Buffer>)[PRE_READ_BODY] = body

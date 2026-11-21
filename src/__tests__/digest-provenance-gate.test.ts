@@ -3,7 +3,7 @@
 // falsified live the same morning (the first run AFTER the SKILL.md freshness
 // gate shipped all four errors), so the rule is enforced here in code, as a
 // PreToolUse hook scoped to the heartbeat worker. These tests pin the gate's
-// contract, including Marveen's three stipulations (msg 16050): legitimate
+// contract, including Alfred's three stipulations (msg 16050): legitimate
 // traffic passes, internal failure is loud fail-closed, and the RED-BEFORE
 // baseline is measured (the bad drafts pass the pre-existing gate stack, so
 // only THIS gate blocks them).
@@ -33,13 +33,13 @@ const deps = {
     })[id] ?? null,
   prMerged: (n: number) => n === 1062,
   readFile: (p: string) => {
-    if (p === '/stub/lelet.json') return JSON.stringify({ from: 'heartbeat', to: 'marveen', content: 'DONECARD1 | done | zard le | evidencia' })
+    if (p === '/stub/lelet.json') return JSON.stringify({ from: 'heartbeat', to: 'alfred', content: 'DONECARD1 | done | zard le | evidencia' })
     throw new Error(`ENOENT: ${p}`)
   },
 }
 
 const post = (content: string) =>
-  `curl -s -X POST http://localhost:3420/api/messages -H "Content-Type: application/json" -d '${JSON.stringify({ from: 'heartbeat', to: 'marveen', content })}'`
+  `curl -s -X POST http://localhost:3420/api/messages -H "Content-Type: application/json" -d '${JSON.stringify({ from: 'heartbeat', to: 'alfred', content })}'`
 
 const decide = (cmd: string) => gateDecision('Bash', { command: cmd }, deps)
 
@@ -48,7 +48,7 @@ describe('digest-provenance-gate: scope (legitimate traffic passes untouched)', 
     expect(gateDecision('Read', { file_path: '/x' }, deps).deny).toBe(false)
   })
   it('ignores Bash that does not touch /api/messages', () => {
-    expect(decide('sqlite3 store/claudeclaw.db "SELECT 1"').deny).toBe(false)
+    expect(decide('sqlite3 store/alfred.db "SELECT 1"').deny).toBe(false)
   })
   it('ignores a GET on /api/messages (status polling has no data flag)', () => {
     expect(decide('curl -s -H "Authorization: Bearer x" "http://localhost:3420/api/messages?agent=heartbeat"').deny).toBe(false)

@@ -4,7 +4,7 @@
      segment of its own, and the run was not addressed: no approval was asked. Also backtick, <(...), a glued $(...),
      a heredoc body or a comment with an apostrophe before the run (Revizor 4111 L1), `bash -c "..\\$(..).."` (L2).
   2  `python3 tool.py --to $(cat addr.txt)`       the address itself comes from a substitution, a variable or an
-     ANSI-C string: the gate cannot read it, so it is treated as an address (fail-closed, Marveen 4114); also an
+     ANSI-C string: the gate cannot read it, so it is treated as an address (fail-closed, Alfred 4114); also an
      argparse prefix (--bc) and eval.
 
 This file drives the real hook (email-approval-gate.py, the main agent's approval gate) as a subprocess at level 2
@@ -40,7 +40,7 @@ def make_install(td):
     os.makedirs(store)
     with open(os.path.join(store, "autonomy-config.json"), "w", encoding="utf-8") as fh:
         json.dump({"version": 1, "categories": [{"key": "email_send", "label": "Email", "level": 2, "locked": False}]}, fh)
-    con = sqlite3.connect(os.path.join(store, "claudeclaw.db"))
+    con = sqlite3.connect(os.path.join(store, "alfred.db"))
     con.execute("""CREATE TABLE approvals (id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, category TEXT NOT NULL,
         action_description TEXT NOT NULL, action_payload TEXT, status TEXT NOT NULL DEFAULT 'pending',
         timeout_at INTEGER, telegram_message_id INTEGER,
@@ -95,7 +95,7 @@ try:
         code, err = rc(cmd)
         check(f"{name} -> exit 2", code == 2, f"exit={code} err={err[:200]!r}")
 
-    print("== 2: a recipient value that is no literal counts as an address (fail-closed, Marveen 4114)")
+    print("== 2: a recipient value that is no literal counts as an address (fail-closed, Alfred 4114)")
     for name, cmd in (
         ("--to $(cat addr.txt)", f"{T} --to $(cat addr.txt)"),
         ("--to `cat addr.txt`", f"{T} --to `cat addr.txt`"),
@@ -120,7 +120,7 @@ try:
         code, err = rc(cmd)
         check(f"{name} -> exit 2", code == 2, f"exit={code} err={err[:200]!r}")
 
-    print("== KNOWN LIMIT (Marveen 4128, Revizor 4123 L4): eval \"$(cmd)\" is not stopped")
+    print("== KNOWN LIMIT (Alfred 4128, Revizor 4123 L4): eval \"$(cmd)\" is not stopped")
     # The line eval runs comes from a command the gate cannot evaluate. Stopping every such eval would stop
     # eval "$(pyenv init -)" and eval "$(ssh-agent -s)" too, so it passes by decision; this pins the decision, and a
     # change of it must change this test. A cost of the fail-closed rule above is stated here as well (Revizor 4123 L5):

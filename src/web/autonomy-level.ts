@@ -1,4 +1,4 @@
-// One autonomy category's level, for a SERVER-side gate (MARVEENGAPS1020 (a)).
+// One autonomy category's level, for a SERVER-side gate (ALFREDGAPS1020 (a)).
 //
 // The levels in store/autonomy-config.json (1 = only report, 2 = propose and
 // wait for approval, 3 = act and report) were until now read only by agent

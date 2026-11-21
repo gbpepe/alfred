@@ -19,7 +19,7 @@ const PROFILE_IDS = [
   'applier', 'sub-dev', 'default',
 ] as const
 
-const ctx = { HOME: '/Users/testuser', AGENT_DIR: '/Users/testuser/ClaudeClaw/agents/tester' }
+const ctx = { HOME: '/Users/testuser', AGENT_DIR: '/Users/testuser/Alfred/agents/tester' }
 
 describe('resolveProfilePlaceholders rule normalization', () => {
   it('rewrites a single-slash absolute Read rule to the // absolute form', () => {
@@ -29,7 +29,7 @@ describe('resolveProfilePlaceholders rule normalization', () => {
 
   it('rewrites Edit and Write rules the same way', () => {
     expect(resolveProfilePlaceholders('Edit(${AGENT_DIR}/**)', ctx))
-      .toBe('Edit(//Users/testuser/ClaudeClaw/agents/tester/**)')
+      .toBe('Edit(//Users/testuser/Alfred/agents/tester/**)')
     expect(resolveProfilePlaceholders('Write(/tmp/**)', ctx)).toBe('Write(//tmp/**)')
   })
 
@@ -89,8 +89,8 @@ describe('web-reading profile posture (TMPLPERM908)', () => {
     })
   }
 
-  // No template may hardcode THIS install's directory name. `${HOME}/marveen`
-  // only resolves for an install that happens to live in ~/marveen; everywhere
+  // No template may hardcode THIS install's directory name. `${HOME}/alfred`
+  // only resolves for an install that happens to live in ~/alfred; everywhere
   // else the rule silently matches nothing, which turns an allow into a missing
   // capability and a deny into no protection at all. `${PROJECT_ROOT}` is
   // substituted from the running install (profiles.ts), so it is correct by
@@ -106,7 +106,7 @@ describe('web-reading profile posture (TMPLPERM908)', () => {
     for (const id of PROFILE_IDS) {
       const p = loadProfileTemplate(id)
       for (const rule of [...p.filesystem.allow, ...p.filesystem.deny, ...(p.additionalDirectories ?? [])]) {
-        expect(rule).not.toContain('${HOME}/marveen')
+        expect(rule).not.toContain('${HOME}/alfred')
       }
     }
   })
@@ -130,7 +130,7 @@ describe('web-reading profile posture (TMPLPERM908)', () => {
   // needs. Each assertion pins one item of the PR #1357 fleet review
   // (2026-09-25): a general interpreter sidesteps the whole deny list; store/
   // holds the dashboard and fleet tokens; a raw dashboard POST is any write,
-  // not only memory and messaging (the agent-msg.sh / marveen-api.sh helpers
+  // not only memory and messaging (the agent-msg.sh / alfred-api.sh helpers
   // cover those; agent-mem.sh never existed, #2232); /mnt/... paths are one machine's layout, not the product's.
   it('researcher ships without the injection-exposed grants', () => {
     const p = loadProfileTemplate('researcher')
@@ -140,7 +140,7 @@ describe('web-reading profile posture (TMPLPERM908)', () => {
     expect(p.filesystem.allow.filter(r => /^Bash\(curl\b.*-X\s*POST/i.test(r))).toEqual([])
     expect(rules.filter(r => r.includes('/mnt/'))).toEqual([])
     // the product-needed grants stay
-    expect(p.filesystem.allow).toContain('Bash(bash ${PROJECT_ROOT}/scripts/marveen-api.sh:*)')
+    expect(p.filesystem.allow).toContain('Bash(bash ${PROJECT_ROOT}/scripts/alfred-api.sh:*)')
     expect(p.filesystem.allow).toContain('Bash(pdf2txt.py:*)')
     // The research-inbox write grant is the Edit rule: Write(path) is never consulted (PERMWRITERULE927).
     expect(p.filesystem.allow).toContain('Edit(${PROJECT_ROOT}/research-inbox/**)')

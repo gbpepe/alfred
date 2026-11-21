@@ -16,7 +16,11 @@ __pycache__/
 *~
 store/
 workspace/
-agents/
+workspaces/
+agents/*
+!agents/alfred-*/
+agents/alfred-*/*
+!agents/alfred-*/SOUL.md
 reports/
 # CLAUDEIGN820: '.claude/' (directory pattern) stopped traversal, so the
 # '!.claude/settings.json' negation never fired -- the tracked settings file
@@ -51,7 +55,7 @@ tmp.*
 CLAUDE.md
 
 # Agent persona / soul (per-operator personality; never ship upstream)
-SOUL.md
+/SOUL.md
 
 # Custom MCP servers and config (user-specific)
 mcp-servers/
@@ -66,7 +70,7 @@ SKOOL_*.md
 alkuszokatas_dashboard.md
 napindito-prompt.md
 scheduled-tasks.json
-claudeclaw.log
+alfred.log
 
 # Local backup archives from scripts/backup.sh
 backups/
@@ -99,7 +103,7 @@ scripts/support-mail/no-support-reply.html
 # secret -- never commit. Operator keeps this locally per install.
 # GITIGNENV820 same-class gap: exact-name-only patterns left their backup/copy
 # variants (name.bak, name.old, name.secret.bak) stageable. Glob the whole family.
-marveen-mail-ugyfelkod*
+alfred-mail-ugyfelkod*
 *.secret
 *.secret.*
 .mail-credentials*

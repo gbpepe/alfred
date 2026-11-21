@@ -1,4 +1,4 @@
-// CHANSTATEWRITE1104 (Marveen 69167, Samu 69174/69201): a sub-agent may not write a channel plugin's trust files
+// CHANSTATEWRITE1104 (Alfred 69167, Samu 69174/69201): a sub-agent may not write a channel plugin's trust files
 // (who is the owner or an allowed sender, what is paired or approved, which bot identity, an inbound message's
 // provenance) under any state root: the shared ~/.claude/channels, the install's .claude/channels and every
 // agents/<name>/.claude/channels, its own included. The decision functions only read paths; HOME points at a temp dir.

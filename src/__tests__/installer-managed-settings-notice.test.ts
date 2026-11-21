@@ -21,7 +21,7 @@ const LINUX = read('install-linux.sh')
 function t(lang: string, key: string): string {
   const r = spawnSync('bash', ['-c', `source "${join(ROOT, 'install-lang.sh')}"; _t ${key}`], {
     encoding: 'utf8',
-    env: { ...process.env, MARVEEN_LANG: lang },
+    env: { ...process.env, ALFRED_LANG: lang },
   })
   expect(r.status, r.stderr).toBe(0)
   return r.stdout.trim()
@@ -36,7 +36,7 @@ function helperOf(script: string): string {
 
 function runHelperTwice(script: string, lang: string): string {
   const body = `source "${join(ROOT, 'install-lang.sh')}"\nORANGE=''; NC=''\nset -e\n${helperOf(script)}\nmanaged_settings_notice\nmanaged_settings_notice\necho END`
-  const r = spawnSync('bash', ['-c', body], { encoding: 'utf8', env: { ...process.env, MARVEEN_LANG: lang } })
+  const r = spawnSync('bash', ['-c', body], { encoding: 'utf8', env: { ...process.env, ALFRED_LANG: lang } })
   expect(r.status, r.stderr).toBe(0)
   return r.stdout
 }

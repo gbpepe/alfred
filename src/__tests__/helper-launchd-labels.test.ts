@@ -1,8 +1,8 @@
-// #1873 (external report): the macOS helper installers wrote a FIXED com.marveen.<name>
+// #1873 (external report): the macOS helper installers wrote a FIXED com.alfred.<name>
 // launchd label while the main units are com.${SERVICE_ID}.*, so two installs under one
 // user shared one helper job, and the last installer to run took it over. The label now
 // keys off the install's own SERVICE_ID (scripts/launchd-label.sh), update.sh asks the
-// installer for it, and a renamed install retires ITS OWN legacy com.marveen.<name> job
+// installer for it, and a renamed install retires ITS OWN legacy com.alfred.<name> job
 // once -- never another install's.
 //
 // Every case runs real code: the installers' --print-label, the helper's migration with a
@@ -49,11 +49,11 @@ const legacyPlist = (label: string, workdir: string) =>
 
 describe('--print-label: com.<SERVICE_ID>.<name>, from the install .env (all four installers)', () => {
   const cases: Array<[string, string | null, (n: string) => string, boolean]> = [
-    ['no .env value: the default, unchanged', null, (n) => `com.marveen.${n}`, false],
+    ['no .env value: the default, unchanged', null, (n) => `com.alfred.${n}`, false],
     ['SERVICE_ID', 'SERVICE_ID=foo\n', (n) => `com.foo.${n}`, false],
     ['MAIN_AGENT_ID when SERVICE_ID is absent', 'MAIN_AGENT_ID=bar\n', (n) => `com.bar.${n}`, false],
     ['SERVICE_ID wins over MAIN_AGENT_ID, last line wins, quotes stripped', 'MAIN_AGENT_ID=bar\nSERVICE_ID=x\nSERVICE_ID="foo"\n', (n) => `com.foo.${n}`, false],
-    ['an id that is not a label part: the default, and a warning', 'SERVICE_ID=../evil\n', (n) => `com.marveen.${n}`, true],
+    ['an id that is not a label part: the default, and a warning', 'SERVICE_ID=../evil\n', (n) => `com.alfred.${n}`, true],
   ]
   for (const [installer, name] of Object.entries(HELPERS)) {
     for (const [label, env, want, warns] of cases) {
@@ -64,7 +64,7 @@ describe('--print-label: com.<SERVICE_ID>.<name>, from the install .env (all fou
           if (env !== null) writeFileSync(envFile, env)
           const r = bash([join(ROOT, 'scripts', `${installer}.sh`), '--print-label'], {
             HOME: d,
-            MARVEEN_ENV_FILE: env === null ? join(d, 'absent.env') : envFile,
+            ALFRED_ENV_FILE: env === null ? join(d, 'absent.env') : envFile,
           })
           expect(r.code).toBe(0)
           expect(r.out.trim()).toBe(want(name))
@@ -83,8 +83,8 @@ describe("retire_legacy_helper_label: only THIS install's legacy job", () => {
     const d = tmp()
     const agents = join(d, 'LaunchAgents')
     mkdirSync(agents, { recursive: true })
-    const legacy = join(agents, 'com.marveen.stuck-modal-guard.plist')
-    if (legacyWorkdir !== null) writeFileSync(legacy, legacyPlist('com.marveen.stuck-modal-guard', legacyWorkdir))
+    const legacy = join(agents, 'com.alfred.stuck-modal-guard.plist')
+    if (legacyWorkdir !== null) writeFileSync(legacy, legacyPlist('com.alfred.stuck-modal-guard', legacyWorkdir))
     const r = bash(
       ['-c', `set -euo pipefail; . "${join(ROOT, 'scripts', 'launchd-label.sh')}"; retire_legacy_helper_label "${project}" stuck-modal-guard "${newLabel}" "${agents}"`],
       { HOME: d, PATH: `${stubBin(d)}:${process.env.PATH}` },
@@ -99,10 +99,10 @@ describe("retire_legacy_helper_label: only THIS install's legacy job", () => {
     const { r, calls, kept } = run('/inst/A', 'com.foo.stuck-modal-guard', '/inst/A')
     expect(r.code).toBe(0)
     expect(kept).toBe(false)
-    expect(calls).toContain('com.marveen.stuck-modal-guard')
-    expect(r.out).toContain('com.marveen.stuck-modal-guard')
+    expect(calls).toContain('com.alfred.stuck-modal-guard')
+    expect(r.out).toContain('com.alfred.stuck-modal-guard')
   })
-  it("another install's com.marveen job is left alone (no unload, file kept)", () => {
+  it("another install's com.alfred job is left alone (no unload, file kept)", () => {
     const { r, calls, kept } = run('/inst/A', 'com.foo.stuck-modal-guard', '/inst/B')
     expect(r.code).toBe(0)
     expect(kept).toBe(true)
@@ -114,7 +114,7 @@ describe("retire_legacy_helper_label: only THIS install's legacy job", () => {
     expect(calls).toBe('')
   })
   it('a default install (the new label IS the legacy one) touches nothing', () => {
-    const { kept, calls } = run('/inst/A', 'com.marveen.stuck-modal-guard', '/inst/A')
+    const { kept, calls } = run('/inst/A', 'com.alfred.stuck-modal-guard', '/inst/A')
     expect(kept).toBe(true)
     expect(calls).toBe('')
   })
@@ -130,19 +130,19 @@ describe('a full installer run (keepalive probe, stubbed uname and launchctl)', 
     const d = tmp()
     const agents = join(d, 'home', 'Library', 'LaunchAgents')
     mkdirSync(agents, { recursive: true })
-    writeFileSync(join(agents, 'com.marveen.channel-keepalive-probe.plist'), legacyPlist('com.marveen.channel-keepalive-probe', legacyWorkdir))
+    writeFileSync(join(agents, 'com.alfred.channel-keepalive-probe.plist'), legacyPlist('com.alfred.channel-keepalive-probe', legacyWorkdir))
     writeFileSync(join(d, '.env'), 'SERVICE_ID=foo\n')
     const r = bash([join(ROOT, 'scripts', 'install-channel-keepalive-probe.sh')], {
       HOME: join(d, 'home'),
       PATH: `${stubBin(d, true)}:${process.env.PATH}`,
-      MARVEEN_ENV_FILE: join(d, '.env'),
+      ALFRED_ENV_FILE: join(d, '.env'),
     })
     const neu = join(agents, 'com.foo.channel-keepalive-probe.plist')
     const res = {
       r,
       newExists: existsSync(neu),
       newPlist: existsSync(neu) ? readFileSync(neu, 'utf-8') : '',
-      legacyKept: existsSync(join(agents, 'com.marveen.channel-keepalive-probe.plist')),
+      legacyKept: existsSync(join(agents, 'com.alfred.channel-keepalive-probe.plist')),
     }
     rmSync(d, { recursive: true, force: true })
     return res
@@ -174,7 +174,7 @@ describe("update.sh asks the installer for the label (real functions, stub insta
 
   // ISSUE1891 (#1891): the signal is the com.foo JOB being loaded (`launchctl list`),
   // not a plist on disk -- a plist whose job never ran must be retried.
-  it('keepalive: a loaded com.foo job is the "already installed" signal, a com.marveen one is not', () => {
+  it('keepalive: a loaded com.foo job is the "already installed" signal, a com.alfred one is not', () => {
     const d = tmp()
     try {
       const inst = join(d, 'install')
@@ -191,8 +191,8 @@ describe("update.sh asks the installer for the label (real functions, stub insta
       chmodSync(join(bin, 'launchctl'), 0o755)
       const env = { HOME: join(d, 'home'), PATH: `${bin}:${process.env.PATH}` }
       // only the legacy shared job is loaded (and its plist exists): this install has no job of its own -> install
-      writeFileSync(join(agents, 'com.marveen.channel-keepalive-probe.plist'), 'x')
-      writeFileSync(join(d, 'loaded-com.marveen.channel-keepalive-probe'), '')
+      writeFileSync(join(agents, 'com.alfred.channel-keepalive-probe.plist'), 'x')
+      writeFileSync(join(d, 'loaded-com.alfred.channel-keepalive-probe'), '')
       let r = bash(['-c', script], env)
       expect(r.code).toBe(0)
       expect(existsSync(join(d, 'inst.log'))).toBe(true)
@@ -213,7 +213,7 @@ describe("update.sh asks the installer for the label (real functions, stub insta
     }
   })
 
-  it('stuck-modal guard: launchctl is asked about com.foo.<name>, not com.marveen.<name>', () => {
+  it('stuck-modal guard: launchctl is asked about com.foo.<name>, not com.alfred.<name>', () => {
     const d = tmp()
     try {
       const inst = join(d, 'install')
@@ -238,10 +238,10 @@ describe("update.sh asks the installer for the label (real functions, stub insta
 })
 
 describe('the binding', () => {
-  it('no helper installer carries a fixed com.marveen label any more', () => {
+  it('no helper installer carries a fixed com.alfred label any more', () => {
     for (const installer of Object.keys(HELPERS)) {
       const src = readFileSync(join(ROOT, 'scripts', `${installer}.sh`), 'utf-8')
-      expect(src, installer).not.toMatch(/^LABEL="com\.marveen\./m)
+      expect(src, installer).not.toMatch(/^LABEL="com\.alfred\./m)
       expect(src, installer).toContain('. "$SCRIPT_DIR/launchd-label.sh"')
       // the legacy retirement runs before the new plist is written
       const retire = src.indexOf('retire_legacy_helper_label "$PROJECT_DIR"')
@@ -261,6 +261,6 @@ describe('the binding', () => {
     // which builds the label from the SERVICE_ID the call site passes.
     expect(mon).toContain('const label = `com.${serviceId}.channel-keepalive-probe`')
     expect(mon).toContain('keepaliveProducerRemedy(process.platform, SERVICE_ID,')
-    expect(mon).not.toContain('com.marveen.channel-keepalive-probe')
+    expect(mon).not.toContain('com.alfred.channel-keepalive-probe')
   })
 })

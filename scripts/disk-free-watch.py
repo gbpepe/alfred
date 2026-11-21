@@ -104,7 +104,7 @@ def send(text, root):
     try:
         token = open(os.path.join(root, "store", ".dashboard-token")).read().strip()
         # The main agent's self-notice form (CLAUDE.md, level 1): an unregistered sender id would be refused.
-        body = json.dumps({"from": "marveen", "to": "marveen", "content": "[DISKFREEWATCH1027] " + text}).encode("utf-8")
+        body = json.dumps({"from": "alfred", "to": "alfred", "content": "[DISKFREEWATCH1027] " + text}).encode("utf-8")
         req = urllib.request.Request("http://localhost:3420/api/messages", data=body, method="POST",
                                      headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
         with urllib.request.urlopen(req, timeout=30) as r:

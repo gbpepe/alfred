@@ -197,7 +197,7 @@ export async function tryHandleClaudePlansLogin(ctx: RouteContext): Promise<bool
       json(res, { error: 'Invalid plan: id (letters/digits/_.- only), label, planType (personal|team) and channelsAllowed (boolean) are required', code: 'invalid-plan' }, 400)
       return true
     }
-    // K1 (ROTSLACK1111): the final write (commitNewPlan) refuses a label with a line break or a control character.
+    // The final write (commitNewPlan) refuses a label with a line break or a control character.
     // Checked here too, on the raw value as POST /api/claude-plans does, so such a label is refused before the
     // browser login and not after it (Dani 75745, Samu 75749). The value is not echoed.
     if (typeof body.label === 'string' && breaksLine(body.label)) {

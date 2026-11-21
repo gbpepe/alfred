@@ -1,5 +1,5 @@
 // The kanban section of templates/CLAUDE.md.template tells the main agent which
-// fields of the done answer to read. scripts/marveen-api.sh exits 0 on every
+// fields of the done answer to read. scripts/alfred-api.sh exits 0 on every
 // HTTP 200, so these fields are the only signal of how a close went. Each field
 // the template names is produced here by the route, in the situation the
 // template describes, so the text cannot drift from what the answer carries.

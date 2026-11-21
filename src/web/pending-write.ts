@@ -6,7 +6,7 @@
 // already asked for it, so it is queued instead, and run at the next quiet
 // moment.
 //
-// NOT a poll: the Stop hook (marveen-commands.py --stop) reports the end of
+// NOT a poll: the Stop hook (alfred-commands.py --stop) reports the end of
 // every main-session turn, and the runner arms ONE attempt after the switch
 // quiet window. The gate's own sweep is the restart-survivor fallback.
 //

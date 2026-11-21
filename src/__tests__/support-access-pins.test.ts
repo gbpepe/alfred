@@ -35,11 +35,11 @@ describe('the shipped pins', () => {
     if (!check.ok) expect(['support_keys_unset', 'support_from_unset']).toContain(check.code)
   })
 
-  it('are the two ceremony keys: each fingerprint is the one of its own blob, the application is ssh:marveen-support', () => {
+  it('are the two ceremony keys: each fingerprint is the one of its own blob, the application is ssh:alfred-support', () => {
     expect(SUPPORT_KEYS.map((k) => k.name)).toEqual(['owner', 'eva'])
     for (const k of SUPPORT_KEYS) {
       expect(fingerprintOfBlob(k.pub), k.name).toBe(k.fingerprint)
-      expect(parseSkEd25519Blob(k.pub), k.name).toEqual({ ok: true, application: 'ssh:marveen-support' })
+      expect(parseSkEd25519Blob(k.pub), k.name).toEqual({ ok: true, application: 'ssh:alfred-support' })
     }
     // the keys alone are valid; what is still unset is the source address
     expect(validateSupportPins(SUPPORT_KEYS, TEST_ONLY_FROM)).toEqual({ ok: true })
@@ -63,7 +63,7 @@ describe('the shipped pins', () => {
 
 describe('parseSkEd25519Blob', () => {
   it('accepts an sk-ssh-ed25519 blob and returns its application', () => {
-    expect(parseSkEd25519Blob(TEST_ONLY_BLOB_1)).toEqual({ ok: true, application: 'ssh:marveen-support-test' })
+    expect(parseSkEd25519Blob(TEST_ONLY_BLOB_1)).toEqual({ ok: true, application: 'ssh:alfred-support-test' })
   })
 
   it('rejects a plain ssh-ed25519 blob', () => {

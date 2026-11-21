@@ -57,7 +57,7 @@ function deps(w: World, log: { probes: string[]; samples: string[]; warns: strin
   }
 }
 const emptyLog = () => ({ probes: [] as string[], samples: [] as string[], warns: [] as string[] })
-const baseState = (over: Partial<ClaudePlansState> = {}): ClaudePlansState => ({ activePlanByAgent: { marveen: 'm' }, plans: {}, ...over })
+const baseState = (over: Partial<ClaudePlansState> = {}): ClaudePlansState => ({ activePlanByAgent: { alfred: 'm' }, plans: {}, ...over })
 
 describe('pure rules', () => {
   it('the busy rule is the manual-restart gate\'s: every sample idle', () => {
@@ -85,10 +85,10 @@ describe('who is managed', () => {
   it('local, running sub-agents on a TOKEN plan only, in name order; never the main agent', () => {
     const plans = [tokenPlan('a'), tokenPlan('b'), dirPlan('team'), tokenPlan('m')]
     const w: World = { agents: {
-      marveen: { plan: 'm' }, zara: { plan: 'b' }, iris: { plan: 'a' }, devy: { plan: 'team' },
+      alfred: { plan: 'm' }, zara: { plan: 'b' }, iris: { plan: 'a' }, devy: { plan: 'team' },
       far: { plan: 'a', remote: true }, off: { plan: 'b', running: false }, none: { plan: null }, ghost: { plan: 'gone' },
     }, pct: {} }
-    expect(managedSubAgents(plans, 'marveen', deps(w, emptyLog())).map((x) => x.name)).toEqual(['iris', 'zara'])
+    expect(managedSubAgents(plans, 'alfred', deps(w, emptyLog())).map((x) => x.name)).toEqual(['iris', 'zara'])
   })
 })
 
@@ -98,15 +98,15 @@ describe('runSubAgentRotation', () => {
   it('a calm agent with a fresh, below-gate reading is not probed and prints nothing', async () => {
     const log = emptyLog()
     const state = baseState({ plans: { a: { observedAt: NOW - 60_000, source: 'probe', windows: { five_hour: { usedPercent: 40, resetsAt: resets } } } } })
-    const r = await runSubAgentRotation({ plans, state, mainAgentId: 'marveen', nowMs: NOW, deps: deps({ agents: { iris: { plan: 'a' } }, pct: {} }, log) })
+    const r = await runSubAgentRotation({ plans, state, mainAgentId: 'alfred', nowMs: NOW, deps: deps({ agents: { iris: { plan: 'a' } }, pct: {} }, log) })
     expect(log.probes).toEqual([])
     expect(r.lines).toEqual([])
   })
 
   it('over the shared threshold: SUBAGENT_ROTATE, never onto the main plan, another sub-agent\'s plan or its own', async () => {
     const log = emptyLog()
-    const w: World = { agents: { marveen: { plan: null }, iris: { plan: 'a' }, zara: { plan: 'b' } }, pct: { a: ROTATION_GATE.switchAtPercent + 3, b: 10, c: 50, m: 1 } }
-    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'marveen', nowMs: NOW, deps: deps(w, log) })
+    const w: World = { agents: { alfred: { plan: null }, iris: { plan: 'a' }, zara: { plan: 'b' } }, pct: { a: ROTATION_GATE.switchAtPercent + 3, b: 10, c: 50, m: 1 } }
+    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'alfred', nowMs: NOW, deps: deps(w, log) })
     const line = r.lines.find((l) => l.includes('agent=iris'))
     expect(line).toMatch(/^SUBAGENT_ROTATE agent=iris target=c /)
     expect(r.lines.every((l) => !l.startsWith('ROTATE '))).toBe(true)
@@ -115,7 +115,7 @@ describe('runSubAgentRotation', () => {
   it('two agents due in one tick never get the same target', async () => {
     const plans5 = [tokenPlan('m'), tokenPlan('a'), tokenPlan('b'), tokenPlan('c'), tokenPlan('d')]
     const w: World = { agents: { iris: { plan: 'a' }, zara: { plan: 'b' } }, pct: { a: 95, b: 95, c: 5, d: 30, m: 1 } }
-    const r = await runSubAgentRotation({ plans: plans5, state: baseState(), mainAgentId: 'marveen', nowMs: NOW, deps: deps(w, emptyLog()) })
+    const r = await runSubAgentRotation({ plans: plans5, state: baseState(), mainAgentId: 'alfred', nowMs: NOW, deps: deps(w, emptyLog()) })
     const targets = r.lines.map((l) => /target=(\S+)/.exec(l)?.[1])
     expect(targets).toHaveLength(2)
     expect(new Set(targets).size).toBe(2)
@@ -125,12 +125,12 @@ describe('runSubAgentRotation', () => {
     const w: World = { agents: { iris: { plan: 'a' } }, pct: { a: 93, c: 5 }, busy: { iris: true } }
     let state = baseState()
     for (let i = 1; i <= SUBAGENT_MAX_DEFERRALS; i++) {
-      const r = await runSubAgentRotation({ plans, state, mainAgentId: 'marveen', nowMs: NOW + i, deps: deps(w, emptyLog()) })
+      const r = await runSubAgentRotation({ plans, state, mainAgentId: 'alfred', nowMs: NOW + i, deps: deps(w, emptyLog()) })
       expect(r.lines).toEqual([])
       expect(r.state.subAgents?.iris?.deferrals).toBe(i)
       state = r.state
     }
-    const last = await runSubAgentRotation({ plans, state, mainAgentId: 'marveen', nowMs: NOW + 10, deps: deps(w, emptyLog()) })
+    const last = await runSubAgentRotation({ plans, state, mainAgentId: 'alfred', nowMs: NOW + 10, deps: deps(w, emptyLog()) })
     expect(last.lines[0]).toMatch(/^SUBAGENT_ROTATE agent=iris /)
     expect(last.state.subAgents?.iris).toBeUndefined()
   })
@@ -138,7 +138,7 @@ describe('runSubAgentRotation', () => {
   it('a spent window switches at once, without even sampling the pane', async () => {
     const log = emptyLog()
     const w: World = { agents: { iris: { plan: 'a' } }, pct: { a: 100, c: 5 }, busy: { iris: true } }
-    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'marveen', nowMs: NOW, deps: deps(w, log) })
+    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'alfred', nowMs: NOW, deps: deps(w, log) })
     expect(r.lines[0]).toMatch(/^SUBAGENT_ROTATE agent=iris /)
     expect(log.samples).toEqual([])
   })
@@ -146,19 +146,19 @@ describe('runSubAgentRotation', () => {
   it('NO_ALTERNATIVE is printed once per window, again in a new window', async () => {
     const two = [tokenPlan('m'), tokenPlan('a')] // nothing to switch to: m is the main agent's
     const w: World = { agents: { iris: { plan: 'a' } }, pct: { a: 95 } }
-    const first = await runSubAgentRotation({ plans: two, state: baseState(), mainAgentId: 'marveen', nowMs: NOW, deps: deps(w, emptyLog()) })
+    const first = await runSubAgentRotation({ plans: two, state: baseState(), mainAgentId: 'alfred', nowMs: NOW, deps: deps(w, emptyLog()) })
     expect(first.lines[0]).toMatch(/^SUBAGENT_NO_ALTERNATIVE agent=iris /)
-    const again = await runSubAgentRotation({ plans: two, state: first.state, mainAgentId: 'marveen', nowMs: NOW + 600_000, deps: deps(w, emptyLog()) })
+    const again = await runSubAgentRotation({ plans: two, state: first.state, mainAgentId: 'alfred', nowMs: NOW + 600_000, deps: deps(w, emptyLog()) })
     expect(again.lines).toEqual([])
     const moved = { ...first.state, subAgents: { iris: { deferrals: 0, notice: 'other-window' } } }
-    const next = await runSubAgentRotation({ plans: two, state: moved, mainAgentId: 'marveen', nowMs: NOW, deps: deps(w, emptyLog()) })
+    const next = await runSubAgentRotation({ plans: two, state: moved, mainAgentId: 'alfred', nowMs: NOW, deps: deps(w, emptyLog()) })
     expect(next.lines[0]).toMatch(/^SUBAGENT_NO_ALTERNATIVE /)
   })
 
   it('a missing token: no probe, no line, a diagnostic that names the plan only', async () => {
     const log = emptyLog()
     const w: World = { agents: { iris: { plan: 'a' } }, pct: { a: 99 }, tokens: { 'claude-plan-token-a': null } }
-    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'marveen', nowMs: NOW, deps: deps(w, log) })
+    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'alfred', nowMs: NOW, deps: deps(w, log) })
     expect(r.lines).toEqual([])
     expect(log.probes).toEqual([])
     expect(log.warns.join()).toContain('plan=a: token missing from vault')
@@ -166,14 +166,14 @@ describe('runSubAgentRotation', () => {
 
   it('fewer than 2 plans: nothing at all', async () => {
     const log = emptyLog()
-    const r = await runSubAgentRotation({ plans: [tokenPlan('a')], state: baseState(), mainAgentId: 'marveen', nowMs: NOW, deps: deps({ agents: { iris: { plan: 'a' } }, pct: { a: 99 } }, log) })
+    const r = await runSubAgentRotation({ plans: [tokenPlan('a')], state: baseState(), mainAgentId: 'alfred', nowMs: NOW, deps: deps({ agents: { iris: { plan: 'a' } }, pct: { a: 99 } }, log) })
     expect(r.lines).toEqual([]); expect(log.probes).toEqual([])
   })
 })
 
 describe('setSubAgentRecord (the state side-car)', () => {
   it('sets, replaces and clears one agent\'s bookkeeping; an empty record removes it; the last removal drops the key', () => {
-    let s: ClaudePlansState = { activePlanByAgent: { marveen: 'm' }, plans: {} }
+    let s: ClaudePlansState = { activePlanByAgent: { alfred: 'm' }, plans: {} }
     s = setSubAgentRecord(s, 'iris', { deferrals: 1 })
     s = setSubAgentRecord(s, 'zara', { deferrals: 0, notice: '5h:1:-' })
     expect(s.subAgents).toEqual({ iris: { deferrals: 1 }, zara: { deferrals: 0, notice: '5h:1:-' } })
@@ -181,7 +181,7 @@ describe('setSubAgentRecord (the state side-car)', () => {
     expect(s.subAgents).toEqual({ zara: { deferrals: 0, notice: '5h:1:-' } })
     s = setSubAgentRecord(s, 'zara', null)
     expect('subAgents' in s).toBe(false)
-    expect(s.activePlanByAgent).toEqual({ marveen: 'm' })
+    expect(s.activePlanByAgent).toEqual({ alfred: 'm' })
   })
 })
 
@@ -196,14 +196,14 @@ describe('a directory name that is not a valid agent name never reaches a line (
   ])('%j is skipped with a diagnostic, not managed, not printed', async (bad) => {
     const log = emptyLog()
     const w: World = { agents: { [bad]: { plan: 'a' }, zara: { plan: 'b' } }, pct: { a: 99, b: 99, c: 1, m: 1 } }
-    expect(managedSubAgents(plans, 'marveen', deps(w, log)).map((x) => x.name)).toEqual(['zara'])
-    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'marveen', nowMs: NOW, deps: deps(w, emptyLog()) })
+    expect(managedSubAgents(plans, 'alfred', deps(w, log)).map((x) => x.name)).toEqual(['zara'])
+    const r = await runSubAgentRotation({ plans, state: baseState(), mainAgentId: 'alfred', nowMs: NOW, deps: deps(w, emptyLog()) })
     expect(r.lines.every((l) => !l.includes(bad))).toBe(true)
     expect(r.lines.some((l) => l.includes('agent=zara'))).toBe(true)
     expect(log.warns.join()).toContain('not a valid agent name')
   })
   it('a valid name with a dot, a dash and an underscore stays managed', () => {
     const w: World = { agents: { 'qa.bot-2_x': { plan: 'a' } }, pct: {} }
-    expect(managedSubAgents(plans, 'marveen', deps(w, emptyLog())).map((x) => x.name)).toEqual(['qa.bot-2_x'])
+    expect(managedSubAgents(plans, 'alfred', deps(w, emptyLog())).map((x) => x.name)).toEqual(['qa.bot-2_x'])
   })
 })

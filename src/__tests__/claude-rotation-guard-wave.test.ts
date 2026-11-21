@@ -17,7 +17,7 @@ const settings = new Map<string, string>()
 
 vi.mock('../config.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../config.js')>()),
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
 }))
 vi.mock('../settings-store.js', () => ({
   getEffectiveSettingValue: (k: string) => settings.get(k) ?? (k === 'MAIN_AGENT_CONFIG_DIR' ? '' : '0'),
@@ -46,7 +46,7 @@ vi.mock('node:child_process', async (importOriginal) => ({
 }))
 const restarts: number[] = []
 vi.mock('../web/channel-monitor.js', () => ({
-  hardRestartMarveenChannels: () => { restarts.push(Date.now()); return { ok: true } },
+  hardRestartAlfredChannels: () => { restarts.push(Date.now()); return { ok: true } },
   restartMainForRotationContinue: async () => ({ ok: true, mode: 'continue' }),
 }))
 
@@ -70,7 +70,7 @@ beforeEach(() => {
   settings.set('CLAUDE_ROTATION_ENABLED', '1')
   settings.set('MAIN_AGENT_ISOLATED_CONFIG', '1')
   plans = [tokenPlan('a'), tokenPlan('b')]
-  state = { activePlanByAgent: { marveen: 'a' }, plans: {} }
+  state = { activePlanByAgent: { alfred: 'a' }, plans: {} }
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'log').mockImplementation(() => {})
 })

@@ -54,18 +54,18 @@ chmod +x "$TMPD/tmux"
 
 # The pane measured in the #1948 report: the command parked in the box, with
 # the session-title banner above and the footer below.
-PARKED=$'earlier output\n\n──────────── Marveen ─\n❯ /rename Marveen\n────────────────────\n  Sonnet 5 | ctx 11% | 7d 5%\n  ⏵⏵ bypass permissions on (shift+tab to cycle)'
+PARKED=$'earlier output\n\n──────────── Alfred ─\n❯ /rename Alfred\n────────────────────\n  Sonnet 5 | ctx 11% | 7d 5%\n  ⏵⏵ bypass permissions on (shift+tab to cycle)'
 # Submitted: the command is echoed in the transcript, the box is empty.
-DONE=$'❯ /rename Marveen\n  ⎿  Session renamed to: Marveen\n\n────────────────────\n❯ \n────────────────────\n  Sonnet 5 | ctx 11% | 7d 5%'
+DONE=$'❯ /rename Alfred\n  ⎿  Session renamed to: Alfred\n\n────────────────────\n❯ \n────────────────────\n  Sonnet 5 | ctx 11% | 7d 5%'
 # The prompt is drawn and the box is empty: ready to type.
-READY=$'──────────── Marveen ─\n────────────────────\n❯ \n────────────────────\n  footer'
+READY=$'──────────── Alfred ─\n────────────────────\n❯ \n────────────────────\n  footer'
 # Booting: the ready banner is out, the input prompt is not drawn yet
 # (the 2026-10-23 boot: text sent here parked for hours).
 BOOTING=$'Listening for messages from Telegram\n  loading...'
 # A session started with history: an earlier prompt is echoed, no box yet.
-HISTORY_BOOTING=$'❯ /rename Marveen\n  ⎿  Session renamed to: Marveen\nListening for messages from Telegram'
+HISTORY_BOOTING=$'❯ /rename Alfred\n  ⎿  Session renamed to: Alfred\nListening for messages from Telegram'
 # Someone else's text in the box: never the bot's own command.
-OTHER=$'────────────────────\n❯ /rename Marveen please not yet\n────────────────────\n  footer'
+OTHER=$'────────────────────\n❯ /rename Alfred please not yet\n────────────────────\n  footer'
 
 # run <frames...>: a fresh fake, the given captures, one main_rename_send.
 run() {
@@ -73,16 +73,16 @@ run() {
   export FAKE_LOG="$FAKE_DIR/log"; : > "$FAKE_LOG"
   local i=0 f
   for f in "$@"; do i=$((i + 1)); printf '%s\n' "$f" > "$FAKE_DIR/frame-$i"; done
-  MAIN_RENAME_RETRY_S=0 MAIN_RENAME_TYPE_S=0 MAIN_RENAME_POLL_S=0 main_rename_send "$TMPD/tmux" "=main-channels:" "Marveen" 2> "$FAKE_DIR/err"
+  MAIN_RENAME_RETRY_S=0 MAIN_RENAME_TYPE_S=0 MAIN_RENAME_POLL_S=0 main_rename_send "$TMPD/tmux" "=main-channels:" "Alfred" 2> "$FAKE_DIR/err"
   RC=$?
 }
 enters()  { grep -c '^send-keys -t =main-channels: Enter$' "$FAKE_LOG"; }
-texts()   { grep -c '^send-keys -t =main-channels: -l /rename Marveen$' "$FAKE_LOG"; }
-nonenter(){ grep '^send-keys' "$FAKE_LOG" | grep -v ' Enter$' | grep -vc ' -l /rename Marveen$'; }
+texts()   { grep -c '^send-keys -t =main-channels: -l /rename Alfred$' "$FAKE_LOG"; }
+nonenter(){ grep '^send-keys' "$FAKE_LOG" | grep -v ' Enter$' | grep -vc ' -l /rename Alfred$'; }
 
 echo "the box parser"
 echo "=============="
-eq "parked pane: the box holds the command"       "/rename Marveen" "$(main_rename_box_text "$PARKED")"
+eq "parked pane: the box holds the command"       "/rename Alfred" "$(main_rename_box_text "$PARKED")"
 eq "submitted pane: the echoed history line is not the box" "" "$(main_rename_box_text "$DONE")"
 eq "a bordered box is read too" "/rename Árvíztűrő" "$(main_rename_box_text $'│ ❯ /rename Árvíztűrő  │')"
 eq "...also under a C locale (no multi-byte damage)" "/rename Árvíztűrő" "$(LC_ALL=C main_rename_box_text $'│ ❯ /rename Árvíztűrő  │')"
@@ -94,7 +94,7 @@ run "$DONE"
 eq "the Enter lands: exit 0"                          "0" "$RC"
 eq "...text typed once, literally (-l)"               "1" "$(texts)"
 eq "...and exactly one Enter"                         "1" "$(enters)"
-eq "...and the text comes before the Enter"           "send-keys -t =main-channels: -l /rename Marveen" "$(grep '^send-keys' "$FAKE_LOG" | head -1)"
+eq "...and the text comes before the Enter"           "send-keys -t =main-channels: -l /rename Alfred" "$(grep '^send-keys' "$FAKE_LOG" | head -1)"
 
 run "$READY" "$PARKED" "$DONE"
 eq "the first Enter is lost: exit 0 after a retry"   "0" "$RC"
@@ -158,12 +158,12 @@ echo ""
 echo "a startup dialog on screen (#2389, 2026-10-31 crash loop)"
 echo "========================================================="
 # The 2.1.252+ panels: "No, exit" is the FIRST, highlighted row, so an Enter quits.
-TRUST=$'╭──────────────────────────────────────╮\n│ Accessing workspace:                 │\n│ /opt/marveen                         │\n│ Quick safety check: Is this a project│\n│ you created or one you trust?        │\n│ ❯ No, exit                           │\n│   Yes, I trust this folder           │\n│ Enter to confirm · Esc to cancel     │\n╰──────────────────────────────────────╯'
+TRUST=$'╭──────────────────────────────────────╮\n│ Accessing workspace:                 │\n│ /opt/alfred                         │\n│ Quick safety check: Is this a project│\n│ you created or one you trust?        │\n│ ❯ No, exit                           │\n│   Yes, I trust this folder           │\n│ Enter to confirm · Esc to cancel     │\n╰──────────────────────────────────────╯'
 TRUST_OLD=$'Do you trust the files in this folder?\n\n❯ No, exit\n  Yes, proceed\n\nEnter to confirm · Esc to exit'
 BYPASS=$'Bypass Permissions mode\n\n❯ No, exit\n  Yes, I accept\n\nEnter to confirm · Esc to exit'
 # The cursor on the LAST option with the border right below reads like a box to
 # main_rename_prompt_drawn alone (cursor line + rule): the dialog check must win.
-TRUST_BOXLIKE=$'│ Accessing workspace: /opt/marveen │\n│   No, exit                        │\n│ ❯ Yes, I trust this folder        │\n╰───────────────────────────────────╯'
+TRUST_BOXLIKE=$'│ Accessing workspace: /opt/alfred │\n│   No, exit                        │\n│ ❯ Yes, I trust this folder        │\n╰───────────────────────────────────╯'
 
 MAIN_RENAME_READY_TRIES=3 run "$TRUST"
 eq "trust dialog for the whole wait: 0 send-keys"     "0" "$(grep -c '^send-keys' "$FAKE_LOG")"

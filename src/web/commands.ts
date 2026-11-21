@@ -1,10 +1,10 @@
 // Command registry for the owner's slash commands (CMD920, ELSOKOR922 D-4).
 //
 // Every command the main session's command hook answers without a model turn
-// (scripts/hooks/marveen-commands.py -> POST /api/commands/dispatch) is
+// (scripts/hooks/alfred-commands.py -> POST /api/commands/dispatch) is
 // registered here with a
-// description and a `kind` (read | write). `/help` and the Telegram command
-// menu (`setMyCommands`) are GENERATED from this registry, so a new command
+// description and a `kind` (read | write). `/help` and the command
+// menu are GENERATED from this registry, so a new command
 // cannot silently miss the help text.
 //
 // One command name can carry several entries: a read entry (the fallback, no
@@ -19,13 +19,13 @@
 // touching this file's builtin list.
 
 export type CommandKind = 'read' | 'write'
-export type CommandChannel = 'telegram' | 'discord'
+export type CommandChannel = 'discord'
 
 export interface CommandContext {
   reply(text: string): Promise<void>
   ownerId: number
   now: number
-  /** The channel the command came from; unset = Telegram (every caller before Discord). /status shows its CSATORNA. */
+  /** The channel the command came from; defaults to Discord. /status shows its CSATORNA. */
   channel?: CommandChannel
 }
 
@@ -110,7 +110,7 @@ export function listInvalidCustomCommands(): readonly InvalidCustomCommand[] {
   return invalidCustom
 }
 
-export function hasCommand(name: string, channel: CommandChannel = 'telegram'): boolean {
+export function hasCommand(name: string, channel: CommandChannel = 'discord'): boolean {
   return entries.some(e => e.name === name && onChannel(e, channel))
 }
 
@@ -132,7 +132,7 @@ export function parseCommand(text: string): ParsedCommand | null {
 }
 
 // Pick the entry that should handle `args` for command `name`.
-export function resolveCommand(name: string, args: string[], channel: CommandChannel = 'telegram'): CommandSpec | null {
+export function resolveCommand(name: string, args: string[], channel: CommandChannel = 'discord'): CommandSpec | null {
   const forName = entries.filter(e => e.name === name && onChannel(e, channel))
   for (const e of forName) {
     if (e.matches && e.matches(args)) return e
@@ -149,7 +149,7 @@ export function isHelpRequest(args: string[]): boolean {
   return args.includes('?')
 }
 
-export function commandHelpText(name: string, channel: CommandChannel = 'telegram'): string | null {
+export function commandHelpText(name: string, channel: CommandChannel = 'discord'): string | null {
   const forName = entries.filter(e => e.name === name && onChannel(e, channel))
   if (forName.length === 0) return null
   const own = forName.find(e => e.help)
@@ -165,7 +165,7 @@ export type DispatchOutcome = 'ran' | 'planned' | 'unknown' | 'not-command' | 'e
 export async function dispatchCommand(text: string, ctx: CommandContext): Promise<DispatchOutcome> {
   const parsed = parseCommand(text)
   if (!parsed) return 'not-command'
-  const channel = ctx.channel ?? 'telegram'
+  const channel = ctx.channel ?? 'discord'
   if (isHelpRequest(parsed.args)) {
     const h = commandHelpText(parsed.name, channel)
     if (h !== null) {
@@ -197,7 +197,7 @@ function helpLine(e: CommandSpec): string {
 }
 
 // /help text, generated from the registry. Sections follow CMD920 3.2.
-export function renderHelp(channel: CommandChannel = 'telegram'): string {
+export function renderHelp(channel: CommandChannel = 'discord'): string {
   const here = entries.filter(e => onChannel(e, channel))
   const builtin = here.filter(e => e.source !== 'custom')
   const custom = here.filter(e => e.source === 'custom')
@@ -229,10 +229,10 @@ export interface BotCommand {
   description: string
 }
 
-// The Telegram command menu: one row per runnable top-level name. Planned-only
+// The channel command menu: one row per runnable top-level name. Planned-only
 // names are left out (the menu would offer a command that does nothing).
-// With channel 'discord' it is the list the Discord overlay registers as slash commands.
-export function botCommandList(channel: CommandChannel = 'telegram'): BotCommand[] {
+// Discord registers these as slash commands.
+export function botCommandList(channel: CommandChannel = 'discord'): BotCommand[] {
   const seen = new Set<string>()
   const out: BotCommand[] = []
   const here = entries.filter(e => onChannel(e, channel))
@@ -245,11 +245,11 @@ export function botCommandList(channel: CommandChannel = 'telegram'): BotCommand
   return out
 }
 
-// Split a reply into Telegram-sized chunks (4096 chars), preferring line
+// Split a reply into chat-sized chunks (4096 chars), preferring line
 // boundaries so a table row is not cut in half.
-export const TELEGRAM_MAX_TEXT = 4096
+export const CHANNEL_MAX_TEXT = 4096
 
-export function chunkText(text: string, max = TELEGRAM_MAX_TEXT): string[] {
+export function chunkText(text: string, max = CHANNEL_MAX_TEXT): string[] {
   if (text.length <= max) return [text]
   const chunks: string[] = []
   let rest = text

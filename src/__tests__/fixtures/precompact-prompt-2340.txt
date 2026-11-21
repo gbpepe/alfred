@@ -1,6 +1,6 @@
 A kontextus hamarosan tömörítődik. Három dolgot csinálj:
 
-A {{BOT_NAME}} /api/* hívásai EGY segéden mennek: bash {{PROJECT_ROOT}}/scripts/marveen-api.sh <ige> (az igék: bash {{PROJECT_ROOT}}/scripts/marveen-api.sh --help). A tokent a segéd maga olvassa, ezért nem kell sem nyers curl, sem parancs-behelyettesítés: szigorú profilon ezeket a Claude Code kérdés nélkül megtagadja. A szöveget a segéd CSAK fájlból veszi: előbb a Write eszközzel írd a munkamappádba, és a fájl útját add át. Szöveget soha ne tegyél a parancssorba.
+A {{BOT_NAME}} /api/* hívásai EGY segéden mennek: bash {{PROJECT_ROOT}}/scripts/alfred-api.sh <ige> (az igék: bash {{PROJECT_ROOT}}/scripts/alfred-api.sh --help). A tokent a segéd maga olvassa, ezért nem kell sem nyers curl, sem parancs-behelyettesítés: szigorú profilon ezeket a Claude Code kérdés nélkül megtagadja. A szöveget a segéd CSAK fájlból veszi: előbb a Write eszközzel írd a munkamappádba, és a fájl útját add át. Szöveget soha ne tegyél a parancssorba.
 
 ## 1. Memória mentés
 Nézd át az eddigi beszélgetést és mentsd el a fontos dolgokat.
@@ -9,12 +9,12 @@ FONTOS: Az agent_id-t a CLAUDE.md-ből derítsd ki (a fájl elején szerepel a n
 
 Használd a segédet (előtte a mentendő szöveget írd az api-payload.txt fájlba a munkamappádban):
 - Fontos döntések, preferenciák, tanulságok (category=warm):
-  bash {{PROJECT_ROOT}}/scripts/marveen-api.sh memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-payload.txt
+  bash {{PROJECT_ROOT}}/scripts/alfred-api.sh memory-save SAJAT_NEVED warm "kulcsszo1, kulcsszo2" api-payload.txt
 - Aktív feladatok, pending -> category=hot
 - Hosszútávú tanulság -> category=cold
 - Más agent-nek is -> category=shared
 - Napi napló bejegyzés:
-  bash {{PROJECT_ROOT}}/scripts/marveen-api.sh daily-log SAJAT_NEVED api-payload.txt
+  bash {{PROJECT_ROOT}}/scripts/alfred-api.sh daily-log SAJAT_NEVED api-payload.txt
 
 CSAK a tényleg fontos, nem nyilvánvaló dolgokat mentsd. Ne mentsd ami a kódból kiderül.
 
@@ -55,6 +55,6 @@ Ha ÉPP egy feladaton dolgozol (nem fejezted be), mentsd el strukturáltan, hogy
 Írd a rekordot JSON-ként az api-payload.json fájlba a munkamappádban:
 {"summary":"egy mondat mit csinálsz","doneSteps":["már kész lépés"],"alreadyDelegated":["mit kinek adtál már át"],"nextAction":"a következő konkrét lépés","pendingDecision":"nyitott döntés vagy blokkoló ha van"}
 majd:
-bash {{PROJECT_ROOT}}/scripts/marveen-api.sh taskstate-save SAJAT_NEVED api-payload.json
+bash {{PROJECT_ROOT}}/scripts/alfred-api.sh taskstate-save SAJAT_NEVED api-payload.json
 
 FONTOS: doneSteps = amit MÁR megcsináltál (NE ismételd), alreadyDelegated = amit MÁR átadtál másik agentnek (NE küldd újra), nextAction = a következő konkrét lépés. Ha NINCS aktív feladat (csak beszélgetés/idle), hagyd ki ezt a lépést teljesen -- ilyenkor nem kell rekord.

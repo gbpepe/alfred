@@ -311,7 +311,7 @@ export function createSshdProbeDeps(user: SshdProbeDeps['user'] = currentLoginUs
     user,
     interfaceAddresses: () =>
       Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((a) => ({ address: a.address, internal: a.internal }))),
-    makePrivateDir: () => mkdtempSync(join(tmpdir(), 'marveen-sshd-probe-')),
+    makePrivateDir: () => mkdtempSync(join(tmpdir(), 'alfred-sshd-probe-')),
     removeDir: (path) => {
       try {
         rmSync(path, { recursive: true, force: true })

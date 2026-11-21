@@ -235,7 +235,7 @@ describe('a refused heartbeat digest is reported to the main agent (Geri, #1684 
   })
 })
 
-// FORMAT PIN (Marveen, after Geri measured the old digest formats: 21 pre-09-11
+// FORMAT PIN (Alfred, after Geri measured the old digest formats: 21 pre-09-11
 // digests gave 0 recognised lines -- the gate would have skipped silently -- and
 // words like "etc" read as ids). The gate reads what the metrics renderer writes;
 // if the renderer's Kanban format drifts, THIS fails, not the gate in production.

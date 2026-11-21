@@ -17,7 +17,7 @@ import { sanitizeAgentName } from '../sanitize.js'
 import { agentGetsSecondReviewer } from '../agent-scaffold.js'
 import { fileServerApproval, categoryWindowSeconds, approvalWindowSeconds } from './approvals.js'
 import type { RouteContext } from './types.js'
-import type { ApprovalLang } from '../../approval-slack.js'
+import type { ApprovalLang } from '../approval-texts.js'
 
 export const SECOND_REVIEW_CATEGORY = 'second_review'
 export const SECOND_REVIEW_TIMEOUT_MS = 45_000

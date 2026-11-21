@@ -1,9 +1,9 @@
 /**
- * MARVEENLANG1763 (Szotasz/marveen#1763): the README's one-liner
+ * ALFREDLANG1763 (gbpepe/alfred#1763): the README's one-liner
  *   curl -fsSL .../main/install-linux.sh -o install.sh && bash install.sh
  * stopped at once on line 27, `source "$(dirname "$0")/install-lang.sh"`: a script
  * downloaded on its own has no install-lang.sh next to it. The Windows/WSL wrapper
- * (/tmp/marveen-install.sh) hit the same line.
+ * (/tmp/alfred-install.sh) hit the same line.
  *
  * What each part proves, on the REAL install-linux.sh: its exact prefix up to the
  * end of the language loader (the bytes a user runs), followed by an immediate
@@ -11,8 +11,8 @@
  * plays raw.githubusercontent.com and serves this checkout's install-lang.sh.
  * - From an EMPTY directory, the README's exact command shape (curl -o install.sh
  *   && bash install.sh), and the Windows/WSL wrapper's shape (downloaded into a
- *   tmp dir as marveen-install.sh, run from another cwd), get past the loader: the language works (hu and en),
- *   the file came from the ref in MARVEEN_REF (default main), the temp copy is
+ *   tmp dir as alfred-install.sh, run from another cwd), get past the loader: the language works (hu and en),
+ *   the file came from the ref in ALFRED_REF (default main), the temp copy is
  *   removed.
  * - With install-lang.sh next to the script (a checkout, the Bridge), it is
  *   sourced from there and nothing is downloaded: unchanged behaviour.
@@ -32,7 +32,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 const ROOT = process.cwd()
 const SCRIPT = readFileSync(join(ROOT, 'install-linux.sh'), 'utf8')
 const LANG = readFileSync(join(ROOT, 'install-lang.sh'), 'utf8')
-const END = '# end of the install-lang loader (MARVEENLANG1763)\n'
+const END = '# end of the install-lang loader (ALFREDLANG1763)\n'
 
 // The real script up to the end of the loader, then stop: what a user runs, minus
 // every install step.
@@ -81,14 +81,14 @@ const shells = (() => {
 })()
 
 async function readmeRun(shell: string, env: Record<string, string> = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'marveen-standalone-'))
-  const tmp = mkdtempSync(join(tmpdir(), 'marveen-tmpdir-'))
-  const ref = env.MARVEEN_REF || 'main'
+  const dir = mkdtempSync(join(tmpdir(), 'alfred-standalone-'))
+  const tmp = mkdtempSync(join(tmpdir(), 'alfred-tmpdir-'))
+  const ref = env.ALFRED_REF || 'main'
   // The README's command, pointed at the local server instead of raw.githubusercontent.com.
   const cmd = `curl -fsSL ${base}/${ref}/install-linux.sh -o install.sh && ${shell} install.sh`
   const r = await run(shell, ['-c', cmd], {
     cwd: dir,
-    env: { PATH: process.env.PATH || '', HOME: dir, TMPDIR: tmp, TERM: 'xterm-256color', MARVEEN_RAW_BASE: base, ...env },
+    env: { PATH: process.env.PATH || '', HOME: dir, TMPDIR: tmp, TERM: 'xterm-256color', ALFRED_RAW_BASE: base, ...env },
   })
   const leftovers = readdirSync(tmp)
   rmSync(dir, { recursive: true, force: true })
@@ -107,25 +107,25 @@ describe.each(shells)('install-linux.sh run on its own (%s)', (shell) => {
     expect(r.leftovers).toEqual([])
   })
 
-  it('English, and the language file comes from MARVEEN_REF', async () => {
+  it('English, and the language file comes from ALFRED_REF', async () => {
     mode = 'ok'; hits.length = 0
-    const r = await readmeRun(shell, { MARVEEN_LANG: 'en', MARVEEN_REF: 'feature-x' })
+    const r = await readmeRun(shell, { ALFRED_LANG: 'en', ALFRED_REF: 'feature-x' })
     expect(r.status).toBe(0)
     expect(r.stdout).toContain('LANG_OK:[1/7] Checking prerequisites...')
     expect(hits).toEqual(['/feature-x/install-linux.sh', '/feature-x/install-lang.sh'])
   })
 
-  it('the Windows/WSL wrapper shape (install-windows.ps1:107): downloaded into a tmp dir as marveen-install.sh and run from there', async () => {
+  it('the Windows/WSL wrapper shape (install-windows.ps1:107): downloaded into a tmp dir as alfred-install.sh and run from there', async () => {
     mode = 'ok'; hits.length = 0
     // stand-in for /tmp (never the real one), and a different cwd, as `wsl -- bash -c` has
-    const fakeTmp = mkdtempSync(join(tmpdir(), 'marveen-fake-slash-tmp-'))
-    const cwd = mkdtempSync(join(tmpdir(), 'marveen-wsl-cwd-'))
-    const lang = mkdtempSync(join(tmpdir(), 'marveen-tmpdir-'))
-    const target = join(fakeTmp, 'marveen-install.sh')
+    const fakeTmp = mkdtempSync(join(tmpdir(), 'alfred-fake-slash-tmp-'))
+    const cwd = mkdtempSync(join(tmpdir(), 'alfred-wsl-cwd-'))
+    const lang = mkdtempSync(join(tmpdir(), 'alfred-tmpdir-'))
+    const target = join(fakeTmp, 'alfred-install.sh')
     const cmd = `curl -fsSL ${base}/main/install-linux.sh -o ${target} && ${shell} ${target}`
     const r = await run(shell, ['-c', cmd], {
       cwd,
-      env: { PATH: process.env.PATH || '', HOME: cwd, TMPDIR: lang, TERM: 'xterm-256color', MARVEEN_RAW_BASE: base },
+      env: { PATH: process.env.PATH || '', HOME: cwd, TMPDIR: lang, TERM: 'xterm-256color', ALFRED_RAW_BASE: base },
     })
     const inFakeTmp = readdirSync(fakeTmp)
     const left = readdirSync(lang)
@@ -135,17 +135,17 @@ describe.each(shells)('install-linux.sh run on its own (%s)', (shell) => {
     expect(r.stdout).toContain('LANG_OK:[1/7] Előfeltételek ellenőrzése...')
     expect(hits).toEqual(['/main/install-linux.sh', '/main/install-lang.sh'])
     // nothing but the downloaded script next to it, and no temp copy left
-    expect(inFakeTmp).toEqual(['marveen-install.sh'])
+    expect(inFakeTmp).toEqual(['alfred-install.sh'])
     expect(left).toEqual([])
   })
 
   it('install-lang.sh next to the script (checkout, Bridge): sourced from there, nothing downloaded', async () => {
     mode = 'ok'; hits.length = 0
-    const dir = mkdtempSync(join(tmpdir(), 'marveen-checkout-'))
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-checkout-'))
     writeFileSync(join(dir, 'install-linux.sh'), PREFIX)
     writeFileSync(join(dir, 'install-lang.sh'), LANG)
     const r = await run(shell, [join(dir, 'install-linux.sh')], {
-      env: { PATH: process.env.PATH || '', HOME: dir, TERM: 'xterm-256color', MARVEEN_RAW_BASE: base },
+      env: { PATH: process.env.PATH || '', HOME: dir, TERM: 'xterm-256color', ALFRED_RAW_BASE: base },
     })
     rmSync(dir, { recursive: true, force: true })
     expect(r.status).toBe(0)
@@ -157,13 +157,13 @@ describe.each(shells)('install-linux.sh run on its own (%s)', (shell) => {
     hits.length = 0
     // the script itself is served; only the language file 404s
     mode = 'ok'
-    const dir = mkdtempSync(join(tmpdir(), 'marveen-standalone-'))
-    const tmp = mkdtempSync(join(tmpdir(), 'marveen-tmpdir-'))
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-standalone-'))
+    const tmp = mkdtempSync(join(tmpdir(), 'alfred-tmpdir-'))
     writeFileSync(join(dir, 'install.sh'), PREFIX)
     mode = '404'
     const r = await run(shell, ['install.sh'], {
       cwd: dir,
-      env: { PATH: process.env.PATH || '', HOME: dir, TMPDIR: tmp, TERM: 'xterm-256color', MARVEEN_RAW_BASE: base },
+      env: { PATH: process.env.PATH || '', HOME: dir, TMPDIR: tmp, TERM: 'xterm-256color', ALFRED_RAW_BASE: base },
     })
     const left = readdirSync(tmp)
     rmSync(dir, { recursive: true, force: true }); rmSync(tmp, { recursive: true, force: true })
@@ -172,19 +172,19 @@ describe.each(shells)('install-linux.sh run on its own (%s)', (shell) => {
     expect(r.stdout).not.toContain('LANG_OK')
     expect(r.stderr).toContain('Hiba: a telepito nyelvi fajlja (install-lang.sh) nem toltheto le')
     expect(r.stderr).toContain("Error: the installer's language file (install-lang.sh) could not be downloaded")
-    expect(r.stderr).toContain('git clone --branch main https://github.com/Szotasz/marveen.git')
+    expect(r.stderr).toContain('git clone --branch main https://github.com/gbpepe/alfred.git')
     expect(left).toEqual([])
   })
 
   it('a downloaded file that does not define _t is refused, not sourced', async () => {
     hits.length = 0
-    const dir = mkdtempSync(join(tmpdir(), 'marveen-standalone-'))
-    const tmp = mkdtempSync(join(tmpdir(), 'marveen-tmpdir-'))
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-standalone-'))
+    const tmp = mkdtempSync(join(tmpdir(), 'alfred-tmpdir-'))
     writeFileSync(join(dir, 'install.sh'), PREFIX)
     mode = 'garbage'
     const r = await run(shell, ['install.sh'], {
       cwd: dir,
-      env: { PATH: process.env.PATH || '', HOME: dir, TMPDIR: tmp, TERM: 'xterm-256color', MARVEEN_RAW_BASE: base },
+      env: { PATH: process.env.PATH || '', HOME: dir, TMPDIR: tmp, TERM: 'xterm-256color', ALFRED_RAW_BASE: base },
     })
     const left = readdirSync(tmp)
     rmSync(dir, { recursive: true, force: true }); rmSync(tmp, { recursive: true, force: true })
@@ -199,12 +199,12 @@ describe('pins', () => {
   it('the loader ends with its marker, once', () => {
     expect(SCRIPT.split(END).length - 1).toBe(1)
   })
-  it('exactly one Bridge derive anchor (marveen-bridge-installer HELPER_ANCHOR)', () => {
+  it('exactly one Bridge derive anchor (alfred-bridge-installer HELPER_ANCHOR)', () => {
     expect(SCRIPT.split('# shellcheck source=install-lang.sh').length - 1).toBe(1)
   })
   it('the self-reclone uses the same ref as the language file', () => {
-    expect(SCRIPT).toContain('MARVEEN_REF="${MARVEEN_REF:-main}"')
-    expect(SCRIPT).toContain('git clone --depth 1 --branch "$MARVEEN_REF" https://github.com/Szotasz/marveen.git "$TARGET_DIR"')
+    expect(SCRIPT).toContain('ALFRED_REF="${ALFRED_REF:-main}"')
+    expect(SCRIPT).toContain('git clone --depth 1 --branch "$ALFRED_REF" https://github.com/gbpepe/alfred.git "$TARGET_DIR"')
   })
   it('install-lang.sh defines _t at a line start (the marker the loader checks)', () => {
     expect(LANG).toMatch(/^_t\(\) \{/m)

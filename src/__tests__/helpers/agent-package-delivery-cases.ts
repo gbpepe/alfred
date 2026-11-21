@@ -132,7 +132,7 @@ export function makeDeliveryCases(): { keys: Jwk[]; signer: TestKeyPair; cases: 
     refused('payload slug differs from the requested one', d({ slug: 'other-agent' }), 2, 'slug_mismatch'),
     refused('version with a leading zero', d({ version: '1.02.0' }), 2, 'bad_payload'),
     refused('version with two parts', d({ version: '1.0' }), 2, 'bad_payload'),
-    refused('min_marveen_version malformed', d({ minMarveenVersion: 'v1.0.0' }), 2, 'bad_payload'),
+    refused('min_alfred_version malformed', d({ minAlfredVersion: 'v1.0.0' }), 2, 'bad_payload'),
     refused('files is not an array', tamper({ payload: (p) => ({ ...p, files: {} }) }), 2, 'bad_payload'),
     refused('a files entry without sha256', tamper({ payload: (p) => ({ ...p, files: filesOf(p).map(({ sha256: _s, ...f }) => f) }) }), 2, 'bad_payload'),
     refused('a files entry with an uppercase sha256', tamper({ payload: (p) => ({ ...p, files: filesOf(p).map((f) => ({ ...f, sha256: String(f.sha256).toUpperCase() })) }) }), 2, 'bad_payload'),

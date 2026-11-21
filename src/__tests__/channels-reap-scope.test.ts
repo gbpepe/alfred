@@ -77,7 +77,7 @@ describe('channels.sh second-pass orphan reap is scoped to the main agent', () =
 
   it('matches the slack plugin by its slack-channel cache dir', () => {
     expect(channelsSh).toMatch(/slack\) PLUGIN_SEG="\/slack-channel" ;;/)
-    const slackOrphan = '55503 ?? S 0:01 node CLAUDE_PLUGIN_ROOT=/Users/u/.claude/plugins/cache/marveen-marketplace/slack-channel/0.1.0 HOME=/Users/u'
+    const slackOrphan = '55503 ?? S 0:01 node CLAUDE_PLUGIN_ROOT=/Users/u/.claude/plugins/cache/alfred-marketplace/slack-channel/0.1.0 HOME=/Users/u'
     expect(runReapMatcher([slackOrphan, MAIN_ORPHAN_B], '/slack-channel')).toEqual(['55503'])
   })
 

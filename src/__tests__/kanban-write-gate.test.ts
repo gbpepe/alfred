@@ -24,22 +24,22 @@ const bash = (command: string) => gateDecision('Bash', { command })
 describe('kanban-write-gate gateDecision: SQL writes (known positives)', () => {
   it('denies a direct sqlite3 UPDATE of kanban_cards (the 14:43 incident shape)', () => {
     expect(
-      bash(`sqlite3 store/claudeclaw.db "UPDATE kanban_cards SET status='done', updated_at=unixepoch() WHERE id='KANBANCTXDEAD824'"`).deny
+      bash(`sqlite3 store/alfred.db "UPDATE kanban_cards SET status='done', updated_at=unixepoch() WHERE id='KANBANCTXDEAD824'"`).deny
     ).toBe(true)
   })
   it('denies INSERT INTO kanban_comments', () => {
     expect(
-      bash(`sqlite3 store/claudeclaw.db "INSERT INTO kanban_comments (card_id, author, content, created_at) VALUES ('X', 'heartbeat', 'auto-close', unixepoch())"`).deny
+      bash(`sqlite3 store/alfred.db "INSERT INTO kanban_comments (card_id, author, content, created_at) VALUES ('X', 'heartbeat', 'auto-close', unixepoch())"`).deny
     ).toBe(true)
   })
   it('denies heredoc SQL: the write verb sits on its own body line', () => {
     expect(
-      bash(`sqlite3 store/claudeclaw.db << 'EOF'\nUPDATE kanban_cards SET status='done' WHERE id='X';\nEOF`).deny
+      bash(`sqlite3 store/alfred.db << 'EOF'\nUPDATE kanban_cards SET status='done' WHERE id='X';\nEOF`).deny
     ).toBe(true)
   })
   it('denies a python-driven kanban write (no sqlite3 CLI token anywhere)', () => {
     expect(
-      bash(`python3 -c "import sqlite3; c=sqlite3.connect('store/claudeclaw.db'); c.execute('DELETE FROM kanban_cards WHERE id=?', ('X',)); c.commit()"`).deny
+      bash(`python3 -c "import sqlite3; c=sqlite3.connect('store/alfred.db'); c.execute('DELETE FROM kanban_cards WHERE id=?', ('X',)); c.commit()"`).deny
     ).toBe(true)
   })
   it('denies DROP/ALTER on kanban tables', () => {
@@ -64,7 +64,7 @@ describe('kanban-write-gate gateDecision: dashboard API writes', () => {
 describe('kanban-write-gate gateDecision: the worker duties that MUST pass', () => {
   it('allows sqlite3 SELECT over kanban tables (the measuring read)', () => {
     expect(
-      bash(`sqlite3 store/claudeclaw.db "SELECT id, status, substr(title,1,50) FROM kanban_cards WHERE archived_at IS NULL AND status IN ('in_progress','waiting')"`).deny
+      bash(`sqlite3 store/alfred.db "SELECT id, status, substr(title,1,50) FROM kanban_cards WHERE archived_at IS NULL AND status IN ('in_progress','waiting')"`).deny
     ).toBe(false)
   })
   it('allows the scaffolded GET of /api/kanban/heartbeat-summary', () => {
@@ -74,7 +74,7 @@ describe('kanban-write-gate gateDecision: the worker duties that MUST pass', () 
   })
   it('allows writes to NON-kanban tables (memories, daily log)', () => {
     expect(
-      bash(`sqlite3 store/claudeclaw.db "INSERT INTO memories (agent_id, content) VALUES ('heartbeat', 'x')"`).deny
+      bash(`sqlite3 store/alfred.db "INSERT INTO memories (agent_id, content) VALUES ('heartbeat', 'x')"`).deny
     ).toBe(false)
   })
   it('allows the report message even when its payload QUOTES SQL-looking text', () => {
@@ -82,7 +82,7 @@ describe('kanban-write-gate gateDecision: the worker duties that MUST pass', () 
     // CONTENT describes a proposed write. stripDataPayloads blanks the -d
     // literal, so describing a write is never treated as performing one.
     expect(
-      bash(`curl -s -X POST http://localhost:3420/api/messages -H "Content-Type: application/json" -d '{"from":"heartbeat","to":"marveen","content":"NYERSANYAG: X kartya | waiting | javasolt: UPDATE kanban_cards SET status=done | evidencia msg 123"}'`).deny
+      bash(`curl -s -X POST http://localhost:3420/api/messages -H "Content-Type: application/json" -d '{"from":"heartbeat","to":"alfred","content":"NYERSANYAG: X kartya | waiting | javasolt: UPDATE kanban_cards SET status=done | evidencia msg 123"}'`).deny
     ).toBe(false)
   })
   it('allows plain non-kanban commands', () => {
@@ -93,8 +93,8 @@ describe('kanban-write-gate gateDecision: the worker duties that MUST pass', () 
   })
 })
 
-describe('kanban-write-gate gateDecision: the marveen-api.sh kanban verbs (#2080)', () => {
-  // #2080 moved the kanban recipes onto scripts/marveen-api.sh: a write is now a verb of the helper,
+describe('kanban-write-gate gateDecision: the alfred-api.sh kanban verbs (#2080)', () => {
+  // #2080 moved the kanban recipes onto scripts/alfred-api.sh: a write is now a verb of the helper,
   // with no /api/kanban URL and no SQL on the command line, so neither rule above sees it. The helper
   // path -- or a bash / sh / python runner or a parameter expansion, since the path may sit in a variable --
   // followed by a write verb denies; the read verbs, the help and the report message pass.
@@ -104,51 +104,51 @@ describe('kanban-write-gate gateDecision: the marveen-api.sh kanban verbs (#2080
   }
   it('denies every write verb of the helper', () => {
     for (const command of [
-      'bash scripts/marveen-api.sh kanban-create heartbeat normal /tmp/title.txt',
-      'bash scripts/marveen-api.sh kanban-move abcd1234 done --evidence-file /tmp/ev.txt',
-      'bash scripts/marveen-api.sh kanban-claim abcd1234 heartbeat',
-      'bash scripts/marveen-api.sh kanban-release abcd1234 heartbeat',
-      'bash scripts/marveen-api.sh kanban-comment abcd1234 heartbeat /tmp/c.txt',
+      'bash scripts/alfred-api.sh kanban-create heartbeat normal /tmp/title.txt',
+      'bash scripts/alfred-api.sh kanban-move abcd1234 done --evidence-file /tmp/ev.txt',
+      'bash scripts/alfred-api.sh kanban-claim abcd1234 heartbeat',
+      'bash scripts/alfred-api.sh kanban-release abcd1234 heartbeat',
+      'bash scripts/alfred-api.sh kanban-comment abcd1234 heartbeat /tmp/c.txt',
     ]) denied(command)
   })
   it('denies the other spellings of the same call', () => {
     for (const command of [
-      'bash /home/marveen/marveen/scripts/marveen-api.sh kanban-move abcd1234 done',
-      "bash '/home/x y/marveen/scripts/marveen-api.sh' 'kanban-move' abcd1234 done",
-      'cd /home/marveen/marveen && MARVEEN_API_BASE=http://127.0.0.1:3420 bash scripts/marveen-api.sh kanban-comment abcd1234 heartbeat /tmp/c.txt',
-      'scripts/marveen-api.sh kanban-claim abcd1234 heartbeat',
-      'timeout 30 bash scripts/marveen-api.sh kanban-release abcd1234 heartbeat',
-      'python3 scripts/lib/marveen_api.py kanban-create heartbeat high /tmp/t.txt',
-      'H=scripts/marveen-api.sh; bash "$H" kanban-move abcd1234 done',
+      'bash /home/alfred/alfred/scripts/alfred-api.sh kanban-move abcd1234 done',
+      "bash '/home/x y/alfred/scripts/alfred-api.sh' 'kanban-move' abcd1234 done",
+      'cd /home/alfred/alfred && ALFRED_API_BASE=http://127.0.0.1:3420 bash scripts/alfred-api.sh kanban-comment abcd1234 heartbeat /tmp/c.txt',
+      'scripts/alfred-api.sh kanban-claim abcd1234 heartbeat',
+      'timeout 30 bash scripts/alfred-api.sh kanban-release abcd1234 heartbeat',
+      'python3 scripts/lib/alfred_api.py kanban-create heartbeat high /tmp/t.txt',
+      'H=scripts/alfred-api.sh; bash "$H" kanban-move abcd1234 done',
       // the shell joins what the quotes split, and a quoted space keeps NAME=value one word
-      'H=scripts/marveen-api.sh; bash "$H" kanban-"move" abcd1234 done',
-      "bash scripts/marveen-api.sh 'kanban'-move abcd1234 done",
-      "H=scripts/marveen-api.sh; X='a b' bash \"$H\" kanban-move abcd1234 done",
-      'H=scripts/marveen-api.sh; timeout 30 bash "$H" kanban-move abcd1234 done',
+      'H=scripts/alfred-api.sh; bash "$H" kanban-"move" abcd1234 done',
+      "bash scripts/alfred-api.sh 'kanban'-move abcd1234 done",
+      "H=scripts/alfred-api.sh; X='a b' bash \"$H\" kanban-move abcd1234 done",
+      'H=scripts/alfred-api.sh; timeout 30 bash "$H" kanban-move abcd1234 done',
       // the helper run straight from a variable: a parameter expansion is a runner, too
-      'H=scripts/marveen-api.sh; "$H" kanban-move abcd1234 done',
-      'H=scripts/marveen-api.sh; ${H} kanban-claim abcd1234 heartbeat',
-      'P=scripts/lib/marveen_api.py; python3.11 "$P" kanban-create heartbeat high /tmp/t.txt',
+      'H=scripts/alfred-api.sh; "$H" kanban-move abcd1234 done',
+      'H=scripts/alfred-api.sh; ${H} kanban-claim abcd1234 heartbeat',
+      'P=scripts/lib/alfred_api.py; python3.11 "$P" kanban-create heartbeat high /tmp/t.txt',
       // a backslash-newline is joined by the shell before it splits words
-      'bash scripts/marveen-api.sh kanban-mo\\\nve abcd1234 done',
+      'bash scripts/alfred-api.sh kanban-mo\\\nve abcd1234 done',
     ]) denied(command)
   })
   it('allows the read verbs, the help and the report message', () => {
     for (const command of [
-      'bash scripts/marveen-api.sh kanban-list',
-      'bash scripts/marveen-api.sh agents-list',
-      'bash scripts/marveen-api.sh --help',
-      'bash scripts/marveen-api.sh message heartbeat marveen /tmp/jelolt.txt',
-      "bash scripts/marveen-api.sh message heartbeat marveen - <<'EOF'\nabcd1234 | waiting | javasolt: kanban-move abcd1234 done | msg 123\nEOF",
-      'grep -n kanban-move scripts/lib/marveen_api.py',
+      'bash scripts/alfred-api.sh kanban-list',
+      'bash scripts/alfred-api.sh agents-list',
+      'bash scripts/alfred-api.sh --help',
+      'bash scripts/alfred-api.sh message heartbeat alfred /tmp/jelolt.txt',
+      "bash scripts/alfred-api.sh message heartbeat alfred - <<'EOF'\nabcd1234 | waiting | javasolt: kanban-move abcd1234 done | msg 123\nEOF",
+      'grep -n kanban-move scripts/lib/alfred_api.py',
     ]) expect({ command, deny: bash(command).deny }).toEqual({ command, deny: false })
   })
   // The word boundaries (maintainer mutants on #2080): the shell drops a backslash anywhere in a word, not only
   // before a newline; the runner and the verb count only as whole words.
   it('denies a verb with a backslash inside the word', () => {
     for (const command of [
-      'bash scripts/marveen-api.sh kanban-mo\\ve abcd1234 done',
-      'bash scripts/marveen-api.sh kanban\\-claim abcd1234 heartbeat',
+      'bash scripts/alfred-api.sh kanban-mo\\ve abcd1234 done',
+      'bash scripts/alfred-api.sh kanban\\-claim abcd1234 heartbeat',
     ]) denied(command)
   })
   it('allows a runner name inside a longer word: git push, git show, a path ending in .sh, $VAR/path', () => {
@@ -161,20 +161,20 @@ describe('kanban-write-gate gateDecision: the marveen-api.sh kanban verbs (#2080
   })
   it('allows a verb inside a longer word: a path, a file name, a plural', () => {
     for (const command of [
-      'bash scripts/marveen-api.sh message heartbeat marveen /tmp/kanban-move',
-      'bash scripts/marveen-api.sh message heartbeat marveen kanban-comment.txt',
-      'bash scripts/marveen-api.sh message heartbeat marveen kanban-moves',
+      'bash scripts/alfred-api.sh message heartbeat alfred /tmp/kanban-move',
+      'bash scripts/alfred-api.sh message heartbeat alfred kanban-comment.txt',
+      'bash scripts/alfred-api.sh message heartbeat alfred kanban-moves',
     ]) expect({ command, deny: bash(command).deny }).toEqual({ command, deny: false })
   })
   it('the hook process: deny-JSON for a helper write; empty output for kanban-list and for broken input; exit 0', () => {
     const gate = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'kanban-write-gate.mjs')
     const run = (input: string) => spawnSync(process.execPath, [gate], { input, encoding: 'utf-8' })
     const call = (command: string) => run(JSON.stringify({ tool_name: 'Bash', tool_input: { command } }))
-    const w = call('bash scripts/marveen-api.sh kanban-move abcd1234 done')
+    const w = call('bash scripts/alfred-api.sh kanban-move abcd1234 done')
     expect({ status: w.status, decision: JSON.parse(w.stdout).hookSpecificOutput.permissionDecision }).toEqual({ status: 0, decision: 'deny' })
-    const r = call('bash scripts/marveen-api.sh kanban-list')
+    const r = call('bash scripts/alfred-api.sh kanban-list')
     expect({ status: r.status, stdout: r.stdout }).toEqual({ status: 0, stdout: '' })
-    const c = call('bash scripts/marveen-api.sh kanban-mo\\\nve abcd1234 done')
+    const c = call('bash scripts/alfred-api.sh kanban-mo\\\nve abcd1234 done')
     expect({ status: c.status, decision: JSON.parse(c.stdout).hookSpecificOutput.permissionDecision }).toEqual({ status: 0, decision: 'deny' })
     const b = run('{not json')
     expect({ status: b.status, stdout: b.stdout }).toEqual({ status: 0, stdout: '' })

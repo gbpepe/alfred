@@ -94,7 +94,7 @@ describe('agent-msg.sh: the token and the message text are not on curl\'s argv',
   it('the server gets the token header and the body; the curl argv and env carry neither; nothing on disk', async () => {
     const tmp = mkdtempSync(join(dir, 'tmp-'))
     const r = await run(join(REPO, 'scripts', 'agent-msg.sh'), ['dani', 'samu', CONTENT], {
-      MARVEEN_API_BASE: `http://127.0.0.1:${port()}`, MARVEEN_TOKEN_FILE: tokenFile, TMPDIR: tmp,
+      ALFRED_API_BASE: `http://127.0.0.1:${port()}`, ALFRED_TOKEN_FILE: tokenFile, TMPDIR: tmp,
     })
     expect(r.code, r.out).toBe(0)
     expect(seen).toHaveLength(1)
@@ -111,7 +111,7 @@ describe('agent-msg.sh: the token and the message text are not on curl\'s argv',
   // so curl's environment carried the dashboard token.
   it('a TOKEN the caller exported does not carry the dashboard token into curl\'s environment', async () => {
     const r = await run(join(REPO, 'scripts', 'agent-msg.sh'), ['dani', 'samu', 'x'], {
-      MARVEEN_API_BASE: `http://127.0.0.1:${port()}`, MARVEEN_TOKEN_FILE: tokenFile, TOKEN: 'ambient-foreign-value',
+      ALFRED_API_BASE: `http://127.0.0.1:${port()}`, ALFRED_TOKEN_FILE: tokenFile, TOKEN: 'ambient-foreign-value',
     })
     expect(r.code, r.out).toBe(0)
     expect(seen[0].headers.authorization).toBe(`Bearer ${TOKEN}`)
@@ -124,7 +124,7 @@ describe('agent-msg.sh: the token and the message text are not on curl\'s argv',
     reply = '{"error":"x"}'
     const before = seen.length
     const r = await run(join(REPO, 'scripts', 'agent-msg.sh'), ['dani', 'samu', 'x'], {
-      MARVEEN_API_BASE: `http://127.0.0.1:${port()}`, MARVEEN_TOKEN_FILE: tokenFile,
+      ALFRED_API_BASE: `http://127.0.0.1:${port()}`, ALFRED_TOKEN_FILE: tokenFile,
     })
     reply = '{"id":1}'
     expect(r.code).not.toBe(0)
@@ -135,7 +135,7 @@ describe('agent-msg.sh: the token and the message text are not on curl\'s argv',
     const empty = join(mkdtempSync(join(dir, 'e-')), '.dashboard-token')
     writeFileSync(empty, '\n')
     const r = await run(join(REPO, 'scripts', 'agent-msg.sh'), ['dani', 'samu', 'x'], {
-      MARVEEN_API_BASE: `http://127.0.0.1:${port()}`, MARVEEN_TOKEN_FILE: empty,
+      ALFRED_API_BASE: `http://127.0.0.1:${port()}`, ALFRED_TOKEN_FILE: empty,
     })
     expect(r.code).not.toBe(0)
     expect(r.out).toMatch(/is empty; nothing was sent/)
@@ -154,7 +154,7 @@ describe('agent-msg-get.sh: the token is not on curl\'s argv', () => {
     writeFileSync(join(root, 'store', '.dashboard-token'), TOKEN + '\n')
     const tmp = mkdtempSync(join(dir, 'tmpg-'))
     reply = JSON.stringify({ id: 7, from_agent: 'dani', to_agent: 'samu', status: 'done', content: 'c', result: 'r' })
-    const r = await run(join(root, 'scripts', 'agent-msg-get.sh'), ['7'], { MARVEEN_WEB_PORT: String(port()), TMPDIR: tmp })
+    const r = await run(join(root, 'scripts', 'agent-msg-get.sh'), ['7'], { ALFRED_WEB_PORT: String(port()), TMPDIR: tmp })
     reply = '{"id":1}'
     expect(r.code, r.out).toBe(0)
     expect(r.out).toContain('# msg 7')
@@ -169,7 +169,7 @@ describe('agent-msg-get.sh: the token is not on curl\'s argv', () => {
     seen = []
     reply = JSON.stringify({ id: 7, from_agent: 'dani', to_agent: 'samu', status: 'done', content: 'c', result: 'r' })
     const r2 = await run(join(root, 'scripts', 'agent-msg-get.sh'), ['7'], {
-      MARVEEN_WEB_PORT: String(port()), TMPDIR: tmp, TOKEN: 'ambient-foreign-value',
+      ALFRED_WEB_PORT: String(port()), TMPDIR: tmp, TOKEN: 'ambient-foreign-value',
     })
     reply = '{"id":1}'
     expect(r2.code, r2.out).toBe(0)

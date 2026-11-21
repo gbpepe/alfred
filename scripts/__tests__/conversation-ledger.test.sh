@@ -15,12 +15,12 @@
 set -e
 
 # Every case derives the agent from the payload or the cwd, but ledger_lib
-# resolves MARVEEN_AGENT_ID BEFORE the cwd. An agent session exports it, so the
+# resolves ALFRED_AGENT_ID BEFORE the cwd. An agent session exports it, so the
 # suite run from inside one (e.g. a scheduled sync that types into an agent's
 # pane) attributed every cwd-derived row to that agent and failed 7 cases
-# (measured: 53/60 with MARVEEN_AGENT_ID=kigyo, 60/60 without). Same reasoning
+# (measured: 53/60 with ALFRED_AGENT_ID=kigyo, 60/60 without). Same reasoning
 # as pinning MAIN_AGENT_ID and OWNER_NAME in run_hook below.
-unset MARVEEN_AGENT_ID
+unset ALFRED_AGENT_ID
 
 PASS=0
 FAIL=0
@@ -64,16 +64,16 @@ assert_eq() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (expected '$2', 
 INSTALL_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOKS_DIR="$INSTALL_DIR/scripts/hooks"
 
-# ENVRELAXGATE1104: the hooks take their ledger DB (<install>/store/claudeclaw.db)
+# ENVRELAXGATE1104: the hooks take their ledger DB (<install>/store/alfred.db)
 # and the owner (the install's .env, settings overrides and channel dirs) only from
 # the install they live in, never from the environment. So every case has its own
 # tmp install: case_db makes it (scripts/ linked to this repo's) and names its DB;
 # run_hook links the case's owner install into it and runs the hook from there.
-case_db() { # name -> <tmp install>/store/claudeclaw.db
+case_db() { # name -> <tmp install>/store/alfred.db
     local inst="$TMPDIR_BASE/inst-$(printf '%s' "$1" | tr '/' '-')"
     mkdir -p "$inst/store"
     [ -e "$inst/scripts" ] || ln -s "$INSTALL_DIR/scripts" "$inst/scripts"
-    printf '%s\n' "$inst/store/claudeclaw.db"
+    printf '%s\n' "$inst/store/alfred.db"
 }
 inst_of() { dirname "$(dirname "$1")"; }
 link_owner() { # inst owner-install: the owner's files, re-pointed on every run
@@ -86,7 +86,7 @@ link_owner() { # inst owner-install: the owner's files, re-pointed on every run
 }
 
 # Run a hook with isolation env vars. MAIN_AGENT_ID is pinned so a payload with
-# no cwd resolves deterministically to agent 'marveen'. Extra env (e.g.
+# no cwd resolves deterministically to agent 'alfred'. Extra env (e.g.
 # LEDGER_CONTEXT_WINDOW=3) can be exported by the caller and is inherited.
 run_hook() {
     local hook="$1"
@@ -98,7 +98,7 @@ run_hook() {
     local inst
     inst="$(inst_of "$db")"
     link_owner "$inst" "${T_OWNER_INSTALL-$OWNER_INSTALL}"
-    LEDGER_OWNER_CHAT="10000000001" MAIN_AGENT_ID="marveen" \
+    LEDGER_OWNER_CHAT="10000000001" MAIN_AGENT_ID="alfred" \
         OWNER_NAME="Gyula" \
         TELEGRAM_STATE_DIR="${T_TELEGRAM_STATE_DIR-$STATE_BASE/telegram}" \
         DISCORD_STATE_DIR="${T_DISCORD_STATE_DIR-$STATE_BASE/discord}" \
@@ -108,19 +108,19 @@ run_hook() {
         python3 "$inst/scripts/hooks/$hook" "$@"
 }
 
-# Run the live-drain from cwd=<the case's install> so agent_id resolves to 'marveen'
+# Run the live-drain from cwd=<the case's install> so agent_id resolves to 'alfred'
 # (matching the capture/outbound rows). The drain's dedup statefile lands beside
 # the DB, inside the case's own install, so the cases stay isolated.
 run_drain() { # db
     ( cd "$(inst_of "$1")" && LEDGER_OWNER_CHAT="10000000001" \
-        MAIN_AGENT_ID="marveen" python3 "$(inst_of "$1")/scripts/hooks/ledger-live-drain.py" )
+        MAIN_AGENT_ID="alfred" python3 "$(inst_of "$1")/scripts/hooks/ledger-live-drain.py" )
 }
 
 # The task's scheduler preCheck, run through the shipped wrapper from a foreign
 # cwd: the wrapper itself must pin cwd to the install root.
 run_drain_precheck() { # db
     ( cd / && LEDGER_OWNER_CHAT="10000000001" \
-        MAIN_AGENT_ID="marveen" bash "$(inst_of "$1")/scripts/hooks/ledger-live-drain-precheck.sh" )
+        MAIN_AGENT_ID="alfred" bash "$(inst_of "$1")/scripts/hooks/ledger-live-drain-precheck.sh" )
 }
 
 # Age every row in a ledger DB backwards so an open question clears the grace window.
@@ -569,7 +569,7 @@ else
     fail "live drain: output missing question text"
 fi
 assert_eq "live drain: statefile records the surfaced message_id" "1122" \
-    "$(cat "$(dirname "$DB_LD1")/.ledger-drain-marveen" 2>/dev/null)"
+    "$(cat "$(dirname "$DB_LD1")/.ledger-drain-alfred" 2>/dev/null)"
 
 # (g2) same open question again -> dedup, no output
 OUT_G2="$(run_drain "$DB_LD1")"
@@ -603,7 +603,7 @@ emit_inbound 10000000001 1140 "Precheck utan is felszinre kell jonnie" | run_hoo
 age_rows "$DB_LD6" 120
 assert_eq "drain precheck: open question -> empty stdout (run the turn)" "" "$(run_drain_precheck "$DB_LD6")"
 assert_eq "drain precheck: never records the surfaced id" "" \
-    "$(cat "$TMPDIR_BASE/ld6/.ledger-drain-marveen" 2>/dev/null)"
+    "$(cat "$TMPDIR_BASE/ld6/.ledger-drain-alfred" 2>/dev/null)"
 if printf '%s' "$(run_drain "$DB_LD6")" | grep -q "message_id=1140"; then
     pass "drain precheck: the real drain still surfaces the question afterwards"
 else
@@ -991,7 +991,7 @@ python3 - "$(inst_of "$DB_R6")/scripts/hooks" <<'PYEOF'
 import sys
 sys.path.insert(0, sys.argv[1])
 import ledger_lib
-ledger_lib.log_inbound("marveen", "10000000001", "9006", "regi sor", "2026-11-01T08:00:00.000Z")
+ledger_lib.log_inbound("alfred", "10000000001", "9006", "regi sor", "2026-11-01T08:00:00.000Z")
 PYEOF
 CTX_R6="$(replay_ctx "$DB_R6" "$TMPDIR_BASE/r6.json")"
 if printf '%s' "$CTX_R6" | grep -q 'korábbi sor, a feladó ismeretlen: "regi sor"' && ! printf '%s' "$CTX_R6" | grep -q 'Gyula: "regi sor"'; then

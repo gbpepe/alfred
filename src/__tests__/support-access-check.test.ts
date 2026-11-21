@@ -15,7 +15,7 @@ describe('the reconcile\'s self-probe (Dani 32056 G1, G5, G6; Mira 78172, 78183)
     const seen: RedeemRequest[] = []
     await supportSelfProbe({ token: TOKEN, fingerprint: FP }, answering(200, '{}', seen))
     expect(seen).toHaveLength(1)
-    expect(seen[0]).toMatchObject({ origin: 'https://api.marveen.io', path: SUPPORT_ACCESS_CHECK_PATH, bearer: TOKEN, maxBodyBytes: 2048 })
+    expect(seen[0]).toMatchObject({ origin: 'https://api.alfred.io', path: SUPPORT_ACCESS_CHECK_PATH, bearer: TOKEN, maxBodyBytes: 2048 })
     expect(JSON.parse(seen[0].body)).toEqual({ key_fingerprint: FP, probe: true })
     expect(seen[0].body).not.toContain(TOKEN)
   })

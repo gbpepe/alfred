@@ -15,7 +15,7 @@ const settings = new Map<string, string>()
 
 vi.mock('../config.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../config.js')>()),
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
 }))
 vi.mock('../settings-store.js', () => ({
   // MAIN_AGENT_CONFIG_DIR is a string setting whose real default is ''; every
@@ -108,7 +108,7 @@ beforeEach(() => {
   probeMock.mockImplementation(async () => ({ ok: false as const, error: 'network' as const, message: 'mocked' }))
   usageCollectCalls = 0
   settings.clear()
-  state = { activePlanByAgent: { marveen: 'a' }, plans: {} }
+  state = { activePlanByAgent: { alfred: 'a' }, plans: {} }
   // Near a limit by default, so the gating tests below isolate their own rule.
   usageJson = activeUsage(IDLE_PROBE_GATE.fiveHourPercent)
   // Rotation on, main agent NOT isolated: the probe-wiring tests below then
@@ -180,7 +180,7 @@ describe('runRotateCheck -> idle-plan probe wiring', () => {
     // exhausted and c is nearly empty. Only a probe that ran BEFORE the
     // decision can make it pick c.
     state = {
-      activePlanByAgent: { marveen: 'a' },
+      activePlanByAgent: { alfred: 'a' },
       plans: { b: fiveHourObs(5), c: fiveHourObs(60) },
     } as ClaudePlansState
     const order: string[] = []
@@ -279,7 +279,7 @@ describe('runRotateCheck -> the active plan is read from the right account', () 
     rotationOn()
     plans = [tokenPlan('a'), tokenPlan('b')]
     state = {
-      activePlanByAgent: { marveen: 'a' },
+      activePlanByAgent: { alfred: 'a' },
       plans: { a: { ...fiveHourObs(10), lastProbe: { at: Date.now(), ok: true } } },
     } as ClaudePlansState
     probeReturns({ a: 10 })
@@ -359,7 +359,7 @@ describe('SUBPLANTOKEN1110: a token plan a sub-agent runs on is neither probed a
   it('without the reservation the emptiest plan b wins (the baseline)', async () => {
     rotationOn()
     plans = [tokenPlan('a'), tokenPlan('b'), tokenPlan('c')]
-    state = { activePlanByAgent: { marveen: 'a' }, plans: {} } as ClaudePlansState
+    state = { activePlanByAgent: { alfred: 'a' }, plans: {} } as ClaudePlansState
     probeReturns({ a: ROTATION_GATE.switchAtPercent + 5, b: 2, c: 40 })
     const logs = captureLogs()
     await runRotateCheck()
@@ -369,7 +369,7 @@ describe('SUBPLANTOKEN1110: a token plan a sub-agent runs on is neither probed a
   it('b reserved by a sub-agent: b is not probed, and the main agent rotates to c, not b', async () => {
     rotationOn()
     plans = [tokenPlan('a'), tokenPlan('b'), tokenPlan('c')]
-    state = { activePlanByAgent: { marveen: 'a' }, plans: {} } as ClaudePlansState
+    state = { activePlanByAgent: { alfred: 'a' }, plans: {} } as ClaudePlansState
     reserved = new Set(['b'])
     probeReturns({ a: ROTATION_GATE.switchAtPercent + 5, b: 2, c: 40 })
     const logs = captureLogs()
@@ -385,7 +385,7 @@ describe('SUBPLANTOKEN1110: a token plan a sub-agent runs on is neither probed a
   it('every other plan reserved: no ROTATE onto a sub-agent plan (NO_ALTERNATIVE)', async () => {
     rotationOn()
     plans = [tokenPlan('a'), tokenPlan('b')]
-    state = { activePlanByAgent: { marveen: 'a' }, plans: { b: fiveHourObs(1) } } as ClaudePlansState
+    state = { activePlanByAgent: { alfred: 'a' }, plans: { b: fiveHourObs(1) } } as ClaudePlansState
     reserved = new Set(['b'])
     probeReturns({ a: ROTATION_GATE.switchAtPercent + 5, b: 1 })
     const logs = captureLogs()
@@ -405,7 +405,7 @@ describe('SUBPLANTOKEN1110 2nd PR: the sub-agent stage in the tick', () => {
   it('its lines are printed BEFORE the main agent\'s ROTATE (which restarts the session reading them)', async () => {
     rotationOn()
     plans = [tokenPlan('a'), tokenPlan('b'), tokenPlan('c')]
-    state = { activePlanByAgent: { marveen: 'a' }, plans: {} } as ClaudePlansState
+    state = { activePlanByAgent: { alfred: 'a' }, plans: {} } as ClaudePlansState
     reserved = new Set(['b'])
     subStageLines = ['SUBAGENT_ROTATE agent=iris target=x targetLabel=x currentLabel=b currentPct=95 resetsInMin=10 trigger=5h']
     probeReturns({ a: ROTATION_GATE.switchAtPercent + 5, b: 2, c: 40 })
@@ -469,7 +469,7 @@ describe('rotateCheckOnce: the same lines as actions (PLANROTATEDEADLOCK1115 P1)
     const r = await bothWays(() => {
       rotationOn()
       plans = [tokenPlan('a'), tokenPlan('b'), tokenPlan('c')]
-      state = { activePlanByAgent: { marveen: 'a' }, plans: {} } as ClaudePlansState
+      state = { activePlanByAgent: { alfred: 'a' }, plans: {} } as ClaudePlansState
       reserved = new Set(['b'])
       subStageLines = ['SUBAGENT_ROTATE agent=iris target=x targetLabel=x currentLabel=b currentPct=95 resetsInMin=10 trigger=5h']
       probeReturns({ a: ROTATION_GATE.switchAtPercent + 5, b: 2, c: 40 })
@@ -478,7 +478,7 @@ describe('rotateCheckOnce: the same lines as actions (PLANROTATEDEADLOCK1115 P1)
     expect(r.lines).toEqual(r.printed)
     expect(r.streamed).toEqual(r.printed)
     expect(r.actions.map((a) => a.kind)).toEqual(['SUBAGENT_ROTATE', 'ROTATE'])
-    expect(r.actions[1].fields).toMatchObject({ agent: 'marveen', target: 'c' })
+    expect(r.actions[1].fields).toMatchObject({ agent: 'alfred', target: 'c' })
   })
 
   it('a quiet tick: no line printed, no action', async () => {
@@ -504,11 +504,11 @@ describe('rotateCheckOnce: the same lines as actions (PLANROTATEDEADLOCK1115 P1)
   })
 
   it('rotationActionFromLine: kind is the first word, fields the key=value pairs, line unchanged', () => {
-    const line = 'ROTATE agent=marveen target=b targetLabel=b currentLabel=a currentPct=97 resetsInMin=30 trigger=5h'
+    const line = 'ROTATE agent=alfred target=b targetLabel=b currentLabel=a currentPct=97 resetsInMin=30 trigger=5h'
     const a = rotationActionFromLine(line)
     expect(a.kind).toBe('ROTATE')
     expect(a.line).toBe(line)
-    expect(a.fields).toMatchObject({ agent: 'marveen', target: 'b', trigger: '5h', currentPct: '97' })
+    expect(a.fields).toMatchObject({ agent: 'alfred', target: 'b', trigger: '5h', currentPct: '97' })
   })
 })
 
@@ -520,7 +520,7 @@ describe('the active plan answers 429 (PLANROTATEDEADLOCK1115 P4)', () => {
       return { ok: true, httpStatus: 200, usage: { fiveHour: { usedPercent: 0, resetsAt: nowS() + 3600, status: 'allowed' }, sevenDay: null, overallStatus: null, representativeClaim: null } } as never
     })
   }
-  const setup = () => { rotationOn(); plans = [tokenPlan('a'), tokenPlan('b')]; state = { activePlanByAgent: { marveen: 'a' }, plans: {} } as ClaudePlansState }
+  const setup = () => { rotationOn(); plans = [tokenPlan('a'), tokenPlan('b')]; state = { activePlanByAgent: { alfred: 'a' }, plans: {} } as ClaudePlansState }
 
   it('a single header-less 429 with a short retry-after: no line (a burst), and it is marked for the next tick', async () => {
     setup(); active429({ retryAfterSec: 30 })
@@ -566,7 +566,7 @@ describe('rotation on, the main agent NOT isolated (Dani 79322)', () => {
     settings.set('CLAUDE_ROTATION_ENABLED', '1')
     settings.set('MAIN_AGENT_ISOLATED_CONFIG', '0')
     plans = [tokenPlan('a'), tokenPlan('b')]
-    state = { activePlanByAgent: { marveen: 'a' }, plans: {} } as ClaudePlansState
+    state = { activePlanByAgent: { alfred: 'a' }, plans: {} } as ClaudePlansState
     usageJson = activeUsage(100, 100)
     const actions = await rotateCheckOnce()
     expect(actions).toEqual([])

@@ -76,7 +76,7 @@ const USAGE_LIMIT_BANNER_REGION_LINES = 15
 // A rebase (2026-08-19) elott a ket ag KULON-KULON javitotta ezt a regexet, es a sajat aganak
 // `hit ... limit` resze epp a masik meresét (session) ejtette volna ki. Ezert unio, nem valasztas.
 //
-// ISSUE2817 (marveen#2817, measured on a customer install 2026-11-15/16): unanchored, this matched a scheduled
+// ISSUE2817 (alfred#2817, measured on a customer install 2026-11-15/16): unanchored, this matched a scheduled
 // task's own prompt that QUOTES the phrase ("... elfogy ('Usage limit reached' egy pane-ben) ..."): the failed
 // prompt stayed in the live region and the owner got an hourly "out of quota" notice while the real cause was a
 // revoked token. So the phrase must OPEN the line, the way EXTRA_USAGE_EXHAUSTED_RX is anchored: after indentation

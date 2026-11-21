@@ -71,7 +71,7 @@ export interface ClaudePlan {
   tokenSecretId?: string
   /** Personal subscription vs. company/team seat. */
   planType: ClaudePlanType
-  /** Whether external Channels (Telegram etc.) may run on this plan. Team
+  /** Whether external Channels (Discord etc.) may run on this plan. Team
    *  plans typically forbid it; the guardrail (PR3) reads this. */
   channelsAllowed: boolean
   /** Forward-compat drift-detection hints (PR3), unused in PR1. Optional so

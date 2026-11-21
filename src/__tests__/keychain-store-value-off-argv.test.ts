@@ -27,13 +27,13 @@ describe('keychainStore: the stored value is not in the security argument list',
     expect(c.args).toEqual(['-i'])
     expect(JSON.stringify(c.args)).not.toContain(value)
     expect(c.opts.stdio[0]).toBe('pipe')
-    expect(String(c.opts.input)).toBe(`add-generic-password -U -s com.marveen.vault -a master-key -w ${value} -A\n`)
+    expect(String(c.opts.input)).toBe(`add-generic-password -U -s com.alfred.vault -a master-key -w ${value} -A\n`)
     expect(c.opts.timeout).toBeGreaterThan(0)
   })
 
   it.each([
     ['a space', 'abc def'],
-    ['a newline (a second command)', 'abc\ndelete-generic-password -s com.marveen.vault -a master-key'],
+    ['a newline (a second command)', 'abc\ndelete-generic-password -s com.alfred.vault -a master-key'],
     ['a quote', 'abc"def'],
     ['empty', ''],
   ])('a value with %s is refused before any process starts', (_label, value) => {

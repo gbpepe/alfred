@@ -6,9 +6,9 @@
 set -euo pipefail
 # Prefer a toolkit dir that has BOTH _vtools.py AND a usable venv. The source
 # tree (scripts/voice) has _vtools.py but no venv -> fall back to the installed
-# toolkit at ~/.local/share/marveen-voice which carries the venv.
+# toolkit at ~/.local/share/alfred-voice which carries the venv.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INSTALL_DIR="${MARVEEN_VOICE_DIR:-$HOME/.local/share/marveen-voice}"
+INSTALL_DIR="${ALFRED_VOICE_DIR:-$HOME/.local/share/alfred-voice}"
 if [[ -f "$SCRIPT_DIR/_vtools.py" && -x "$SCRIPT_DIR/venv/bin/python" ]]; then
   DEST="$SCRIPT_DIR"
 else

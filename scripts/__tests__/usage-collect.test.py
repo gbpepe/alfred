@@ -1070,7 +1070,7 @@ class TestCodexSnapshotFreshness(unittest.TestCase):
             self.assertAlmostEqual(result["snapshot_age_hours"], 3.0, delta=0.2)
 
     def test_collect_codex_no_rate_limits_fails_closed_with_named_state(self):
-        # Regression guard (Marveen review of #1287): the edit that added the
+        # Regression guard (Alfred review of #1287): the edit that added the
         # timestamp capture must NOT drop the "no rate_limits entries" raise.
         # An empty/absent rate_limits payload must fail closed (ok False) with a
         # message that NAMES THE STATE ("rate_limits") -- so a later round sees
@@ -1153,13 +1153,13 @@ class TestCodexSnapshotFreshness(unittest.TestCase):
 class TestInstallZone(unittest.TestCase):
     """ISSUE1895 (#1895): reset stamps follow the install zone, not a fixed Europe/Budapest."""
 
-    def test_explicit_marveen_tz_wins(self):
-        with patch.dict(os.environ, {"MARVEEN_TZ": "Europe/London"}):
+    def test_explicit_alfred_tz_wins(self):
+        with patch.dict(os.environ, {"ALFRED_TZ": "Europe/London"}):
             self.assertEqual(str(uc._local_tz()), "Europe/London")
 
     def test_scheduler_tz_from_the_overrides_file(self):
         with tempfile.TemporaryDirectory() as d, patch.object(uc, "STORE_DIR", d), patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("MARVEEN_TZ", None)
+            os.environ.pop("ALFRED_TZ", None)
             with open(os.path.join(d, "config-overrides.json"), "w") as f:
                 json.dump({"SCHEDULER_TZ": "America/New_York"}, f)
             self.assertEqual(str(uc._local_tz()), "America/New_York")
@@ -1169,7 +1169,7 @@ class TestInstallZone(unittest.TestCase):
         # other side of a DST switch one hour off; a ZoneInfo keeps the rules.
         from zoneinfo import ZoneInfo
         with tempfile.TemporaryDirectory() as d, patch.object(uc, "STORE_DIR", d), patch.object(uc, "ENV_PATH", os.path.join(d, ".env")):
-            env = {k: v for k, v in os.environ.items() if k not in ("MARVEEN_TZ", "TZ")}
+            env = {k: v for k, v in os.environ.items() if k not in ("ALFRED_TZ", "TZ")}
             with patch.dict(os.environ, env, clear=True):
                 if "/zoneinfo/" not in os.path.realpath("/etc/localtime"):
                     self.skipTest("host has no named zone to fall back to")

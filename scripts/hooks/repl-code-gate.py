@@ -7,7 +7,7 @@ sealed vm. Measured on live probes, 2026-11-19 (card CODEMODEFLAG1119,
 comment 33384, Claude Code 2.1.326): code that uses require or import is
 refused by Claude Code as a whole block before any of it runs ("Nothing ran:
 import and require aren't available here"); fetch and process are undefined.
-typeof require is NOT a proof of the seal: on Marveen's run it returned
+typeof require is NOT a proof of the seal: on Alfred's run it returned
 "function", a decoy, while a call through it still did not run. The model
 reaches the outside only through the tool helpers, and each of those calls
 passes the fleet's own PreToolUse gates as an ordinary tool call.

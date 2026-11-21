@@ -30,7 +30,7 @@ function makeInstall(envValue: string | undefined, accessBody: unknown): string 
   const dir = mkdtempSync(join(tmpdir(), 'owner-chat-parity-'))
   dirs.push(dir)
   const envLine = envValue === undefined ? '' : `ALLOWED_CHAT_ID=${envValue}\n`
-  writeFileSync(join(dir, '.env'), `MAIN_AGENT_ID=marveen\n${envLine}`)
+  writeFileSync(join(dir, '.env'), `MAIN_AGENT_ID=alfred\n${envLine}`)
   if (accessBody !== undefined) {
     const chDir = join(dir, '.claude', 'channels', 'telegram')
     mkdirSync(chDir, { recursive: true })
@@ -172,7 +172,7 @@ describe('owner-chat parity on Teams: the plugin allowlist.json, never access.js
     const dir = mkdtempSync(join(tmpdir(), 'owner-chat-parity-teams-'))
     dirs.push(dir)
     const envLine = envValue === undefined ? '' : `TEAMS_ALLOWED_CONVERSATION_ID=${envValue}\n`
-    writeFileSync(join(dir, '.env'), `MAIN_AGENT_ID=marveen\nCHANNEL_PROVIDER=teams\n${envLine}`)
+    writeFileSync(join(dir, '.env'), `MAIN_AGENT_ID=alfred\nCHANNEL_PROVIDER=teams\n${envLine}`)
     const chDir = join(dir, '.claude', 'channels', 'teams')
     mkdirSync(chDir, { recursive: true })
     writeFileSync(join(chDir, '.env'), 'TEAMS_BOT_APP_ID=x\n')

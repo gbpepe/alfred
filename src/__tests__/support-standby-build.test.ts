@@ -57,7 +57,7 @@ describe('scripts/support-standby.mjs', () => {
         fromCidrs: TEST_ONLY_FROM,
         grantId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
         consentVersion: 1,
-        dispatchPath: '/home/marveen/.marveen/support-dispatch.sh',
+        dispatchPath: '/home/alfred/.alfred/support-dispatch.sh',
         sshd: { major: 9, minor: 6 },
       },
       {
@@ -65,7 +65,7 @@ describe('scripts/support-standby.mjs', () => {
         fromCidrs: [TEST_ONLY_FROM[0], TEST_ONLY_FROM_V6],
         grantId: '9b2e7c1a-5d44-4e0b-8f3a-6c1d2e3f4a5b',
         consentVersion: 9999,
-        dispatchPath: '/Users/admin/.marveen/support-dispatch.sh',
+        dispatchPath: '/Users/admin/.alfred/support-dispatch.sh',
         sshd: { major: 10, minor: 2 },
       },
     ]
@@ -82,7 +82,7 @@ describe('scripts/support-standby.mjs', () => {
       fromCidrs: ['203.0.113.0/24'],
       grantId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
       consentVersion: 1,
-      dispatchPath: '/home/marveen/.marveen/support-dispatch.sh',
+      dispatchPath: '/home/alfred/.alfred/support-dispatch.sh',
       sshd: { major: 9, minor: 6 },
     }
     expect(() => buildSupportGrantLines(bad)).toThrow()

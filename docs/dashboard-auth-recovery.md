@@ -40,12 +40,12 @@ A konténer képében nincs TypeScript-futtató, ezért ott az `npm run dashboar
 a CLI lefordítva a konténeren belül fut, `node`-dal, ugyanazokkal a parancsokkal:
 
 ```bash
-docker compose exec marveen node dist/dashboard-user-cli.js totp:off <felhasznalo>
-docker compose exec marveen node dist/dashboard-user-cli.js reset-password <felhasznalo>
-docker compose exec marveen node dist/dashboard-user-cli.js list
+docker compose exec alfred node dist/dashboard-user-cli.js totp:off <felhasznalo>
+docker compose exec alfred node dist/dashboard-user-cli.js reset-password <felhasznalo>
+docker compose exec alfred node dist/dashboard-user-cli.js list
 ```
 
-Hostingeren nincs saját compose-mappa: SSH-val lépj be, a konténer nevét a `docker ps` adja (`-marveen-1`-re végződik),
+Hostingeren nincs saját compose-mappa: SSH-val lépj be, a konténer nevét a `docker ps` adja (`-alfred-1`-re végződik),
 és ugyanez a parancs `docker exec -it <a-nev> node dist/dashboard-user-cli.js ...` alakban fut. A részletek a
 [docker.md "Locked out" szakaszában](docker.md#locked-out-lost-password-or-phone) vannak.
 
@@ -77,9 +77,9 @@ nyitható. Egy MÁR FELÉPÜLT ssh-alagút viszont a következő bontásig
 kapcsolatokat nem ellenőrzi újra. Ha azonnali vágás kell, állítsd le a Bridge
 appot az eszközön, vagy zárd le a szerveren az eszköz élő SSH-kapcsolatát.
 Ha az SSH-sor törlése hibára fut, a felület külön figyelmeztetést mutat --
-ilyenkor a sort kézzel töröld: a Marveent futtató user
+ilyenkor a sort kézzel töröld: a Alfredet futtató user
 `~/.ssh/authorized_keys` fájljából vedd ki az eszköz
-`marveen-remote:<install-id>` kommentű sorát. Az eszköz ettől nem "kizárt
+`alfred-remote:<install-id>` kommentű sorát. Az eszköz ettől nem "kizárt
 felhasználó": újra-párosítással (új kulcs-sor beillesztése) bármikor
 visszahozható. A `security:reset` a
 párosított kulcsokat is visszavonja, de az SSH-sorokat nem bántja -- azok a

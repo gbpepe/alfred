@@ -2,7 +2,7 @@
 // counts as a send (fail-closed), so a deeply wrapped NON-send is blocked too.
 // That is intended -- but the block must say WHY. Before, the copy gate told a
 // `nohup x9 git status` that "the letter could not be audited", which sends
-// the reader looking for a letter that does not exist (Marveen, #1522 review).
+// the reader looking for a letter that does not exist (Alfred, #1522 review).
 // These tests pin the reason on both gates, and that the ordinary reasons are
 // unchanged everywhere else.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
@@ -45,7 +45,7 @@ describe('copy gate: the depth-bound block names its own reason', () => {
   // Both reasons could be named here (a visible send AND a segment past the
   // bound): the VISIBLE send wins, in either order, so a refactor cannot flip
   // the precedence silently. And the mirror: a mixed command whose visible
-  // segment is NOT a send keeps the depth reason (Marveen, #1523 review).
+  // segment is NOT a send keeps the depth reason (Alfred, #1523 review).
   it('both reasons present: the VISIBLE send wins, in either segment order (Samu, #1523 review)', () => {
     for (const cmd of [`sendmail a@b.hu; ${wrap(9, 'true')}`, `${wrap(9, 'true')}; sendmail a@b.hu`]) {
       const r = copyGate(cmd)

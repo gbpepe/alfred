@@ -59,16 +59,16 @@ const FILES_2 = [
 
 const MANIFEST: KitManifest = {
   files: { 'support-standby.mjs': HASH_B, 'support-access': HASH_A },
-  installRoot: '/opt/marveen',
+  installRoot: '/opt/alfred',
   nodePath: '/usr/bin/node',
   nodeMin: 20,
   release: RELEASE,
 }
 const MANIFEST_TEXT =
-  'marveen-support-kit 1\n' +
+  'alfred-support-kit 1\n' +
   'file support-access ' + HASH_A + '\n' +
   'file support-standby.mjs ' + HASH_B + '\n' +
-  'install-root /opt/marveen\n' +
+  'install-root /opt/alfred\n' +
   'node /usr/bin/node\n' +
   'node-min 20\n' +
   'release ' + RELEASE + '\n'
@@ -78,7 +78,7 @@ describe('the kit manifest', () => {
     expect(formatKitManifest(MANIFEST)).toBe(MANIFEST_TEXT)
     expect(parseKitManifest(MANIFEST_TEXT)).toEqual({
       files: { 'support-access': HASH_A, 'support-standby.mjs': HASH_B },
-      installRoot: '/opt/marveen',
+      installRoot: '/opt/alfred',
       nodePath: '/usr/bin/node',
       nodeMin: 20,
       release: RELEASE,
@@ -92,7 +92,7 @@ describe('the kit manifest', () => {
       expect(() => formatKitManifest({ ...MANIFEST, nodePath })).toThrow()
     }
     // The install root keeps the narrow alphabet.
-    expect(() => formatKitManifest({ ...MANIFEST, installRoot: '/opt/marveen@1' })).toThrow()
+    expect(() => formatKitManifest({ ...MANIFEST, installRoot: '/opt/alfred@1' })).toThrow()
   })
 
   it.each<[string, Partial<KitManifest>]>([
@@ -104,9 +104,9 @@ describe('the kit manifest', () => {
     ['the manifest named as a file of itself', { files: { manifest: HASH_A } }],
     ['a hash in upper case', { files: { a: 'A'.repeat(64) } }],
     ['a hash that is too short', { files: { a: 'a'.repeat(63) } }],
-    ['an install root that is not absolute', { installRoot: 'opt/marveen' }],
-    ['an install root with a space', { installRoot: '/opt/my marveen' }],
-    ['an install root with a line break', { installRoot: '/opt/marveen\nnode /bin/evil' }],
+    ['an install root that is not absolute', { installRoot: 'opt/alfred' }],
+    ['an install root with a space', { installRoot: '/opt/my alfred' }],
+    ['an install root with a line break', { installRoot: '/opt/alfred\nnode /bin/evil' }],
     ['a node path with a quote', { nodePath: '/usr/bin/"node"' }],
     ['a node path that is not absolute', { nodePath: 'node' }],
     ['a release that is not a commit id', { release: 'v1.2.3' }],
@@ -124,12 +124,12 @@ describe('the kit manifest', () => {
   // What the manifest says decides which file is run: nothing but the exact format is one.
   it.each<[string, string]>([
     ['nothing', ''],
-    ['another header', MANIFEST_TEXT.replace('marveen-support-kit 1', 'marveen-support-kit 2')],
+    ['another header', MANIFEST_TEXT.replace('alfred-support-kit 1', 'alfred-support-kit 2')],
     ['no line end after the last line', MANIFEST_TEXT.slice(0, -1)],
     ['a blank line at the end', MANIFEST_TEXT + '\n'],
     ['a blank line in the middle', MANIFEST_TEXT.replace('install-root', '\ninstall-root')],
     ['CR LF line ends', MANIFEST_TEXT.replace(/\n/g, '\r\n')],
-    ['a missing install root', MANIFEST_TEXT.replace('install-root /opt/marveen\n', '')],
+    ['a missing install root', MANIFEST_TEXT.replace('install-root /opt/alfred\n', '')],
     ['a missing node path', MANIFEST_TEXT.replace('node /usr/bin/node\n', '')],
     ['a missing release', MANIFEST_TEXT.replace('release ' + RELEASE + '\n', '')],
     ['no file line', MANIFEST_TEXT.replace(/file [^\n]*\n/g, '')],
@@ -195,7 +195,7 @@ describe('the kit on disk', () => {
   beforeEach(() => {
     // realpath: the macOS temp folder is reached through a link, and the kit refuses a path it has to resolve.
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-kit-')))
-    supportDir = join(root, 'home', '.marveen', 'support')
+    supportDir = join(root, 'home', '.alfred', 'support')
     kitDir = join(supportDir, KIT_SUBFOLDER)
   })
   afterEach(() => {
@@ -205,7 +205,7 @@ describe('the kit on disk', () => {
   const opts = (over: Partial<WriteKitOptions> = {}): WriteKitOptions => ({
     supportDir,
     files: FILES_1,
-    installRoot: '/opt/marveen',
+    installRoot: '/opt/alfred',
     nodePath: '/usr/bin/node',
     nodeMin: 20,
     release: RELEASE,
@@ -241,7 +241,7 @@ describe('the kit on disk', () => {
           'support-dispatch.sh': DISPATCH_1.sha256,
           'support-standby.mjs': ROUTINE_1.sha256,
         },
-        installRoot: '/opt/marveen',
+        installRoot: '/opt/alfred',
         nodePath: '/usr/bin/node',
         nodeMin: 20,
         release: RELEASE,
@@ -294,7 +294,7 @@ describe('the kit on disk', () => {
       ['the same name twice', { files: [ROUTINE_1, ROUTINE_1] }],
       ['no file', { files: [] }],
       ['a stored hash that is not a hash', { files: [{ ...ROUTINE_1, sha256: 'zz' }] }],
-      ['an install root with a space', { installRoot: '/opt/my marveen' }],
+      ['an install root with a space', { installRoot: '/opt/my alfred' }],
       ['a node path that is not absolute', { nodePath: 'node' }],
       ['a release that is not a commit id', { release: 'latest' }],
     ])('refuses %s before anything is created', async (_label, over) => {
@@ -312,7 +312,7 @@ describe('the kit on disk', () => {
     it('REFUSES a support folder that is a link, and writes nothing through it', async () => {
       const elsewhere = join(root, 'elsewhere')
       mkdirSync(elsewhere)
-      mkdirSync(join(root, 'home', '.marveen'), { recursive: true })
+      mkdirSync(join(root, 'home', '.alfred'), { recursive: true })
       symlinkSync(elsewhere, supportDir)
       expect(await codeOf(() => writeKit(opts()))).toBe('kit_link')
       expect(readdirSync(elsewhere)).toEqual([])
@@ -440,7 +440,7 @@ describe('the kit on disk', () => {
 
     it('accepts the kit that was written, and ignores a file the manifest does not name', () => {
       writeFileSync(join(kitDir, '.DS_Store'), 'x')
-      expect(verifyKit({ supportDir })).toMatchObject({ ok: true, kitDir, manifest: { installRoot: '/opt/marveen' } })
+      expect(verifyKit({ supportDir })).toMatchObject({ ok: true, kitDir, manifest: { installRoot: '/opt/alfred' } })
     })
 
     it('accepts the same kit through another spelling of the folder', () => {
@@ -497,7 +497,7 @@ describe('the kit on disk', () => {
     it('says the manifest is unreadable when it is gone, garbled, a link or names nothing', () => {
       const manifestPath = join(kitDir, KIT_MANIFEST_NAME)
       const good = readFileSync(manifestPath, 'utf8')
-      writeFileSync(manifestPath, good.replace('marveen-support-kit 1', 'something else'))
+      writeFileSync(manifestPath, good.replace('alfred-support-kit 1', 'something else'))
       expect(verifyKit({ supportDir })).toMatchObject({ ok: false, problem: 'kit_manifest_unreadable' })
       writeFileSync(manifestPath, good.slice(0, 40))
       expect(verifyKit({ supportDir })).toMatchObject({ ok: false, problem: 'kit_manifest_unreadable' })

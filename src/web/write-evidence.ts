@@ -6,12 +6,11 @@
 // defaulting to true). An agent that simply leaves them out could run a write
 // as the main session, on the owner's chat -- whose id is not a secret.
 //
-// A write therefore runs only when the Telegram message it came in is on
+// A write therefore runs only when the inbound channel message it came in is on
 // record in the channel plugin's own inbound log: the owner's chat, the same
 // message id, the same text, recent, and not used before. The log is written
-// by the plugin process itself (scripts/patch-telegram-plugin.py, the `evid`
-// patch), just before it hands the message to Claude Code -- the one place
-// only a real Telegram update reaches. The prompt text is NOT evidence:
+// by the plugin process itself, just before it hands the message to Claude Code
+// -- the one place only a real channel update reaches. The prompt text is NOT evidence:
 // anything typed into the session pane (an agent message delivered there, or
 // cmd-sim.py) can carry a <channel> block, and conversation_log is captured
 // from exactly that text.
@@ -72,7 +71,7 @@ export function findEvidence(lines: string[], chatId: string, messageId: string)
 }
 
 /** The plugin's log, current file after the rotated one; [] when absent. */
-export function readEvidenceLines(stateDir: string = channelStateDir('telegram')): string[] {
+export function readEvidenceLines(stateDir: string = channelStateDir('discord')): string[] {
   const out: string[] = []
   for (const f of [`${EVIDENCE_FILE}.1`, EVIDENCE_FILE]) {
     try { out.push(...readFileSync(join(stateDir, f), 'utf-8').split('\n')) } catch { /* absent */ }
@@ -102,4 +101,4 @@ export const WRITE_EVIDENCE_REPLY = (name: string, reason: EvidenceRefusal): str
     ? `/${name}: ez az üzenet már túl régi ahhoz, hogy most lefusson. Ha még kell, küldd el újra.`
     : reason === 'already-used'
       ? `/${name}: ez az üzenet egyszer már lefutott, másodszor nem futtatom (already-used). Ha még kell, küldd el újra.`
-      : `/${name}: nem futtatom, mert nem találom a Telegram-üzenetet, amiből jött (${reason}). Ha te küldted, küldd el újra.`
+      : `/${name}: nem futtatom, mert nem találom a csatorna-üzenetet, amiből jött (${reason}). Ha te küldted, küldd el újra.`

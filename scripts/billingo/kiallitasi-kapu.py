@@ -18,8 +18,8 @@ irreversible at NAV. An unknown message class therefore falls to REPORT: the
 gate fails closed.
 
 The prefixes come from the writers on origin/main (2026-10-13):
-  aiam  supabase/functions/stripe-webhook/index.ts  (booking issuance, Marveen issuance)
-  mio   supabase/functions/_shared/invoice-issuance.ts (Marveen issuance, old webhook only)
+  aiam  supabase/functions/stripe-webhook/index.ts  (booking issuance, Alfred issuance)
+  mio   supabase/functions/_shared/invoice-issuance.ts (Alfred issuance, old webhook only)
 
 Usage:
   scripts/supabase-q.sh <ref> "<section-1 SQL>" --output-format json > rows.json
@@ -32,7 +32,7 @@ import re
 import sys
 
 OLD_ISSUANCE_PREFIXES = (
-    'Marveen Billingo issuance failed (queued for retry):',
+    'Alfred Billingo issuance failed (queued for retry):',
     'Failed to create/get Billingo partner',
     'Failed to create Billingo document:',
     'Billingo exception:',
@@ -43,7 +43,7 @@ OLD_ISSUANCE_PREFIXES = (
 # them in section 3, or the message itself demands a manual procedure).
 MANUAL_PREFIXES = (
     'Malformed billing tax number',      # manual NAV lookup + billingo-nav-reissue
-    'Orphan Marveen Payment Link',        # no billing data: section 3 FLAG
+    'Orphan Alfred Payment Link',        # no billing data: section 3 FLAG
 )
 
 PAYMENT_ID_PREFIXES = ('pi_', 'cs_')  # cs_: rows keyed on the Checkout session (NULLCLAIM905)
@@ -125,7 +125,7 @@ def gate(rows):
 FIXTURE = [
     # the only shape that may be issued
     {'id': 'ok-booking', 'stripe_payment_id': 'pi_old1', 'error_message': 'Failed to create Billingo document: 422', 'context': {}},
-    {'id': 'ok-marveen', 'stripe_payment_id': 'cs_old2', 'error_message': 'Marveen Billingo issuance failed (queued for retry): timeout', 'context': {'amount': 95250}},
+    {'id': 'ok-alfred', 'stripe_payment_id': 'cs_old2', 'error_message': 'Alfred Billingo issuance failed (queued for retry): timeout', 'context': {'amount': 95250}},
     # old issuance class but no payment id
     {'id': 'no-pi', 'stripe_payment_id': None, 'error_message': 'Billingo exception: boom', 'context': {}},
     # refund rows of the OLD path carry a payment id -- still not an issuance gap
@@ -138,14 +138,14 @@ FIXTURE = [
     {'id': 'fn-with-pi', 'stripe_payment_id': 'pi_x', 'error_message': 'Billingo exception: y', 'context': {'fn': 'something'}},
     {'id': 'licence', 'stripe_payment_id': None, 'error_message': 'Inline license issue failed for session cs_1: x', 'context': {'session_id': 'cs_1'}},
     # manual old-path classes
-    {'id': 'orphan', 'stripe_payment_id': 'pi_orph', 'error_message': 'Orphan Marveen Payment Link checkout - no billing_info, kézi számlát kell kiállítani', 'context': {}},
+    {'id': 'orphan', 'stripe_payment_id': 'pi_orph', 'error_message': 'Orphan Alfred Payment Link checkout - no billing_info, kézi számlát kell kiállítani', 'context': {}},
     {'id': 'malformed', 'stripe_payment_id': 'pi_mal', 'error_message': 'Malformed billing tax number "1" (expected 11-digit HU format', 'context': {}},
     # odd payment id
     {'id': 'odd-pi', 'stripe_payment_id': 'ch_123', 'error_message': 'Billingo exception: z', 'context': {}},
     # context as a JSON string (PostgREST/CLI may hand it over that way)
     {'id': 'ctx-string', 'stripe_payment_id': 'pi_s', 'error_message': 'Billingo exception: z', 'context': '{"fn": "trial-extension-notice"}'},
 ]
-EXPECTED_ELIGIBLE = {'ok-booking', 'ok-marveen'}
+EXPECTED_ELIGIBLE = {'ok-booking', 'ok-alfred'}
 # Each REPORT row must be stopped by ITS OWN rule, not by a neighbouring one:
 # a check that is shadowed by another would otherwise be untested.
 EXPECTED_REASON = {

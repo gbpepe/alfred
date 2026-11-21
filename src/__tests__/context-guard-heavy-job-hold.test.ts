@@ -28,7 +28,7 @@ const HOLDS = join(STORE, 'context-guard-heavy-holds.json')
 
 vi.mock('../config.js', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
-  MAIN_AGENT_ID: 'marveen',
+  MAIN_AGENT_ID: 'alfred',
   PROJECT_ROOT: ROOT,
 }))
 
@@ -109,9 +109,9 @@ vi.mock('../web/system-directive.js', async () => {
   return { sendSystemDirective: (...a: unknown[]) => h.sendSystemDirective(...a) }
 })
 vi.mock('../web/channel-monitor.js', () => ({
-  hardRestartMarveenChannels: () => ({ ok: true }),
+  hardRestartAlfredChannels: () => ({ ok: true }),
   lastMainRespawnAt: () => null,
-  MARVEEN_POST_RESPAWN_GRACE_MS: 0,
+  ALFRED_POST_RESPAWN_GRACE_MS: 0,
   markAgentRestartPending: () => {},
 }))
 vi.mock('../web/stuck-tool-call-watcher.js', () => ({ shouldDeferForRecentRespawn: () => false }))
@@ -130,7 +130,7 @@ vi.mock('../web/active-model.js', () => ({
   readTranscriptTailFromProjectDir: () => null,
   readLastTurnActivityMs: () => null,
 }))
-vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'marveen-channels' }))
+vi.mock('../web/main-agent.js', () => ({ MAIN_CHANNELS_SESSION: 'alfred-channels' }))
 vi.mock('../notify.js', async () => {
   const { vi } = await import('vitest')
   h.notifyChannel = vi.fn(async () => h.notifyOk)
@@ -606,7 +606,7 @@ describe('unreadable /proc is never "no job" or "killed"', () => {
 
 describe('main agent: the alert counts only when the channel took it', () => {
   it('a failed operator send is logged as a failed alert', async () => {
-    writeFileSync(CONFIG, JSON.stringify({ marveen: { enabled: true, limitTokens: 100_000, heavyJobDeferMaxMinutes: 0 } }))
+    writeFileSync(CONFIG, JSON.stringify({ alfred: { enabled: true, limitTokens: 100_000, heavyJobDeferMaxMinutes: 0 } }))
     h.tokens = 99_000
     job(5001, 'main-job')
     h.notifyOk = false
@@ -624,7 +624,7 @@ describe('main agent: the alert counts only when the channel took it', () => {
 
 describe('main agent: a notifyChannel that does not report delivery', () => {
   it('a void result (a build whose notifyChannel resolves undefined) counts as sent', async () => {
-    writeFileSync(CONFIG, JSON.stringify({ marveen: { enabled: true, limitTokens: 100_000, heavyJobDeferMaxMinutes: 0 } }))
+    writeFileSync(CONFIG, JSON.stringify({ alfred: { enabled: true, limitTokens: 100_000, heavyJobDeferMaxMinutes: 0 } }))
     h.tokens = 99_000
     job(5001, 'main-job')
     h.notifyOk = undefined

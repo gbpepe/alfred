@@ -125,7 +125,7 @@ def query(pat: str, ref: str, sql: str, start: str, end: str, legacy: bool = Fal
         headers={
             "Authorization": "Bearer " + pat,
             # The Management API rejects the default python User-Agent (403).
-            "User-Agent": "claudeclaw-supabase-logs/1.0",
+            "User-Agent": "alfred-supabase-logs/1.0",
         },
         method="GET",
     )

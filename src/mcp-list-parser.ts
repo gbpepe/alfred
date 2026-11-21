@@ -3,7 +3,7 @@
 // The CLI prints one line per registered MCP server, shaped like:
 //
 //   claude.ai Gmail: https://gmailmcp.googleapis.com/mcp/v1 - Connected
-//   plugin:telegram:telegram: bun run --cwd /path ... - Connected
+//   plugin:discord:discord: bun run --cwd /path ... - Connected
 //   my-local-server: node /path/to/server.js - ! Needs authentication
 //
 // The name portion carries a source prefix that the dashboard's
@@ -80,8 +80,8 @@ export function catalogMatchesConfigured(
 function classifyName(raw: string): { source: McpListSource; normalizedId: string } {
   const trimmed = raw.trim()
   // "plugin:<package>:<name>" -- the trailing segment is the actual
-  // MCP id as it appears in enabledPlugins. `plugin:telegram:telegram`
-  // collapses to `telegram`; `plugin:foo-bar:my-server` collapses to
+  // MCP id as it appears in enabledPlugins. `plugin:discord:discord`
+  // collapses to `discord`; `plugin:foo-bar:my-server` collapses to
   // `my-server`. If the input is malformed and has fewer than three
   // segments, fall back to the last segment we do have.
   if (trimmed.toLowerCase().startsWith('plugin:')) {
@@ -112,7 +112,7 @@ export function parseMcpListLine(line: string): McpListEntry | null {
   if (trimmed.startsWith('Checking')) return null
 
   // Shape: "<name>: <endpoint> - <status>". The name itself can contain
-  // colons (e.g. "plugin:telegram:telegram"), so anchor on the first
+  // colons (e.g. "plugin:discord:discord"), so anchor on the first
   // ": " (colon + space) rather than the first ":" alone -- that
   // separator is stable because the CLI always prints one space after
   // the name's terminating colon. The endpoint may contain URL colons

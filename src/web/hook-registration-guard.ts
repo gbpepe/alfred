@@ -23,8 +23,8 @@ import { logger } from '../logger.js'
 //      entries (not our script names, not worktree-pathed) are never touched.
 
 // Hook script filenames this app registers into settings.json files
-// (templates/settings.json.template, ensureAgentStalenessHook, the
-// PreToolUse gates, and the telegram/slack-progress watchdog installers).
+// (templates/settings.json.template, ensureAgentStalenessHook, and the
+// PreToolUse gates).
 // Used to decide whether a missing-file hook entry is OURS (prunable) or
 // foreign (kept).
 export const KNOWN_HOOK_SCRIPTS: readonly string[] = [
@@ -35,30 +35,10 @@ export const KNOWN_HOOK_SCRIPTS: readonly string[] = [
   'email-send-gate.mjs',
   'self-pace-gate.mjs',
   'db-write-gate.mjs',
-  'mxd-path-gate.mjs',
-  'telegram_progress.py',
-  'telegram_progress_clear.py',
-  'telegram_progress_watchdog.py',
-  // The Slack counterpart: the three settings hooks are repo-shipped in
-  // .claude/settings.json (#1305); the watchdog comes from
-  // scripts/install-slack-progress-hook.sh.
-  'slack_progress.py',
-  'slack_progress_clear.py',
-  'slack_progress_reply_clear.py',
-  'slack_progress_watchdog.py',
-  // PELENKAGCHAT1113: one script on two events (UserPromptSubmit records the
-  // inbound's thread, PreToolUse judges the Google Chat reply), in both the
-  // project settings and the sub-agent template.
-  'googlechat-thread-guard.py',
   'inbox-drain.py',
   'channel-inbox-drain.py',
   'ledger-capture.py',
-  // The Telegram sub-agent reply fix trio (telegram-subagent-reply-fix.py):
-  // without these here a stale entry survives every boot while its
-  // ledger-capture sibling is pruned (KNOWNTRIO924, review 2026-09-24).
   'ledger-outbound.py',
-  'telegram-reply-guard.py',
-  'telegram-reply-directive.py',
   'skill-usage-capture.py',
   'tool-log-capture.py',
   'memory-frontmatter-gate.py',
@@ -109,7 +89,7 @@ export function isWorktreeRoot(
 // Temp-dir prefixes that mark a checkout as transient. A plain `git clone` under
 // a temp dir (NOT a git worktree, so isWorktreeRoot misses it) is exactly the
 // canary / second-instance case: 2026-07-13 a develop canary started from
-// /private/tmp/marveen-work registered hooks into the USER-GLOBAL settings.json
+// /private/tmp/alfred-work registered hooks into the USER-GLOBAL settings.json
 // with /tmp-rooted paths -- the same deaf-agent trap isWorktreeRoot was added to
 // prevent, one class wider. A real install never runs from a temp dir, so
 // skipping here can never suppress a legitimate owner's registration.
@@ -161,7 +141,7 @@ export function shouldRegisterHooks(opts: {
 // The opt-in for a second instance that runs the background services on purpose (Samu 64702, 64709):
 // read from the PROCESS environment, where WEB_ONLY is read (src/web.ts; there is no dotenv, so neither
 // of the two has any effect in the instance's .env file), and logged at start when it is on.
-export const ALLOW_SECOND_INSTANCE_SERVICES_KEY = 'MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES'
+export const ALLOW_SECOND_INSTANCE_SERVICES_KEY = 'ALFRED_ALLOW_SECOND_INSTANCE_SERVICES'
 
 export interface BackgroundServicesDecision {
   run: boolean

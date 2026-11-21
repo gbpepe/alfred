@@ -98,7 +98,7 @@ describe('check() source pin', () => {
     expect(src).toContain('await getClaudePidForSessionAsync(t.session)')
     expect(src).toContain('await probeChannelPluginLivenessAsync(claudePid, t.provider, t.agentName, { confirmAlive: openDownSpell }, sweepSnapshot ?? undefined)')
     expect(src).toContain('agentDownSince.has(t.session) || (t.agentName !== undefined && agentRestartFailures.has(t.agentName))')
-    expect(src).toContain('marveenSuspectFirstSeen !== null || marveenDownState !== null || marveenRecreatedOutage !== null')
+    expect(src).toContain('alfredSuspectFirstSeen !== null || alfredDownState !== null || alfredRecreatedOutage !== null')
     // Every restart-state read comes after the last await before decideDownAgentAction.
     const age = src.indexOf('const processAgeMs = await getProcessAgeMsAsync(claudePid)')
     const last = src.indexOf('const lastRestart = agentLastRestart.get(t.agentName!)')

@@ -188,7 +188,7 @@ resolve_owner_chat_id() {
 }
 
 
-# ---------------------------------------------------------------- OWNER_ALERT_CHAT_ID (ISSUE2556X, marveen#2556)
+# ---------------------------------------------------------------- OWNER_ALERT_CHAT_ID (ISSUE2556X, alfred#2556)
 # The owner's alert chat from the dashboard's settings page: an overrides-only registry key, read from
 # <install>/store/config-overrides.json only (a .env line never counts). A DELIVERY target for the ALERT senders:
 # resolve_owner_chat_id above is unchanged. It applies only when PROVIDER is the install's CHANNEL_PROVIDER. The

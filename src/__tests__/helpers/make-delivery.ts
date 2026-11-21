@@ -40,7 +40,7 @@ export interface DeliveryInput {
   privateKey: KeyObject
   slug?: string
   version?: string
-  minMarveenVersion?: string
+  minAlfredVersion?: string
   /** path -> UTF-8 text, in payload order. Default: a minimal CLAUDE.md and SOUL.md. */
   files?: Record<string, string>
   avatar?: TestAvatar | null
@@ -88,7 +88,7 @@ export function makeSignedDelivery(input: DeliveryInput): Uint8Array {
     format: 'mio-agent-package/1',
     slug,
     version: input.version ?? '1.0.0',
-    min_marveen_version: input.minMarveenVersion ?? '1.0.0',
+    min_alfred_version: input.minAlfredVersion ?? '1.0.0',
     published_at: '2026-11-14T12:00:00Z',
     title: input.title ?? 'Invoice helper',
     description: input.description ?? 'Keeps the invoices in order.',

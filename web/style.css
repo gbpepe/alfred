@@ -2031,8 +2031,8 @@ main.kanban-active { padding-left: 16px; padding-right: 16px; }
   line-height: 1;
 }
 
-.marveen-card { border-left: 3px solid var(--accent); }
-.marveen-badge {
+.alfred-card { border-left: 3px solid var(--accent); }
+.alfred-badge {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -2044,7 +2044,7 @@ main.kanban-active { padding-left: 16px; padding-right: 16px; }
   margin-left: 4px;
 }
 
-/* === Telegram status dot === */
+/* === Channel status dot === */
 .tg-status {
   display: inline-flex;
   align-items: center;
@@ -2290,7 +2290,7 @@ main.kanban-active { padding-left: 16px; padding-right: 16px; }
   margin-bottom: 20px;
 }
 
-/* === Telegram Tab === */
+/* === Channel Tab === */
 .tg-instructions {
   margin-bottom: 20px;
 }
@@ -5396,7 +5396,7 @@ a.oss-inv-name:hover { text-decoration: underline; }
    surrounding prose in both light and dark themes. Scoped to the
    new modal's body specifically; .modal-body is shared by ~13
    other modals with their own <code> styling (Agent detail
-   Settings, Telegram instructions, etc.) that we must not
+   Settings, channel instructions, etc.) that we must not
    override. */
 #builtinDetailBody code {
   background: var(--bg-input);
@@ -6202,7 +6202,7 @@ a.oss-inv-name:hover { text-decoration: underline; }
 .md-rendered pre code { background: none; padding: 0; }
 .md-rendered :not(pre) > code { border-radius: 3px; padding: 1px 5px; }
 
-/* MARVEENGAPS1020 (b): skills waiting for approval */
+/* ALFREDGAPS1020 (b): skills waiting for approval */
 .skills-pending {
   margin: 0 0 16px;
   padding: 14px 16px;
@@ -7749,30 +7749,6 @@ a.oss-inv-name:hover { text-decoration: underline; }
   line-height: 1.4;
 }
 
-/* === Gromzo card (GROMZOOWNERQR1030; its owner QR moved to the Bridge, GROMZOBRIDGEWIZARD1107 D5a) === */
-.gromzo-card .gromzo-status { font-size: 13px; color: var(--text-muted); margin: 6px 0 12px; }
-.gromzo-card .mobile-login-warn { text-align: left; margin-top: 10px; }
-.gromzo-owner-info { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 4px 0 14px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: 8px; background: var(--bg-card); }
-.gromzo-owner-info[hidden] { display: none; }
-.gromzo-owner-info-text { margin: 0; font-size: 13px; color: var(--text); }
-.gromzo-agents { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
-.gromzo-agents-title { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
-.gromzo-agents-limit { font-size: 12px; color: var(--text-muted); margin: 4px 0 10px; }
-.gromzo-agent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.gromzo-agent-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; min-height: 44px; }
-.gromzo-agent-main { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.gromzo-agent-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.gromzo-agent-state { font-size: 12px; color: var(--text-muted); }
-.gromzo-agent-state.is-on { color: var(--success); }
-.gromzo-agent-state.is-pending { color: var(--accent); }
-.gromzo-agent-state.is-error { color: var(--danger); }
-.gromzo-agent-state.is-warn { color: var(--accent); }
-.gromzo-agent-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
-.gromzo-agent-row .btn-compact { min-height: 36px; }
-/* GROMZONAMETAKEN1106: the agent's name on Gromzo, shown on a row after a name refusal. */
-.gromzo-agent-namefield { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; font-size: 12px; color: var(--text-muted); max-width: 360px; }
-.gromzo-agent-namefield input { width: 100%; }
-
 /* === Docs viewer: content toolbar (.md download) === */
 .docs-content-toolbar { display: flex; justify-content: flex-end; margin: 0 0 12px; }
 .docs-content-toolbar .btn-compact { font-size: 12px; }
@@ -8594,8 +8570,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.gromzo-card > summary.gromzo-summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-muted); user-select: none; }
-.gromzo-card[open] > summary.gromzo-summary { margin-bottom: 8px; color: var(--text); }
 
 /* Card ca046c9a (#570): hot memories with no write for N days. */
 .mem-stale-banner {

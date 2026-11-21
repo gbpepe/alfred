@@ -203,7 +203,7 @@ describe('who takes the route names', () => {
   })
 
   it('the voice channel id does NOT: it names a sender, and no /api/agents/<id> address exists for it', () => {
-    const taken = { mainAgentId: 'marveen', ownerName: 'Owner', systemSenderIds: '', isSubAgent: () => false }
+    const taken = { mainAgentId: 'alfred', ownerName: 'Owner', systemSenderIds: '', isSubAgent: () => false }
     // An install that already runs its voice lane under such an id keeps it.
     expect(resolveVoiceChannelId('status', taken)).toEqual({ id: 'status' })
     // The message layer's own ids stay refused, as before.

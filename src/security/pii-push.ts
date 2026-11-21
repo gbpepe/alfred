@@ -96,7 +96,7 @@ export async function probeVisibility(
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetchImpl(`https://api.github.com/repos/${gh.owner}/${gh.repo}`, {
-      headers: { 'User-Agent': 'marveen-pii-gate', Accept: 'application/vnd.github+json' },
+      headers: { 'User-Agent': 'alfred-pii-gate', Accept: 'application/vnd.github+json' },
       signal: ctrl.signal,
     });
     if (res.status === 404) return { state: 'private', reason: `${gh.owner}/${gh.repo} is not anonymously readable (HTTP 404)` };

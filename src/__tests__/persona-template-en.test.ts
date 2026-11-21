@@ -17,7 +17,7 @@ const PAIRS = [
   ['templates/SOUL.md.template', 'templates/en/SOUL.md.template'],
 ] as const
 
-// PERSONAESC1107 (Marveen 72742): the spans translated ON PURPOSE (no code reads them; the owner and the agent do).
+// PERSONAESC1107 (Alfred 72742): the spans translated ON PURPOSE (no code reads them; the owner and the agent do).
 // Each English text must be in the English template once, its Hungarian original in the Hungarian one once; the parity
 // below compares the English template with these put back, so every other byte of code still has to match.
 const INTENDED: ReadonlyArray<readonly [string, string, string, number?]> = [
@@ -28,8 +28,8 @@ const INTENDED: ReadonlyArray<readonly [string, string, string, number?]> = [
     '   # A SAJÁT csatornád configja a munkakönyvtáradban van (<cwd>/.claude/channels/...: a Főnöknél a projekt gyökere, sub-ágensnél az agents/<név> mappa).',
     "   # YOUR OWN channel's config is in your working directory (<cwd>/.claude/channels/...: the project root for the main agent, the agents/<name> folder for a sub-agent)."],
   ['templates/en/CLAUDE.md.template',
-    '   # A $HOME/.claude/channels csak tartalék: Marveen-telepítésben ott nincs ilyen fájl, ezért a vak $HOME-olvasás hamis "NEM"-et vagy hibát ad.',
-    '   # $HOME/.claude/channels is only a fallback: a Marveen install has no such file there, so a blind $HOME read gives a false "NEM" (no) or an error.'],
+    '   # A $HOME/.claude/channels csak tartalék: Alfred-telepítésben ott nincs ilyen fájl, ezért a vak $HOME-olvasás hamis "NEM"-et vagy hibát ad.',
+    '   # $HOME/.claude/channels is only a fallback: a Alfred install has no such file there, so a blind $HOME read gives a false "NEM" (no) or an error.'],
   // PERSONAESC1107 (Samu 72845): the placeholders and example values in the recipes, translated (the agent fills them in).
   ['templates/en/CLAUDE.md.template',
     "CATEGORY \"kulcsszó1, kulcsszó2\" mem.txt",
@@ -128,7 +128,7 @@ describe('persona_template and the once-decided AGENT_TEXT_LANG (scripts/lib/per
     if (opts.env !== undefined) writeFileSync(join(dir, '.env'), opts.env)
     if (opts.claudeMd) writeFileSync(join(dir, 'CLAUDE.md'), typeof opts.claudeMd === 'string' ? opts.claudeMd : 'existing')
     const env: Record<string, string> = { PATH: process.env.PATH ?? '' }
-    if (opts.lang !== undefined) env.MARVEEN_LANG = opts.lang
+    if (opts.lang !== undefined) env.ALFRED_LANG = opts.lang
     return env
   }
   function run(script: string, env: Record<string, string>, ...args: string[]) {
@@ -139,14 +139,14 @@ describe('persona_template and the once-decided AGENT_TEXT_LANG (scripts/lib/per
   const pick = (name: string, opts: Opts, mode = '') => run(`persona_template "$1" "$2" ${mode}`, setup(name, opts), dir, name)
   const envFile = () => { try { return readFileSync(join(dir, '.env'), 'utf8') } catch { return null } }
 
-  it('first render (decide, no CLAUDE.md): English from MARVEEN_LANG or the .lang, and the key is written', () => {
+  it('first render (decide, no CLAUDE.md): English from ALFRED_LANG or the .lang, and the key is written', () => {
     expect(pick('CLAUDE.md.template', { lang: 'en', env: 'A=1\n' }, 'decide')).toBe('<dir>/templates/en/CLAUDE.md.template')
     expect(envFile()).toBe('A=1\nAGENT_TEXT_LANG=en\n')
     expect(pick('SOUL.md.template', { dotLang: 'en\n', env: '' }, 'decide')).toBe('<dir>/templates/en/SOUL.md.template')
     expect(envFile()).toBe('AGENT_TEXT_LANG=en\n')
   })
 
-  it('first render: Hungarian (and the key hu) by default, for another language, without the English file; MARVEEN_LANG wins', () => {
+  it('first render: Hungarian (and the key hu) by default, for another language, without the English file; ALFRED_LANG wins', () => {
     for (const o of [{}, { lang: 'hu' }, { lang: 'de' }, { lang: 'EN' }, { lang: 'en', en: false }, { lang: 'hu', dotLang: 'en' }] as Opts[]) {
       expect(pick('CLAUDE.md.template', { ...o, env: 'A=1' }, 'decide'), JSON.stringify(o)).toBe('<dir>/templates/CLAUDE.md.template')
       expect(envFile(), JSON.stringify(o)).toBe('A=1\nAGENT_TEXT_LANG=hu\n')
@@ -164,7 +164,7 @@ describe('persona_template and the once-decided AGENT_TEXT_LANG (scripts/lib/per
     expect(envFile()).toBe('A=1\n')
   })
 
-  it('read only (update.sh): the key, else Hungarian; MARVEEN_LANG and .lang are not looked at, nothing is written', () => {
+  it('read only (update.sh): the key, else Hungarian; ALFRED_LANG and .lang are not looked at, nothing is written', () => {
     expect(pick('CLAUDE.md.template', { env: 'AGENT_TEXT_LANG=en\n' })).toBe('<dir>/templates/en/CLAUDE.md.template')
     expect(pick('CLAUDE.md.template', { lang: 'en', dotLang: 'en', env: 'A=1\n' })).toBe('<dir>/templates/CLAUDE.md.template')
     expect(envFile()).toBe('A=1\n')

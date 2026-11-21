@@ -20,7 +20,7 @@ const { privateKey, publicKey } = generateKeyPairSync('rsa', {
 })
 
 const SA = {
-  client_email: 'marveen@marveen-assistant-2026.iam.gserviceaccount.com',
+  client_email: 'alfred@alfred-assistant-2026.iam.gserviceaccount.com',
   private_key: privateKey,
 }
 

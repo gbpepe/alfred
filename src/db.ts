@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { existsSync, mkdirSync, readFileSync, renameSync, chmodSync, openSync, closeSync, statSync } from 'node:fs'
-import { STORE_DIR, DB_FILENAME, ALLOWED_CHAT_ID, OLLAMA_URL, APP_TZ, EMBED_URL, EMBED_MODEL, EMBED_DIMS, MAIN_AGENT_ID } from './config.js'
+import { STORE_DIR, DB_FILENAME, CHANNEL_CHAT_ID, OLLAMA_URL, APP_TZ, EMBED_URL, EMBED_MODEL, EMBED_DIMS, MAIN_AGENT_ID } from './config.js'
 import { isSearchStopword } from './memory-search-stopwords.js'
 import { getEffectiveSettingValue } from './settings-store.js'
 import { logger } from './logger.js'
@@ -156,7 +156,7 @@ export function forgetCachedEmbedding(id: number | bigint): void { embeddingCach
 export function getEmbeddingCacheSize(): number { return embeddingCache.size }
 
 // dbPathOverride is for tests: pass ':memory:' (or a temp file path) to open an
-// isolated database instead of the real store/claudeclaw.db. ':memory:' has no
+// isolated database instead of the real store/alfred.db. ':memory:' has no
 // path to chmod, so the file-precreate (openSync 'wx') and tightenDbPermissions
 // steps are skipped for it. A real on-disk override path (e.g. a /tmp temp file)
 // STILL gets pre-create + tighten -- this lets the permission tests exercise the
@@ -412,7 +412,7 @@ export function initDatabase(dbPathOverride?: string): void {
   }
   // Migration: add agent_id, category, auto_generated columns to memories
   try {
-    db.exec("ALTER TABLE memories ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'marveen'")
+    db.exec("ALTER TABLE memories ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'alfred'")
   } catch {
     // column already exists
   }
@@ -443,7 +443,7 @@ export function initDatabase(dbPathOverride?: string): void {
   // replay hook injects the last ~20 turns of context PLUS highlights the open
   // question (the most recent inbound with no later outbound), so the fresh
   // session continues exactly where the connection dropped -- ZERO agent
-  // discretion. Generic across all three channel agents (marveen/dia/erno-ba);
+  // discretion. Generic across all three channel agents (alfred/dia/erno-ba);
   // agent_id is derived from the session cwd so each session only sees its own
   // chat. Written by the settings.json hooks (UserPromptSubmit capture +
   // PostToolUse outbound). UNIQUE(...) makes inbound capture idempotent; outbound
@@ -533,7 +533,7 @@ export function initDatabase(dbPathOverride?: string): void {
           salience REAL NOT NULL DEFAULT 1.0,
           created_at INTEGER NOT NULL,
           accessed_at INTEGER NOT NULL,
-          agent_id TEXT NOT NULL DEFAULT 'marveen',
+          agent_id TEXT NOT NULL DEFAULT 'alfred',
           category TEXT NOT NULL DEFAULT 'warm' CHECK(category IN ('hot','warm','cold','shared')),
           auto_generated INTEGER NOT NULL DEFAULT 0,
           keywords TEXT
@@ -1280,22 +1280,6 @@ export function initDatabase(dbPathOverride?: string): void {
        AND substr(to_agent, 1, instr(to_agent, '/') - 1) <> lower(substr(to_agent, 1, instr(to_agent, '/') - 1))
   `)
 
-  // --- Pending Channel Requests (Slack channel opt-in workflow) ---
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS pending_channel_requests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      agent TEXT NOT NULL,
-      channel_id TEXT NOT NULL,
-      channel_name TEXT,
-      user_id TEXT,
-      requested_at INTEGER NOT NULL,
-      resolved_at INTEGER,
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','denied'))
-    )
-  `)
-  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pcr_agent_channel ON pending_channel_requests(agent, channel_id) WHERE status = 'pending'`)
-  try { db.exec('ALTER TABLE pending_channel_requests ADD COLUMN resolved_at INTEGER') } catch { /* already exists */ }
-
   // --- Task Run History ---
   // Log every scheduled-task firing so the dashboard overview's "tasksToday"
   // survives dashboard restarts. Replaces the old store/task-run-history.json
@@ -1346,7 +1330,7 @@ export function initDatabase(dbPathOverride?: string): void {
   // operator had asked for the task to run, it silently disappeared.
   // This table persists each busy-retry across restarts so nothing is
   // dropped. When a row crosses the alert threshold, the alerting layer
-  // stamps alert_sent_at before each Telegram send and clears it on
+  // stamps alert_sent_at before each channel alert and clears it on
   // delivery failure, yielding at-least-once delivery with no double-
   // alerting on concurrent ticks. The scheduler itself never abandons:
   // it keeps retrying until the session frees up or the operator
@@ -1462,7 +1446,7 @@ export function initDatabase(dbPathOverride?: string): void {
       category TEXT NOT NULL DEFAULT 'Egyéb',
       scope TEXT NOT NULL DEFAULT 'munka',
       status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new','reviewed','kanban','rejected')),
-      source TEXT NOT NULL DEFAULT 'marveen',
+      source TEXT NOT NULL DEFAULT 'alfred',
       kanban_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -1743,7 +1727,6 @@ export function initDatabase(dbPathOverride?: string): void {
       status TEXT NOT NULL DEFAULT 'pending'
         CHECK(status IN ('pending','approved','rejected','timeout')),
       timeout_at INTEGER,
-      telegram_message_id INTEGER,
       requested_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER)),
       resolved_at INTEGER,
       resolved_by TEXT
@@ -1776,49 +1759,6 @@ export function initDatabase(dbPathOverride?: string): void {
   // only; never updated. NULL (every older row) = no grant: the filer's own
   // token, and the main token, behave as before.
   try { db.exec('ALTER TABLE approvals ADD COLUMN for_agent TEXT') } catch { /* already exists */ }
-  // APPROVALSLACK1030 (2): the request as it was posted into the owner's Slack DM, for the server's own reaction check.
-  // The owner id is a SNAPSHOT taken at posting (a later change of SLACK_OWNER_USER_ID does not move an open request);
-  // text_sha256 is over the exact posted text; decided_at closes the row once (a later reaction change only logs).
-  // A security table: the db-write-gate denies an agent's write on it, like approvals.
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS approval_slack_posts (
-      approval_id TEXT PRIMARY KEY,
-      channel TEXT NOT NULL,
-      ts TEXT NOT NULL,
-      text_sha256 TEXT NOT NULL,
-      owner_user_id TEXT NOT NULL,
-      bot_user_id TEXT NOT NULL,
-      posted_at INTEGER NOT NULL,
-      decided_at INTEGER,
-      decision TEXT,
-      last_checked_ms INTEGER
-    )
-  `)
-  // Dani 66059: the sweeper rotates by the last check, so old unanswered requests cannot starve a newer one.
-  try { db.exec('ALTER TABLE approval_slack_posts ADD COLUMN last_checked_ms INTEGER') } catch { /* already exists */ }
-  // APPROVALSLACK1030 B (the owner's decision of 11-04): the owner's typed reply decides too, read by the server.
-  // content_basis: what the DM showed (envelope / server_filed / description); the reaction decides only on the first
-  // two (#2452's rule), the reply on all three. reaction_mode / reply_mode: which decision this post was offered (a row
-  // from before this change was a reaction post). decided_by_ts: the owner message that decided, unique per channel, so
-  // one owner message decides one request. binding: thread / next_message. notice_ts: the server's own thread notice,
-  // the only non-owner message the thread may hold before the owner's reply.
-  for (const col of [
-    'content_basis TEXT', 'reaction_mode INTEGER NOT NULL DEFAULT 1', 'reply_mode INTEGER NOT NULL DEFAULT 0',
-    'decided_by_ts TEXT', 'binding TEXT', 'notice_ts TEXT',
-    // APPROVALTAGEN1108: the language the post was made in (its words decide); NULL = hu, as every older row.
-    'lang TEXT',
-    // AGENTCREATEPR3-1119: the content hash of a hash-bound request (agent_create) the post showed; the reply decides
-    // against it. NULL for every other category and every older row (they bind the posted text only).
-    'content_hash TEXT',
-  ]) {
-    try { db.exec(`ALTER TABLE approval_slack_posts ADD COLUMN ${col}`) } catch { /* already exists */ }
-  }
-  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_approval_slack_posts_decided_by ON approval_slack_posts(channel, decided_by_ts) WHERE decided_by_ts IS NOT NULL')
-  // TEAMSAPPROVECARD1118: the Teams approval card the SERVER posted for one request (web/approval-teams-card.ts).
-  // conversation_id + activity_id name the posted card, so a click counts only on that card; owner_aad is a snapshot of
-  // TEAMS_OWNER_AAD_OBJECT_ID at posting; content_hash is the request's anchor the card showed; nonce_sha256 is the hash
-  // of the one-time value only the card carries. decided_at closes the row once; decided_activity_id / decided_by_aad
-  // are the audit of the click that decided (the request itself gets resolved_by = 'teams_card').
   // AGENTCREATEPR2-1119: the stored spec behind an agent_create approval. spec_json is the canonical JSON the owner was
   // shown (the text is rendered from it) and content_hash its sha256, equal to the approvals row's. The consumer stamps
   // consumed_at in the same transaction as the approval's consume, then the outcome. A security table.
@@ -1833,39 +1773,6 @@ export function initDatabase(dbPathOverride?: string): void {
       created_agent TEXT,
       outcome TEXT,
       outcome_at INTEGER
-    )
-  `)
-  // A security table: the db-write-gate denies an agent's write on it, like approvals.
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS approval_teams_cards (
-      approval_id TEXT PRIMARY KEY,
-      conversation_id TEXT NOT NULL,
-      activity_id TEXT NOT NULL,
-      owner_aad TEXT NOT NULL,
-      content_hash TEXT NOT NULL,
-      nonce_sha256 TEXT NOT NULL,
-      card_sha256 TEXT NOT NULL,
-      lang TEXT NOT NULL,
-      posted_at INTEGER NOT NULL,
-      decided_at INTEGER,
-      decision TEXT,
-      decided_activity_id TEXT,
-      decided_by_aad TEXT
-    )
-  `)
-  // AGENTCREATEPR3-1119: an approval posted to the owner's Gromzo app through mxd's decisions verbs. mxd_hash is the hash
-  // mxd computed over the posted row (the one its consume is spent against); spec_hash is the approval's content hash the
-  // posted row showed (the core decides against it, never the approval's current hash). state: pending (waiting for the owner's
-  // answer), consuming (the answer was approve and mxd's consume is under way), done, failed. A security table.
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS approval_gromzo_posts (
-      approval_id TEXT PRIMARY KEY,
-      mxd_hash TEXT NOT NULL,
-      spec_hash TEXT NOT NULL,
-      state TEXT NOT NULL,
-      posted_at INTEGER NOT NULL,
-      updated_at INTEGER,
-      note TEXT
     )
   `)
   // Every consume call leaves a row here, the refused ones too: a second send
@@ -1909,7 +1816,7 @@ export function initDatabase(dbPathOverride?: string): void {
   `)
 
   // --- Owner write-command evidence, single use (#1530 review) ---
-  // One row per Telegram message that has already authorised an owner WRITE
+  // One row per channel message that has already authorised an owner WRITE
   // command (web/write-evidence.ts). The PRIMARY KEY is the single-use rule:
   // a second dispatch naming the same message is refused, across restarts.
   db.exec(`
@@ -1943,7 +1850,7 @@ export function initDatabase(dbPathOverride?: string): void {
   const dashUserCols = (db.prepare('PRAGMA table_info(dashboard_users)').all() as { name: string }[]).map((c) => c.name)
   if (!dashUserCols.includes('totp_enabled')) db.exec('ALTER TABLE dashboard_users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0')
   // Browser login sessions. NOT named `sessions` -- that table already maps
-  // Telegram chats to Claude session ids. Only sha256(session_id) is stored, so
+  // channel chats to Claude session ids. Only sha256(session_id) is stored, so
   // a DB leak does not hand out live sessions. Rows survive dashboard restarts;
   // the in-memory cache in web/auth-sessions.ts rehydrates from here lazily.
   db.exec(`
@@ -1977,7 +1884,7 @@ export function initDatabase(dbPathOverride?: string): void {
     )
   `)
   // Bridge pairing (AUTHPLAN1 #2): links a device key to the SSH enrollment's
-  // marveen-remote:<uuid> so revoking the key can drop the authorized_keys
+  // alfred-remote:<uuid> so revoking the key can drop the authorized_keys
   // line in the same step. Null for keys minted outside the pairing flow.
   try { db.exec(`ALTER TABLE device_keys ADD COLUMN install_id TEXT`) } catch { /* column already exists */ }
   // DASHOPERATOR1005: what a key may reach. 'full' = every existing key and the
@@ -2209,7 +2116,7 @@ export function saveMemory(
   content: string,
   sector: 'semantic' | 'episodic',
   topicKey?: string,
-  // Owner of the row. The column default is the literal 'marveen', but every
+  // Owner of the row. The column default is the literal 'alfred', but every
   // per-agent reader filters on `agent_id = ?`, so on an install whose main
   // agent id is anything else a row that relied on the default was invisible
   // to that agent's views and search.
@@ -2635,7 +2542,7 @@ function insertMemoryRow(
 ): number {
   const info = db.prepare(
     'INSERT INTO memories (chat_id, topic_key, content, sector, salience, created_at, accessed_at, agent_id, category, auto_generated, keywords) VALUES (?, ?, ?, ?, 1.0, ?, ?, ?, ?, ?, ?)'
-  ).run(ALLOWED_CHAT_ID, null, content, sector, createdAt, createdAt, agentId, category, autoGenerated ? 1 : 0, keywords ?? null)
+  ).run(CHANNEL_CHAT_ID, null, content, sector, createdAt, createdAt, agentId, category, autoGenerated ? 1 : 0, keywords ?? null)
   return Number(info.lastInsertRowid)
 }
 
@@ -3493,8 +3400,8 @@ export function listKanbanCards(
   const feltetelek: string[] = []
   const ertekek: unknown[] = []
   if (!opts.includeArchived) feltetelek.push('c.archived_at IS NULL')
-  // COLLATE NOCASE: configured names are capitalised (BOT_NAME=Marveen) while stored
-  // assignees are typically lowercase (`marveen`); an exact match found neither spelling.
+  // COLLATE NOCASE: configured names are capitalised (BOT_NAME=Alfred) while stored
+  // assignees are typically lowercase (`alfred`); an exact match found neither spelling.
   if (opts.agent) { feltetelek.push('c.assignee = ? COLLATE NOCASE'); ertekek.push(opts.agent) }
   // Card 12b0f698: the status and id filters run in SQL, so a narrow read never builds the
   // whole board. An empty list is a caller's "match nothing", never "no filter".
@@ -4746,7 +4653,7 @@ export function getDoneEvidence(cardId: string): { since: number; comments: numb
 // closed in the window, which of its cards are stuck (the getStuckKanbanCards
 // measurement, not a second definition), and what waits on the owner. Agent
 // names are lowercased and the bot name folds into the main agent id, so
-// "Marveen" and "marveen" are one row. done_evidence is read only when the
+// "Alfred" and "alfred" are one row. done_evidence is read only when the
 // column exists (it arrives with #566), so this works on either schema.
 
 export interface BoardSummaryCardRef {
@@ -4959,7 +4866,7 @@ export function countNewHotMemories(agentId: string): number {
 // "started" signal, independent of status.
 //
 // A comment is a WORK-TRACE only if its author is the card's assignee (case-
-// insensitive: the board stores "Marveen", the agent writes "marveen") and it
+// insensitive: the board stores "Alfred", the agent writes "alfred") and it
 // is not marked `automated`. Measured on a maintainer board (#1531 review): of
 // 590 "stuck" cards, all 590 were "started" by a comment alone, and 151 of them
 // only by a migration or sweep comment that was also their last activity.
@@ -6040,7 +5947,7 @@ export function hasOpenInboundQuestion(agentId: string): boolean {
 // heartbeat or the coordinator), but messages involving them still count toward
 // the human/agent peer they are paired with (so a thread's count matches what
 // getAgentConversation returns when you open it).
-export const CHAT_SYSTEM_AGENTS = ['heartbeat', 'telegram-coordinator', 'channel-coordinator', 'system'] as const
+export const CHAT_SYSTEM_AGENTS = ['heartbeat', 'channel-coordinator', 'system'] as const
 
 const AGENT_MESSAGE_LIMIT_CAP = 200
 
@@ -6406,7 +6313,7 @@ export function upsertPendingTaskRetry(
 }
 
 /** Clear the alert timestamp so the next tick is free to re-alert. Used
- * when a Telegram send failed after we stamped the row optimistically. */
+ * when a channel send failed after we stamped the row optimistically. */
 export function clearPendingTaskRetryAlert(taskName: string, agentName: string): boolean {
   return db
     .prepare('UPDATE pending_task_retries SET alert_sent_at = NULL WHERE task_name = ? AND agent_name = ?')
@@ -6890,81 +6797,6 @@ export async function backfillEmbeddings(): Promise<BackfillResult> {
     )
   }
   return { attempted: rows.length, embedded: count, failed: rows.length - count }
-}
-
-// --- Pending Channel Requests ---
-
-export interface PendingChannelRequest {
-  id: number
-  agent: string
-  channel_id: string
-  channel_name: string | null
-  user_id: string | null
-  requested_at: number
-  status: 'pending' | 'approved' | 'denied'
-}
-
-export function upsertChannelRequest(agent: string, channelId: string, userId?: string): boolean {
-  const now = Math.floor(Date.now() / 1000)
-  const sevenDaysAgo = now - 7 * 86400
-  const existing = db.prepare(
-    "SELECT id FROM pending_channel_requests WHERE agent = ? AND channel_id = ? AND (status = 'pending' OR (status = 'denied' AND COALESCE(resolved_at, requested_at) > ?))"
-  ).get(agent, channelId, sevenDaysAgo)
-  if (existing) return false
-  db.prepare(
-    'INSERT INTO pending_channel_requests (agent, channel_id, user_id, requested_at, status) VALUES (?, ?, ?, ?, ?)'
-  ).run(agent, channelId, userId ?? null, now, 'pending')
-  return true
-}
-
-export function listPendingChannelRequests(agent: string): PendingChannelRequest[] {
-  return db.prepare(
-    "SELECT * FROM pending_channel_requests WHERE agent = ? AND status = 'pending' ORDER BY requested_at DESC"
-  ).all(agent) as PendingChannelRequest[]
-}
-
-export function updateChannelRequestStatus(id: number, status: 'approved' | 'denied'): boolean {
-  const now = Math.floor(Date.now() / 1000)
-  return db.prepare(
-    'UPDATE pending_channel_requests SET status = ?, resolved_at = ? WHERE id = ? AND status = ?'
-  ).run(status, now, id, 'pending').changes > 0
-}
-
-export function updateChannelRequestName(id: number, channelName: string): void {
-  db.prepare('UPDATE pending_channel_requests SET channel_name = ? WHERE id = ?').run(channelName, id)
-}
-
-// --- Telegram History ---
-
-export function saveTelegramMessage(
-  chatId: string,
-  messageId: string,
-  direction: 'in' | 'out',
-  text: string,
-  userId?: string,
-  ts?: number,
-): void {
-  const now = ts ?? Math.floor(Date.now() / 1000)
-  db.prepare(
-    `INSERT OR IGNORE INTO telegram_history (chat_id, message_id, user_id, direction, text, ts)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(chatId, messageId, userId ?? null, direction, text, now)
-}
-
-export interface TelegramHistoryRow {
-  id: number
-  chat_id: string
-  message_id: string
-  user_id: string | null
-  direction: 'in' | 'out'
-  text: string
-  ts: number
-}
-
-export function getTelegramHistory(chatId: string, limit: number = 50): TelegramHistoryRow[] {
-  return db.prepare(
-    'SELECT * FROM telegram_history WHERE chat_id = ? ORDER BY ts DESC LIMIT ?'
-  ).all(chatId, limit) as TelegramHistoryRow[]
 }
 
 // --- Idea Box ---
@@ -8011,7 +7843,6 @@ export interface Approval {
   action_payload: string | null
   status: 'pending' | 'approved' | 'rejected' | 'timeout'
   timeout_at: number | null
-  telegram_message_id: number | null
   requested_at: number
   resolved_at: number | null
   resolved_by: string | null
@@ -8061,7 +7892,6 @@ export function createApproval(params: {
     action_payload: params.action_payload ?? null,
     status: 'pending',
     timeout_at: params.timeout_at ?? null,
-    telegram_message_id: null,
     requested_at: now,
     resolved_at: null,
     resolved_by: null,
@@ -8077,30 +7907,28 @@ export function getApproval(id: string): Approval | undefined {
   return db.prepare('SELECT * FROM approvals WHERE id = ?').get(id) as Approval | undefined
 }
 
-export function resolveApproval(id: string, status: 'approved' | 'rejected' | 'timeout', resolvedBy: string, telegramMessageId?: number | null): boolean {
+export function resolveApproval(id: string, status: 'approved' | 'rejected' | 'timeout', resolvedBy: string): boolean {
   const now = Math.floor(Date.now() / 1000)
   return db.prepare(`
     UPDATE approvals
-    SET status = ?, resolved_at = ?, resolved_by = ?,
-        telegram_message_id = COALESCE(?, telegram_message_id)
+    SET status = ?, resolved_at = ?, resolved_by = ?
     WHERE id = ? AND status = 'pending'
-  `).run(status, now, resolvedBy, telegramMessageId ?? null, id).changes > 0
+  `).run(status, now, resolvedBy, id).changes > 0
 }
 
-// AGENTCREATEPR1-1119: the channel-independent decision core. A channel adapter (Slack, the Teams card, later more)
+// AGENTCREATEPR1-1119: the channel-independent decision core. A channel adapter
 // verifies on its own who decided, where and on which message, without any agent in the chain; the core then records
-// the decision with the same rules for every channel. The adapters keep their own decision rows (approval_slack_posts,
-// approval_teams_cards) and close them in the same transaction as the core's write.
+// the decision with the same rules for every channel.
 
 /** What a channel adapter verified about one decision. */
 export interface ApprovalEvidence {
-  /** The channel whose adapter verified the decision: 'slack', 'teams', ... */
+  /** The channel whose adapter verified the decision (e.g. 'discord'). */
   channel: string
   /** How the owner decided there ('reaction', 'reply', 'card'), or the refusal mode that turned it into a rejection. */
   mode: string
   /**
    * The verified ids the audit names in resolved_by, in order (the owner's user id, the deciding message, a refusal
-   * reason). A channel with its own decision row (the Teams card) keeps its ids there and passes none.
+   * reason).
    */
   trail?: readonly string[]
 }
@@ -8174,8 +8002,7 @@ function runApprovalConsumer(approvalId: string): void {
 
 /**
  * One decision from a channel adapter that has no decision row of its own, in one transaction, then the category's
- * consumer. The Slack and Teams adapters call the same core inside their own transactions (decideApprovalFromSlack,
- * decideApprovalFromTeams).
+ * consumer.
  */
 export function decideApproval(p: {
   approvalId: string; status: 'approved' | 'rejected'; evidence: ApprovalEvidence; expectedContentHash?: string
@@ -8186,199 +8013,6 @@ export function decideApproval(p: {
   }))()
   if (outcome === 'decided') runApprovalConsumer(p.approvalId)
   return { outcome, approval: getApproval(p.approvalId) }
-}
-
-// APPROVALSLACK1030 (2): the posted request (approval_slack_posts).
-export interface ApprovalSlackPostRow {
-  approval_id: string
-  channel: string
-  ts: string
-  text_sha256: string
-  owner_user_id: string
-  bot_user_id: string
-  posted_at: number
-  decided_at: number | null
-  decision: string | null
-  last_checked_ms: number | null
-  content_basis: string | null
-  reaction_mode: number
-  reply_mode: number
-  decided_by_ts: string | null
-  binding: string | null
-  notice_ts: string | null
-  lang: string | null
-  content_hash?: string | null
-}
-
-export function recordApprovalSlackPost(p: {
-  approvalId: string; channel: string; ts: string; textSha256: string; ownerUserId: string; botUserId: string
-  contentBasis?: string; reactionMode?: boolean; replyMode?: boolean; lang?: 'hu' | 'en'; contentHash?: string | null
-}): boolean {
-  return db.prepare(`
-    INSERT OR IGNORE INTO approval_slack_posts (approval_id, channel, ts, text_sha256, owner_user_id, bot_user_id, posted_at, content_basis, reaction_mode, reply_mode, lang, content_hash)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(p.approvalId, p.channel, p.ts, p.textSha256, p.ownerUserId, p.botUserId, Math.floor(Date.now() / 1000),
-    p.contentBasis ?? null, p.reactionMode === false ? 0 : 1, p.replyMode === true ? 1 : 0, p.lang === 'en' ? 'en' : null, p.contentHash ?? null).changes > 0
-}
-
-/**
- * Posts still waiting for the owner: undecided, the request pending and not timed out. The least recently checked come
- * first (never checked before any checked one), then the oldest: a sweep takes the head of this list and stamps what it
- * checked, so every pending post is reached within ceil(pending / SWEEP_MAX_PER_ROUND) rounds, however many older
- * requests the owner leaves unanswered (Dani 66059: oldest-first starved a newer request until the old ones expired).
- */
-export function pendingApprovalSlackPosts(limit = 50): ApprovalSlackPostRow[] {
-  const now = Math.floor(Date.now() / 1000)
-  return db.prepare(`
-    SELECT p.* FROM approval_slack_posts p JOIN approvals a ON a.id = p.approval_id
-    WHERE p.decided_at IS NULL AND a.status = 'pending' AND (a.timeout_at IS NULL OR a.timeout_at > ?)
-    ORDER BY COALESCE(p.last_checked_ms, 0) ASC, p.posted_at ASC, p.rowid ASC LIMIT ?
-  `).all(now, limit) as ApprovalSlackPostRow[]
-}
-
-export function getApprovalSlackPost(approvalId: string): ApprovalSlackPostRow | undefined {
-  return db.prepare('SELECT * FROM approval_slack_posts WHERE approval_id = ?').get(approvalId) as ApprovalSlackPostRow | undefined
-}
-
-/** Stamps the moment the sweeper last asked Slack about this post (the rotation key of pendingApprovalSlackPosts). */
-export function markApprovalSlackPostChecked(approvalId: string, atMs: number = Date.now()): void {
-  db.prepare('UPDATE approval_slack_posts SET last_checked_ms = ? WHERE approval_id = ?').run(atMs, approvalId)
-}
-
-/** The server's own thread notice on [approvalId]'s post (the one non-owner message the thread may hold). */
-export function setApprovalSlackNotice(approvalId: string, ts: string): void {
-  db.prepare('UPDATE approval_slack_posts SET notice_ts = ? WHERE approval_id = ? AND notice_ts IS NULL').run(ts, approvalId)
-}
-
-export type SlackDecisionOutcome = 'recorded' | 'already_decided' | 'reply_already_used'
-
-/**
- * One decision from Slack, in ONE transaction (APPROVALSLACK1030 B, egm M7): the post row closes once, with the owner
- * message that decided (unique per channel: one owner message, one decision); then the request is resolved, and an
- * approval only while it is still pending and not past its timeout (the Slack reads before this were async). The
- * second return value says whether the request itself changed.
- */
-export function decideApprovalFromSlack(p: {
-  approvalId: string; decision: string; status: 'approved' | 'rejected'; resolvedBy: string
-  decidedByTs?: string | null; binding?: string | null
-}): { outcome: SlackDecisionOutcome; changed: boolean } {
-  const now = Math.floor(Date.now() / 1000)
-  let res: { outcome: SlackDecisionOutcome; changed: boolean }
-  try {
-    res = db.transaction(() => {
-      const closed = db.prepare(`
-        UPDATE approval_slack_posts SET decided_at = ?, decision = ?, decided_by_ts = ?, binding = ?
-        WHERE approval_id = ? AND decided_at IS NULL
-      `).run(now, p.decision, p.decidedByTs ?? null, p.binding ?? null, p.approvalId).changes > 0
-      if (!closed) return { outcome: 'already_decided' as const, changed: false }
-      // The Slack post binds the message text (checked before this call). AGENTCREATEPR3-1119: a hash-bound request's
-      // post also recorded the content hash it showed, and the decision is bound to it (agent_create).
-      const post = db.prepare('SELECT content_hash FROM approval_slack_posts WHERE approval_id = ?').get(p.approvalId) as { content_hash: string | null } | undefined
-      const core = decideApprovalInTx({ approvalId: p.approvalId, status: p.status, resolvedBy: p.resolvedBy, now,
-        ...(post?.content_hash ? { expectedContentHash: post.content_hash } : {}) })
-      return { outcome: 'recorded' as const, changed: core === 'decided' }
-    })()
-  } catch (err) {
-    if (err instanceof Error && /UNIQUE constraint failed/.test(err.message)) return { outcome: 'reply_already_used', changed: false }
-    throw err
-  }
-  if (res.changed) runApprovalConsumer(p.approvalId)
-  return res
-}
-
-// AGENTCREATEPR3-1119: the Gromzo approval rows (see the table's comment).
-export interface ApprovalGromzoPost { approval_id: string; mxd_hash: string; spec_hash: string; state: string; posted_at: number; updated_at: number | null; note: string | null }
-export function recordApprovalGromzoPost(approvalId: string, mxdHash: string, specHash: string): boolean {
-  return db.prepare('INSERT OR IGNORE INTO approval_gromzo_posts (approval_id, mxd_hash, spec_hash, state, posted_at) VALUES (?, ?, ?, ?, ?)')
-    .run(approvalId, mxdHash, specHash, 'pending', Math.floor(Date.now() / 1000)).changes > 0
-}
-/** The rows waiting for the owner's answer, their approval still pending. */
-export function pendingApprovalGromzoPosts(limit = 50): ApprovalGromzoPost[] {
-  return db.prepare(`
-    SELECT g.* FROM approval_gromzo_posts g JOIN approvals a ON a.id = g.approval_id
-    WHERE g.state = 'pending' AND a.status = 'pending' ORDER BY g.posted_at ASC LIMIT ?
-  `).all(limit) as ApprovalGromzoPost[]
-}
-/** Rows a stopped server left between mxd's consume and the commit (swept at the watcher's start). */
-export function consumingApprovalGromzoPosts(): ApprovalGromzoPost[] {
-  return db.prepare("SELECT * FROM approval_gromzo_posts WHERE state = 'consuming' ORDER BY posted_at ASC").all() as ApprovalGromzoPost[]
-}
-export function getApprovalGromzoPost(approvalId: string): ApprovalGromzoPost | undefined {
-  return db.prepare('SELECT * FROM approval_gromzo_posts WHERE approval_id = ?').get(approvalId) as ApprovalGromzoPost | undefined
-}
-/** Moves the row from [from] to [to] (one step, compare-and-set): true when it moved. */
-export function moveApprovalGromzoPost(approvalId: string, from: string, to: string, note: string | null = null): boolean {
-  return db.prepare('UPDATE approval_gromzo_posts SET state = ?, updated_at = ?, note = COALESCE(?, note) WHERE approval_id = ? AND state = ?')
-    .run(to, Math.floor(Date.now() / 1000), note, approvalId, from).changes > 0
-}
-
-// TEAMSAPPROVECARD1118: the Teams approval card rows (see the table's comment).
-export interface ApprovalTeamsCard {
-  approval_id: string
-  conversation_id: string
-  activity_id: string
-  owner_aad: string
-  content_hash: string
-  nonce_sha256: string
-  card_sha256: string
-  lang: string
-  posted_at: number
-  decided_at: number | null
-  decision: string | null
-  decided_activity_id: string | null
-  decided_by_aad: string | null
-}
-
-export function recordApprovalTeamsCard(p: {
-  approvalId: string; conversationId: string; activityId: string; ownerAad: string; contentHash: string
-  nonceSha256: string; cardSha256: string; lang: string
-}): void {
-  db.prepare(`
-    INSERT INTO approval_teams_cards (approval_id, conversation_id, activity_id, owner_aad, content_hash, nonce_sha256, card_sha256, lang, posted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(p.approvalId, p.conversationId, p.activityId, p.ownerAad, p.contentHash, p.nonceSha256, p.cardSha256, p.lang, Math.floor(Date.now() / 1000))
-}
-
-export function getApprovalTeamsCard(approvalId: string): ApprovalTeamsCard | undefined {
-  return db.prepare('SELECT * FROM approval_teams_cards WHERE approval_id = ?').get(approvalId) as ApprovalTeamsCard | undefined
-}
-
-export type TeamsCardDecisionOutcome = 'decided' | 'card_already_used' | 'not_pending' | 'expired' | 'content_changed'
-
-/**
- * One owner click on the server-posted Teams card, in ONE transaction: the card row closes once (the click's activity
- * id and the owner's object id recorded), and the request is resolved only while it is still pending, its content_hash
- * still the one the card showed, and (for an approval) its timeout not passed. The caller has already checked the
- * channel token, the tenant, the owner, the card binding and the nonce.
- */
-export function decideApprovalFromTeams(p: {
-  approvalId: string; status: 'approved' | 'rejected'; activityId: string; ownerAad: string
-}): { outcome: TeamsCardDecisionOutcome; approval: Approval | undefined } {
-  const now = Math.floor(Date.now() / 1000)
-  const res = db.transaction(() => {
-    const card = db.prepare('SELECT content_hash FROM approval_teams_cards WHERE approval_id = ? AND decided_at IS NULL').get(p.approvalId) as { content_hash: string } | undefined
-    if (!card) return { outcome: 'card_already_used' as const, approval: getApproval(p.approvalId) }
-    // The card showed the owner this content_hash: the core decides only while the request still carries it.
-    const outcome: TeamsCardDecisionOutcome = decideApprovalInTx({
-      approvalId: p.approvalId, status: p.status, resolvedBy: approvalResolvedBy({ channel: 'teams', mode: 'card' }),
-      expectedContentHash: card.content_hash, now,
-    })
-    db.prepare(`
-      UPDATE approval_teams_cards SET decided_at = ?, decision = ?, decided_activity_id = ?, decided_by_aad = ?
-      WHERE approval_id = ? AND decided_at IS NULL
-    `).run(now, outcome === 'decided' ? p.status : `${p.status}:${outcome}`, p.activityId, p.ownerAad, p.approvalId)
-    return { outcome, approval: getApproval(p.approvalId) }
-  })()
-  if (res.outcome === 'decided') runApprovalConsumer(p.approvalId)
-  return res
-}
-
-// The CREATE path stamps the owner-notification message id onto the row
-// (APPROVALVAK821): until this existed, telegram_message_id was only writable
-// through resolveApproval, so a pending request could never carry it.
-export function setApprovalTelegramMessageId(id: string, telegramMessageId: number): boolean {
-  return db.prepare('UPDATE approvals SET telegram_message_id = ? WHERE id = ?')
-    .run(telegramMessageId, id).changes > 0
 }
 
 export function listApprovals(opts: {
@@ -8447,7 +8081,7 @@ export function consumeApproval(params: {
   messageId?: string | null
   windowSeconds: number
   nowS?: number
-  // MARVEENGAPS1020 (a): the memory delete consumes a data_delete approval on
+  // ALFREDGAPS1020 (a): the memory delete consumes a data_delete approval on
   // the same one-shot terms. Every existing caller is the email path.
   category?: string
 }): ApprovalConsumeResult {
@@ -8750,7 +8384,7 @@ export function markCustomCommandRun(name: string, runAt: number, definitionAt: 
 }
 
 /**
- * Claim one Telegram message as the evidence of an owner WRITE command. True
+ * Claim one channel message as the evidence of an owner WRITE command. True
  * only for the first claim of that (chat, message); every later one is false
  * (web/write-evidence.ts, single use). Rows older than a day are pruned on
  * the way: the evidence window is minutes, so an older row cannot matter.

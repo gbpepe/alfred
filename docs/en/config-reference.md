@@ -20,7 +20,7 @@ These files are managed by the dashboard and change at runtime. They are not che
 | `store/.vault-key` | no | Vault decryption key (migrated to OS keychain when available) |
 | `store/schedule-last-run.json` | automatic | Last-run timestamps for scheduled tasks (crash-safe skip guard) |
 | `store/kanban-audit-state.json` | automatic | Last kanban audit timestamp |
-| `store/claudeclaw.db` | not directly | SQLite database -- memory, kanban, messages, token log, etc. |
+| `store/alfred.db` | not directly | SQLite database -- memory, kanban, messages, token log, etc. |
 | `store/config-overrides.json` | dashboard UI | Settings-page overrides (plain values only, never contains secrets) |
 | `store/update.pid` | automatic | Update process PID file (concurrency lock) |
 | `store/telegram-topics.json` | `/topic new <name>` (Telegram) | The named topics of the main chat: `{ "chatId", "topics": { "<name>": <message_thread_id> } }` (0600); written only while `TELEGRAM_TOPICS_ENABLED` is on |
@@ -245,9 +245,9 @@ script that handles `/status` and the inbound evidence) adds a patch to the plug
 - the plugin's instructions and the `telegram-reply-directive.py` hook ask the agent to
   pass the topic back.
 
-Marveen's own answer paths follow the same topic: the "Dolgozom rajta" placeholder and
+Alfred's own answer paths follow the same topic: the "Dolgozom rajta" placeholder and
 its fallback senders (`telegram_progress*.py`), the commands the hook answers
-(`marveen-commands.py`, mid-turn commands included), and the fallback poller's handoff
+(`alfred-commands.py`, mid-turn commands included), and the fallback poller's handoff
 (`channel-coordinator`).
 
 For a message without a topic every call is exactly what it is with the switch off.
@@ -255,7 +255,7 @@ For a message without a topic every call is exactly what it is with the switch o
 **Shared plugin cache.** The patch changes the plugin source in the plugin cache
 (`$CLAUDE_CONFIG_DIR/plugins/cache`, else `~/.claude/plugins/cache`), and every Claude Code
 session that uses the same cache loads the Telegram plugin from there, sessions outside
-Marveen included. They see the optional `message_thread_id` parameter of the `reply` tool
+Alfred included. They see the optional `message_thread_id` parameter of the `reply` tool
 and the attribute on a topic message's tag as well; as long as they do not pass the
 parameter, they behave as before.
 
@@ -393,7 +393,7 @@ Success response: `{ "ok": true, "key": "KANBAN_WIP_WARN_PCT", "value": 75, "req
 
 Error response: `{ "error": "..." }` (400 validation error, 403 secret key, 404 unknown key)
 
-**Hot-reload:** after a successful POST, the `/api/marveen` `kanbanWip` block immediately reflects the new value with no restart needed (for keys where `requiresRestart: false`).
+**Hot-reload:** after a successful POST, the `/api/alfred` `kanbanWip` block immediately reflects the new value with no restart needed (for keys where `requiresRestart: false`).
 
 **Change log:** every successful POST appends an audit row to the `config_change_log` SQLite table (key, old value, new value, actor, timestamp). For secret keys the value is stored as `null`. There is no UI for this table; query it directly:
 
@@ -527,7 +527,7 @@ Every sub-agent's directory is gitignored (`agents/` folder), keeping secrets sa
   "profileId": "developer-senior",
   "team": {
     "role": "member",
-    "reportsTo": "marveen",
+    "reportsTo": "alfred",
     "delegatesTo": [],
     "autoDelegation": false,
     "trustFrom": []
@@ -563,12 +563,12 @@ Profile is set via the `profileId` field in `agent-config.json` and configurable
 
 Under a strict profile Claude Code runs in `dontAsk` mode, where a command substitution
 (`$(cat <token>)`) never matches the allow-list, so such an agent cannot run the token `curl`
-recipes (#2232). It reaches the dashboard API through `scripts/marveen-api.sh` instead, which
-reads the token itself and takes every text from a file (`bash scripts/marveen-api.sh --help`
+recipes (#2232). It reaches the dashboard API through `scripts/alfred-api.sh` instead, which
+reads the token itself and takes every text from a file (`bash scripts/alfred-api.sh --help`
 lists the verbs). The helper and `scripts/agent-msg.sh` are on the `developer-junior.json`
 allow-list, and the generated CLAUDE.md blocks give a strict agent this recipe; every other
 agent keeps the `curl` recipe unchanged. The helper sends the token only to a loopback address, or to exactly the
-`AGENT_API_ORIGIN` / `DASHBOARD_PUBLIC_URL` in the install's `.env` (`MARVEEN_API_BASE`), and reads it only from a `.dashboard-token` file.
+`AGENT_API_ORIGIN` / `DASHBOARD_PUBLIC_URL` in the install's `.env` (`ALFRED_API_BASE`), and reads it only from a `.dashboard-token` file.
 
 ---
 
@@ -608,7 +608,7 @@ Each task lives in its own folder with two files. Detailed description: [schedul
 
 ## .mcp.json -- MCP Servers
 
-MCP configurations are scoped: agent `agents/<name>/.mcp.json` files contain only the servers relevant to that agent. The `.mcp.json` at the project root applies to the main agent (marveen/Jarvis).
+MCP configurations are scoped: agent `agents/<name>/.mcp.json` files contain only the servers relevant to that agent. The `.mcp.json` at the project root applies to the main agent (alfred/Jarvis).
 
 ```json
 {
@@ -635,7 +635,7 @@ MCP configurations are scoped: agent `agents/<name>/.mcp.json` files contain onl
 
 ## Environment Variables (.env / launchd plist)
 
-Key configuration variables live in the launchd plist (`~/Library/LaunchAgents/com.marveen.dashboard.plist`) or `.env` file.
+Key configuration variables live in the launchd plist (`~/Library/LaunchAgents/com.alfred.dashboard.plist`) or `.env` file.
 
 | Variable | Description |
 |----------|-------------|
@@ -650,8 +650,8 @@ Key configuration variables live in the launchd plist (`~/Library/LaunchAgents/c
 | `BOT_NAME` | Main agent name (e.g. "Jarvis") |
 | `VOICE_TRANSCRIBE_INBOUND` | `1` = transcribe inbound voice notes for text-mode agents too (default off; per-agent `voice.transcribeInbound` overrides). See `voice.md` |
 | `WEB_ONLY` | `true` = every background service off (schedule runner, router, monitors, worker pre-start). **Read from the process environment only** (`WEB_ONLY=true node dist/index.js`); a `.env` line has no effect, there is no dotenv |
-| `MARVEEN_ALLOW_SECOND_INSTANCE_SERVICES` | A second instance (git worktree, a clone under a temp dir) runs no background services even without WEB_ONLY, because its schedule runner would fire the global scheduled tasks into the live sessions. `1` = run them anyway (a deliberate test instance), logged as a warning at start. **Process environment only**, as `WEB_ONLY`. A second instance is a git worktree or a clone under a temp dir (`/tmp`, `/private/tmp`, `/var/folders`, the OS tmpdir): a plain `git clone` OUTSIDE those counts as an install and runs the services, so there `WEB_ONLY=true` is the guard |
-| `MXD_DASH_SOCK` | marveen-mxd's dash.sock path. **The other way round: read from the `.env` file only** (per call), never from the process environment; without it the platform default, the live socket. A test instance sets it in its own `.env` |
+| `ALFRED_ALLOW_SECOND_INSTANCE_SERVICES` | A second instance (git worktree, a clone under a temp dir) runs no background services even without WEB_ONLY, because its schedule runner would fire the global scheduled tasks into the live sessions. `1` = run them anyway (a deliberate test instance), logged as a warning at start. **Process environment only**, as `WEB_ONLY`. A second instance is a git worktree or a clone under a temp dir (`/tmp`, `/private/tmp`, `/var/folders`, the OS tmpdir): a plain `git clone` OUTSIDE those counts as an install and runs the services, so there `WEB_ONLY=true` is the guard |
+| `MXD_DASH_SOCK` | alfred-mxd's dash.sock path. **The other way round: read from the `.env` file only** (per call), never from the process environment; without it the platform default, the live socket. A test instance sets it in its own `.env` |
 
 ---
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Migrate an existing install from the hardcoded "marveen" main agent id
+# Migrate an existing install from the hardcoded "alfred" main agent id
 # to the configurable MAIN_AGENT_ID slug derived from BOT_NAME. Run this
 # once after pulling the release that introduces MAIN_AGENT_ID.
 #
 # Behaviour:
 #   * Reads BOT_NAME from .env, computes the slug.
-#   * If the slug is "marveen" (default install), prints a note and exits --
+#   * If the slug is "alfred" (default install), prints a note and exits --
 #     nothing to migrate, the defaults already match.
 #   * Otherwise: stops the services (launchd on macOS, systemd user units on
-#     Linux), rewrites the DB rows from "marveen" to the new slug, renames the
+#     Linux), rewrites the DB rows from "alfred" to the new slug, renames the
 #     unit files (plist Label keys / systemd unit names + OnFailure drop-ins),
 #     writes MAIN_AGENT_ID into .env, and restarts.
 
@@ -53,13 +53,13 @@ print(val or '', end='')
 PYEOF
 }
 ENV_BOT_NAME="$(read_env_bot_name .env)"
-BOT_NAME="${ENV_BOT_NAME:-${BOT_NAME:-Marveen}}"
+BOT_NAME="${ENV_BOT_NAME:-${BOT_NAME:-Alfred}}"
 NEW_SLUG=$(python3 - "$BOT_NAME" <<'PYEOF'
 import sys, unicodedata, re
 s = sys.argv[1].strip()
 s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode()
 s = re.sub(r'[^a-zA-Z0-9]+', '-', s).strip('-').lower()
-print(s or 'marveen')
+print(s or 'alfred')
 PYEOF
 )
 
@@ -119,7 +119,7 @@ for line in content.split('\n'):
     env[key] = val
 def ident(t):
     return re.sub(r'[^a-zA-Z0-9_-]', '', t)
-main = main_override if main_override is not None else env.get('MAIN_AGENT_ID', 'marveen')
+main = main_override if main_override is not None else env.get('MAIN_AGENT_ID', 'alfred')
 owner = ident(env.get('OWNER_NAME', 'Owner'))
 senders = {ident(trim(x)) for x in env.get('SYSTEM_SENDER_IDS', '').split(',')} - {''}
 def collides(i):
@@ -153,24 +153,24 @@ if [ "$VOICE_CHANNEL_ID_AFTER" != "$VOICE_CHANNEL_ID" ]; then
   echo "Nothing was changed. Set VOICE_CHANNEL_ID (or BOT_NAME) in .env so both agree, and rerun." >&2
   exit 1
 fi
-# "marveen" is the id the install already runs under: nothing to rename there.
-if [ "$NEW_SLUG" != "marveen" ] && [ -d "$INSTALL_DIR/agents/$NEW_SLUG" ]; then
+# "alfred" is the id the install already runs under: nothing to rename there.
+if [ "$NEW_SLUG" != "alfred" ] && [ -d "$INSTALL_DIR/agents/$NEW_SLUG" ]; then
   echo "ERROR: BOT_NAME=\"$BOT_NAME\" gives the id \"$NEW_SLUG\", which is already a sub-agent (agents/$NEW_SLUG)." >&2
   echo "Nothing was changed. Set another BOT_NAME in .env and rerun." >&2
   exit 1
 fi
 
-if [ "$NEW_SLUG" = "marveen" ]; then
-  echo "BOT_NAME=\"$BOT_NAME\" → slug \"marveen\" (default). Nothing to migrate."
+if [ "$NEW_SLUG" = "alfred" ]; then
+  echo "BOT_NAME=\"$BOT_NAME\" → slug \"alfred\" (default). Nothing to migrate."
   # Still write MAIN_AGENT_ID into .env for forward compatibility if missing.
   if ! grep -q '^MAIN_AGENT_ID=' .env; then
-    echo "MAIN_AGENT_ID=marveen" >> .env
-    echo "✓ MAIN_AGENT_ID=marveen added to .env"
+    echo "MAIN_AGENT_ID=alfred" >> .env
+    echo "✓ MAIN_AGENT_ID=alfred added to .env"
   fi
   exit 0
 fi
 
-DB="$INSTALL_DIR/store/claudeclaw.db"
+DB="$INSTALL_DIR/store/alfred.db"
 
 # Preflight, BEFORE anything is stopped: the DB rewrite below is the first step
 # that can fail on a stock host, and it runs after the services are stopped and
@@ -183,7 +183,7 @@ if [ -f "$DB" ] && ! python3 -c 'import sqlite3' 2>/dev/null; then
   exit 1
 fi
 
-echo "Migrating main agent id: marveen → $NEW_SLUG (BOT_NAME=\"$BOT_NAME\")"
+echo "Migrating main agent id: alfred → $NEW_SLUG (BOT_NAME=\"$BOT_NAME\")"
 read -r -p "This will restart the launchd services and update the DB. Continue? (y/N) " ans
 case "$ans" in
   y|Y|yes|YES) ;;
@@ -195,16 +195,16 @@ SYSTEMD_DIR="$HOME/.config/systemd/user"
 OS="$(uname -s)"
 
 if [ "$OS" = "Darwin" ]; then
-  launchctl unload "$PLIST_DIR/com.marveen.channels.plist" 2>/dev/null || true
-  launchctl unload "$PLIST_DIR/com.marveen.dashboard.plist" 2>/dev/null || true
+  launchctl unload "$PLIST_DIR/com.alfred.channels.plist" 2>/dev/null || true
+  launchctl unload "$PLIST_DIR/com.alfred.dashboard.plist" 2>/dev/null || true
 elif [ "$OS" = "Linux" ]; then
   # Stop and disable the old-named units before the rename. Missing units are
   # fine (partial installs); a failure to stop a RUNNING unit is not, but stop
   # returns 0 for not-loaded units, so the || true only covers no-systemd hosts.
-  systemctl --user stop marveen-channels.service marveen-dashboard.service marveen-morning.timer 2>/dev/null || true
-  systemctl --user disable marveen-channels.service marveen-dashboard.service marveen-morning.timer marveen-host-watchdog.service 2>/dev/null || true
+  systemctl --user stop alfred-channels.service alfred-dashboard.service alfred-morning.timer 2>/dev/null || true
+  systemctl --user disable alfred-channels.service alfred-dashboard.service alfred-morning.timer alfred-host-watchdog.service 2>/dev/null || true
 fi
-tmux kill-session -t "=marveen-channels:" 2>/dev/null || true
+tmux kill-session -t "=alfred-channels:" 2>/dev/null || true
 
 # DB rewrite, through python3's stdlib sqlite3 (see the preflight above), in one
 # transaction: either every table is rewritten or none is. The success line is
@@ -226,7 +226,7 @@ try:
                 missing.append(table)
                 continue
             total += con.execute(f'UPDATE {table} SET {col} = ? WHERE {col} = ?',
-                                 (slug, 'marveen')).rowcount
+                                 (slug, 'alfred')).rowcount
 finally:
     con.close()
 note = f" (no table: {', '.join(sorted(set(missing)))})" if missing else ''
@@ -243,7 +243,7 @@ fi
 # Rename plists + patch Label.
 if [ "$OS" = "Darwin" ]; then
   for kind in channels dashboard; do
-    OLD="$PLIST_DIR/com.marveen.${kind}.plist"
+    OLD="$PLIST_DIR/com.alfred.${kind}.plist"
     NEW="$PLIST_DIR/com.${NEW_SLUG}.${kind}.plist"
     if [ -f "$OLD" ]; then
       mv "$OLD" "$NEW"
@@ -251,7 +251,7 @@ if [ "$OS" = "Darwin" ]; then
       python3 - "$NEW" "$NEW_SLUG" "$kind" <<'PYEOF'
 import sys, pathlib
 p = pathlib.Path(sys.argv[1]); slug = sys.argv[2]; kind = sys.argv[3]
-p.write_text(p.read_text().replace(f"com.marveen.{kind}", f"com.{slug}.{kind}"))
+p.write_text(p.read_text().replace(f"com.alfred.{kind}", f"com.{slug}.{kind}"))
 PYEOF
       echo "✓ Renamed $OLD → $NEW"
     fi
@@ -262,7 +262,7 @@ elif [ "$OS" = "Linux" ]; then
   # morning timer binds to its service by name stem, so renaming both files
   # keeps the binding.
   for unit in dashboard.service channels.service morning.service morning.timer host-watchdog.service 'notify@.service'; do
-    OLD="$SYSTEMD_DIR/marveen-${unit}"
+    OLD="$SYSTEMD_DIR/alfred-${unit}"
     NEW="$SYSTEMD_DIR/${NEW_SLUG}-${unit}"
     if [ -f "$OLD" ]; then
       mv "$OLD" "$NEW"
@@ -271,9 +271,9 @@ elif [ "$OS" = "Linux" ]; then
   done
   # OnFailure drop-in dirs: rename the dir AND patch the notifier reference
   # inside, or every crash of the renamed units would fire a non-existent
-  # marveen-notify@ unit (silently -- OnFailure on a missing unit just logs).
+  # alfred-notify@ unit (silently -- OnFailure on a missing unit just logs).
   for kind in dashboard channels; do
-    OLDD="$SYSTEMD_DIR/marveen-${kind}.service.d"
+    OLDD="$SYSTEMD_DIR/alfred-${kind}.service.d"
     NEWD="$SYSTEMD_DIR/${NEW_SLUG}-${kind}.service.d"
     if [ -d "$OLDD" ]; then
       mv "$OLDD" "$NEWD"
@@ -281,7 +281,7 @@ elif [ "$OS" = "Linux" ]; then
         python3 - "$NEWD/onfailure.conf" "$NEW_SLUG" <<'PYEOF'
 import sys, pathlib
 p = pathlib.Path(sys.argv[1]); slug = sys.argv[2]
-p.write_text(p.read_text().replace('marveen-notify@', f'{slug}-notify@'))
+p.write_text(p.read_text().replace('alfred-notify@', f'{slug}-notify@'))
 PYEOF
       fi
       echo "✓ Renamed $OLDD → $NEWD"
@@ -301,24 +301,24 @@ else
 fi
 echo "✓ .env updated (MAIN_AGENT_ID=$NEW_SLUG)"
 
-# Rewrite any "agent": "marveen" examples in the generated CLAUDE.md so the
+# Rewrite any "agent": "alfred" examples in the generated CLAUDE.md so the
 # agent copying the curl snippet targets the right session. Keeps a backup.
 if [ -f "$INSTALL_DIR/CLAUDE.md" ]; then
-  CLAUDE_MATCHES=$(grep -c '"agent": "marveen"' "$INSTALL_DIR/CLAUDE.md" 2>/dev/null || echo 0)
+  CLAUDE_MATCHES=$(grep -c '"agent": "alfred"' "$INSTALL_DIR/CLAUDE.md" 2>/dev/null || echo 0)
   CLAUDE_MATCHES=$(echo "$CLAUDE_MATCHES" | tr -d '[:space:]')
   if [ -n "$CLAUDE_MATCHES" ] && [ "$CLAUDE_MATCHES" -gt 0 ]; then
     cp "$INSTALL_DIR/CLAUDE.md" "$INSTALL_DIR/CLAUDE.md.pre-migrate-$(date +%Y%m%d-%H%M%S)"
     python3 - "$INSTALL_DIR/CLAUDE.md" "$NEW_SLUG" <<'PYEOF'
 import sys, pathlib
 p = pathlib.Path(sys.argv[1]); slug = sys.argv[2]
-p.write_text(p.read_text().replace('"agent": "marveen"', f'"agent": "{slug}"'))
+p.write_text(p.read_text().replace('"agent": "alfred"', f'"agent": "{slug}"'))
 PYEOF
     echo "✓ CLAUDE.md agent example updated ($CLAUDE_MATCHES occurrence(s))"
   fi
 fi
 
 # Rewrite ~/.claude/scheduled-tasks/*/task-config.json agent fields: the
-# scheduler routes by this name, and "marveen" now targets a non-existent
+# scheduler routes by this name, and "alfred" now targets a non-existent
 # session on non-default installs.
 SCHED_DIR="$HOME/.claude/scheduled-tasks"
 _SCHED_CLI="$INSTALL_DIR/dist/web/schedule-registry-cli.js"
@@ -327,7 +327,7 @@ if [ -f "$_SCHED_CLI" ] && command -v node >/dev/null 2>&1; then _SCHED_CLI_OK=1
 # Scheduled-task registry: the rewrite below changes task-config.json
 # bytes, so the runner's registry hashes stop matching. Re-registering every
 # rewritten task would launder a never-registered or tampered (planted) task
-# that happens to target "marveen". So the registry verdict of each candidate
+# that happens to target "alfred". So the registry verdict of each candidate
 # is recorded BEFORE the rewrite, and afterwards only a task that was trusted
 # then is re-registered; the rest is listed for operator review.
 _SCHED_PRE_OK=""
@@ -341,7 +341,7 @@ for cfg in sorted(root.glob('*/task-config.json')):
         data = json.loads(cfg.read_text())
     except Exception:
         continue
-    if isinstance(data, dict) and data.get('agent') == 'marveen' and re.fullmatch(r'[a-z0-9-]+', cfg.parent.name):
+    if isinstance(data, dict) and data.get('agent') == 'alfred' and re.fullmatch(r'[a-z0-9-]+', cfg.parent.name):
         print(cfg.parent.name)
 PYEOF
 )"
@@ -373,7 +373,7 @@ for cfg in root.glob('*/task-config.json'):
         data = json.loads(cfg.read_text())
     except Exception:
         continue
-    if isinstance(data, dict) and data.get('agent') == 'marveen':
+    if isinstance(data, dict) and data.get('agent') == 'alfred':
         data['agent'] = slug
         cfg.write_text(json.dumps(data, indent=2))
         fixed += 1
@@ -454,4 +454,4 @@ fi
 
 echo ""
 echo "Done. Dashboard: http://localhost:${WEB_PORT:-3420}"
-echo "tmux attach -t ${NEW_SLUG}-channels   (was marveen-channels)"
+echo "tmux attach -t ${NEW_SLUG}-channels   (was alfred-channels)"

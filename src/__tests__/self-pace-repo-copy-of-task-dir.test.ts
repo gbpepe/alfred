@@ -118,7 +118,7 @@ describe('self-pace-gate: a fleet config repo copy of the task dir is not the st
     for (const p of [
       `${H}/.claude/${SD}/x/SKILL.md`,
       `${H}/.claude-config/${SD}/x/SKILL.md`,
-      `${H}/marveen/agents/worker/.claude-config/${SD}/x/SKILL.md`,
+      `${H}/alfred/agents/worker/.claude-config/${SD}/x/SKILL.md`,
       `${H}/.channels-config/${SD}/x/SKILL.md`,
       `${ROOT}/${SD}/x/SKILL.md`,
       `${ROOT}/seed-${SD}/x/SKILL.md`,

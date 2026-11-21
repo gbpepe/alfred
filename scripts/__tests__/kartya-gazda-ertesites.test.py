@@ -2,7 +2,7 @@
 """GAZDAUZENET921 (2026-09-21): a gazdanak (szabolcs) cimzett kartya-ertesites NEM kezbesitheto --
 a gazda nem agens, nincs tmux-sessionje -- es az eszkoz megis zold `UZENET OK`-ot irt, mert a
 POST-olt SORT olvasta vissza, nem a kezbesitest (a teljes tortenetben 19 failed / 0 delivered).
-Marveen ketszer olvasta ugy, hogy az ertesites elment.
+Alfred ketszer olvasta ugy, hogy az ertesites elment.
 
 A javitas: gazda-felelosnel az eszkoz NEM POST-ol, hanem a kimeneten KIMONDJA a hianyt (a merendo
 szamokkal, ugyanabbol a DB-bol), a kartya letrejon, es a kartya-nyom is a hianyt rogziti. A dry-run
@@ -58,7 +58,7 @@ def fresh_db(path):
     now = int(time.time())
     for i in range(3):
         db.execute("INSERT INTO agent_messages (from_agent,to_agent,content,status,created_at)"
-                   " VALUES ('marveen','szabolcs',?, 'failed', ?)", (f'regi {i}', now - 1000 + i))
+                   " VALUES ('alfred','szabolcs',?, 'failed', ?)", (f'regi {i}', now - 1000 + i))
     db.commit(); db.close()
 
 
@@ -68,7 +68,7 @@ def run(card_id, assignee, msg_text, port, extra=()):
     with open(mf, 'w', encoding='utf-8') as f:
         f.write(msg_text)
     env = dict(os.environ)
-    env['KARTYA_DB'] = DB_PATH; env['CLAUDECLAW_ROOT'] = SANDBOX_ROOT
+    env['KARTYA_DB'] = DB_PATH; env['ALFRED_ROOT'] = SANDBOX_ROOT
     env['KARTYA_TOKEN'] = 'teszt-token'; env['KARTYA_API'] = f'http://127.0.0.1:{port}/api/messages'
     return subprocess.run([sys.executable, SCRIPT, '--id', card_id, '--assignee', assignee,
                            '--title', f'teszt kartya {card_id}', '--msg-file', mf, *extra],
@@ -94,7 +94,7 @@ def main():
     # 1. GAZDA-FELELOS + --msg-file: a kartya letrejon, az uzenet NEM megy ki, a kimenet KIMONDJA.
     POSTED.clear()
     p = run('GAZDAA921', 'szabolcs', 'Kartya: GAZDAA921 -- dontes-kerdes a gazdanak.', port,
-            extra=('--from', 'marveen'))
+            extra=('--from', 'alfred'))
     out = p.stdout + p.stderr
     check('1 lefutott (a kartya legitim, nem megtagadas)', p.returncode == 0, out)
     check('1 NEM POST-olt a gazdanak', not POSTED, f'POSTED={POSTED}')
@@ -117,7 +117,7 @@ def main():
     # 2. DRY-RUN PARITAS: ugyanaz a hivas --dry-run-nal ugyanezt mondja, es nem ir semmit.
     POSTED.clear()
     p = run('GAZDAB921', 'szabolcs', 'Kartya: GAZDAB921 -- dry-run a gazdanak.', port,
-            extra=('--from', 'marveen', '--dry-run'))
+            extra=('--from', 'alfred', '--dry-run'))
     out = p.stdout + p.stderr
     check('2 dry-run lefutott', p.returncode == 0, out)
     check('2 dry-run is KIMONDJA a hianyt', 'FIGYELEM' in out and 'NEM lesz kezbesitve' in out, out)
@@ -129,7 +129,7 @@ def main():
     # 3. POZITIV KONTROLL ugyanazon a muszeren: flotta-felelosnel az uzenet kimegy, UZENET OK all.
     POSTED.clear()
     p = run('GAZDAC921', 'samu', 'Kartya: GAZDAC921 -- flotta-felelos, kontroll.', port,
-            extra=('--from', 'marveen'))
+            extra=('--from', 'alfred'))
     out = p.stdout + p.stderr
     check('3 kontroll lefutott', p.returncode == 0, out)
     check('3 kontroll: az uzenet kiment samunak', POSTED and POSTED[0]['to'] == 'samu', f'POSTED={POSTED}')

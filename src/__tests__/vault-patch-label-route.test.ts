@@ -37,13 +37,13 @@ vi.mock('../web/vault-bindings.js', async (importOriginal) => ({
   syncSecret: (...a: unknown[]) => (syncSecret as any)(...a),
 }))
 
-const savedEnvDir = process.env.CLAUDECLAW_ENV_DIR
-process.env.CLAUDECLAW_ENV_DIR = STORE
+const savedEnvDir = process.env.ALFRED_ENV_DIR
+process.env.ALFRED_ENV_DIR = STORE
 const { tryHandleConnectors } = await import('../web/routes/connectors.js')
 
 afterAll(() => {
-  if (savedEnvDir === undefined) delete process.env.CLAUDECLAW_ENV_DIR
-  else process.env.CLAUDECLAW_ENV_DIR = savedEnvDir
+  if (savedEnvDir === undefined) delete process.env.ALFRED_ENV_DIR
+  else process.env.ALFRED_ENV_DIR = savedEnvDir
   rmSync(STORE, { recursive: true, force: true })
 })
 beforeEach(() => {

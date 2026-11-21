@@ -46,7 +46,7 @@ describe('discordOptionsText', () => {
       `  · ${CH1}: megszólítás kell igen, allowFrom 2 fő`,
       `  · ${CH2}: megszólítás kell igen (alap), allowFrom 0 fő`,
       '',
-      'Marveen-bővítés · állítás: dashboard, Beállítások, Csatornák',
+      'Alfred-bővítés · állítás: dashboard, Beállítások, Csatornák',
       'DISCORD_PLUGIN_EXT: be (alap)',
       'DISCORD_OWNER_USER_ID: beállítva',
       'DISCORD_BACKFILL: be (alap)',
@@ -147,7 +147,7 @@ describe('/options, the command', () => {
   })
 
   it('the hook: options is not a Telegram builtin (a dashboard-down /options on Telegram goes to the model), only a Discord one', () => {
-    const src = readFileSync(join(__dirname, '..', '..', 'scripts', 'hooks', 'marveen-commands.py'), 'utf-8')
+    const src = readFileSync(join(__dirname, '..', '..', 'scripts', 'hooks', 'alfred-commands.py'), 'utf-8')
     const block = (name: string) => [...(src.match(new RegExp(`${name} = frozenset\\(\\{([\\s\\S]*?)\\}\\)`))?.[1] ?? '').matchAll(/"([a-z_]+)"/g)].map(m => m[1])
     expect(block('BUILTIN_NAMES')).not.toContain('options')
     expect(block('DISCORD_ONLY_NAMES')).toEqual(['options'])

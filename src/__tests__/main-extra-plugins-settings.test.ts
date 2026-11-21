@@ -22,7 +22,7 @@ import { buildMainSessionRespawnCmd } from '../web/channel-monitor.js'
 import { mainConfigDecisionForTest } from '../web/main-config-decision.js'
 
 const ROOT = join(__dirname, '..', '..')
-const SLACK = 'slack-channel@marveen-marketplace'
+const SLACK = 'slack-channel@alfred-marketplace'
 const shellFlag = (installDir: string, ...ids: string[]) =>
   execFileSync('bash', ['-c', `. "${ROOT}/scripts/main-extra-plugins-settings.sh"; main_extra_settings_flag "$@"`, 'x', installDir, ...ids]).toString()
 
@@ -255,7 +255,7 @@ describe('every main-session launcher carries the flag', () => {
 // INSTALLDIRTYTREE1103: the primary channel plugin used to be enabled by WRITING the
 // tracked .claude/settings.json (the installers' `claude plugin enable --scope project`
 // and channels.sh's self-healing guard). Both rewrote the whole compact file
-// (~500 lines on marveen2, 11-03), so every fresh install was dirty and every update
+// (~500 lines on alfred2, 11-03), so every fresh install was dirty and every update
 // went down the stash path. The primary now rides the same --settings file.
 describe('the primary channel plugin rides the flag file, never the tracked settings (INSTALLDIRTYTREE1103)', () => {
   // resolve_plugin_ids() from channels.sh and the watchdog's case block, executed as-is.

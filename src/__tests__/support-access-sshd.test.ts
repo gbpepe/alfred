@@ -197,10 +197,10 @@ describe('parseSshdEffectiveConfig', () => {
 })
 
 describe('formatSshdConnectionSpec', () => {
-  const spec: SshdConnectionSpec = { user: 'marveen', addr: '203.0.113.7', laddr: '192.0.2.10', lport: 22 }
+  const spec: SshdConnectionSpec = { user: 'alfred', addr: '203.0.113.7', laddr: '192.0.2.10', lport: 22 }
 
   it('names every criterion a Match block can use, with the source address as the host', () => {
-    expect(formatSshdConnectionSpec(spec)).toBe('user=marveen,addr=203.0.113.7,host=203.0.113.7,laddr=192.0.2.10,lport=22')
+    expect(formatSshdConnectionSpec(spec)).toBe('user=alfred,addr=203.0.113.7,host=203.0.113.7,laddr=192.0.2.10,lport=22')
     expect(formatSshdConnectionSpec({ user: 'root', addr: '2001:db8::7', laddr: '2001:db8::10', lport: 2222 })).toBe(
       'user=root,addr=2001:db8::7,host=2001:db8::7,laddr=2001:db8::10,lport=2222',
     )
@@ -229,7 +229,7 @@ describe('formatSshdConnectionSpec', () => {
   })
 
   it('accepts the user names a system really has', () => {
-    for (const user of ['root', 'ubuntu', 'marveen_1', 'first.last', 'Admin', '_svc', 'a'.repeat(64)]) {
+    for (const user of ['root', 'ubuntu', 'alfred_1', 'first.last', 'Admin', '_svc', 'a'.repeat(64)]) {
       expect(formatSshdConnectionSpec({ ...spec, user })).not.toBeNull()
     }
   })
@@ -239,12 +239,12 @@ const SOURCES = ['203.0.113.7/32', '2001:db8::7/128']
 const LOCALS = ['192.0.2.10', '2001:db8::10']
 
 describe('planSshdProbes', () => {
-  const base = { loginUser: 'marveen', fromCidrs: SOURCES, localAddresses: LOCALS }
+  const base = { loginUser: 'alfred', fromCidrs: SOURCES, localAddresses: LOCALS }
 
   it('asks ONE question before the ports are known, on the discovery port', () => {
     expect(SSHD_DISCOVERY_PORT).toBe(22)
     expect(planSshdProbes({ ...base, listenPorts: null })).toEqual([
-      { user: 'marveen', addr: '203.0.113.7', laddr: '192.0.2.10', lport: 22 },
+      { user: 'alfred', addr: '203.0.113.7', laddr: '192.0.2.10', lport: 22 },
     ])
   })
 
@@ -253,14 +253,14 @@ describe('planSshdProbes', () => {
     expect(plan).toHaveLength(8)
     expect(plan.map((s) => formatSshdConnectionSpec(s)).sort()).toEqual(
       [
-        'user=marveen,addr=2001:db8::7,host=2001:db8::7,laddr=192.0.2.10,lport=22',
-        'user=marveen,addr=2001:db8::7,host=2001:db8::7,laddr=192.0.2.10,lport=2222',
-        'user=marveen,addr=2001:db8::7,host=2001:db8::7,laddr=2001:db8::10,lport=22',
-        'user=marveen,addr=2001:db8::7,host=2001:db8::7,laddr=2001:db8::10,lport=2222',
-        'user=marveen,addr=203.0.113.7,host=203.0.113.7,laddr=192.0.2.10,lport=22',
-        'user=marveen,addr=203.0.113.7,host=203.0.113.7,laddr=192.0.2.10,lport=2222',
-        'user=marveen,addr=203.0.113.7,host=203.0.113.7,laddr=2001:db8::10,lport=22',
-        'user=marveen,addr=203.0.113.7,host=203.0.113.7,laddr=2001:db8::10,lport=2222',
+        'user=alfred,addr=2001:db8::7,host=2001:db8::7,laddr=192.0.2.10,lport=22',
+        'user=alfred,addr=2001:db8::7,host=2001:db8::7,laddr=192.0.2.10,lport=2222',
+        'user=alfred,addr=2001:db8::7,host=2001:db8::7,laddr=2001:db8::10,lport=22',
+        'user=alfred,addr=2001:db8::7,host=2001:db8::7,laddr=2001:db8::10,lport=2222',
+        'user=alfred,addr=203.0.113.7,host=203.0.113.7,laddr=192.0.2.10,lport=22',
+        'user=alfred,addr=203.0.113.7,host=203.0.113.7,laddr=192.0.2.10,lport=2222',
+        'user=alfred,addr=203.0.113.7,host=203.0.113.7,laddr=2001:db8::10,lport=22',
+        'user=alfred,addr=203.0.113.7,host=203.0.113.7,laddr=2001:db8::10,lport=2222',
       ].sort(),
     )
   })
@@ -280,7 +280,7 @@ describe('planSshdProbes', () => {
 })
 
 const ROOT = { user: 'root', home: '/root' }
-const MARVEEN = { user: 'marveen', home: '/home/marveen' }
+const ALFRED = { user: 'alfred', home: '/home/alfred' }
 
 describe('isArrivalAddress and probeLocalAddresses', () => {
   it.each(['192.0.2.10', '10.0.0.5', '2001:db8::10', '2001:DB8::10', 'fec0::1', '169.25.4.1', '::ffff:192.0.2.1'])(
@@ -322,9 +322,9 @@ describe('isArrivalAddress and probeLocalAddresses', () => {
 describe('expandKeysFileEntry', () => {
   it('reads a relative path against the home, and replaces the home, the user and the doubled percent sign', () => {
     expect(expandKeysFileEntry('.ssh/authorized_keys', ROOT)).toBe('/root/.ssh/authorized_keys')
-    expect(expandKeysFileEntry('%h/.ssh/authorized_keys', MARVEEN)).toBe('/home/marveen/.ssh/authorized_keys')
-    expect(expandKeysFileEntry('/etc/ssh/keys/%u', MARVEEN)).toBe('/etc/ssh/keys/marveen')
-    expect(expandKeysFileEntry('/home/%u/.ssh/authorized_keys', MARVEEN)).toBe('/home/marveen/.ssh/authorized_keys')
+    expect(expandKeysFileEntry('%h/.ssh/authorized_keys', ALFRED)).toBe('/home/alfred/.ssh/authorized_keys')
+    expect(expandKeysFileEntry('/etc/ssh/keys/%u', ALFRED)).toBe('/etc/ssh/keys/alfred')
+    expect(expandKeysFileEntry('/home/%u/.ssh/authorized_keys', ALFRED)).toBe('/home/alfred/.ssh/authorized_keys')
     expect(expandKeysFileEntry('keys%%/x', ROOT)).toBe('/root/keys%/x')
     expect(expandKeysFileEntry('%%h/.ssh/authorized_keys', ROOT)).toBe('/root/%h/.ssh/authorized_keys')
     expect(expandKeysFileEntry('.ssh/authorized_keys', { user: 'root', home: '/' })).toBe('/.ssh/authorized_keys')
@@ -365,7 +365,7 @@ describe('supportKeysFiles', () => {
   // The comparison is on the expanded path: three spellings, one file.
   it('takes the absolute and the user-token spelling of the SAME file as that file', () => {
     expect(supportKeysFiles(['/root/.ssh/authorized_keys'], ROOT)).toEqual(['authorized_keys'])
-    expect(supportKeysFiles(['/home/%u/.ssh/authorized_keys', '/home/marveen/.ssh/authorized_keys2'], MARVEEN)).toEqual([
+    expect(supportKeysFiles(['/home/%u/.ssh/authorized_keys', '/home/alfred/.ssh/authorized_keys2'], ALFRED)).toEqual([
       'authorized_keys',
       'authorized_keys2',
     ])
@@ -378,7 +378,7 @@ describe('supportKeysFiles', () => {
   it.each([
     ['only the second file', ['.ssh/authorized_keys2']],
     ['a shared directory keyed by the user name', ['/etc/ssh/keys/%u']],
-    ['the absolute path of ANOTHER user\'s file', ['/home/marveen/.ssh/authorized_keys']],
+    ['the absolute path of ANOTHER user\'s file', ['/home/alfred/.ssh/authorized_keys']],
     ['a path that only reaches the same file through a dot segment', ['/root/./.ssh/authorized_keys']],
     ['a path that only reaches the same file through a parent segment', ['/root/.ssh/../.ssh/authorized_keys']],
     ['a path with a doubled slash', ['/root//.ssh/authorized_keys']],
@@ -438,7 +438,7 @@ describe('assessSshd', () => {
   })
 
   it('hands over the hostkey files without the probe\'s throwaway -h key (the host key cross-check, Dani 79778)', () => {
-    const probeKey = '/tmp/marveen-sshd-probe-x/probe_host_key'
+    const probeKey = '/tmp/alfred-sshd-probe-x/probe_host_key'
     const withProbe = every('hostkey ' + probeKey + '\n' + T_DEFAULT)
     expect(assessSshd({ ...withProbe, probeHostKey: probeKey })).toMatchObject({
       ok: true,
@@ -617,7 +617,7 @@ describe('assessSshd', () => {
 
   it('refuses every install whose user is not root, whatever the answers say, with its own reason', () => {
     for (const input of [ok, every(config({ permitrootlogin: 'no' })), every(null), { ...ok, answers: [] }]) {
-      expect(assessSshd({ ...input, loginIsRoot: false, loginUser: 'marveen', loginHome: '/home/marveen' })).toEqual({
+      expect(assessSshd({ ...input, loginIsRoot: false, loginUser: 'alfred', loginHome: '/home/alfred' })).toEqual({
         ok: false,
         problem: 'sshd_config_not_fully_readable',
         version: { major: 10, minor: 0 },
@@ -629,7 +629,7 @@ describe('assessSshd', () => {
     for (const value of [
       '/etc/ssh/keys/%u',
       '.ssh/authorized_keys2',
-      '/home/marveen/.ssh/authorized_keys',
+      '/home/alfred/.ssh/authorized_keys',
       'x.ssh/authorized_keys',
       '/etc/ssh/keys/%u %h/.ssh/authorized_keys',
       '.ssh/authorized_keys /etc/ssh/keys/%U',

@@ -877,8 +877,8 @@ def build_ownership_fixture(root):
     owners, third-party clones, a worktree clone and a no-origin clone."""
     w(os.path.join(root, '.git', 'config'),
       '[core]\n\tbare = false\n'
-      '[remote "origin"]\n\turl = https://github.com/Szotasz/marveen.git\n'
-      '[remote "fork"]\n\turl = git@github.com:OwnerCo/marveen.git\n')
+      '[remote "origin"]\n\turl = https://github.com/gbpepe/alfred.git\n'
+      '[remote "fork"]\n\turl = git@github.com:OwnerCo/alfred.git\n')
     A = os.path.join(root, 'agents')
     ag = os.path.join(A, 'dev')
     # a clone of the install repo's upstream owner, and two of the fork owner
@@ -1104,7 +1104,7 @@ class TheSettingIsTheOnlyOwnerBasedReasonACloneIsNotListed(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         inst = os.path.join(tmp.name, 'inst')
         main_git = os.path.join(tmp.name, 'main.git')
-        w(os.path.join(main_git, 'config'), '[remote "origin"]\n\turl = https://github.com/wt-owner/marveen\n')
+        w(os.path.join(main_git, 'config'), '[remote "origin"]\n\turl = https://github.com/wt-owner/alfred\n')
         w(os.path.join(main_git, 'worktrees', 'inst', 'commondir'), '../..\n')
         w(os.path.join(main_git, 'worktrees', 'inst', 'HEAD'), 'd' * 40 + '\n')
         w(os.path.join(inst, '.git'), 'gitdir: %s\n' % os.path.join(main_git, 'worktrees', 'inst'))

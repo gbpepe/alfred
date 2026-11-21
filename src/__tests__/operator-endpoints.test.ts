@@ -83,7 +83,7 @@ vi.mock('../web/agent-config.js', async (orig) => ({
   // The real isKnownAgent also answers TRUE for names that resolve to the agents/
   // base itself ('./', 'x/..', 'samu/..': safeJoin allows the exact base), so the
   // mock does too -- the route's own name check must be what refuses them.
-  isKnownAgent: (n: string) => ['samu', 'marveen', './', 'x/..', 'samu/..'].includes(n) || n === h.mainId,
+  isKnownAgent: (n: string) => ['samu', 'alfred', './', 'x/..', 'samu/..'].includes(n) || n === h.mainId,
   readAgentRemoteHost: () => null,
 }))
 vi.mock('../web/agent-process.js', async (orig) => ({

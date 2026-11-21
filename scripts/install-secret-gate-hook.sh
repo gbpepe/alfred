@@ -19,7 +19,7 @@ case "$GIT_COMMON_DIR" in /*) ;; *) GIT_COMMON_DIR="$ROOT/$GIT_COMMON_DIR" ;; es
 HOOK_DIR="$(cd "$GIT_COMMON_DIR" && pwd)/hooks"
 DISPATCH="$HOOK_DIR/pre-commit"
 GUARD="$HOOK_DIR/pre-commit.d/10-secret-gate"
-MARK="marveen-pre-commit-dispatcher"
+MARK="alfred-pre-commit-dispatcher"
 mkdir -p "$HOOK_DIR/pre-commit.d"
 
 # 1. The sub-hook: scan what is staged.
@@ -71,7 +71,7 @@ echo "  secret gate pre-commit hook installed (bypass: SKIP_SECRET_GATE=1; the C
 # export a variable could switch the gate off. `git push --no-verify` is git's
 # own switch and is denied to agents by the destructive-gate hook.
 PUSH_DISPATCH="$HOOK_DIR/pre-push"
-PUSH_MARK="marveen-pre-push-dispatcher"
+PUSH_MARK="alfred-pre-push-dispatcher"
 PUSH_GUARD="$HOOK_DIR/pre-push.d/15-personal-data-gate"
 mkdir -p "$HOOK_DIR/pre-push.d"
 

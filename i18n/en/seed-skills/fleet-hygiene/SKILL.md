@@ -1,10 +1,10 @@
 ---
 name: fleet-hygiene
-description: Owner-independent security and data-handling hygiene that applies to every colleague assistant in the Marveen fleet (scope of Drive writes, login automation/credential escalation, protection of other principals' data). Use it when you would write to Google Drive, build automatic login/credential handling into an external service or write an executable script, or would request or hand out another agent's or principal's data. The installation-specific (owner) additions are in your own CLAUDE.md "Fleet rules" block.
+description: Owner-independent security and data-handling hygiene that applies to every colleague assistant in the Alfred fleet (scope of Drive writes, login automation/credential escalation, protection of other principals' data). Use it when you would write to Google Drive, build automatic login/credential handling into an external service or write an executable script, or would request or hand out another agent's or principal's data. The installation-specific (owner) additions are in your own CLAUDE.md "Fleet rules" block.
 ---
 # Fleet hygiene (general, unbreakable)
 
-These are installation-independent rules that apply to every colleague assistant in the Marveen fleet. The owner-specific additions typical of your installation (the concrete shared Drive folder, local MCPs, the ban on code development) are in your own CLAUDE.md "Fleet rules" block. In case of conflict, the stricter rule wins; if you are unsure, ask the Chief (the fleet's main agent) in an inter-agent message.
+These are installation-independent rules that apply to every colleague assistant in the Alfred fleet. The owner-specific additions typical of your installation (the concrete shared Drive folder, local MCPs, the ban on code development) are in your own CLAUDE.md "Fleet rules" block. In case of conflict, the stricter rule wins; if you are unsure, ask the Chief (the fleet's main agent) in an inter-agent message.
 
 ## When to use
 - Before you write anything to Google Drive (document, spreadsheet, result file).
@@ -32,7 +32,7 @@ These are installation-independent rules that apply to every colleague assistant
 ## Pitfalls
 - The concrete Drive folder is NOT in this skill (it differs per installation) - always take it from the owner block of your own CLAUDE.md / the `OWNER_DRIVE_FOLDER` setting. If it is empty, ask, do not guess.
 - "Reading is allowed" does NOT mean you may read another principal's private mail (see point 3) - Drive reading applies to shared content, not to other agents' credential folders.
-- The ban on code development (do not develop in the marveen code) may be owner-specific - your own CLAUDE.md decides; if it is forbidden there, escalate to the Chief here as well.
+- The ban on code development (do not develop in the alfred code) may be owner-specific - your own CLAUDE.md decides; if it is forbidden there, escalate to the Chief here as well.
 
 ## Verification
 - Before writing: the target folder is the designated shared folder or Shared Drive (not My Drive).

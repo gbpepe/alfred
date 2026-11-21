@@ -43,7 +43,7 @@ function buildImage(files: Record<string, string>, links: Record<string, string>
 
 function sync(extraEnv: Record<string, string> = {}) {
   const r = spawnSync('python3', ['-I', SCRIPT], {
-    env: { PATH: process.env.PATH ?? '', MARVEEN_IMAGE_DIR: img, MARVEEN_INSTALL_DIR: dst, MARVEEN_DOCKER_DIR: meta, ...extraEnv },
+    env: { PATH: process.env.PATH ?? '', ALFRED_IMAGE_DIR: img, ALFRED_INSTALL_DIR: dst, ALFRED_DOCKER_DIR: meta, ...extraEnv },
     encoding: 'utf8',
   })
   return { code: r.status, out: (r.stdout ?? '') + (r.stderr ?? '') }
@@ -60,13 +60,13 @@ describe('docker/code-sync.py', () => {
   it('first start: copies the code, verifies it, records the image id; the state next to it is untouched', () => {
     buildImage({ 'dist/index.js': 'v1', 'scripts/channels.sh': '#!/bin/bash', 'package.json': '{}' }, { 'node_modules/.bin/tsc': '../typescript/bin/tsc' })
     writeFileSync(join(dst, '.env'), 'SECRET=1\n')
-    mkdirSync(join(dst, 'store')); writeFileSync(join(dst, 'store', 'claudeclaw.db'), 'db')
+    mkdirSync(join(dst, 'store')); writeFileSync(join(dst, 'store', 'alfred.db'), 'db')
     const r = sync()
     expect(r.code, r.out).toBe(0)
     expect(readFileSync(join(dst, 'dist', 'index.js'), 'utf8')).toBe('v1')
     expect(readFileSync(join(dst, '.image-id'), 'utf8').trim()).toBe(readFileSync(join(meta, 'image.id'), 'utf8').trim())
     expect(readFileSync(join(dst, '.env'), 'utf8')).toBe('SECRET=1\n')
-    expect(readFileSync(join(dst, 'store', 'claudeclaw.db'), 'utf8')).toBe('db')
+    expect(readFileSync(join(dst, 'store', 'alfred.db'), 'utf8')).toBe('db')
     expect(existsSync(join(dst, '.code-sync-pending'))).toBe(false)
     expect(readdirSync(dst).filter((e) => e.startsWith('.code-stage') || e.startsWith('.code-old'))).toEqual([])
   })
@@ -146,7 +146,7 @@ describe('docker/code-sync.py', () => {
       'sys.exit(cs.main())',
     ].join('\n')
     const r = spawnSync('python3', ['-I', '-c', harness], {
-      env: { PATH: process.env.PATH ?? '', MARVEEN_IMAGE_DIR: img, MARVEEN_INSTALL_DIR: dst, MARVEEN_DOCKER_DIR: meta },
+      env: { PATH: process.env.PATH ?? '', ALFRED_IMAGE_DIR: img, ALFRED_INSTALL_DIR: dst, ALFRED_DOCKER_DIR: meta },
       encoding: 'utf8',
     })
     expect(r.status, (r.stdout ?? '') + (r.stderr ?? '')).toBe(4)

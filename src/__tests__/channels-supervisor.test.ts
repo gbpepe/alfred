@@ -106,7 +106,7 @@ describe('supervisorWaitDecision (#2203 follow-up: a supervisor is waited on, bu
     }
     expect(supervisorWaitDecision(st, t0 + SUPERVISOR_STUCK_MS + 1000, 1).verdict).toBe('stuck')
   })
-  it('the limit is the recreate path\'s own cold-start grace (Marveen 42304)', () => {
+  it('the limit is the recreate path\'s own cold-start grace (Alfred 42304)', () => {
     const monitor = readFileSync(join(__dirname, '../web/channel-monitor.ts'), 'utf-8')
     const grace = Number(/const MAIN_SESSION_CREATE_GRACE_MS = ([\d_]+)/.exec(monitor)?.[1].replace(/_/g, ''))
     expect(SUPERVISOR_STUCK_MS).toBe(grace)
@@ -178,7 +178,7 @@ describe('the two call sites in channel-monitor.ts', () => {
     }
     const stuck = block("if (wait.verdict === 'stuck') {")
     expect(stuck[0]).toMatch(/^logger\.error\(/)
-    // Owner-action alert (Szotasz/marveen#2353 review): this branch starts
+    // Owner-action alert (gbpepe/alfred#2353 review): this branch starts
     // nothing, so it must stay off the NOTIFY_ROUTINE_ALERTS-gated path.
     expect(stuck.some((l) => /^sendOwnerActionAlert\('main-session-supervisor-stuck', /.test(l))).toBe(true)
     expect(stuck.some((l) => /^sendRoutineAlert\(/.test(l))).toBe(false)
@@ -189,8 +189,8 @@ describe('the two call sites in channel-monitor.ts', () => {
     expect(waitLines).toHaveLength(2)
   })
 
-  it('hardRestartMarveenChannels takes a fresh supervisor as the effect when the pane is unreadable, before the fall-through', () => {
-    const body = fn('hardRestartMarveenChannels')
+  it('hardRestartAlfredChannels takes a fresh supervisor as the effect when the pane is unreadable, before the fall-through', () => {
+    const body = fn('hardRestartAlfredChannels')
     const reloadAt = body.indexOf('const reloadAt = Date.now()')
     const unload = body.indexOf("'unload'")
     const fresh = body.indexOf('freshSupervisor(runningChannelsSupervisors(CHANNELS_SCRIPT), reloadWindowSec(reloadAt, Date.now()))')

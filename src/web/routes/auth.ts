@@ -170,8 +170,8 @@ export function bridgeOwner(auth: RouteContext['auth'], req?: http.IncomingMessa
 }
 
 /** The owner's password-login session riding on this request as its cookie: its user name, or null. The ONE place
- *  the cookie branch is decided (BRIDGEPWLOGIN1101, Dani 65623 (a)): isOwnerSession (gromzo.ts), mayActAsOwner and
- *  mayActAsOwnerOrFirstRun all read it, so expiry, idle limit and logout (resolveSession) are the same for every gate. */
+ *  the cookie branch is decided (BRIDGEPWLOGIN1101, Dani 65623 (a)): mayActAsOwner and
+ *  mayActAsOwnerOrFirstRun read it, so expiry, idle limit and logout (resolveSession) are the same for every gate. */
 export function ownerCookieSession(req?: http.IncomingMessage): string | null {
   const cookie = req ? parseCookies(req.headers.cookie)[SESSION_COOKIE_NAME] : undefined
   if (!cookie) return null
@@ -208,7 +208,7 @@ function bridgeOwnerAudited(auth: RouteContext['auth'], req?: http.IncomingMessa
  *  on it. Only these may call mayActAsOwnerOrFirstRun; a source-scan test (owner-gate-first-run-pin.test.ts) pins
  *  every call and its reason to this list, so a new first-run caller cannot appear without editing it.
  *   - 'agent-create': POST /api/agents. The customer install creates its first agent in the onboarding wizard.
- *   - 'channel-setup': POST /api/agents/:name/channels/:provider (and the legacy /telegram). Onboarding step 2: the
+ *   - 'channel-setup': POST /api/agents/:name/channels/:provider. Onboarding step 2: the
  *     bot token and the owner's chat id, so the owner can reach the agent at all. ONLY while that agent's that channel
  *     is unconfigured (the call site checks channelIsUnconfigured: no setting in its .env and no approved sender;
  *     unreadable counts as configured); re-setting a configured channel is strict.
@@ -933,7 +933,7 @@ export async function tryHandleAuth(ctx: RouteContext): Promise<boolean> {
     }
     logger.info({ username: created.username }, 'dashboard user created')
     // BRIDGEFIRSTLOGIN1106: the first login made with a device key (the first-run branch: a key, no owner session) is
-    // told to the owner's channel, Slack first (notifySecurityEvent -> notifyOwner). With no channel set up yet (a
+    // told to the owner's channel (notifySecurityEvent -> notifyOwner). With no channel set up yet (a
     // fresh install often has none) the notice is silent by design and the audit lines are the record: the first-run
     // one (mayActAsOwnerOrFirstRun) and this one.
     if (auth?.kind === 'device' && ownerCookieSession(req) === null) {

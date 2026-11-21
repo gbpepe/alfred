@@ -16,16 +16,16 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readdirSync, copyFileSyn
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const tmpRoot = mkdtempSync(join(tmpdir(), 'marveen-fleet-base-rules-char-'))
+const tmpRoot = mkdtempSync(join(tmpdir(), 'alfred-fleet-base-rules-char-'))
 // readEnvFile (src/env.ts) takes its folder from this at import time.
-process.env.CLAUDECLAW_ENV_DIR = tmpRoot
+process.env.ALFRED_ENV_DIR = tmpRoot
 
 const drive = { value: '' }
 vi.mock('../config.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../config.js')>()
   return {
     ...real,
-    STORE_DIR: '/nonexistent/claudeclaw-test-store',
+    STORE_DIR: '/nonexistent/alfred-test-store',
     PROJECT_ROOT: tmpRoot,
     OWNER_NAME: 'TestOwner',
     MAIN_AGENT_ID: 'agent-a',
@@ -149,7 +149,7 @@ describe('the sub-agent creation prompt is byte-identical across the fleet base 
     expect(await promptFor('hu', 'own-helper', 'DRIVEFOLDER123')).toContain('drive/folders/DRIVEFOLDER123')
     expect(a).not.toContain('drive/folders/')
     expect(await promptFor('hu', 'shared-curl', '')).toContain('curl -s -X POST')
-    expect(a).toContain('marveen-api.sh message AGENT_NAME agent-a')
+    expect(a).toContain('alfred-api.sh message AGENT_NAME agent-a')
     expect(await promptFor('en', 'own-helper', '')).toContain('## Fleet rules (UNBREAKABLE')
     expect(await promptFor('hu', 'own-curl', '')).toContain('agents/own-curl/.dashboard-token')
     expect(await promptFor('hu', 'shared-curl', '')).not.toContain('agents/shared-curl/.dashboard-token')

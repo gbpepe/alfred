@@ -6,7 +6,7 @@
 // does (routes/claude-plans-login.ts -> commitNewPlan).
 //
 // The parser below is a port of the Bridge installer's TOKENWIZ1 relay
-// (Szotasz/marveen-bridge-installer src/setup-token.ts), where the facts it
+// (gbpepe/alfred-bridge-installer src/setup-token.ts), where the facts it
 // stands on were measured: the prompt needs a PTY, the auth URL arrives inside an
 // OSC 8 hyperlink, Ctrl-C does not end it but closing the terminal does, there is
 // no self-timeout, and the token is printed (coloured, possibly wrapped) rather
@@ -21,9 +21,9 @@
 // the raw buffer is dropped as soon as it is caught.
 //
 // ISOLATION: the child claude must not load the channel plugin -- a child with
-// the inherited environment stops the main agent's Telegram poller
+// the inherited environment stops the main agent's channel poller
 // (docs/mcp-list-channel-plugin.md). So the env is built from an allowlist, with
-// a throwaway CLAUDE_CONFIG_DIR and an empty TELEGRAM_STATE_DIR, and the whole
+// a throwaway CLAUDE_CONFIG_DIR and an empty DISCORD_STATE_DIR, and the whole
 // temp root is removed on every ending.
 import { spawn } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -156,7 +156,7 @@ export function buildRelayEnv(root: string, parent: NodeJS.ProcessEnv = process.
     LANG: parent.LANG ?? 'en_US.UTF-8',
     TERM: 'xterm-256color',
     CLAUDE_CONFIG_DIR: join(root, 'config'),
-    TELEGRAM_STATE_DIR: join(root, 'telegram'),
+    DISCORD_STATE_DIR: join(root, 'discord'),
     BROWSER: join(root, 'no-browser.sh'),
   }
   for (const key of ['USER', 'LOGNAME', 'TMPDIR'] as const) {
@@ -174,9 +174,9 @@ export function launchSetupTokenRelay(claudeBin?: string): LaunchResult {
     root = null
   }
   try {
-    root = mkdtempSync(join(tmpdir(), 'marveen-setup-token-'))
+    root = mkdtempSync(join(tmpdir(), 'alfred-setup-token-'))
     mkdirSync(join(root, 'config'), { mode: 0o700 })
-    mkdirSync(join(root, 'telegram'), { mode: 0o700 })
+    mkdirSync(join(root, 'discord'), { mode: 0o700 })
     writeFileSync(join(root, 'no-browser.sh'), '#!/bin/sh\nexit 0\n', { mode: 0o700 })
     const child = spawn('python3', [RELAY_SCRIPT, claude], {
       env: buildRelayEnv(root),

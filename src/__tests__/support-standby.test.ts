@@ -26,7 +26,7 @@ const LINES = buildSupportGrantLines({
   fromCidrs: TEST_ONLY_FROM,
   grantId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
   consentVersion: 1,
-  dispatchPath: '/home/marveen/.marveen/support-dispatch.sh',
+  dispatchPath: '/home/alfred/.alfred/support-dispatch.sh',
   sshd: { major: 9, minor: 6 },
 })
 const PERSONAL = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH someone'
@@ -211,13 +211,13 @@ describe('runSupportCli', () => {
     const ok = io()
     expect(await runSupportCli(['verify-kit'], ok.io, {
       status: () => deps().deps, installKit: noInstall, ...NO_STANDBY,
-      verifyKit: () => ({ ok: true, kitDir: '/home/x/.marveen/support/kit', manifest: { files: {}, installRoot: '/opt/m', nodePath: '/usr/bin/node', nodeMin: 20, release: 'abc1234' } }),
+      verifyKit: () => ({ ok: true, kitDir: '/home/x/.alfred/support/kit', manifest: { files: {}, installRoot: '/opt/m', nodePath: '/usr/bin/node', nodeMin: 20, release: 'abc1234' } }),
     })).toBe(0)
     expect(ok.out.join('')).toBe('kit=ok\n')
     const bad = io()
     expect(await runSupportCli(['verify-kit'], bad.io, {
       status: () => deps().deps, installKit: noInstall, ...NO_STANDBY,
-      verifyKit: () => ({ ok: false, problem: 'kit_mismatch', detail: '/home/x/.marveen/support/kit/support-access is not the file the manifest names' }),
+      verifyKit: () => ({ ok: false, problem: 'kit_mismatch', detail: '/home/x/.alfred/support/kit/support-access is not the file the manifest names' }),
     })).toBe(0)
     expect(bad.out.join('')).toBe('kit=kit_mismatch\n')
     expect(bad.err).toEqual([])
@@ -232,7 +232,7 @@ describe('runSupportCli', () => {
     })).toBe(2)
   })
 
-  const ROOT_ARGS = ['--install-root', '/opt/marveen', '--node', '/usr/bin/node', '--release', 'abc1234']
+  const ROOT_ARGS = ['--install-root', '/opt/alfred', '--node', '/usr/bin/node', '--release', 'abc1234']
 
   it.each([
     [[]],
@@ -246,9 +246,9 @@ describe('runSupportCli', () => {
     [['install-kit', ...ROOT_ARGS, '--release', 'def5678']],
     [['install-kit', '--install-root', '/a', '--install-root', '/b', '--release', 'abc1234']],
     [['install-kit', '--install-root', '', '--node', '/usr/bin/node', '--release', 'abc1234']],
-    [['install-kit', '--install-root=/opt/marveen', '--node', '/usr/bin/node', '--release', 'abc1234', 'x']],
+    [['install-kit', '--install-root=/opt/alfred', '--node', '/usr/bin/node', '--release', 'abc1234', 'x']],
     [['install-kit', '--node', '/usr/bin/node', '--release', 'abc1234', '--support-dir', '/tmp/x']],
-    [['install-kit', '--INSTALL-ROOT', '/opt/marveen', '--node', '/usr/bin/node', '--release', 'abc1234']],
+    [['install-kit', '--INSTALL-ROOT', '/opt/alfred', '--node', '/usr/bin/node', '--release', 'abc1234']],
     [['install-kit', '__proto__', '/x', '--node', '/usr/bin/node', '--release', 'abc1234']],
   ])('anything else (%j) prints the usage, exits with 2, and neither measures nor writes', async (argv) => {
     const c = io()
@@ -273,17 +273,17 @@ describe('runSupportCli', () => {
   it('install-kit hands the three values over, in any order, and prints what happened', async () => {
     const c = io()
     const seen: unknown[] = []
-    const argv = ['install-kit', '--release', 'abc1234', '--node', '/usr/bin/node', '--install-root', '/opt/marveen']
+    const argv = ['install-kit', '--release', 'abc1234', '--node', '/usr/bin/node', '--install-root', '/opt/alfred']
     const code = await runSupportCli(argv, c.io, {
       status: () => deps().deps,
       ...NO_STANDBY,
       installKit: async (args) => {
         seen.push(args)
-        return { kitDir: '/home/x/.marveen/support/kit', replaced: true, cleaned: ['.kit-old-0123456789abcdef'] }
+        return { kitDir: '/home/x/.alfred/support/kit', replaced: true, cleaned: ['.kit-old-0123456789abcdef'] }
       },
     })
     expect(code).toBe(0)
-    expect(seen).toEqual([{ installRoot: '/opt/marveen', nodePath: '/usr/bin/node', release: 'abc1234' }])
+    expect(seen).toEqual([{ installRoot: '/opt/alfred', nodePath: '/usr/bin/node', release: 'abc1234' }])
     expect(c.out.join('')).toBe('kit=written\nreplaced=yes\ncleaned=1\n')
     expect(c.err).toEqual([])
   })
@@ -315,13 +315,13 @@ describe('runSupportCli', () => {
 
 describe('createStatusDeps', () => {
   const savedHome = process.env['HOME']
-  const savedSeam = process.env['MARVEEN_SSH_DIR']
+  const savedSeam = process.env['ALFRED_SSH_DIR']
   let root: string | null = null
   afterEach(() => {
     if (savedHome === undefined) delete process.env['HOME']
     else process.env['HOME'] = savedHome
-    if (savedSeam === undefined) delete process.env['MARVEEN_SSH_DIR']
-    else process.env['MARVEEN_SSH_DIR'] = savedSeam
+    if (savedSeam === undefined) delete process.env['ALFRED_SSH_DIR']
+    else process.env['ALFRED_SSH_DIR'] = savedSeam
     if (root !== null) rmSync(root, { recursive: true, force: true })
     root = null
   })
@@ -337,8 +337,8 @@ describe('createStatusDeps', () => {
     writeFileSync(join(elsewhere, '.ssh', 'authorized_keys'), 'not this one either\n')
     mkdirSync(join(home, '.ssh', 'authorized_keys2'))
     process.env['HOME'] = elsewhere
-    process.env['MARVEEN_SSH_DIR'] = elsewhere
-    const real = createStatusDeps({ name: 'marveen', isRoot: false, home })
+    process.env['ALFRED_SSH_DIR'] = elsewhere
+    const real = createStatusDeps({ name: 'alfred', isRoot: false, home })
     expect(real.readKeysFile('authorized_keys')).toBe('aé\n')
     // A directory in the file's place exists and cannot be read as a file.
     expect(real.readKeysFile('authorized_keys2')).toBe('unreadable')
@@ -401,7 +401,7 @@ describe('enable and disable on the command line', () => {
 
   it('tells the kit copy from the tree copy by its own URL', () => {
     expect(startedFromKit('data:text/javascript;base64,AAAA')).toBe(true)
-    expect(startedFromKit('file:///opt/marveen/scripts/support-standby.mjs')).toBe(false)
+    expect(startedFromKit('file:///opt/alfred/scripts/support-standby.mjs')).toBe(false)
     expect(startedFromKit('not a url')).toBe(false)
   })
 
@@ -508,7 +508,7 @@ describe('the status and the group record', () => {
 
   it('prints on and the key names, and no source address, grant id or consent', async () => {
     home = realpathSync(mkdtempSync(join(tmpdir(), 'support-status-home-')))
-    const supportDir = join(home, '.marveen', 'support')
+    const supportDir = join(home, '.alfred', 'support')
     mkdirSync(supportDir, { recursive: true, mode: 0o700 })
     writeSupportToken(supportDir, 'mst_' + 'TESTONLY'.repeat(5) + '_-0')
     writeGroupRecord(supportDir, {
@@ -521,7 +521,7 @@ describe('the status and the group record', () => {
       dispatchPath: join(supportDir, 'kit', 'support-dispatch.sh'),
       sshd: { major: 9, minor: 6 },
     })
-    const real = createStatusDeps({ name: 'marveen', isRoot: false, home })
+    const real = createStatusDeps({ name: 'alfred', isRoot: false, home })
     const text = formatSupportStatus(await supportStatus({ ...real, pins: { keys: [], fromCidrs: [] } }))
     expect(text).toContain('standby=on\nstandby_keys=key1,key2\n')
     for (const secret of ['203.0.113.7', '3f2504e0', '2026-11-15', TEST_ONLY_KEYS[0].fingerprint, 'mst_']) {

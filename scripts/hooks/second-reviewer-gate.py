@@ -53,7 +53,7 @@ def is_high_risk(tool_name: str, tool_input: dict) -> bool:
 
 
 def agent_name(payload: dict) -> str:
-    name = os.environ.get("MARVEEN_AGENT_NAME")
+    name = os.environ.get("ALFRED_AGENT_NAME")
     if name:
         return name
     cwd = payload.get("cwd")

@@ -23,7 +23,7 @@
 #  3. Never fatal: a failing or missing `claude` is logged and skipped; the
 #     function always returns 0.
 
-CHANNEL_PLUGIN_REFRESH_IDS="${CHANNEL_PLUGIN_REFRESH_IDS:-slack-channel@marveen-marketplace}"
+CHANNEL_PLUGIN_REFRESH_IDS="${CHANNEL_PLUGIN_REFRESH_IDS:-slack-channel@alfred-marketplace}"
 
 # The config dirs that can hold a plugin registry: the user-level one, the main
 # channel session's, and each agent's. One line each, symlinks resolved, no
@@ -145,7 +145,7 @@ refresh_channel_plugins() { # install_dir home
   if ! command -v timeout >/dev/null 2>&1 && ! command -v perl >/dev/null 2>&1; then
     echo "  (nincs timeout es perl: a plugin-frissites idokorlat nelkul fut)"
   fi
-  empty="$(mktemp -d "${TMPDIR:-/tmp}/marveen-plugin-refresh.XXXXXX")" || return 0
+  empty="$(mktemp -d "${TMPDIR:-/tmp}/alfred-plugin-refresh.XXXXXX")" || return 0
   while IFS= read -r cfg; do
     for id in $CHANNEL_PLUGIN_REFRESH_IDS; do
       channel_plugin_installed "$cfg" "$id" || continue

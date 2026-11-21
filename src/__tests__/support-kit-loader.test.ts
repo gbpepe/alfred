@@ -76,7 +76,7 @@ describe('running the kit copy of the routine', () => {
 
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'support-kit-loader-')))
-    supportDir = join(root, 'home', '.marveen', 'support')
+    supportDir = join(root, 'home', '.alfred', 'support')
   })
   afterEach(() => {
     rmSync(root, { recursive: true, force: true })
@@ -92,7 +92,7 @@ describe('running the kit copy of the routine', () => {
         { name: KIT_DISPATCHER_NAME, content: dispatcher, sha256: sha(dispatcher), executable: false },
         { name: KIT_ROUTINE_NAME, content: routine, sha256: sha(routine), executable: false },
       ],
-      installRoot: '/opt/marveen',
+      installRoot: '/opt/alfred',
       nodePath: NODE,
       nodeMin: 20,
       release: RELEASE,

@@ -241,7 +241,7 @@ describe('bashEgressParserCovers', () => {
     expect(bashEgressParserCovers('agent-a', {})).toBe(false)
   })
   it('the main agent is covered by the --main-scope registration in the project-local settings', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'marveen-egress-'))
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-egress-'))
     try {
       const p = join(dir, 'settings.json')
       writeFileSync(p, JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node "$CLAUDE_PROJECT_DIR/scripts/hooks/bash-egress-parser.mjs" --main-scope' }] }] } }))
@@ -305,7 +305,7 @@ describe('bashEgressDenyTargetPath', () => {
 
 describe('ensureBashEgressDeny for the main agent', () => {
   it('writes the rules into the config dir it was given', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'marveen-egress-'))
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-egress-'))
     try {
       expect(ensureBashEgressDeny(MAIN_AGENT_ID, dir)).toBe(true)
       const written = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf-8'))
@@ -319,7 +319,7 @@ describe('ensureBashEgressDeny for the main agent', () => {
   })
 
   it('keeps the config dir\'s other keys -- the file is rebuilt on every start and only its own keys survive', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'marveen-egress-'))
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-egress-'))
     try {
       writeFileSync(join(dir, 'settings.json'), JSON.stringify({ hooks: { PreCompact: [] }, enabledPlugins: { x: true } }))
       ensureBashEgressDeny(MAIN_AGENT_ID, dir)

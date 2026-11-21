@@ -86,8 +86,7 @@ import { readTranscriptMtimeAcrossConfigDirs, projectsDirFor } from './active-mo
 import { classifyDelivery, readUserPromptsSince, sessionAuthFailedSince, type DeliveryVerdict, type ReceivedPrompt } from './delivery-integrity.js'
 import { paneTyped } from './pane-text.js'
 import { mainConfigRoots } from './inbound-probe.js'
-import { channelStateDir, getProvider, readChannelToken, readTeamsCreds, type ChannelProviderType } from '../channel-provider.js'
-import { sendTeamsMessage } from '../teams-send.js'
+import { channelStateDir, getProvider, readChannelToken, type ChannelProviderType } from '../channel-provider.js'
 import {
   agentSessionName,
   isAgentRunning,
@@ -106,7 +105,6 @@ import {
 import { isRestartInFlight } from './restart-lock.js'
 import { mainRespawnHold } from './main-respawn-hold.js'
 import { MAIN_CHANNELS_SESSION } from './main-agent.js'
-import { findTelegramTopic, telegramTopicsEnabled } from './telegram-topics.js'
 import { runCommandTask } from './command-task.js'
 import { trackDetachedGroup } from './detached-groups.js'
 import { decideQuotaAction, quotaBlindness, type QuotaSnapshot, type QuotaWorkClass } from '../quota-gate.js'
@@ -145,7 +143,7 @@ const RESUBMIT_LANE_BUSY_MAX_SKIPS = 20
 // clear before the agent even starts.
 //
 // Timeout: if the session is STILL busy TASK_FIRE_TIMEOUT_MS after injection,
-// we send a one-shot Telegram alert. 'busy' is the specific signal -- 'unknown'
+// we send a one-shot channel alert. 'busy' is the specific signal -- 'unknown'
 // and 'error' are handled by the context-guard / stuck-tool-call-watcher so we
 // leave them alone here.
 //
@@ -163,7 +161,7 @@ const TASK_FIRE_MAX_TRACK_MS = 6 * 60 * 60_000
 // only when the agent does nothing else. In practice the owner talks to the
 // agent mid-task, so a heartbeat that fired at 12:00 is still the in-flight
 // entry at 12:40 while the session is busy with a conversation -- and every one
-// of those produced a "possible hang" Telegram alert. The owner got four or
+// of those produced a "possible hang" channel alert. The owner got four or
 // five of them in a single morning (2026-09-01) and asked for it to stop,
 // which is the correct reading: an alert that fires on normal work is noise,
 // and noise is what makes a real hang invisible. 45 minutes still catches a
@@ -229,7 +227,7 @@ export interface TaskInflightEntry {
   runId: number | null
   // Task type, captured at injection time for the same reason as timeoutMs.
   // Read by sendTaskTimeoutAlert to keep self-healing heartbeats out of the
-  // operator's Telegram (see the guard there).
+  // operator's channel (see the guard there).
   taskType: string | undefined
   // True while attemptFireTask's detached post-send resubmit chain is still
   // working on this injection (probing for a parked prompt, re-pressing Enter,
@@ -419,7 +417,7 @@ export type TaskTimeoutDecision = 'done' | 'abandoned' | 'alert' | 'escalate' | 
 // the two would otherwise persist 'tail-lost' for what is really a 'split'.
 // Every other verdict is final on first sight.
 //
-// The CLOSING look never leaves the question open (Marveen's #1506 review): in
+// The CLOSING look never leaves the question open (Alfred's #1506 review): in
 // flight, "nothing of ours arrived" means "not yet"; at the close there is no
 // "yet". It becomes 'not-arrived' when a transcript directory was readable,
 // and 'unverifiable' when none was -- so a wholly lost prompt no longer sits
@@ -726,7 +724,7 @@ export function isOwnPromptParkedOverfull(pane: string | null, record: InjectedP
 // and abandoned them after an hour -- which silently dropped business-
 // critical schedules. The new policy never abandons; once the age
 // crosses ALERT_THRESHOLD_MS the alerting layer stamps alert_sent_at
-// before each Telegram send and clears the stamp on delivery failure,
+// before each channel send and clears the stamp on delivery failure,
 // giving exactly-one stamp per attempt and at-least-once delivery until
 // success. See sendPendingRetryAlert below.
 
@@ -1080,28 +1078,10 @@ function persistLastTickMs(nowMs: number): void {
 //   non-zero exit            → log warning, run LLM anyway (fail-open)
 // --- Bound-channel chat id resolution for scheduled-task prompts ---
 //
-// TELEGRAM: The prompt prefix used to carry a "chat_id: 0" sentinel meaning "the running
-// agent's own bound channel". The convention belonged to an earlier channel
-// implementation; the official Telegram plugin (0.0.6) knows nothing about it: the reply
-// tool calls assertAllowedChat(chat_id) first, "0" is never on the allowlist, so
-// every non-heartbeat scheduled task threw at delivery time (Zara, 2026-07-27;
-// all 32 task-configs affected -- none carries a chat_id). The sentinel's INTENT
-// stays correct (a sub-agent's result must go to its own owner, never the boss's
-// chat), so the fix resolves the concrete chat id at prompt-build time from the
-// same place the plugin enforces it: the agent's own channel access.json.
-//
-// SLACK: the resolution is now provider-aware. The main agent and each
-// sub-agent can be bound to Telegram OR Slack (CHANNEL_PROVIDER / per-agent
-// agent-config.json channelProvider), and the access.json lives under the
-// matching provider subdir. Reading telegram/access.json unconditionally meant a
-// Slack-bound agent (no telegram/access.json at all) resolved to null and its
-// scheduled tasks silently shipped with NO delivery instruction (measured on the
-// live CHANNEL_PROVIDER=slack install: telegram/access.json absent, so every
-// scheduled task result had nowhere to go).
+// Resolves the concrete chat id at prompt-build time from the same place
+// the channel plugin enforces it: the agent's own channel access.json.
 
-/** Pure core: first DM allowlist entry, else first allowed group/channel, else
- *  null. Handles both the Telegram/Discord `groups` map and the Slack `channels`
- *  map so one helper covers every provider's access.json shape. */
+/** Pure core: first DM allowlist entry, else first allowed group/channel, else null. */
 export function chatIdFromAccessConfig(raw: unknown): string | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -1110,15 +1090,11 @@ export function chatIdFromAccessConfig(raw: unknown): string | null {
     if (typeof first === 'string' && first.trim()) return first.trim()
     if (typeof first === 'number') return String(first)
   }
-  // #2404 (WRONGRECIP819, the #2403 Discord rule on every provider): exactly one allowed group or channel is the target;
-  // two or more are no target at all. The key order is insertion order, a re-pairing can reorder it, and everyone in a
-  // group or channel reads what lands there, so the first key would be a guess that can leak. resolveBoundChannel
-  // turns 2+ into ambiguousCandidates, so the delivery is skipped and reported.
   const targets = groupOrChannelTargets(o)
   return targets.length === 1 ? targets[0]! : null
 }
 
-/** The allowed groups (Telegram, Discord: `groups`) and channels (Slack: `channels`) of an access.json, in file order. */
+/** The allowed groups (`groups`) and channels (`channels`) of an access.json, in file order. */
 export function groupOrChannelTargets(raw: unknown): string[] {
   if (!raw || typeof raw !== 'object') return []
   const o = raw as Record<string, unknown>
@@ -1130,55 +1106,29 @@ export function groupOrChannelTargets(raw: unknown): string[] {
   return out
 }
 
-
-// WRONGRECIP819 (Marci, 2026-08-19, kanban f1217c23): the "first allowlist
-// entry" rule below was a HEURISTIC, not a stated fact -- access.json has no
-// owner field, so with 2+ DM contacts a reordering silently redirects a
-// scheduled task's result to the wrong person. That was never hypothetical:
-// measured on this host, 6 of 7 currently-enabled sub-agent `task`-type
-// schedules either contradicted their own explicit recipient with a
-// wrapper-injected owner chat_id, or carried NO real chat target at all (their
-// true delivery is an inter-agent message) and still got a spurious "send this
-// to the owner" instruction. A warn line does not prevent the misdelivery; only
-// refusing to guess does.
-//
-// SLACKFOCSATORNA1007C (owner, 2026-10-07: "Ez legyen a fo ag!" -- the Slack
-// DM is the main channel): the main agent is bound to Telegram, so every one
-// of its scheduled tasks was told to deliver on Telegram, and the task config
-// had no way to say otherwise. Two knobs, neither of which touches sub-agents
-// unless a task names it explicitly:
-//   - task-config.json `channelProvider`: this task delivers on that provider;
-//   - SCHEDULED_DELIVERY_CHANNEL="<provider>:<chat id>" on the Settings page
-//     (overrides-only since ENVRELAXGATE1104: a .env line no longer counts):
-//     the default for the MAIN agent's tasks that pin nothing themselves.
-//
 // Precedence for a scheduled task's delivery target:
-//   1. task.telegramChatId === 'none'  -> no chat target, by design.
+//   1. task.channelChatId === 'none'   -> no chat target, by design.
 //   2. task.channelProvider set        -> that provider; the chat is
-//      task.telegramChatId when pinned, else (main agent) the install default
+//      task.channelChatId when pinned, else (main agent) the install default
 //      when it names the same provider, else the agent's own binding on that
 //      provider (with the same 2+-contact refusal).
-//   3. task.telegramChatId set         -> that value, always (author-pinned),
+//   3. task.channelChatId set          -> that value, always (author-pinned),
 //      on the agent's own provider.
 //   4. main agent + install default    -> the default.
-//   5. otherwise                       -> the agent's own bound channel, which
-//      returns ambiguousCandidates instead of picking one when 2+ DM contacts
-//      exist.
-// The config key keeps its historical `telegramChatId` name across providers so
-// existing task-config.json files stay valid.
+//   5. otherwise                       -> the agent's own bound channel.
 export function resolveTaskChannelTarget(
-  task: Pick<ScheduledTask, 'agent' | 'telegramChatId' | 'channelProvider'>,
+  task: Pick<ScheduledTask, 'agent' | 'channelChatId' | 'channelProvider'>,
   deliveryDefault: DeliveryDefault | null = readScheduledDeliveryDefault(),
 ): BoundChannel {
   const agentName = task.agent || MAIN_AGENT_ID
   const isMain = agentName === MAIN_AGENT_ID
-  if (task.telegramChatId === 'none') return { provider: task.channelProvider ?? resolveAgentProvider(agentName), chatId: null }
+  if (task.channelChatId === 'none') return { provider: task.channelProvider ?? resolveAgentProvider(agentName), chatId: null }
   if (task.channelProvider) {
-    if (task.telegramChatId) return { provider: task.channelProvider, chatId: task.telegramChatId }
+    if (task.channelChatId) return { provider: task.channelProvider, chatId: task.channelChatId }
     if (isMain && deliveryDefault && deliveryDefault.provider === task.channelProvider) return { ...deliveryDefault }
     return resolveBoundChannel(agentName, task.channelProvider)
   }
-  if (task.telegramChatId) return { provider: resolveAgentProvider(agentName), chatId: task.telegramChatId }
+  if (task.channelChatId) return { provider: resolveAgentProvider(agentName), chatId: task.channelChatId }
   if (isMain && deliveryDefault) return { ...deliveryDefault }
   return resolveBoundChannel(agentName)
 }
@@ -1187,7 +1137,7 @@ export type DeliveryDefault = { provider: ChannelProviderType; chatId: string }
 
 /**
  * SCHEDULED_DELIVERY_CHANNEL parsed: "<provider>:<chat id>", e.g.
- * "slack:D0C74N9SAF6". Anything else -- no colon, an unknown provider, an
+ * "discord:1234567890123456789". Anything else -- no colon, an unknown provider, an
  * empty chat, the "0" placeholder -- is null: no override, never a guess.
  */
 export function parseDeliveryDefault(raw: string | undefined | null): DeliveryDefault | null {
@@ -1228,120 +1178,30 @@ export function readScheduledDeliveryDefault(
   return parsed
 }
 
-/** NOTIFY_TELEGRAM_FALLBACK=0: Telegram is never a fallback (read fresh, a read error keeps the default). */
-export function readTelegramFallbackOff(): boolean {
-  try { return String(getEffectiveSettingValue('NOTIFY_TELEGRAM_FALLBACK') ?? '').trim() === '0' } catch { return false }
-}
-
 /** The provider's name in the nominative, for "a <name> hibat". */
 export function channelDisplayName(provider: ChannelProviderType): string {
   switch (provider) {
-    case 'slack': return 'Slack'
     case 'discord': return 'Discord'
-    case 'googlechat': return 'Google Chat'
-    case 'teams': return 'Teams'
-    case 'telegram': return 'Telegram'
-    case 'gromzo': return 'Gromzo'
   }
 }
 
-/**
- * The fallback clause of the MAIN agent's delivery instruction when it is told
- * to deliver somewhere other than Telegram: if that channel's reply tool is
- * missing OR FAILS, the owner's Telegram chat (ALLOWED_CHAT_ID) is the
- * fallback, and its first line names the failure. The failing case is the
- * live one (review 35241): the slack-channel plugin's outbound gate refuses a
- * COLD DM -- one not in access.json channels that has not messaged this
- * process yet -- with an "Outbound gate" error, while the tool itself exists.
- * Same shape as the morning-briefing task's fallback. Empty for Telegram itself, for sub-agents (ALLOWED_CHAT_ID is the
- * boss's chat, never a sub-agent owner's -- WRONGRECIP819), and when no
- * Telegram owner chat is configured: no chat, no fallback, no guess.
- */
-export function deliveryFallbackClause(
-  provider: ChannelProviderType,
-  isMain: boolean,
-  ownerTelegramChat: string | null = normalizeChatId(configuredOwnerChatFor('telegram')),
-  telegramFallbackOff: boolean = readTelegramFallbackOff(),
-): string {
-  if (provider === 'telegram' || !isMain) return ''
-  // NOTIFY_TELEGRAM_FALLBACK=0 (SLACKATALLAS1006, owner 2026-10-10: "Telegram
-  // SOHA"): the owner left Telegram, so the fallback is notify.sh, which posts
-  // with the dashboard's own Slack token and is not subject to the plugin's
-  // outbound gate that refuses a cold DM.
-  if (telegramFallbackOff) {
-    return `Ha ${channelDeliveryName(provider)} nem tudod elkuldeni (a reply tool hianyzik VAGY hibat ad, pl. "Outbound gate"), kuldd a ${join(PROJECT_ROOT, 'scripts', 'notify.sh')} "<szoveg>" paranccsal (a gazda Slack-celjara megy); Telegramra NE kuldd. Ha a notify.sh sem "(Slack)"-ot ir, a hibat ird a napi naploba, mas csatornat ne probalj. `
-  }
-  if (!ownerTelegramChat) return ''
-  return `Ha ${channelDeliveryName(provider)} nem tudod elkuldeni (a reply tool hianyzik VAGY hibat ad, pl. "Outbound gate"), kuldd Telegramon (chat_id: ${ownerTelegramChat}, reply tool), es az uzenet ELSO sora nevezze meg a ${channelDisplayName(provider)} hibat (a hibauzenettel); mas cimzettet ne tippelj. `
-}
-
-// The task types whose prompt carries ONLY a bare tag, never a "send the result to
-// <channel>" instruction. heartbeat: a background check nobody is waiting for.
-// dream-engine (#2284): its SKILL.md forbids a channel send twice (the owner is asleep;
-// DREAM.md goes out with the 07:30 briefing), so the runner must not say the opposite in
-// the same prompt. The type is cast, not validated (see catchUpMaxAgeMs), so every
-// other type, unknown ones included, keeps the delivery instruction; catch-up budget and
-// quota class are NOT changed here. Returns the tag, or null for a delivering type.
 export function silentTaskTag(task: Pick<ScheduledTask, 'type' | 'name'>): string | null {
   if (task.type === 'heartbeat') return `[Heartbeat: ${task.name}] `
   if ((task.type as string) === 'dream-engine') return `[Utemezett feladat: ${task.name}] `
   return null
 }
 
-/** The prompt prefix of a non-heartbeat scheduled task whose delivery target resolved.
- *  `threadId`: a Telegram topic (resolveTaskTopicThreadId); without one the text is unchanged. */
-export function taskDeliveryPrefix(taskName: string, provider: ChannelProviderType, chatId: string, isMain: boolean, threadId: number | null = null): string {
-  const topic = threadId === null ? '' : `, message_thread_id: ${threadId}`
-  return `[Utemezett feladat: ${taskName}] Az eredmenyt kuldd el ${channelDeliveryName(provider)} (chat_id: ${chatId}${topic}, reply tool). ${deliveryFallbackClause(provider, isMain)}`
-}
-
-export interface TaskTopicResolution {
-  threadId: number | null
-  /** Why a configured telegramTopic is not used; absent when none is configured or the switch is off. */
-  problem?: string
-}
-
-// task-config.json `telegramTopic`: a topic NAME from store/telegram-topics.json,
-// resolved to its thread id here, so the agent gets the number and never guesses
-// one from the name. Only the main bot's chat has named topics (`/topic new`
-// runs in the main chat), and a thread id is only valid in the chat of the bot
-// that opened it, so a sub-agent's or a non-Telegram task gets no topic. Any
-// failure delivers to the chat without a topic (the owner still gets the
-// result) and is reported; with the switch off the field is ignored, silently.
-export function resolveTaskTopicThreadId(
-  task: Pick<ScheduledTask, 'telegramTopic'>,
-  bound: { provider: ChannelProviderType; chatId: string },
-  isMain: boolean,
-  topicsOn: boolean = telegramTopicsEnabled(),
-  find: typeof findTelegramTopic = findTelegramTopic,
-): TaskTopicResolution {
-  if (!task.telegramTopic || !topicsOn) return { threadId: null }
-  if (bound.provider !== 'telegram') return { threadId: null, problem: `the task delivers on ${bound.provider}, not Telegram` }
-  if (!isMain) return { threadId: null, problem: 'only the main agent has named topics' }
-  const found = find(task.telegramTopic, bound.chatId)
-  if (!found) return { threadId: null, problem: 'no topic of this name for the delivery chat (/topic lists them)' }
-  return { threadId: found.threadId }
+/** The prompt prefix of a non-heartbeat scheduled task whose delivery target resolved. */
+export function taskDeliveryPrefix(taskName: string, provider: ChannelProviderType, chatId: string, _isMain = false): string {
+  return `[Utemezett feladat: ${taskName}] Az eredmenyt kuldd el ${channelDeliveryName(provider)} (chat_id: ${chatId}, reply tool). `
 }
 
 /** How a scheduled-task prompt names the delivery channel, in Hungarian, for
- *  the "kuldd el <ide>" instruction. The reply tool itself is the same across
- *  providers -- only the channel noun and the chat_id format differ. */
+ *  the "kuldd el <ide>" instruction. */
 export function channelDeliveryName(provider: ChannelProviderType): string {
   switch (provider) {
-    case "slack":
-      return "Slacken";
-    case "discord":
-      return "Discordon";
-    case "googlechat":
-      return "Google Chaten";
-    case "teams":
-      return "Teamsen";
-    case "telegram":
-      return "Telegramon";
-    case "gromzo":
-      return "Gromzón";
-    // No default: the switch is exhaustive over ChannelProviderType, so a new
-    // provider is a compile error here instead of silently reading "Telegramon".
+    case 'discord':
+      return 'Discordon'
   }
 }
 
@@ -1390,11 +1250,7 @@ export function discordBoundChannelFromAccess(raw: unknown): { chatId: string | 
 }
 
 /** The agent's own bound channel + chat, or {provider, chatId:null} when no
- *  binding exists. Reads <agent channels dir>/<provider>/access.json -- the
- *  exact file the plugin's assertAllowedChat enforces, so a resolved id is
- *  deliverable by construction. Deliberately NOT falling back to
- *  ALLOWED_CHAT_ID: that is the boss's chat, and pointing a sub-agent's result
- *  there is the precise bug the old sentinel existed to avoid. */
+ *  binding exists. Reads <agent channels dir>/<provider>/access.json. */
 export function resolveBoundChannel(agentName: string, providerOverride?: ChannelProviderType): BoundChannel {
   const provider = providerOverride ?? resolveAgentProvider(agentName)
   const dir = agentName === MAIN_AGENT_ID
@@ -1926,7 +1782,7 @@ const discordNoChannelAlerted = new Set<string>()
 
 /** The one-time notice for a Discord-bound task whose access.json has user ids only (#2390). */
 export function discordNoChannelNotice(taskName: string, agentName: string, scheduleId: string): string {
-  return `[FELHÍVÁS] A(z) "${taskName}" ütemezett feladat (agent: ${agentName}) Discordra kézbesítene, de nincs Discord csatorna-azonosító: az ágens Discord access.json-jában csak felhasználó-azonosító (allowFrom) van, a Discord plugin pedig csatorna-azonosítóra küld (felhasználó-azonosítóra "Unknown Channel" hibát ad). A kézbesítési utasítás kimaradt EBBŐL a futásból (nem küldtünk felhasználó-azonosítóra). Állítsd be a csatornát: PUT /api/schedules/${scheduleId} ({"channelProvider": "discord", "telegramChatId": "<Discord csatorna-azonosító>"}), vagy az install SCHEDULED_DELIVERY_CHANNEL beállítását ("discord:<csatorna-azonosító>"). A task-config.json kézi szerkesztése hash-eltérés miatt leállítja a feladatot.`
+  return `[FELHÍVÁS] A(z) "${taskName}" ütemezett feladat (agent: ${agentName}) Discordra kézbesítene, de nincs Discord csatorna-azonosító: az ágens Discord access.json-jában csak felhasználó-azonosító (allowFrom) van, a Discord plugin pedig csatorna-azonosítóra küld (felhasználó-azonosítóra "Unknown Channel" hibát ad). A kézbesítési utasítás kimaradt EBBŐL a futásból (nem küldtünk felhasználó-azonosítóra). Állítsd be a csatornát: PUT /api/schedules/${scheduleId} ({"channelProvider": "discord", "channelChatId": "<Discord csatorna-azonosító>"}), vagy az install SCHEDULED_DELIVERY_CHANNEL beállítását ("discord:<csatorna-azonosító>"). A task-config.json kézi szerkesztése hash-eltérés miatt leállítja a feladatot.`
 }
 
 // Per target pane (host + session), the usage-limit episode the
@@ -2020,7 +1876,7 @@ function mcpMissingReason(taskName: string, agentName: string): string {
 export function allowedTargetSessions(agents: string[] = listAgentNames()): Set<string> {
   // A test-only list (src/__tests__/helpers/allow-target-sessions.ts) for suites whose fixtures use made-up session
   // names; production never sets this symbol.
-  const testOnly = (globalThis as Record<symbol, unknown>)[Symbol.for('marveen.schedule.targetSessionAllowForTest')] as Set<string> | undefined
+  const testOnly = (globalThis as Record<symbol, unknown>)[Symbol.for('alfred.schedule.targetSessionAllowForTest')] as Set<string> | undefined
   return new Set([MAIN_CHANNELS_SESSION, ...agents.map((a) => agentSessionName(a)), ...(testOnly ?? [])])
 }
 export function targetSessionRefused(task: Pick<ScheduledTask, 'targetSession'>, allowed: () => Set<string> = allowedTargetSessions): boolean {
@@ -2263,7 +2119,7 @@ async function attemptFireTask(
     // steps: the pane accepts the keystrokes and the wedged session never acts
     // on them, and the context-guard's rescue restart then discards the queued
     // input (2026-07-17: reggeli-napindito force-injected into a saturated
-    // marveen-channels and vanished without a trace). Closes the KNOWN
+    // alfred-channels and vanished without a trace). Closes the KNOWN
     // FOLLOW-UP that previously lived here: saturation is the one busy-state
     // forceSend must respect. Defer via the pending-retry queue (the caller
     // maps 'busy' to a retry row, exempt from skipIfBusy for forceSend); the
@@ -2329,59 +2185,23 @@ async function attemptFireTask(
       // operational directive here.
       //
       // SECURITY (removed 2026-06-08): the previous `agentName !== 'heartbeat'`
-      // branch injected a coercive "call exactly one local tool before you
-      // write anything, do NOT use Telegram" keep-alive preamble. That text sat
-      // OUTSIDE the wrapUntrusted() envelope, so the receiving agent -- told to
-      // trust everything outside the untrusted tags -- was instructed to perform
-      // a mandatory no-op tool call and to suppress the very channel the user
-      // sees. The runner was poisoning its own trusted channel: a prompt
-      // injection we shipped ourselves. It also contradicted the agent contract
-      // and, if the channel-plugin disable leaked through user-scope settings,
-      // told the leftover Telegram tool to message ALLOWED_CHAT_ID. Removed
-      // entirely; ALL heartbeat agents now get the clean tag. Channel liveness
-      // is handled separately by the channels TUI keepalive
-      // (channel-coordinator/liveness.ts), never by injecting instructions into
-      // heartbeat prompts.
+      // branch injected a coercive keep-alive preamble. Removed entirely.
       prefix = silentTag
     } else {
-      // Target the RUNNING agent's own bound channel, NOT the global
-      // ALLOWED_CHAT_ID. The latter is the main/admin chat; injecting it here
-      // pointed every sub-agent's task result at the boss's chat instead of its
-      // own owner (e.g. attilamarveenja -> Papp Attila). The old "chat_id: 0"
-      // sentinel encoded the same intent, but the official Telegram plugin rejects it
-      // (assertAllowedChat: "0" is never allowlisted), so the binding is
-      // resolved to a CONCRETE id here at prompt-build time.
-      // SLACK: the resolution follows the agent's actual provider (Telegram or Slack) and
-      // the instruction names that channel + uses its chat_id format. No
-      // binding -> no delivery instruction at all: better to skip delivery than
-      // to deliver to the wrong chat, and the warn below makes the config gap
-      // visible. The system-level pending-retry alert further down uses the
-      // owner chat by design.
       const bound = resolveTaskChannelTarget(task)
       if (bound.chatId) {
-        // Resolved cleanly: forget any earlier ambiguity alert for this task so
-        // that removing the pin again is not silently swallowed.
         ambiguousTargetAlerted.delete(task.name)
         discordNoChannelAlerted.delete(task.name)
         const isMain = agentName === MAIN_AGENT_ID
-        const topic = resolveTaskTopicThreadId(task, { provider: bound.provider, chatId: bound.chatId }, isMain)
-        if (topic.problem) {
-          logger.warn({ task: task.name, agent: agentName, telegramTopic: task.telegramTopic, reason: topic.problem }, 'scheduled task: telegramTopic not used, the result goes to the chat without a topic')
-        }
-        prefix = taskDeliveryPrefix(task.name, bound.provider, bound.chatId, isMain, topic.threadId)
+        prefix = taskDeliveryPrefix(task.name, bound.provider, bound.chatId, isMain)
       } else if (bound.ambiguousCandidates) {
-        // WRONGRECIP819: 2+ possible human contacts and no explicit pin -- do
-        // NOT guess. Delivery is skipped (bare tag, same as the config-gap
-        // branch below) but this is NOT a config gap, it is an unresolved
-        // author decision, so it gets error-level visibility plus a direct
-        // nudge to fix it, instead of a log line nobody is watching.
         logger.error({ task: task.name, agent: agentName, provider: bound.provider, candidates: bound.ambiguousCandidates }, 'scheduled task: delivery target is ambiguous (2+ DM contacts, or 2+ allowed groups/channels; no pinned chat id) -- skipping the delivery instruction instead of guessing')
         if (!ambiguousTargetAlerted.has(task.name)) {
           ambiguousTargetAlerted.add(task.name)
           createAgentMessage(
             'system',
             MAIN_AGENT_ID,
-            `[FELHIVAS] A(z) "${task.name}" utemezett feladat (agent: ${agentName}) cimzettje bizonytalan -- ${bound.ambiguousCandidates} lehetseges cimzett van az agens access.json-jaban (DM-kontakt az allowFrom-ban, vagy engedelyezett csoport/csatorna a groups/channels alatt), es a task-config.json-ban nincs telegramChatId megadva. A kezbesitesi utasitas kimaradt EBBOL A futasbol (nem tippeltunk). Toltsd ki a telegramChatId mezot (konkret chat_id, vagy "none" ha a taskot nem kell csatornara kuldeni) a PUT /api/schedules/${task.dirName ?? task.name} hivassal ({"telegramChatId": ...}); a task-config.json kezi szerkesztese hash-elteres miatt leallitja a feladatot.`,
+            `[FELHIVAS] A(z) "${task.name}" utemezett feladat (agent: ${agentName}) cimzettje bizonytalan -- ${bound.ambiguousCandidates} lehetseges cimzett van az agens access.json-jaban (DM-kontakt az allowFrom-ban, vagy engedelyezett csoport/csatorna a groups/channels alatt), es a task-config.json-ban nincs channelChatId megadva. A kezbesitesi utasitas kimaradt EBBOL A futasbol (nem tippeltunk). Toltsd ki a channelChatId mezot (konkret chat_id, vagy "none" ha a taskot nem kell csatornara kuldeni) a PUT /api/schedules/${task.dirName ?? task.name} hivassal ({"channelChatId": ...}); a task-config.json kezi szerkesztese hash-elteres miatt leallitja a feladatot.`,
           )
         }
         prefix = `[Utemezett feladat: ${task.name}] `
@@ -2904,66 +2724,26 @@ export async function runScheduledTaskNow(
 }
 
 // Fire an owner alert when a pending retry has been stuck past the threshold.
-// The alert goes over the main agent's bound channel (CHANNEL_PROVIDER:
-// Telegram or Slack). Stamps `alert_sent_at` BEFORE the network call so
-// concurrent ticks and crash-restarts cannot race into double-alerting on the
-// same attempt. If the send fails, the stamp is cleared so the next tick can
-// retry -- that way a transient channel outage or a bad token doesn't silently
-// suppress every future alert on this row. Net semantics: exactly-one stamp per
-// delivery attempt, at-least-once delivery with a 60s retry cadence until success.
-// Bot token for the system-level scheduler alerts (pending-retry, task-timeout,
-// catch-up summary). SLACKAWARE: the alerts go over whatever channel the MAIN
-// agent is bound to (CHANNEL_PROVIDER), so the token is resolved for that
-// provider. Every provider keeps the historical dual-location lookup:
-// marveen/.env first, then the main agent's channel .env (2026-07-08: every
-// scheduler alert was silently suppressed on hosts where the token had moved
-// to the plugin env after the channels migration -- that fallback must hold
-// for Telegram and Slack alike). readChannelToken maps the provider to its
-// env key (TELEGRAM_BOT_TOKEN / SLACK_BOT_TOKEN / ...). A creds-based
-// provider without a direct send path (Google Chat) has no bot token, so the
-// alert falls back to the log-only path in each caller; Teams now has a
-// direct dashboard send and resolves its app id through the same lookup.
-// `provider` and `readToken` are injectable for the unit test only (lookup
-// order + empty-value fall-through); production callers use the defaults.
+// The alert goes over the main agent's bound channel (CHANNEL_PROVIDER: Discord).
 export function resolveSchedulerAlertToken(
   provider: ChannelProviderType = CHANNEL_PROVIDER,
   readToken: (provider: ChannelProviderType, envFilePath: string) => string | null = readChannelToken,
 ): string | undefined {
-  if (provider === "googlechat") return undefined;
-
   return (
-    readToken(provider, join(PROJECT_ROOT, ".env")) ||
-    readToken(provider, join(channelStateDir(provider), ".env")) ||
+    readToken(provider, join(PROJECT_ROOT, '.env')) ||
+    readToken(provider, join(channelStateDir(provider), '.env')) ||
     undefined
-  );
+  )
 }
 
-// Resolve the owner chat for the MAIN agent's bound provider. The default
-// resolveOwnerChatId() reads ALLOWED_CHAT_ID + telegram/access.json; the
-// scheduler alerts must follow CHANNEL_PROVIDER on BOTH halves: the configured
-// id comes from the provider's own .env key (SLACK_CHANNEL_ID etc. via
-// configuredOwnerChatFor -- a stale Telegram ALLOWED_CHAT_ID must not win on a
-// Slack install) and the paired fallback from slack/access.json (the live
-// CHANNEL_PROVIDER=slack install has no telegram access.json at all, so the
-// default path returned null and every scheduler alert was suppressed).
-// ISSUE2556X: the owner's OWNER_ALERT_CHAT_ID wins when set (a delivery target only; unset, this is unchanged).
 function resolveSchedulerOwnerChat(): string | null {
   return ownerAlertChatOverride(CHANNEL_PROVIDER) ?? resolveOwnerChatId(undefined, configuredOwnerChatFor(CHANNEL_PROVIDER), CHANNEL_PROVIDER)
 }
 
-// Send a system-level scheduler alert over the MAIN agent's bound channel. The
-// message is plain text (no markdown) as it always has been, so no formatMessage
-// pass is applied; getProvider throws on a non-2xx / ok:false response so the
-// callers' try/catch + classifySendError paths work for every provider.
 async function sendSchedulerAlertMessage(token: string, chatId: string, text: string): Promise<void> {
   await getProvider(CHANNEL_PROVIDER).sendMessage(token, chatId, text)
 }
 
-// One line about what the scheduler missed while it was down: which tasks it
-// caught up, and which were too stale to be worth running. Sent once per tick
-// that produced any such entry -- in normal operation that is never, so the
-// channel stays quiet. This is the reporting half of the catch-up policy: a
-// missed occurrence either runs or gets named, never both and never neither.
 function sendCatchUpSummary(
   caughtUp: Array<{ task: string; ageMs: number }>,
   stale: Array<{ task: string; ageMs: number }>,
@@ -2976,7 +2756,7 @@ function sendCatchUpSummary(
   }
   const ownerChat = resolveSchedulerOwnerChat()
   if (!ownerChat) {
-    logger.warn({ provider: CHANNEL_PROVIDER }, 'catch-up summary suppressed: no owner chat (ALLOWED_CHAT_ID unset/placeholder and no paired channel)')
+    logger.warn({ provider: CHANNEL_PROVIDER }, 'catch-up summary suppressed: no owner chat (no configured channel id and no paired channel)')
     return
   }
   const mins = (ms: number) => `${Math.round(ms / 60000)} perc`
@@ -3013,7 +2793,7 @@ export function decideCatchUpSummaryDelivery(sleptDuringGap: boolean): CatchUpSu
 // The same one line, LOG-ONLY. Used instead of sendCatchUpSummary when the gap
 // the scheduler is catching up on is one the machine SLEPT through (see the
 // call site and decideCatchUpSummaryDelivery): lid-close downtime is caused by
-// the operator on purpose, and pinging Telegram with "Kimaradt ütemezés (X perc
+// the operator on purpose, and pinging the channel with "Kimaradt ütemezés (X perc
 // kiesés)" on every wake was pure noise (2026-09-02, kanban 83b8c4c3). A gap
 // with no sleep in it -- process down, crash, failed restart -- still goes to
 // the channel via sendCatchUpSummary (review 2026-09-03). The catch-up
@@ -3075,69 +2855,13 @@ function pendingRetryAlertText(view: PendingRetryView, prefix: string, ageMinute
       ]).join('\n')
 }
 
-// Where a stuck scheduled task's OWN channel target learns about the stall.
-// The main-agent notice below reaches the main agent's session, but the team
-// that asked for the result (a Teams channel bound to the stuck agent) waits
-// in silence: its agent is the one that could not start, so nobody in that
-// conversation knows the result is late. This is a team-facing one-liner --
-// no operator detail (tmux, MCP, dashboard page, login steps) -- because the
-// recipients are the humans waiting for the output, not the person who has to
-// fix the session. Best effort and never a throw: the stall is already being
-// escalated through the stage-1/stage-2 paths below, so a failed Teams send
-// must not take the tick down with it.
-export type StallNoticeOutcome = 'sent' | 'not-teams' | 'no-target' | 'failed'
-
-export async function notifyTaskTargetOfStall(
-  task: Pick<ScheduledTask, 'name' | 'agent' | 'telegramChatId' | 'channelProvider'>,
-  agentName: string,
-  ageMinutes: number,
-  deps: {
-    resolveTarget?: typeof resolveTaskChannelTarget
-    send?: typeof sendTeamsMessage
-    readCreds?: typeof readTeamsCreds
-  } = {},
-): Promise<StallNoticeOutcome> {
-  try {
-    // The stuck ROW's agent, not task.agent: a multi-agent task is retried
-    // once per (task, agent) row, and the channel to tell is the one bound to
-    // the agent that could not start.
-    const target = (deps.resolveTarget ?? resolveTaskChannelTarget)({ ...task, agent: agentName })
-    if (target.provider !== 'teams') return 'not-teams'
-    if (!target.chatId) {
-      const reason = task.telegramChatId === 'none' ? 'opted-out' : target.ambiguousCandidates ? 'ambiguous' : 'unbound'
-      logger.info({ task: task.name, agent: agentName, reason, ambiguousCandidates: target.ambiguousCandidates }, 'Teams stall notice skipped: no target conversation for the task')
-      return 'no-target'
-    }
-    // The Teams bot credentials live in the state dir of the agent that owns
-    // the channel: install-scoped for the main agent, agent-scoped otherwise.
-    const isMain = agentName === MAIN_AGENT_ID
-    const dir = isMain ? channelStateDir('teams') : channelStateDir('teams', agentDir(agentName))
-    const creds = (deps.readCreds ?? readTeamsCreds)('', isMain ? undefined : [join(dir, '.env')])
-    const text = `[ütemező] A(z) "${task.name}" ütemezett feladat (${agentName}) ${ageMinutes} perce nem tudott elindulni, ezért az eredménye késik. A rendszer tovább próbálkozik.`
-    await (deps.send ?? sendTeamsMessage)(creds, dir, target.chatId, text)
-    logger.info({ task: task.name, agent: agentName, ageMinutes }, 'Teams stall notice sent')
-    return 'sent'
-  } catch (err) {
-    // Never rethrow, and never log `creds` (it holds the bot secret) or the
-    // error object itself -- only its message string.
-    logger.warn({ task: task.name, agent: agentName, error: err instanceof Error ? err.message : String(err) }, 'Teams stall notice failed')
-    return 'failed'
-  }
-}
-
 // Stage 1: inter-agent notice to the main agent once a pending retry crosses
-// ALERT_THRESHOLD_MS. This used to go straight to the operator's channel
-// (see sendPendingRetryAlert below, now the stage-2 escalation) -- too
-// eager: a handful of tasks that all resolved themselves within the hour
-// each fired a direct alert for nothing.
+// ALERT_THRESHOLD_MS.
 export function sendPendingRetryMainAgentNotice(
   view: PendingRetryView,
   nowMs: number,
-  task?: Pick<ScheduledTask, 'name' | 'agent' | 'telegramChatId' | 'channelProvider'>,
+  _task?: Pick<ScheduledTask, 'name' | 'agent' | 'channelChatId' | 'channelProvider'>,
 ): void {
-  // Stamp first, same claim-before-send guard as the channel path: if
-  // another tick raced us, markPendingTaskRetryAlert returns false (the
-  // WHERE alert_sent_at IS NULL guards it) and we skip the send entirely.
   const claimed = markPendingTaskRetryAlert(view.taskName, view.agentName, nowMs)
   if (!claimed) return
 
@@ -3148,10 +2872,6 @@ export function sendPendingRetryMainAgentNotice(
   try {
     createAgentMessage('system', MAIN_AGENT_ID, text)
     logger.info({ task: view.taskName, agent: view.agentName, ageMinutes }, 'Pending-retry main-agent notice sent')
-    // Only once the notice is safely in the DB: the task's own channel target
-    // has to be told too (see notifyTaskTargetOfStall). Fire-and-forget -- it
-    // never rejects and must never roll back the claim above.
-    if (task) void notifyTaskTargetOfStall(task, view.agentName, ageMinutes)
   } catch (err) {
     // A failed DB insert here does not block stage-2 escalation -- see
     // sendTaskInflightMainAgentNotice for the same rationale on the other path.
@@ -3174,8 +2894,7 @@ function sendPendingRetryAlert(view: PendingRetryView, nowMs: number): void {
   // or chat_id is a permanent configuration problem -- it will fail
   // identically on every 60s tick. Earlier this path (token only) cleared
   // the stamp on failure, so the alert re-fired every minute forever and
-  // spammed the log; and chat_id was never validated at all, so an empty
-  // ALLOWED_CHAT_ID guaranteed a 400 from Telegram on every attempt. Leave
+  // spammed the log; and chat_id was never validated at all. Leave
   // the stamp in place (it acts as the throttle) and log once so the
   // operator sees the config gap without the spin. The scheduled task
   // itself keeps retrying regardless -- only this alert is suppressed.
@@ -3186,7 +2905,7 @@ function sendPendingRetryAlert(view: PendingRetryView, nowMs: number): void {
   }
   const ownerChat = resolveSchedulerOwnerChat()
   if (!ownerChat) {
-    logger.warn({ task: view.taskName, agent: view.agentName, provider: CHANNEL_PROVIDER }, 'Pending-retry alert suppressed: no owner chat (ALLOWED_CHAT_ID unset/placeholder and no paired channel; stamp kept to avoid 60s spin)')
+    logger.warn({ task: view.taskName, agent: view.agentName, provider: CHANNEL_PROVIDER }, 'Pending-retry alert suppressed: no owner chat (no configured channel id and no paired channel; stamp kept to avoid 60s spin)')
     return
   }
 
@@ -3334,14 +3053,14 @@ function sendTaskTimeoutAlert(entry: TaskInflightEntry, elapsedMs: number, reaso
   // since injection. If the machine slept anywhere inside that window, the
   // number lies -- a 2-minute task injected just before lid-close reads as
   // "stuck for hours" on wake (observed with ledger-live-drain). A window
-  // that contains a sleep gap proves nothing about the task, so no Telegram
+  // that contains a sleep gap proves nothing about the task, so no channel
   // ping; the log line and the rest of the stuck handling (one-shot flag,
   // eviction, retries) run unchanged, and the kanban 'waiting' move is not
   // even here: it happens in stage 1 (sendTaskInflightMainAgentNotice), so
   // this guard cannot short-circuit it (review 2026-09-03). Genuine
   // hangs are unaffected: their window contains no sleep gap. Trade-off,
   // accepted: the alert is one-shot per injection, so a task that ALSO hangs
-  // for real after the wake stays Telegram-silent for that injection -- it is
+  // for real after the wake stays channel-silent for that injection -- it is
   // still visible in the log/dashboard and ages into the normal eviction path.
   const sleptDuringWindow = systemSleptBetween(entry.injectedAt, Date.now())
   const token = resolveSchedulerAlertToken()
@@ -3351,14 +3070,14 @@ function sendTaskTimeoutAlert(entry: TaskInflightEntry, elapsedMs: number, reaso
   }
   const ownerChat = resolveSchedulerOwnerChat()
   if (!ownerChat) {
-    logger.warn({ task: entry.taskName, agent: entry.agentName, provider: CHANNEL_PROVIDER }, 'task-timeout alert suppressed: no owner chat (ALLOWED_CHAT_ID unset/placeholder and no paired channel)')
+    logger.warn({ task: entry.taskName, agent: entry.agentName, provider: CHANNEL_PROVIDER }, 'task-timeout alert suppressed: no owner chat (no configured channel id and no paired channel)')
     return
   }
 
   if (sleptDuringWindow) {
     logger.info(
       { task: entry.taskName, agent: entry.agentName, ageMinutes, injectedAt: entry.injectedAt },
-      'task-timeout: machine slept inside the stuck-check window -- wall-clock elapsed is unreliable, Telegram alert suppressed (stuck handling continues)',
+      'task-timeout: machine slept inside the stuck-check window -- wall-clock elapsed is unreliable, channel alert suppressed (stuck handling continues)',
     )
     return
   }
@@ -3947,7 +3666,7 @@ export function startScheduleRunner(): NodeJS.Timeout {
       if (lateCatchUpMs != null) caughtUpThisTick.push({ task: task.name, ageMs, type: task.type, schedule: task.schedule })
 
       // type='command' tasks run a raw shell command directly -- no LLM, no
-      // tmux, no target agent. They self-manage failure streaks + Telegram
+      // tmux, no target agent. They self-manage failure streaks + channel
       // alerts. Record the run time like a fired task so the catch-up window
       // does not double-run them on a dashboard restart.
       if (task.type === 'command') {
@@ -4126,7 +3845,7 @@ export function startScheduleRunner(): NodeJS.Timeout {
             // Opt-in skip for short-cadence tasks (e.g. 30-min heartbeats):
             // a single missed tick is harmless because the next one is
             // already on the way, and queueing them produces spurious
-            // "60 perce varakozik" Telegram alerts whenever the operator
+            // "60 perce varakozik" channel alerts whenever the operator
             // is having an active conversation in the channels session.
             // Daily/weekly schedules keep skipIfBusy=false so the queue
             // + alert path catches a long-running busy state.
@@ -4183,7 +3902,7 @@ export function startScheduleRunner(): NodeJS.Timeout {
     // Short-cadence heartbeats are excluded from the report on purpose. Such a
     // heartbeat is self-healing -- the next occurrence is minutes away -- so a
     // missed one is not operator-actionable, and reporting it turned a routine
-    // 15-minute heartbeat into ~25 Telegram alerts a day (2026-08-24, owner
+    // 15-minute heartbeat into ~25 channel alerts a day (2026-08-24, owner
     // asked twice for it to stop). The miss is still WARN-logged and recorded
     // in task_runs, so nothing is silently lost; it just isn't pushed at a human.
     // The exclusion is by CADENCE, not by type (isMissedRunReportable): a

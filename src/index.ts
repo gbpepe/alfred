@@ -35,7 +35,7 @@ import { endAllDetachedGroups } from './web/detached-groups.js'
 import { logger } from './logger.js'
 import { startInviteMonitor, stopInviteMonitor } from './web/channel-invites.js'
 import { ensureDiscordChannelGroup } from './web/discord-group-bootstrap.js'
-import { startChannelRequestWatcher, stopChannelRequestWatcher } from './web/channel-request-watcher.js'
+import { bootAlfredCore } from './alfred/index.js'
 import { startStoreWatcher, stopStoreWatcher } from './store-watcher.js'
 import { startSettingsHealth } from './settings-health.js'
 import { noticeNetTargetDrift } from './net-target-notice.js'
@@ -80,7 +80,7 @@ const SHUTDOWN_HARD_KILL_MS = 5000
 const DASHBOARD_BINARY_PATTERN = /(?:^|[\s/])(?:dist\/index\.js|src\/index\.ts)(?:\s|$)/
 
 // Own-install affinity guard for the takeover kill. The binary pattern alone
-// matches ANY Marveen dashboard argv of the same UID -- including a SECOND
+// matches ANY Alfred dashboard argv of the same UID -- including a SECOND
 // install's live process (federation makes multi-install machines a supported
 // reality, and dev/test copies always existed). Only processes that belong to
 // THIS install may be taken over: an absolute argv must contain PROJECT_ROOT,
@@ -102,7 +102,7 @@ function processCwd(pid: number): string | null {
 }
 
 function argvBelongsToThisInstall(argv: string, pid: number): boolean {
-  // Boundary-suffixed so /path/marveen never matches /path/marveen2.
+  // Boundary-suffixed so /path/alfred never matches /path/alfred2.
   if (argv.includes(PROJECT_ROOT + '/')) return true
   const cwd = processCwd(pid)
   return cwd !== null && (cwd === PROJECT_ROOT || cwd.startsWith(PROJECT_ROOT + '/'))
@@ -445,7 +445,6 @@ const shutdown = (): void => {
       try { stopHeartbeat() } catch (err) { logger.warn({ err }, 'stopHeartbeat threw during shutdown') }
     }
     try { stopInviteMonitor() } catch (err) { logger.warn({ err }, 'stopInviteMonitor threw during shutdown') }
-    try { stopChannelRequestWatcher() } catch (err) { logger.warn({ err }, 'stopChannelRequestWatcher threw during shutdown') }
     try { stopStoreWatcher() } catch (err) { logger.warn({ err }, 'stopStoreWatcher threw during shutdown') }
     if (stopDecaySweep) stopDecaySweep()
     if (digestTimer) clearTimeout(digestTimer)
@@ -533,7 +532,7 @@ async function main(): Promise<void> {
     logger.error({ err }, 'agent package interrupted-install cleanup did not run')
   }
 
-  // GROMZOGATECONF1030 (c): the sub-agents' sender-role gates move from their own agent-config.json (which the agent
+  // Sender-role gates move from each sub-agent's own agent-config.json (which the agent
   // can write) into the store, which only the dashboard writes. Once: an existing store file means it is done.
   try {
     const moved = migrateSenderRoleGates(listAgentNames(), (n) => JSON.parse(readFileOr(join(agentDir(n), 'agent-config.json'), '{}')))
@@ -587,9 +586,9 @@ async function main(): Promise<void> {
     // so a value read at startup would stay the placeholder for the life of
     // the process and the first digest would go nowhere.
     const runDigest = () => {
-      const chatId = ownerAlertChatOverride('telegram') ?? resolveOwnerChatId()
+      const chatId = ownerAlertChatOverride('discord') ?? resolveOwnerChatId()
       if (!chatId) {
-        logger.warn('Napi naplo kihagyva: nincs gazda-chat (nincs ALLOWED_CHAT_ID es nincs parositott csatorna)')
+        logger.warn('Napi naplo kihagyva: nincs gazda-chat (nincs CHANNEL_CHAT_ID es nincs parositott csatorna)')
         return
       }
       runDailyDigest(chatId).catch((err) => logger.error({ err }, 'Napi naplo hiba'))
@@ -605,7 +604,7 @@ async function main(): Promise<void> {
   // Heartbeat -- 2026-06-02 architecture switch: the dedicated channel-less
   // `heartbeat` sub-agent now handles the hourly summary via the scheduled-
   // task runner. The legacy native scheduler (initHeartbeat) was the source
-  // of the Marveen self-poll loop that caused channel-disconnect every fire
+  // of the Alfred self-poll loop that caused channel-disconnect every fire
   // (see commit history #237/#250/#252/#253/#255 for the abandoned
   // isolation-chain attempt). We keep the native module imported so other
   // code paths that reference its exports still compile, but we do NOT
@@ -664,11 +663,12 @@ async function main(): Promise<void> {
   // No-op for non-discord providers.
   ensureDiscordChannelGroup()
 
-  // Telegram invite auto-approve monitor (one-click pairing).
-  startInviteMonitor(MAIN_AGENT_ID, AGENTS_BASE_DIR)
+  // Alfred Core: load config/agents.json, provision isolated workspaces/,
+  // and sync ALLOWED_USER_IDS + per-agent Discord channels into access.json.
+  bootAlfredCore()
 
-  // Slack channel request watcher (audit.jsonl -> pending_channel_requests).
-  startChannelRequestWatcher()
+  // Channel invite auto-approve monitor (one-click pairing).
+  startInviteMonitor(MAIN_AGENT_ID, AGENTS_BASE_DIR)
 
   // Store file audit watcher
   startStoreWatcher({ exclude: parseStoreWatchExclude(String(getEffectiveSettingValue('STORE_WATCH_EXCLUDE'))) })
@@ -686,8 +686,8 @@ async function main(): Promise<void> {
   // A notice file is removed only after its send succeeded; a failed one waits for the next start.
   void flushPendingPackageNotices(notifyOwner).catch((err) => logger.warn({ err }, 'agent package owner notices were not sent'))
 
-  logger.info(`Marveen fut! Dashboard: http://localhost:${WEB_PORT}`)
-  logger.info('Telegram kommunikacio: Claude Code Channels kezeli')
+  logger.info(`Alfred fut! Dashboard: http://localhost:${WEB_PORT}`)
+  logger.info('Discord kommunikacio: Claude Code Channels kezeli')
 }
 
 main().catch((err) => {

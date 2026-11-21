@@ -55,7 +55,7 @@ describe('renderFederationBlock', () => {
     expect(block).toContain('`teodor` (https://teodor.example)')
     expect(block).toContain('párosítás folyamatban') // unpaired peer marked
     expect(block).toContain('NEM')                    // explicit exception to the tmux/agents-list rule
-    expect(block).toContain('marveen-api.sh message')  // the recipe goes through the helper (the message verb's agent-msg.sh argv exception is named)
+    expect(block).toContain('alfred-api.sh message')  // the recipe goes through the helper (the message verb's agent-msg.sh argv exception is named)
     expect(block).toContain('SAJÁT csatornádon')      // binary-results rule
   })
 
@@ -90,7 +90,7 @@ describe('renderFederationBlock', () => {
   it('renders English when DASHBOARD_LANG is en, without literal brand names', () => {
     const block = renderFederationBlock(cfg(), { ...ID, lang: 'en' })
     expect(block).toContain('USUAL message API')
-    expect(block).not.toContain('Marveen') // brand discipline: ids come from identity
+    expect(block).not.toContain('Alfred') // brand discipline: ids come from identity
   })
 })
 
@@ -132,7 +132,7 @@ describe('renderSubAgentFederationBlock', () => {
       const block = renderSubAgentFederationBlock({ ...ID, lang })
       expect(block.startsWith(FEDERATION_BLOCK_BEGIN)).toBe(true)
       expect(block.endsWith(FEDERATION_BLOCK_END)).toBe(true)
-      expect(block).toMatch(/marveen-api\.sh'? message/)       // the reply recipe goes through the helper (a quoted path puts a ' before the space)
+      expect(block).toMatch(/alfred-api\.sh'? message/)       // the reply recipe goes through the helper (a quoted path puts a ' before the space)
       expect(block).not.toContain(FEDERATION_POLICY_ANCHOR)  // owner policy is the main agent's
       expect(Buffer.byteLength(block, 'utf-8')).toBeLessThan(2048)
     }
@@ -197,7 +197,7 @@ describe('applyFederationBlock (line-exact surgery)', () => {
   it('removes the block (markers inclusive) on disable, leaving the persona intact', () => {
     const withBlock = applyFederationBlock(PERSONA, block)!
     const removed = applyFederationBlock(withBlock, null)!
-    expect(removed).not.toContain('MARVEEN-FEDERATION:BEGIN')
+    expect(removed).not.toContain('ALFRED-FEDERATION:BEGIN')
     expect(removed).toContain('Csak futó tmux-os ügynöknek üzenhetsz.')
     expect(removed).toContain('## Öntanulás és Skill rendszer')
   })

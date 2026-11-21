@@ -31,7 +31,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-# #1873: com.<SERVICE_ID>.channel-keepalive-probe, not a fixed com.marveen.channel-keepalive-probe -- two installs
+# #1873: com.<SERVICE_ID>.channel-keepalive-probe, not a fixed com.alfred.channel-keepalive-probe -- two installs
 # under one user must not share (and overwrite) one helper job.
 . "$SCRIPT_DIR/launchd-label.sh"
 LABEL="$(helper_launchd_label "$PROJECT_DIR" channel-keepalive-probe)"

@@ -48,7 +48,7 @@ describe('renderedEnglish (an install rendered English before the key existed)',
   let dir = ''
   afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }) })
   const install = (claudeMd: string | null, enTemplate = true) => {
-    dir = mkdtempSync(join(tmpdir(), 'marveen-rendered-en-'))
+    dir = mkdtempSync(join(tmpdir(), 'alfred-rendered-en-'))
     if (enTemplate) { mkdirSync(join(dir, 'templates', 'en'), { recursive: true }); writeFileSync(join(dir, 'templates', 'en', 'CLAUDE.md.template'), '# x\n') }
     if (claudeMd !== null) writeFileSync(join(dir, 'CLAUDE.md'), claudeMd)
     return dir
