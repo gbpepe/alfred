@@ -27,8 +27,8 @@ import type { RouteContext } from './types.js'
 
 const execFileAsync = promisify(execFile)
 
-async function readJsonBody<T>(req: RouteContext['req']): Promise<T> {
-  const buf = await readBody(req)
+async function readJsonBody<T>(req: RouteContext['req'], maxBytes?: number): Promise<T> {
+  const buf = await readBody(req, maxBytes ? { maxBytes } : {})
   if (!buf || buf.length === 0) return {} as T
   return JSON.parse(buf.toString('utf-8')) as T
 }
@@ -384,6 +384,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     }
     const body = await readJsonBody<{
       agentId?: string
+      displayName?: string | null
       role?: string | null
       provider?: string | null
       model?: string | null
@@ -395,6 +396,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { error: 'agentId is required' }, 400)
       return true
     }
+    const displayName = typeof body?.displayName === 'string' && body.displayName.trim() ? body.displayName.trim().slice(0, 60) : null
     const roleId = body.role ? normalizeRoleId(body.role) : null
     if (body.role && !roleId) {
       json(res, { error: 'Unknown role. Allowed: tervezo, technikus, szakmunkas, segedmunkas' }, 400)
@@ -424,6 +426,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       const entry = list.find((a) => a.id === agentId)
       if (!entry) continue
       found = true
+      if (displayName) entry.displayName = displayName
       if (roleId) entry.role = roleId
       if (provider) entry.provider = provider
       else delete entry.provider
@@ -1282,7 +1285,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { ...OWNER_SESSION_REQUIRED, error: 'Personalizing agents requires an owner session.' }, 403)
       return true
     }
-    const body = await readJsonBody<{ agentId?: string; displayName?: string; avatarDataUrl?: string }>(req)
+    const body = await readJsonBody<{ agentId?: string; displayName?: string; avatarDataUrl?: string }>(req, 5 * 1024 * 1024)
     const agentId = (body?.agentId || '').trim()
     if (!agentId || !/^[a-zA-Z0-9_-]{1,64}$/.test(agentId)) {
       json(res, { error: 'Valid agentId is required' }, 400)
@@ -1302,8 +1305,8 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     if (typeof body?.avatarDataUrl === 'string' && body.avatarDataUrl.startsWith('data:image/png;base64,')) {
       const b64 = body.avatarDataUrl.slice('data:image/png;base64,'.length)
       const buf = Buffer.from(b64, 'base64')
-      if (buf.length === 0 || buf.length > 1_500_000) {
-        json(res, { error: 'Avatar PNG size must be between 1 byte and 1.5 MB' }, 400)
+      if (buf.length === 0 || buf.length > 4_000_000) {
+        json(res, { error: 'Avatar PNG size must be between 1 byte and 4 MB' }, 400)
         return true
       }
       const dir = join(process.cwd(), 'agents', agentId)

@@ -903,10 +903,12 @@
         saveAllBtn.disabled = true
         if (statusEl) statusEl.textContent = 'Mentés...'
         try {
+          const dispNameVal = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
           const res = await apiJson('/api/vps/agent-override', {
             method: 'POST',
             body: JSON.stringify({
               agentId: currentModalAgentId,
+              displayName: dispNameVal || null,
               role: roleSel.value,
               provider: useOverride ? provSel.value : null,
               model: useOverride ? (chosenModel || null) : null,
@@ -915,10 +917,6 @@
             }),
           })
           const fileSaves = []
-          const dispNameVal = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
-          if (dispNameVal) {
-            fileSaves.push(apiJson('/api/vps/agents/personalize', { method: 'POST', body: JSON.stringify({ agentId: currentModalAgentId, displayName: dispNameVal }) }))
-          }
           if (coreFileDirty.claude) {
             const val = document.getElementById('editClaudeMd')?.value ?? ''
             fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/claude-md', { method: 'PUT', body: JSON.stringify({ content: val }) }))
@@ -942,6 +940,7 @@
           await ensureVpsRolesData(true)
           const updated = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
           if (updated) applyCoreOverview(updated)
+          applyDisplayNamesToCards()
           updateInheritedRoleText()
         } catch (err) {
           if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
@@ -1525,14 +1524,37 @@
       }
     })
 
+    function resizeDataUrlToPng256(dataUrl) {
+      return new Promise(function (resolve) {
+        const img = new Image()
+        img.onload = function () {
+          try {
+            const c = document.createElement('canvas')
+            c.width = 256
+            c.height = 256
+            const ctx = c.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, 256, 256)
+              resolve(c.toDataURL('image/png'))
+              return
+            }
+          } catch { /* fallback */ }
+          resolve(dataUrl)
+        }
+        img.onerror = function () { resolve(dataUrl) }
+        img.src = dataUrl
+      })
+    }
+
     aiApplyBtn?.addEventListener('click', async function () {
       if (!currentModalAgentId || !selectedAiAvatarDataUrl) return
       aiApplyBtn.disabled = true
       if (pictoStatus) pictoStatus.textContent = 'Avatar mentése...'
       try {
+        const compactPng = await resizeDataUrlToPng256(selectedAiAvatarDataUrl)
         const res = await apiJson('/api/vps/agents/personalize', {
           method: 'POST',
-          body: JSON.stringify({ agentId: currentModalAgentId, avatarDataUrl: selectedAiAvatarDataUrl }),
+          body: JSON.stringify({ agentId: currentModalAgentId, avatarDataUrl: compactPng }),
         })
         if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
         clearAiAvatarPicker()
