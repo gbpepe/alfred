@@ -73,13 +73,69 @@
         data.agents.forEach(function (a) {
           const opt = document.createElement('option')
           opt.value = a.id
-          opt.textContent = a.id + ' (' + a.model + ')'
+          opt.textContent = a.id + ' (' + (a.role || '') + ' · ' + a.model + ')'
           chatSelect.appendChild(opt)
         })
       }
+
+      renderRolesGrid(data.roles || [], data.agents || [])
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
+  }
+
+  const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
+
+  function renderRolesGrid(roles, agents) {
+    const grid = document.getElementById('vpsRolesGrid')
+    const statusEl = document.getElementById('vpsRolesStatus')
+    if (!grid) return
+    grid.innerHTML = roles
+      .map(function (r) {
+        const assigned = agents
+          .filter(function (a) { return a.role === r.id })
+          .map(function (a) { return a.id })
+          .join(', ')
+        const opts = PROVIDER_OPTIONS.map(function (p) {
+          return '<option value="' + p + '"' + (p === r.provider ? ' selected' : '') + '>' + p + '</option>'
+        }).join('')
+        return (
+          '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center"><strong>' + esc(r.label) + '</strong><span style="font-size:11px;opacity:.6">' + esc(r.id) + '</span></div>' +
+          '<div style="font-size:11px;opacity:.75">' + esc(r.description) + '</div>' +
+          '<div style="font-size:11px;opacity:.8"><b>Ágensek:</b> ' + esc(assigned || '—') + '</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          '<select class="input" data-role-provider="' + esc(r.id) + '" style="padding:4px 6px;font-size:12px">' + opts + '</select>' +
+          '<input type="text" class="input" data-role-model="' + esc(r.id) + '" value="' + esc(r.model) + '" style="flex:1;min-width:120px;padding:4px 6px;font-size:12px">' +
+          '<button class="btn-primary btn-compact" data-role-save="' + esc(r.id) + '">Mentés</button>' +
+          '</div>' +
+          '</div>'
+        )
+      })
+      .join('')
+
+    grid.querySelectorAll('[data-role-save]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const roleId = btn.getAttribute('data-role-save')
+        const provEl = grid.querySelector('[data-role-provider="' + roleId + '"]')
+        const modEl = grid.querySelector('[data-role-model="' + roleId + '"]')
+        if (!provEl || !modEl) return
+        btn.disabled = true
+        if (statusEl) statusEl.textContent = 'Mentés...'
+        try {
+          await apiJson('/api/vps/roles', {
+            method: 'POST',
+            body: JSON.stringify({ role: roleId, provider: provEl.value, model: modEl.value.trim() }),
+          })
+          if (statusEl) statusEl.textContent = roleId + ' frissítve (' + provEl.value + ' / ' + modEl.value.trim() + ')'
+          refreshVpsStatus()
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          btn.disabled = false
+        }
+      })
+    })
   }
 
   async function refreshVpsLogs() {

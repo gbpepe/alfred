@@ -2288,6 +2288,14 @@
 
       <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <strong>Munkakörök és Modellek</strong>
+          <span id="vpsRolesStatus" style="font-size:12px;opacity:.75"></span>
+        </div>
+        <div id="vpsRolesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px"></div>
+      </div>
+
+      <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <strong>Ops műveletek</strong>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn-secondary btn-compact" data-vps-ops="check-health">Check Health</button>

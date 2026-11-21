@@ -60,6 +60,30 @@ export const DEFAULT_TOKEN_PRICES_USD: Record<string, TokenPrice> = {
     cache_write: 2.00,
     output: 12.00,
   },
+  'grok-3': {
+    input: 3.00,
+    cache_read: 0.75,
+    cache_write: 3.00,
+    output: 15.00,
+  },
+  'grok-3-mini': {
+    input: 0.30,
+    cache_read: 0.075,
+    cache_write: 0.30,
+    output: 0.50,
+  },
+  'gpt-4o': {
+    input: 2.50,
+    cache_read: 1.25,
+    cache_write: 2.50,
+    output: 10.00,
+  },
+  'gpt-4o-mini': {
+    input: 0.15,
+    cache_read: 0.075,
+    cache_write: 0.15,
+    output: 0.60,
+  },
 }
 
 export function currentUtcDayWindow(nowSec: number): { dateKey: string; start: number; end: number } {

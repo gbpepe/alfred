@@ -7,7 +7,15 @@ import Database from 'better-sqlite3'
 import { getDb } from '../../db.js'
 import { readEnvFile } from '../../env.js'
 import { logger } from '../../logger.js'
-import { loadAlfredAgentsConfig, type AlfredAgentDefinition } from '../../alfred/agents-config.js'
+import {
+  ALLOWED_PROVIDERS,
+  loadAlfredAgentsConfig,
+  normalizeRoleId,
+  type AlfredAgentDefinition,
+  type AlfredProviderName,
+} from '../../alfred/agents-config.js'
+import { atomicWriteFileSync } from '../atomic-write.js'
+import { mayActAsOwner, OWNER_SESSION_REQUIRED } from './auth.js'
 import {
   evaluateCircuitBreaker,
   resolveEffectiveTokenPrices,
@@ -231,8 +239,10 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       ok: true,
       system: sys,
       services,
+      roles: cfg ? Object.values(cfg.roles) : [],
       agents: (cfg?.agents ?? []).map((a) => ({
         id: a.id,
+        role: a.role ?? null,
         channelName: a.channelName,
         provider: a.provider,
         model: a.model,
@@ -240,6 +250,59 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         tools: a.tools,
       })),
     })
+    return true
+  }
+
+  if (path === '/api/vps/roles' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Updating role models requires an owner session.' }, 403)
+      return true
+    }
+    const body = (await readBody(req)) as { role?: string; provider?: string; model?: string }
+    const roleId = typeof body?.role === 'string' ? normalizeRoleId(body.role) : null
+    const provider = typeof body?.provider === 'string' ? body.provider.trim() : ''
+    const model = typeof body?.model === 'string' ? body.model.trim() : ''
+    if (!roleId) {
+      json(res, { error: 'Unknown role. Allowed: tervezo, technikus, szakmunkas, segedmunkas' }, 400)
+      return true
+    }
+    if (!ALLOWED_PROVIDERS.has(provider as AlfredProviderName)) {
+      json(res, { error: `Unsupported provider "${provider}". Allowed: ${[...ALLOWED_PROVIDERS].join(', ')}` }, 400)
+      return true
+    }
+    if (!model || model.length > 100) {
+      json(res, { error: 'Valid model name is required' }, 400)
+      return true
+    }
+
+    const targets = [
+      process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json'),
+      '/opt/alfred-prod/config/agents.json',
+    ].filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
+
+    if (targets.length === 0) {
+      json(res, { error: 'config/agents.json not found' }, 404)
+      return true
+    }
+
+    for (const cfgPath of targets) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Record<string, unknown>
+      const rolesObj = (parsed.roles && typeof parsed.roles === 'object' && !Array.isArray(parsed.roles))
+        ? (parsed.roles as Record<string, Record<string, unknown>>)
+        : {}
+      const prev = rolesObj[roleId] ?? {}
+      rolesObj[roleId] = {
+        ...prev,
+        provider,
+        model,
+      }
+      parsed.roles = rolesObj
+      atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+    }
+
+    const env = { ...readEnvFile(), ...process.env }
+    const updatedCfg = loadAlfredAgentsConfig({ env })
+    json(res, { ok: true, roles: Object.values(updatedCfg.roles) })
     return true
   }
 

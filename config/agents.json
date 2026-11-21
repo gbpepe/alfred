@@ -6,14 +6,39 @@
     "dailyBudgetUsd": 15.0,
     "workspacesRoot": "workspaces"
   },
+  "roles": {
+    "tervezo": {
+      "label": "Tervező",
+      "description": "Architektúra, tervezés, komplex döntések",
+      "provider": "deepseek",
+      "model": "deepseek-reasoner"
+    },
+    "technikus": {
+      "label": "Technikus",
+      "description": "QA, elemzés, üzemeltetés, felülvizsgálat",
+      "provider": "vertex-eu",
+      "model": "gemini-3.8-flash"
+    },
+    "szakmunkas": {
+      "label": "Szakmunkás",
+      "description": "Kódolás, implementáció, tool-használat",
+      "provider": "deepseek",
+      "model": "deepseek-chat"
+    },
+    "segedmunkas": {
+      "label": "Segédmunkás",
+      "description": "Gyors, olcsó rutin feladatok és összefoglalás",
+      "provider": "vertex-eu",
+      "model": "gemini-3.5-flash-lite"
+    }
+  },
   "agents": [
     {
       "id": "alfred-architect",
       "displayName": "Alfred Architect",
       "channelName": "#alfred-hq",
       "discordChannelId": "${DISCORD_CHANNEL_ALFRED_HQ}",
-      "provider": "deepseek",
-      "model": "deepseek-reasoner",
+      "role": "tervezo",
       "workspace": "workspaces/alfred-architect",
       "memoryNamespace": "alfred-architect",
       "dailyBudgetUsd": 5.0,
@@ -27,8 +52,7 @@
       "displayName": "Alfred Coder (Hypatia)",
       "channelName": "#proj-hypatia",
       "discordChannelId": "${DISCORD_CHANNEL_PROJ_HYPATIA}",
-      "provider": "deepseek",
-      "model": "deepseek-chat",
+      "role": "szakmunkas",
       "workspace": "workspaces/hypatia",
       "memoryNamespace": "alfred-coder-hypatia",
       "dailyBudgetUsd": 8.0,
@@ -42,8 +66,7 @@
       "displayName": "Alfred QA",
       "channelName": "#alfred-qa",
       "discordChannelId": "${DISCORD_CHANNEL_ALFRED_QA}",
-      "provider": "vertex-eu",
-      "model": "gemini-3.8-flash",
+      "role": "technikus",
       "workspace": "workspaces/alfred-qa",
       "memoryNamespace": "alfred-qa",
       "dailyBudgetUsd": 2.0,
@@ -57,7 +80,7 @@
       "displayName": "Alfred Self-Coder",
       "channelName": "#alfred-self-dev",
       "discordChannelId": "${DISCORD_CHANNEL_ALFRED_SELF_DEV}",
-      "provider": "deepseek",
+      "role": "szakmunkas",
       "model": "deepseek-reasoner",
       "workspace": ".",
       "memoryNamespace": "alfred-self-coder",
@@ -88,8 +111,7 @@
       "displayName": "Alfred Ops",
       "channelName": "#alfred-ops",
       "discordChannelId": "${DISCORD_CHANNEL_ALFRED_OPS}",
-      "provider": "deepseek",
-      "model": "deepseek-chat",
+      "role": "technikus",
       "workspace": ".",
       "memoryNamespace": "alfred-ops",
       "dailyBudgetUsd": 2.0,

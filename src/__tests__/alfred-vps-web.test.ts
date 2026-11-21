@@ -1,6 +1,10 @@
 import { EventEmitter } from 'node:events'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import type http from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { loadAlfredAgentsConfig, normalizeRoleId } from '../alfred/agents-config.js'
 import { tryHandleAlfredVps } from '../web/routes/alfred-vps.js'
 import type { RouteContext } from '../web/routes/types.js'
 
@@ -73,6 +77,64 @@ describe('alfred-vps web routes', () => {
     const data = getJson()
     expect(data['ok']).toBe(true)
     expect(Array.isArray(data['services'])).toBe(true)
+    expect(Array.isArray(data['roles'])).toBe(true)
     expect(data['system']).toBeTruthy()
+  })
+
+  it('rejects unauthenticated POST /api/vps/roles', async () => {
+    const { ctx, getStatus } = mockReqRes('POST', '/api/vps/roles', {
+      role: 'szakmunkas',
+      provider: 'xai',
+      model: 'grok-3-mini',
+    })
+    expect(await tryHandleAlfredVps(ctx)).toBe(true)
+    expect(getStatus()).toBe(403)
+  })
+})
+
+describe('alfred role-based model routing', () => {
+  it('normalizes accented role aliases and resolves agent provider/model from role', () => {
+    expect(normalizeRoleId('tervező')).toBe('tervezo')
+    expect(normalizeRoleId('szakmunkás')).toBe('szakmunkas')
+    expect(normalizeRoleId('segédmunkás')).toBe('segedmunkas')
+
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-roles-'))
+    try {
+      mkdirSync(join(dir, 'config'), { recursive: true })
+      writeFileSync(
+        join(dir, 'config', 'agents.json'),
+        JSON.stringify({
+          version: 1,
+          global: { defaultProvider: 'deepseek', defaultModel: 'deepseek-chat', dailyBudgetUsd: 10 },
+          roles: {
+            tervezo: { label: 'Tervező', provider: 'xai', model: 'grok-3' },
+            segedmunkas: { label: 'Segédmunkás', provider: 'gemini', model: 'gemini-2.0-flash' },
+          },
+          agents: [
+            { id: 'planner', role: 'tervező', tools: ['fs_read'] },
+            { id: 'helper', role: 'segédmunkás', tools: [] },
+            { id: 'custom', role: 'tervezo', provider: 'openai', model: 'gpt-4o', tools: [] },
+          ],
+        }),
+      )
+      const cfg = loadAlfredAgentsConfig({ projectRoot: dir, env: {} })
+      expect(cfg.agents.find((a) => a.id === 'planner')).toMatchObject({
+        role: 'tervezo',
+        provider: 'xai',
+        model: 'grok-3',
+      })
+      expect(cfg.agents.find((a) => a.id === 'helper')).toMatchObject({
+        role: 'segedmunkas',
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+      })
+      expect(cfg.agents.find((a) => a.id === 'custom')).toMatchObject({
+        role: 'tervezo',
+        provider: 'openai',
+        model: 'gpt-4o',
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

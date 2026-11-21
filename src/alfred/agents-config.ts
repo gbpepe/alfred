@@ -5,7 +5,70 @@ import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import { resolveAlfredRuntimeEnv, type AlfredRuntimeMode } from './runtime-env.js'
 
-export type AlfredProviderName = 'deepseek' | 'vertex-eu'
+export type AlfredProviderName = 'deepseek' | 'vertex-eu' | 'xai' | 'openai' | 'gemini'
+
+export const ALLOWED_PROVIDERS: ReadonlySet<AlfredProviderName> = new Set<AlfredProviderName>([
+  'deepseek',
+  'vertex-eu',
+  'xai',
+  'openai',
+  'gemini',
+])
+
+export type AlfredRoleId = 'tervezo' | 'technikus' | 'szakmunkas' | 'segedmunkas'
+
+export interface AlfredRoleDefinition {
+  id: AlfredRoleId
+  label: string
+  description: string
+  provider: AlfredProviderName
+  model: string
+}
+
+const ROLE_ALIASES: Record<string, AlfredRoleId> = {
+  tervezo: 'tervezo',
+  'tervező': 'tervezo',
+  technikus: 'technikus',
+  szakmunkas: 'szakmunkas',
+  'szakmunkás': 'szakmunkas',
+  segedmunkas: 'segedmunkas',
+  'segédmunkás': 'segedmunkas',
+}
+
+export function normalizeRoleId(raw: string): AlfredRoleId | null {
+  return ROLE_ALIASES[raw.trim().toLowerCase()] ?? null
+}
+
+const DEFAULT_ROLES: Record<AlfredRoleId, AlfredRoleDefinition> = {
+  tervezo: {
+    id: 'tervezo',
+    label: 'Tervező',
+    description: 'Architektúra, tervezés, komplex döntések',
+    provider: 'deepseek',
+    model: 'deepseek-reasoner',
+  },
+  technikus: {
+    id: 'technikus',
+    label: 'Technikus',
+    description: 'QA, elemzés, üzemeltetés, felülvizsgálat',
+    provider: 'vertex-eu',
+    model: 'gemini-3.8-flash',
+  },
+  szakmunkas: {
+    id: 'szakmunkas',
+    label: 'Szakmunkás',
+    description: 'Kódolás, implementáció, tool-használat',
+    provider: 'deepseek',
+    model: 'deepseek-chat',
+  },
+  segedmunkas: {
+    id: 'segedmunkas',
+    label: 'Segédmunkás',
+    description: 'Gyors, olcsó rutin feladatok és összefoglalás',
+    provider: 'vertex-eu',
+    model: 'gemini-3.5-flash-lite',
+  },
+}
 
 export type AllowedToolName = 'bash' | 'fs_read' | 'fs_write' | 'git' | 'memory'
 
@@ -28,6 +91,7 @@ export interface AlfredAgentDefinition {
   displayName: string
   channelName: string
   discordChannelId: string
+  role?: AlfredRoleId
   provider: AlfredProviderName
   model: string
   /** Relative path in config/agents.json, resolved to absolute path inside PROJECT_ROOT/workspaces (or "." for self-dev/ops) */
@@ -68,6 +132,7 @@ export interface AlfredGlobalConfig {
 export interface AlfredAgentsConfig {
   version: number
   global: AlfredGlobalConfig
+  roles: Record<AlfredRoleId, AlfredRoleDefinition>
   agents: AlfredAgentDefinition[]
 }
 
@@ -211,10 +276,46 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
     ? (root.global as Record<string, unknown>)
     : {}
 
-  const defaultProvider = (rawGlobal.defaultProvider === 'vertex-eu' ? 'vertex-eu' : 'deepseek') as AlfredProviderName
+  const rawDefaultProvider = typeof rawGlobal.defaultProvider === 'string' ? rawGlobal.defaultProvider.trim() : 'deepseek'
+  const defaultProvider = (
+    ALLOWED_PROVIDERS.has(rawDefaultProvider as AlfredProviderName) ? rawDefaultProvider : 'deepseek'
+  ) as AlfredProviderName
   const defaultModel = typeof rawGlobal.defaultModel === 'string' && rawGlobal.defaultModel.trim()
     ? rawGlobal.defaultModel.trim()
     : 'deepseek-chat'
+
+  const roles: Record<AlfredRoleId, AlfredRoleDefinition> = {
+    tervezo: { ...DEFAULT_ROLES.tervezo },
+    technikus: { ...DEFAULT_ROLES.technikus },
+    szakmunkas: { ...DEFAULT_ROLES.szakmunkas },
+    segedmunkas: { ...DEFAULT_ROLES.segedmunkas },
+  }
+  if (root.roles && typeof root.roles === 'object' && !Array.isArray(root.roles)) {
+    for (const [rawRoleKey, rawRoleVal] of Object.entries(root.roles as Record<string, unknown>)) {
+      const roleId = normalizeRoleId(rawRoleKey)
+      if (!roleId) {
+        throw new Error(`Invalid role "${rawRoleKey}" in agents.json`)
+      }
+      if (!rawRoleVal || typeof rawRoleVal !== 'object' || Array.isArray(rawRoleVal)) {
+        throw new Error(`roles.${rawRoleKey} must be an object`)
+      }
+      const r = rawRoleVal as Record<string, unknown>
+      const rProvider = typeof r.provider === 'string' ? r.provider.trim() : roles[roleId].provider
+      if (!ALLOWED_PROVIDERS.has(rProvider as AlfredProviderName)) {
+        throw new Error(`roles.${rawRoleKey}: unsupported provider "${rProvider}". Allowed: ${[...ALLOWED_PROVIDERS].join(', ')}`)
+      }
+      const rModel = typeof r.model === 'string' && r.model.trim() ? r.model.trim() : roles[roleId].model
+      const rLabel = typeof r.label === 'string' && r.label.trim() ? r.label.trim() : roles[roleId].label
+      const rDesc = typeof r.description === 'string' && r.description.trim() ? r.description.trim() : roles[roleId].description
+      roles[roleId] = {
+        id: roleId,
+        label: rLabel,
+        description: rDesc,
+        provider: rProvider as AlfredProviderName,
+        model: rModel,
+      }
+    }
+  }
   const jsonGlobalBudget = typeof rawGlobal.dailyBudgetUsd === 'number' && rawGlobal.dailyBudgetUsd > 0
     ? rawGlobal.dailyBudgetUsd
     : 15.0
@@ -261,12 +362,23 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
     }
     seenIds.add(id)
 
-    const provider = a.provider ?? defaultProvider
-    if (provider !== 'deepseek' && provider !== 'vertex-eu') {
-      throw new Error(`agents[${idx}] (${id}): unsupported provider "${String(provider)}". Allowed: "deepseek", "vertex-eu"`)
+    let role: AlfredRoleId | undefined
+    if (a.role !== undefined) {
+      if (typeof a.role !== 'string' || !normalizeRoleId(a.role)) {
+        throw new Error(`agents[${idx}] (${id}): unknown role "${String(a.role)}". Allowed: tervezo, technikus, szakmunkas, segedmunkas`)
+      }
+      role = normalizeRoleId(a.role)!
+    }
+    const roleDef = role ? roles[role] : undefined
+
+    const provider = (a.provider ?? roleDef?.provider ?? defaultProvider) as string
+    if (!ALLOWED_PROVIDERS.has(provider as AlfredProviderName)) {
+      throw new Error(`agents[${idx}] (${id}): unsupported provider "${String(provider)}". Allowed: ${[...ALLOWED_PROVIDERS].join(', ')}`)
     }
 
-    const model = typeof a.model === 'string' && a.model.trim() ? a.model.trim() : defaultModel
+    const model = typeof a.model === 'string' && a.model.trim()
+      ? a.model.trim()
+      : (roleDef?.model ?? defaultModel)
     const displayName = typeof a.displayName === 'string' && a.displayName.trim() ? a.displayName.trim() : id
     const channelName = typeof a.channelName === 'string' && a.channelName.trim() ? a.channelName.trim() : `#${id}`
     const rawChannelId = typeof a.discordChannelId === 'string' ? a.discordChannelId.trim() : ''
@@ -419,7 +531,8 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
         displayName,
         channelName,
         discordChannelId,
-        provider,
+        ...(role ? { role } : {}),
+        provider: provider as AlfredProviderName,
         model,
         workspace: workspaceRel,
         workspaceAbsPath,
@@ -473,6 +586,7 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
         runtimeMode: runtimeEnv.mode,
         workspacesRoot,
       },
+      roles,
       agents,
     }
   }

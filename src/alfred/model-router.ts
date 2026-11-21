@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
-import type { AlfredAgentDefinition } from './agents-config.js'
+import type { AlfredAgentDefinition, AlfredProviderName } from './agents-config.js'
 import {
   assertBudgetAvailable,
   BudgetExceededError,
@@ -68,7 +68,7 @@ export type HybridRouterOutcome =
   | {
     ok: true
     replyText: string
-    provider: 'deepseek' | 'vertex-eu'
+    provider: AlfredProviderName
     model: string
     iterations: number
     totalUsage: ProviderUsageMetrics
@@ -138,24 +138,27 @@ export function buildPromptCachedMessages(
 }
 
 /**
- * Calls DeepSeek's OpenAI-compatible `/v1/chat/completions` API and extracts
- * `prompt_cache_hit_tokens` and `prompt_cache_miss_tokens` for CostOps tracking.
+ * Calls any OpenAI-compatible `/chat/completions` API (DeepSeek, Grok/xAI, OpenAI, Gemini OpenAI endpoint).
  */
-export async function callDeepSeekProvider(params: {
+export async function callOpenAiCompatibleProvider(params: {
+  providerLabel: string
+  defaultBaseUrl: string
+  baseUrlEnvKey: string
+  apiKeyEnvKey: string
   model: string
   messages: ChatMessage[]
   tools: OpenAiToolSchema[]
   env: Record<string, string | undefined>
   fetchImpl: typeof fetch
 }): Promise<ProviderCallResult> {
-  const apiKey = (params.env['DEEPSEEK_API_KEY'] ?? process.env['DEEPSEEK_API_KEY'] ?? '').trim()
+  const apiKey = (params.env[params.apiKeyEnvKey] ?? process.env[params.apiKeyEnvKey] ?? '').trim()
   if (!apiKey) {
-    throw new Error('DEEPSEEK_API_KEY is missing from environment')
+    throw new Error(`${params.apiKeyEnvKey} is missing from environment`)
   }
   const baseUrl = (
-    params.env['DEEPSEEK_BASE_URL'] ??
-    process.env['DEEPSEEK_BASE_URL'] ??
-    'https://api.deepseek.com/v1'
+    params.env[params.baseUrlEnvKey] ??
+    process.env[params.baseUrlEnvKey] ??
+    params.defaultBaseUrl
   ).replace(/\/+$/, '')
 
   const payload: Record<string, unknown> = {
@@ -178,7 +181,7 @@ export async function callDeepSeekProvider(params: {
 
   if (!resp.ok) {
     const errText = await resp.text().catch(() => '')
-    throw new Error(`DeepSeek API error ${resp.status}: ${errText.slice(0, 300)}`)
+    throw new Error(`${params.providerLabel} API error ${resp.status}: ${errText.slice(0, 300)}`)
   }
 
   const data = (await resp.json()) as {
@@ -229,6 +232,26 @@ export async function callDeepSeekProvider(params: {
       thinkingTokens,
     },
   }
+}
+
+/**
+ * Calls DeepSeek's OpenAI-compatible `/v1/chat/completions` API and extracts
+ * `prompt_cache_hit_tokens` and `prompt_cache_miss_tokens` for CostOps tracking.
+ */
+export async function callDeepSeekProvider(params: {
+  model: string
+  messages: ChatMessage[]
+  tools: OpenAiToolSchema[]
+  env: Record<string, string | undefined>
+  fetchImpl: typeof fetch
+}): Promise<ProviderCallResult> {
+  return callOpenAiCompatibleProvider({
+    ...params,
+    providerLabel: 'DeepSeek',
+    defaultBaseUrl: 'https://api.deepseek.com/v1',
+    baseUrlEnvKey: 'DEEPSEEK_BASE_URL',
+    apiKeyEnvKey: 'DEEPSEEK_API_KEY',
+  })
 }
 
 /**
@@ -437,6 +460,17 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
       throw err
     }
 
+    const openAiPresets: Record<string, { label: string; baseUrl: string; baseEnv: string; keyEnv: string }> = {
+      xai: { label: 'Grok (xAI)', baseUrl: 'https://api.x.ai/v1', baseEnv: 'XAI_BASE_URL', keyEnv: 'XAI_API_KEY' },
+      openai: { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', baseEnv: 'OPENAI_BASE_URL', keyEnv: 'OPENAI_API_KEY' },
+      gemini: {
+        label: 'Google Gemini',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        baseEnv: 'GEMINI_BASE_URL',
+        keyEnv: 'GEMINI_API_KEY',
+      },
+    }
+    const preset = openAiPresets[opts.agent.provider]
     const callResult =
       opts.agent.provider === 'vertex-eu'
         ? await callVertexEuProvider({
@@ -446,13 +480,25 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
           env: envMap,
           fetchImpl,
         })
-        : await callDeepSeekProvider({
-          model: opts.agent.model,
-          messages,
-          tools: toolSchemas,
-          env: envMap,
-          fetchImpl,
-        })
+        : preset
+          ? await callOpenAiCompatibleProvider({
+            providerLabel: preset.label,
+            defaultBaseUrl: preset.baseUrl,
+            baseUrlEnvKey: preset.baseEnv,
+            apiKeyEnvKey: preset.keyEnv,
+            model: opts.agent.model,
+            messages,
+            tools: toolSchemas,
+            env: envMap,
+            fetchImpl,
+          })
+          : await callDeepSeekProvider({
+            model: opts.agent.model,
+            messages,
+            tools: toolSchemas,
+            env: envMap,
+            fetchImpl,
+          })
 
     totalUsage.inputTokens += callResult.usage.inputTokens
     totalUsage.outputTokens += callResult.usage.outputTokens
