@@ -568,6 +568,10 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   }
 
   if (path.startsWith('/api/test-sim/')) {
+    if (process.env['ALFRED_ENV'] !== 'test') {
+      json(res, { error: 'Test simulator is only available in test mode' }, 404)
+      return true
+    }
     if (!mayActAsOwner(ctx.auth, req)) {
       json(res, { ...OWNER_SESSION_REQUIRED, error: 'Test simulator access requires an owner session.' }, 403)
       return true

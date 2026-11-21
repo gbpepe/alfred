@@ -562,11 +562,15 @@
     refreshTestSim()
   }
 
+  const isTestEnv = Boolean(document.getElementById('alfredTestBanner'))
+  const simNav = document.getElementById('sbTestSim')
+  if (simNav) simNav.hidden = !isTestEnv
+
   wireSimEvents()
-  if (!location.hash && document.getElementById('alfredTestBanner')) {
+  if (!location.hash && isTestEnv) {
     location.hash = 'testsim'
   }
-  if (location.hash === '#testsim' || !document.getElementById('testsimPage')?.hidden) {
+  if (isTestEnv && (location.hash === '#testsim' || !document.getElementById('testsimPage')?.hidden)) {
     window.loadTestSimPage()
   }
 })()
