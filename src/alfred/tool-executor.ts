@@ -801,8 +801,8 @@ function buildBashExecEnv(executablePath: string): NodeJS.ProcessEnv | undefined
                 return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
               }
 
-              const BASH_MUTATING_HINT_RE =
-                /(?:>>?|>\||2>|&>|\b(?:rm|del|erase|mv|move|cp|copy|tee|touch|truncate|dd|chmod|chown|ln|install|patch|Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item|Rename-Item|Clear-Content|New-Item|sc|ac|ri|mi|cpi)\b|\bsed\s+[^\n;|&]*-i\b|\bperl\s+[^\n;|&]*-i\b|\b(?:node|tsx|python|python3|ruby|pwsh|powershell|sh|bash)\s+[^\n;|&]*-[ec]\b|\bgit\s+(?:checkout\s+--|restore|apply|clean)\b)/i
+const BASH_MUTATING_HINT_RE =
+  /(?:(?<![12])>>?|(?<![12])>\||2>(?!&1\b)|&>(?!&[12]\b)|\b(?:rm|del|erase|mv|move|cp|copy|tee|touch|truncate|dd|chmod|chown|ln|install|patch|Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item|Rename-Item|Clear-Content|New-Item|sc|ac|ri|mi|cpi)\b|\bsed\s+[^\n;|&]*-i\b|\bperl\s+[^\n;|&]*-i\b|\b(?:node|tsx|python|python3|ruby|pwsh|powershell|sh|bash)\s+[^\n;|&]*-[ec]\b|\bgit\s+(?:checkout\s+--|restore|apply|clean)\b)/i
 
               /**
                * Validates a general `bash` command against forbidden patterns, `protectedPaths` mutations,

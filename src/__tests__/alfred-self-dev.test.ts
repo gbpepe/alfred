@@ -260,6 +260,8 @@ describe('Alfred Self-Dev (#alfred-self-dev & alfred-self-coder)', () => {
     // Should NOT falsely block read-only commands on .env.example or unrelated store/ paths
     expect(() => validateBashCommand('cat .env.example', agent, 'feat/self-ok')).not.toThrow()
     expect(() => validateBashCommand('cat src/store/item.ts', agent, 'feat/self-ok')).not.toThrow()
+    expect(() => validateBashCommand('npx vitest run --config vitest.alfred.config.ts 2>&1', agent, 'feat/self-ok')).not.toThrow()
+    expect(() => validateBashCommand('cmd 2> vitest.alfred.config.ts', agent, 'feat/self-ok')).toThrow(ProtectedPathError)
 
     const out = executeWhitelistedTool({ agent, db }, 'bash', {
       command: 'node -e "console.log(\'self-dev-bash-ok\')"',
