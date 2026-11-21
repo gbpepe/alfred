@@ -185,9 +185,18 @@
     return PROVIDER_MODELS[provider] || []
   }
 
+  const CATALOG_PROVIDER_META = {
+    deepseek: { key: 'DEEPSEEK_API_KEY', placeholder: 'DeepSeek API kulcs (sk-...)', secret: true },
+    'vertex-eu': { key: 'VERTEX_PROJECT_ID', placeholder: 'GCP Project ID (pl. alferd-hq-gc)', secret: false },
+    gemini: { key: 'GEMINI_API_KEY', placeholder: 'Gemini API kulcs (AIza...)', secret: true },
+    xai: { key: 'XAI_API_KEY', placeholder: 'xAI API kulcs (xai-...)', secret: true },
+    openai: { key: 'OPENAI_API_KEY', placeholder: 'OpenAI API kulcs (sk-...)', secret: true },
+  }
+
   function renderModelCatalog() {
     const grid = document.getElementById('vpsModelCatalogGrid')
     const syncedEl = document.getElementById('vpsModelCatalogSyncedAt')
+    const statusEl = document.getElementById('vpsModelCatalogStatus')
     if (syncedEl) {
       syncedEl.textContent = vpsModelSyncedAt
         ? ('Utolsó szinkron: ' + vpsModelSyncedAt.slice(0, 19).replace('T', ' ') + ' UTC')
@@ -196,20 +205,57 @@
     if (!grid || !vpsModelCatalogCache) return
     grid.innerHTML = PROVIDER_OPTIONS.map(function (p) {
       const info = vpsModelCatalogCache[p] || { configured: false, models: PROVIDER_MODELS[p] || [] }
+      const meta = CATALOG_PROVIDER_META[p] || { key: '', placeholder: 'API kulcs...', secret: true }
       const badge = info.configured
         ? '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#16a34a">API aktív</span>'
         : '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#6b7280">nincs kulcs</span>'
       const errHtml = info.error ? '<div style="font-size:11px;color:#dc2626">Hiba: ' + esc(info.error) + '</div>' : ''
       const preview = (info.models || []).slice(0, 5).map(esc).join(', ') + ((info.models || []).length > 5 ? ' …' : '')
       return (
-        '<div style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:4px">' +
+        '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center"><strong>' + esc(p) + '</strong>' + badge + '</div>' +
         '<div style="font-size:11px;opacity:.75">' + (info.models || []).length + ' modell</div>' +
-        '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word">' + (preview || '—') + '</div>' +
+        '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word;flex:1">' + (preview || '—') + '</div>' +
         errHtml +
+        '<div style="display:flex;gap:4px;margin-top:2px">' +
+        '<input type="' + (meta.secret ? 'password' : 'text') + '" class="input" data-cat-key="' + esc(meta.key) + '" placeholder="' + esc(meta.placeholder) + '" autocomplete="off" style="flex:1;min-width:0;padding:4px 6px;font-size:11px">' +
+        '<button type="button" class="btn-secondary btn-compact" data-cat-save="' + esc(p) + '" data-cat-env="' + esc(meta.key) + '" style="padding:4px 8px;font-size:11px">Mentés</button>' +
+        '</div>' +
         '</div>'
       )
     }).join('')
+
+    grid.querySelectorAll('[data-cat-save]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const prov = btn.getAttribute('data-cat-save')
+        const envKey = btn.getAttribute('data-cat-env')
+        const inp = grid.querySelector('[data-cat-key="' + envKey + '"]')
+        const val = inp ? inp.value.trim() : ''
+        if (!envKey || !val) {
+          if (statusEl) statusEl.textContent = 'Adj meg egy kulcsot a(z) ' + prov + ' mezőben!'
+          return
+        }
+        btn.disabled = true
+        if (statusEl) statusEl.textContent = prov + ' kulcs mentése és modellek szinkronizálása...'
+        try {
+          const payload = {}
+          payload[envKey] = val
+          await apiJson('/api/onboarding/providers', {
+            method: 'POST',
+            body: JSON.stringify({ providers: payload }),
+          })
+          const synced = await apiJson('/api/vps/models/sync', { method: 'POST', body: '{}' })
+          vpsModelCatalogCache = synced.providers || null
+          vpsModelSyncedAt = synced.syncedAt || null
+          renderModelCatalog()
+          if (statusEl) statusEl.textContent = prov + ' kulcs elmentve és modellek frissítve!'
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          btn.disabled = false
+        }
+      })
+    })
   }
 
   async function ensureModelCatalog(force) {
