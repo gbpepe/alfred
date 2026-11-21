@@ -48,13 +48,13 @@ const HOME_CREDENTIALS = join(homedir(), '.claude', '.credentials.json')
 const FLEET_TOKEN_FILE = join(STORE_DIR, '.claude-oauth-token')
 
 const PROVIDER_SPECS = [
-  { key: 'DEEPSEEK_API_KEY', label: 'DeepSeek API Key', placeholder: 'sk-...', secret: true },
-  { key: 'GEMINI_API_KEY', label: 'Google Gemini API Key', placeholder: 'AIza...', secret: true },
-  { key: 'VERTEX_PROJECT_ID', label: 'Google Vertex Project ID', placeholder: 'alferd-hq-gc', secret: false },
-  { key: 'VERTEX_LOCATION', label: 'Google Vertex Location', placeholder: 'europe-west1', secret: false },
-  { key: 'XAI_API_KEY', label: 'Grok / xAI API Key', placeholder: 'xai-...', secret: true },
-  { key: 'OPENAI_API_KEY', label: 'OpenAI API Key', placeholder: 'sk-...', secret: true },
-  { key: 'ANTHROPIC_API_KEY', label: 'Anthropic / Claude API Key', placeholder: 'sk-ant-...', secret: true },
+  { key: 'DEEPSEEK_API_KEY', label: 'DeepSeek API Key', placeholder: 'sk-...', secret: true, url: 'https://platform.deepseek.com/api_keys' },
+  { key: 'GEMINI_API_KEY', label: 'Google Gemini API Key', placeholder: 'AIza...', secret: true, url: 'https://aistudio.google.com/apikey' },
+  { key: 'VERTEX_PROJECT_ID', label: 'Google Vertex Project ID', placeholder: 'alferd-hq-gc', secret: false, url: 'https://console.cloud.google.com/vertex-ai' },
+  { key: 'VERTEX_LOCATION', label: 'Google Vertex Location', placeholder: 'europe-west1', secret: false, url: 'https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations' },
+  { key: 'XAI_API_KEY', label: 'Grok / xAI API Key', placeholder: 'xai-...', secret: true, url: 'https://console.x.ai/' },
+  { key: 'OPENAI_API_KEY', label: 'OpenAI API Key', placeholder: 'sk-...', secret: true, url: 'https://platform.openai.com/api-keys' },
+  { key: 'ANTHROPIC_API_KEY', label: 'Anthropic / Claude API Key', placeholder: 'sk-ant-...', secret: true, url: 'https://console.anthropic.com/settings/keys' },
 ] as const
 
 const ALLOWED_PROVIDER_KEYS = new Set<string>(PROVIDER_SPECS.map((p) => p.key))
@@ -358,6 +358,7 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
         label: spec.label,
         placeholder: spec.placeholder,
         secret: spec.secret,
+        url: spec.url,
         configured,
         hint,
       }

@@ -188,10 +188,13 @@
           const badge = p.configured
             ? '<span style="color:#22c55e;font-size:12px;font-weight:600">✓ Beállítva (' + esc(p.hint || '') + ')</span>'
             : '<span style="opacity:.6;font-size:12px">Nincs beállítva</span>'
+          const link = p.url
+            ? ' <a href="' + esc(p.url) + '" target="_blank" rel="noopener noreferrer" style="font-size:11px;text-decoration:underline;opacity:.85">Kulcs beszerzése ↗</a>'
+            : ''
           return (
             '<div style="margin-bottom:10px">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">' +
-            '<label class="form-label-sm" style="margin:0">' + esc(p.label) + '</label>' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">' +
+            '<div><label class="form-label-sm" style="margin:0">' + esc(p.label) + '</label>' + link + '</div>' +
             badge +
             '</div>' +
             '<input type="' + (p.secret ? 'password' : 'text') + '" class="onb-input" data-provider-key="' + esc(p.key) + '" placeholder="' + esc(p.placeholder) + '" autocomplete="off" style="margin-bottom:0">' +
