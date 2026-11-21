@@ -380,7 +380,7 @@
     if (coreCh) { coreCh.hidden = true; coreCh.style.display = 'none' }
     if (coreSkills) { coreSkills.hidden = true; coreSkills.style.display = 'none' }
     if (legacySkills) legacySkills.hidden = false
-    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn'].forEach(function (id) {
+    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
       const b = document.getElementById(id)
       if (b) b.hidden = false
     })
@@ -427,7 +427,7 @@
     if (legacyWrap) legacyWrap.hidden = true
     if (saveBar) { saveBar.hidden = false; saveBar.style.display = 'flex' }
     if (statusEl) statusEl.textContent = ''
-    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn'].forEach(function (id) {
+    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
       const b = document.getElementById(id)
       if (b) b.hidden = true
     })
@@ -1459,13 +1459,27 @@
       }
     })
 
+    let selectedAiAvatarDataUrl = null
+    const aiPicker = document.getElementById('agentAiAvatarPicker')
+    const aiCandidatesEl = document.getElementById('agentAiAvatarCandidates')
+    const aiApplyBtn = document.getElementById('agentAiAvatarApplyBtn')
+    const aiDiscardBtn = document.getElementById('agentAiAvatarDiscardBtn')
+
+    function clearAiAvatarPicker() {
+      selectedAiAvatarDataUrl = null
+      if (aiCandidatesEl) aiCandidatesEl.innerHTML = ''
+      if (aiPicker) { aiPicker.hidden = true; aiPicker.style.display = 'none' }
+      if (aiApplyBtn) aiApplyBtn.disabled = true
+    }
+
     document.getElementById('agentAiAvatarGenBtn')?.addEventListener('click', async function () {
       if (!currentModalAgentId) return
       const btn = document.getElementById('agentAiAvatarGenBtn')
       const dispName = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || currentModalAgentId
       const roleVal = document.getElementById('agentCoreRoleSel')?.value || ''
       if (btn) btn.disabled = true
-      if (pictoStatus) pictoStatus.textContent = '✨ Chibi AI avatar generálása...'
+      clearAiAvatarPicker()
+      if (pictoStatus) pictoStatus.textContent = '✨ 3 Chibi avatar variáció generálása (név + SOUL.md + skillek alapján)...'
       try {
         const res = await apiJson('/api/vps/agents/generate-avatar', {
           method: 'POST',
@@ -1473,15 +1487,65 @@
             agentId: currentModalAgentId,
             displayName: dispName,
             role: roleVal,
+            count: 3,
           }),
         })
-        if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
-        if (pictoStatus) pictoStatus.textContent = '✓ Chibi AI avatar elkészült és elmentve!'
+        const list = res.candidates || []
+        if (list.length === 0) {
+          if (pictoStatus) pictoStatus.textContent = 'Nem érkezett kép.'
+          return
+        }
+        if (aiPicker) { aiPicker.hidden = false; aiPicker.style.display = 'flex' }
+        if (aiCandidatesEl) {
+          aiCandidatesEl.innerHTML = list
+            .map(function (url, idx) {
+              return (
+                '<button type="button" data-ai-cand="' + idx + '" style="padding:3px;border-radius:50%;border:3px solid transparent;background:none;cursor:pointer">' +
+                '<img src="' + url + '" alt="Chibi ' + (idx + 1) + '" style="width:78px;height:78px;border-radius:50%;object-fit:cover;display:block">' +
+                '</button>'
+              )
+            })
+            .join('')
+          aiCandidatesEl.querySelectorAll('[data-ai-cand]').forEach(function (candBtn) {
+            candBtn.addEventListener('click', function () {
+              const idx = Number(candBtn.getAttribute('data-ai-cand'))
+              selectedAiAvatarDataUrl = list[idx] || null
+              aiCandidatesEl.querySelectorAll('[data-ai-cand]').forEach(function (other) {
+                other.style.borderColor = other === candBtn ? '#d97706' : 'transparent'
+              })
+              if (aiApplyBtn) aiApplyBtn.disabled = !selectedAiAvatarDataUrl
+            })
+          })
+        }
+        if (pictoStatus) pictoStatus.textContent = 'Kattints a kedvenc Chibi avatarodra, majd a "Kiválasztott mentése" gombra!'
       } catch (err) {
         if (pictoStatus) pictoStatus.textContent = err.message
       } finally {
         if (btn) btn.disabled = false
       }
+    })
+
+    aiApplyBtn?.addEventListener('click', async function () {
+      if (!currentModalAgentId || !selectedAiAvatarDataUrl) return
+      aiApplyBtn.disabled = true
+      if (pictoStatus) pictoStatus.textContent = 'Avatar mentése...'
+      try {
+        const res = await apiJson('/api/vps/agents/personalize', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, avatarDataUrl: selectedAiAvatarDataUrl }),
+        })
+        if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
+        clearAiAvatarPicker()
+        if (pictoStatus) pictoStatus.textContent = '✓ Kiválasztott Chibi avatar elmentve!'
+      } catch (err) {
+        if (pictoStatus) pictoStatus.textContent = 'Hiba: ' + err.message
+        aiApplyBtn.disabled = false
+      }
+    })
+
+    aiDiscardBtn?.addEventListener('click', function () {
+      clearAiAvatarPicker()
+      if (pictoStatus) pictoStatus.textContent = 'Generált variációk elvetve (az eredeti avatar maradt).'
     })
 
     document.getElementById('agentCoreSuggestPersonaBtn')?.addEventListener('click', async function () {

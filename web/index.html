@@ -2775,6 +2775,14 @@
                   <div id="agentPictoStatus" style="font-size:11px;opacity:.8"></div>
                 </div>
               </div>
+              <div id="agentAiAvatarPicker" hidden style="display:none;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+                <div style="font-size:12px;font-weight:600">Válassz egyet a generált Chibi avatarok közül (vagy vesd el):</div>
+                <div id="agentAiAvatarCandidates" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button type="button" class="btn-primary btn-compact" id="agentAiAvatarApplyBtn" disabled>Kiválasztott mentése</button>
+                  <button type="button" class="btn-secondary btn-compact" id="agentAiAvatarDiscardBtn">Elvetés</button>
+                </div>
+              </div>
             </div>
             <label class="form-label-sm" data-i18n="agents.detail.select_avatar">Válassz új avatart</label>
             <div class="avatar-grid" id="detailAvatarGrid"></div>
@@ -3210,21 +3218,21 @@
             <button class="btn-secondary btn-compact agent-save-section" id="savePlanBtn" data-i18n="common.btn.save">Mentés</button>
           </div>
           </div>
-          <details class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+          <details id="agentClaudeMdDetails" class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
             <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">CLAUDE.md (Instrukciók)</summary>
             <div style="margin-top:8px">
               <textarea id="editClaudeMd" class="code-textarea" rows="10"></textarea>
               <button class="btn-secondary btn-compact agent-save-section" id="saveClaudeMdBtn" data-i18n="common.btn.save">Mentés</button>
             </div>
           </details>
-          <details class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
-            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">SOUL.md (Személyiség)</summary>
+          <details id="agentSoulMdDetails" class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">SOUL.md (Személyiség és alap-instrukciók)</summary>
             <div style="margin-top:8px">
               <textarea id="editSoulMd" class="code-textarea" rows="8"></textarea>
               <button class="btn-secondary btn-compact agent-save-section" id="saveSoulMdBtn" data-i18n="common.btn.save">Mentés</button>
             </div>
           </details>
-          <details class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+          <details id="agentMcpJsonDetails" class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
             <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">.mcp.json (MCP konfiguráció)</summary>
             <div style="margin-top:8px">
               <textarea id="editMcpJson" class="code-textarea" rows="6"></textarea>

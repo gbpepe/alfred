@@ -1330,87 +1330,107 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { ...OWNER_SESSION_REQUIRED, error: 'Generating AI avatars requires an owner session.' }, 403)
       return true
     }
-    const body = await readJsonBody<{ agentId?: string; displayName?: string; role?: string; prompt?: string }>(req)
+    const body = await readJsonBody<{ agentId?: string; displayName?: string; role?: string; count?: number; prompt?: string }>(req)
     const agentId = (body?.agentId || '').trim()
     if (!agentId || !/^[a-zA-Z0-9_-]{1,64}$/.test(agentId)) {
       json(res, { error: 'Valid agentId is required' }, 400)
       return true
     }
+    const count = Math.max(1, Math.min(3, Number(body?.count || 3) || 3))
     const env = { ...readEnvFile(), ...process.env }
     const openaiKey = (env['OPENAI_API_KEY'] || '').trim()
     const geminiKey = (env['GEMINI_API_KEY'] || '').trim()
+    const cfg = loadAlfredAgentsConfig({ env })
+    const ag = cfg?.agents.find((a) => a.id === agentId)
     const roleThemeMap: Record<string, string> = {
       tervezo: 'wearing smart glasses and a neat blazer, holding a tiny glowing blueprint scroll',
       szakmunkas: 'wearing a cozy tech hoodie and headphones, holding a tiny glowing laptop',
       technikus: 'wearing a sleek tech visor and utility vest, holding a tiny diagnostic wrench and checklist',
       segedmunkas: 'wearing a friendly casual sweater, smiling warmly with a tiny notebook',
     }
-    const roleKey = body?.role ? (normalizeRoleId(body.role) ?? '') : ''
+    const roleKey = body?.role ? (normalizeRoleId(body.role) ?? '') : (ag?.role ?? '')
     const roleTheme = roleThemeMap[roleKey] || 'wearing a neat modern smart-casual tech outfit'
-    const charName = (body?.displayName || agentId).trim().slice(0, 40)
-    const desc = (
-      body?.prompt ||
-      `Adorable Chibi (Super Deformed) anime/manga character portrait avatar for a friendly team member named ${charName}, ${roleTheme}. Classic 2-to-3-head-tall chibi proportions with an oversized head, huge sparkling expressive eyes, tiny cute hands, clean crisp cel-shaded anime lineart, vibrant soft studio gradient background, centered head-and-shoulders framing for a circular profile avatar, NO text, NO letters, NO watermark.`
-    ).slice(0, 600)
+    const charName = (body?.displayName || ag?.displayName || agentId).trim().slice(0, 40)
 
-    let pngBuf: Buffer | null = null
-    let lastErr = ''
-    if (geminiKey) {
-      for (const imgModel of ['gemini-2.5-flash-image', 'gemini-3.1-flash-image']) {
-        if (pngBuf) break
+    let soulSnippet = ''
+    try {
+      const soulPath = ag?.soulFile ? join(process.cwd(), ag.soulFile) : join(process.cwd(), 'agents', agentId, 'SOUL.md')
+      if (existsSync(soulPath)) {
+        soulSnippet = readFileSync(soulPath, 'utf-8').replace(/\s+/g, ' ').trim().slice(0, 220)
+      }
+    } catch { /* ignore */ }
+    const skillsHint = ag?.skills && ag.skills.length > 0 ? ` Specialties/skills: ${ag.skills.join(', ')}.` : ''
+    const soulHint = soulSnippet ? ` Personality context: ${soulSnippet}.` : ''
+
+    const variations = [
+      'warm pastel sky-blue and lavender gradient background, cheerful confident smile',
+      'soft sunset peach and coral studio gradient background, playful curious expression',
+      'mint-teal and soft indigo gradient background, calm focused friendly expression',
+    ]
+
+    async function generateOneImage(promptStr: string): Promise<{ dataUrl?: string; err?: string }> {
+      let lastErr = ''
+      if (geminiKey) {
+        for (const imgModel of ['gemini-2.5-flash-image', 'gemini-3.1-flash-image']) {
+          try {
+            const resImg = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/images/generations', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${geminiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ model: imgModel, prompt: promptStr, response_format: 'b64_json', n: 1 }),
+              signal: AbortSignal.timeout(40_000),
+            })
+            if (resImg.ok) {
+              const data = (await resImg.json()) as { data?: Array<{ b64_json?: string }> }
+              const b64 = data.data?.[0]?.b64_json
+              if (b64) return { dataUrl: `data:image/png;base64,${b64}` }
+            } else {
+              lastErr = `Gemini (${imgModel}) HTTP ${resImg.status}`
+            }
+          } catch (e) {
+            lastErr = e instanceof Error ? e.message : String(e)
+          }
+        }
+      }
+      if (openaiKey) {
         try {
-          const resImg = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/images/generations', {
+          const resImg = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',
-            headers: {
-              Authorization: `Bearer ${geminiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ model: imgModel, prompt: desc, response_format: 'b64_json', n: 1 }),
-            signal: AbortSignal.timeout(35_000),
+            headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'gpt-image-1', prompt: promptStr, size: '1024x1024', response_format: 'b64_json' }),
+            signal: AbortSignal.timeout(40_000),
           })
           if (resImg.ok) {
             const data = (await resImg.json()) as { data?: Array<{ b64_json?: string }> }
             const b64 = data.data?.[0]?.b64_json
-            if (b64) pngBuf = Buffer.from(b64, 'base64')
+            if (b64) return { dataUrl: `data:image/png;base64,${b64}` }
           } else {
-            lastErr = `Gemini (${imgModel}) HTTP ${resImg.status}`
+            lastErr = `OpenAI Image HTTP ${resImg.status}`
           }
         } catch (e) {
           lastErr = e instanceof Error ? e.message : String(e)
         }
       }
+      return { err: lastErr || 'nincs GEMINI_API_KEY vagy OPENAI_API_KEY' }
     }
-    if (!pngBuf && openaiKey) {
-      try {
-        const resImg = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'gpt-image-1', prompt: desc, size: '1024x1024', response_format: 'b64_json' }),
-          signal: AbortSignal.timeout(35_000),
-        })
-        if (resImg.ok) {
-          const data = (await resImg.json()) as { data?: Array<{ b64_json?: string }> }
-          const b64 = data.data?.[0]?.b64_json
-          if (b64) pngBuf = Buffer.from(b64, 'base64')
-        } else {
-          lastErr = `OpenAI Image HTTP ${resImg.status}`
-        }
-      } catch (e) {
-        lastErr = e instanceof Error ? e.message : String(e)
-      }
-    }
-    if (!pngBuf) {
-      json(res, { error: `AI avatar generálás nem elérhető (${lastErr || 'nincs GEMINI_API_KEY vagy OPENAI_API_KEY'}). Használd az azonnali Piktogram Stúdiót!` }, 400)
+
+    const prompts = Array.from({ length: count }, (_, idx) =>
+      (
+        body?.prompt ||
+        `Adorable Chibi (Super Deformed) anime/manga character portrait avatar for a friendly team member named ${charName}, ${roleTheme}.${skillsHint}${soulHint} Classic 2-to-3-head-tall chibi proportions with an oversized head, huge sparkling expressive eyes, tiny cute hands, clean crisp cel-shaded anime lineart, ${variations[idx % variations.length]}, centered head-and-shoulders framing for a circular profile avatar, NO text, NO letters, NO watermark.`
+      ).slice(0, 850),
+    )
+
+    const results = await Promise.all(prompts.map((p) => generateOneImage(p)))
+    const candidates = results.map((r) => r.dataUrl).filter((u): u is string => Boolean(u))
+    if (candidates.length === 0) {
+      const errMsg = results.find((r) => r.err)?.err || 'ismeretlen hiba'
+      json(res, { error: `AI avatar generálás nem elérhető (${errMsg}). Használd az azonnali Piktogram Stúdiót!` }, 400)
       return true
     }
-    const dir = join(process.cwd(), 'agents', agentId)
-    mkdirSync(dir, { recursive: true })
-    for (const ext of ['.jpg', '.jpeg', '.webp']) {
-      const old = join(dir, `avatar${ext}`)
-      if (existsSync(old)) rmSync(old, { force: true })
-    }
-    atomicWriteFileSync(join(dir, 'avatar.png'), pngBuf)
-    json(res, { ok: true, agentId, avatarUrl: `/api/agents/${encodeURIComponent(agentId)}/avatar?t=${Date.now()}` })
+    json(res, { ok: true, agentId, candidates })
     return true
   }
 
