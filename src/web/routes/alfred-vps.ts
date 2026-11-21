@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import os from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import Database from 'better-sqlite3'
 import { getDb } from '../../db.js'
@@ -380,6 +380,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       role?: string | null
       provider?: string | null
       model?: string | null
+      dailyBudgetUsd?: number | null
       restartServices?: boolean
     }>(req)
     const agentId = typeof body?.agentId === 'string' ? body.agentId.trim() : ''
@@ -398,6 +399,14 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       return true
     }
     const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : null
+    const dailyBudgetUsd =
+      typeof body.dailyBudgetUsd === 'number' && Number.isFinite(body.dailyBudgetUsd)
+        ? Math.round(body.dailyBudgetUsd * 100) / 100
+        : null
+    if (dailyBudgetUsd !== null && (dailyBudgetUsd < 0.05 || dailyBudgetUsd > 100)) {
+      json(res, { error: 'dailyBudgetUsd must be between 0.05 and 100' }, 400)
+      return true
+    }
 
     const targets = [
       process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json'),
@@ -416,6 +425,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       else delete entry.provider
       if (model) entry.model = model
       else delete entry.model
+      if (dailyBudgetUsd !== null) entry.dailyBudgetUsd = dailyBudgetUsd
       atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
     }
     if (!found) {
@@ -672,5 +682,364 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     return true
   }
 
+  if (path === '/api/vps/models' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const catalogPath = resolveModelCatalogPath()
+    const cached = readModelCatalog(catalogPath)
+    const providers = buildProviderCatalogView(env, cached)
+    json(res, { ok: true, syncedAt: cached?.syncedAt ?? null, providers })
+    return true
+  }
+
+  if (path === '/api/vps/models/sync' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Syncing model catalog requires an owner session.' }, 403)
+      return true
+    }
+    const env = { ...readEnvFile(), ...process.env }
+    const synced = await syncAllProviderModels(env)
+    const catalogPath = resolveModelCatalogPath()
+    mkdirSync(dirname(catalogPath), { recursive: true })
+    atomicWriteFileSync(catalogPath, JSON.stringify(synced, null, 2) + '\n')
+    const providers = buildProviderCatalogView(env, synced)
+    json(res, { ok: true, syncedAt: synced.syncedAt, providers })
+    return true
+  }
+
+  if (path === '/api/vps/agent-terminal' && method === 'GET') {
+    const agentId = (url.searchParams.get('agentId') || '').trim()
+    if (!agentId) {
+      json(res, { error: 'agentId is required' }, 400)
+      return true
+    }
+    const rawLimit = Number(url.searchParams.get('limit') || '80')
+    const limit = Math.max(10, Math.min(200, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 80))
+    const env = { ...readEnvFile(), ...process.env }
+    const cfg = loadAlfredAgentsConfig({ env })
+    const agent = cfg?.agents.find((a) => a.id === agentId)
+    const ns = agent?.memoryNamespace || agentId
+    const db = getDb()
+    const events: Array<{ ts: string; epoch: number; kind: string; title: string; detail: string }> = []
+
+    try {
+      const msgs = db
+        .prepare(
+          `SELECT direction, sender_name, text, ts, created_at, source
+           FROM conversation_log
+           WHERE agent_id = ? OR agent_id = ?
+           ORDER BY created_at DESC, id DESC LIMIT ?`,
+        )
+        .all(agentId, ns, limit) as Array<{
+        direction: string
+        sender_name: string | null
+        text: string
+        ts: string | null
+        created_at: number | null
+        source: string | null
+      }>
+      for (const m of msgs) {
+        const epoch = Number(m.created_at || 0)
+        const ts = m.ts || (epoch ? new Date(epoch * 1000).toISOString() : '')
+        const isIn = m.direction === 'in'
+        events.push({
+          ts,
+          epoch,
+          kind: isIn ? 'user' : 'assistant',
+          title: isIn ? `USER (${m.sender_name || m.source || 'input'})` : `ASSISTANT (${agentId})`,
+          detail: sanitizeOutput(String(m.text || '')).slice(0, 1200),
+        })
+      }
+    } catch { /* table may not exist in minimal test db */ }
+
+    try {
+      const tools = db
+        .prepare(
+          `SELECT tool_name, input_summary, status, duration_ms, created_at
+           FROM tool_call_log
+           WHERE agent_id = ? OR agent_id = ?
+           ORDER BY created_at DESC, id DESC LIMIT ?`,
+        )
+        .all(agentId, ns, limit) as Array<{
+        tool_name: string
+        input_summary: string | null
+        status: string | null
+        duration_ms: number | null
+        created_at: number | null
+      }>
+      for (const t of tools) {
+        const epoch = Number(t.created_at || 0)
+        const isErr = t.status && t.status !== 'ok' && t.status !== 'success'
+        events.push({
+          ts: epoch ? new Date(epoch * 1000).toISOString() : '',
+          epoch,
+          kind: isErr ? 'error' : 'tool',
+          title: `TOOL ${t.tool_name}${t.status ? ` [${t.status}]` : ''}${t.duration_ms ? ` (${t.duration_ms}ms)` : ''}`,
+          detail: sanitizeOutput(String(t.input_summary || '')).slice(0, 600),
+        })
+      }
+    } catch { /* optional table */ }
+
+    try {
+      const usage = db
+        .prepare(
+          `SELECT model, input_tokens, output_tokens, cost_usd, recorded_at
+           FROM token_usage
+           WHERE agent_id = ? OR agent_id = ?
+           ORDER BY recorded_at DESC, id DESC LIMIT ?`,
+        )
+        .all(agentId, ns, Math.min(limit, 40)) as Array<{
+        model: string | null
+        input_tokens: number | null
+        output_tokens: number | null
+        cost_usd: number | null
+        recorded_at: number | null
+      }>
+      for (const u of usage) {
+        const epoch = Number(u.recorded_at || 0)
+        events.push({
+          ts: epoch ? new Date(epoch * 1000).toISOString() : '',
+          epoch,
+          kind: 'llm',
+          title: `LLM ${u.model || 'unknown'}`,
+          detail: `in=${u.input_tokens ?? 0} out=${u.output_tokens ?? 0} cost=$${Number(u.cost_usd ?? 0).toFixed(5)}`,
+        })
+      }
+    } catch { /* optional table */ }
+
+    events.sort((a, b) => a.epoch - b.epoch)
+    const trimmed = events.slice(-limit).map(({ ts, kind, title, detail }) => ({ ts, kind, title, detail }))
+    json(res, { ok: true, agentId, events: trimmed })
+    return true
+  }
+
+  if (path === '/api/vps/discord/guilds' && method === 'GET') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Discord guild listing requires an owner session.' }, 403)
+      return true
+    }
+    const env = { ...readEnvFile(), ...process.env }
+    const token = (env['DISCORD_BOT_TOKEN'] || '').trim()
+    if (!token) {
+      json(res, { error: 'DISCORD_BOT_TOKEN nincs beállítva a szerveren.' }, 400)
+      return true
+    }
+    try {
+      const gRes = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+        headers: { Authorization: `Bot ${token}` },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!gRes.ok) {
+        const errText = await gRes.text()
+        json(res, { error: `Discord API hiba (${gRes.status}): ${sanitizeOutput(errText).slice(0, 200)}` }, 502)
+        return true
+      }
+      const guilds = (await gRes.json()) as Array<{ id: string; name: string }>
+      const enriched = await Promise.all(
+        guilds.slice(0, 10).map(async (g) => {
+          try {
+            const cRes = await fetch(`https://discord.com/api/v10/guilds/${g.id}/channels`, {
+              headers: { Authorization: `Bot ${token}` },
+              signal: AbortSignal.timeout(8000),
+            })
+            if (!cRes.ok) return { id: g.id, name: g.name, categories: [], channels: [] }
+            const all = (await cRes.json()) as Array<{ id: string; name: string; type: number; parent_id?: string | null }>
+            return {
+              id: g.id,
+              name: g.name,
+              categories: all.filter((c) => c.type === 4).map((c) => ({ id: c.id, name: c.name })),
+              channels: all.filter((c) => c.type === 0).map((c) => ({ id: c.id, name: c.name, parentId: c.parent_id ?? null })),
+            }
+          } catch {
+            return { id: g.id, name: g.name, categories: [], channels: [] }
+          }
+        }),
+      )
+      json(res, { ok: true, guilds: enriched })
+    } catch (err) {
+      json(res, { error: err instanceof Error ? err.message : String(err) }, 502)
+    }
+    return true
+  }
+
+  if (path === '/api/vps/discord/create-channel' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Creating Discord channels requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{
+      agentId?: string
+      guildId?: string
+      channelName?: string
+      categoryId?: string | null
+      topic?: string | null
+    }>(req)
+    const agentId = (body?.agentId || '').trim()
+    const guildId = (body?.guildId || '').trim()
+    const rawName = (body?.channelName || '').trim().toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64)
+    if (!agentId || !guildId || !rawName) {
+      json(res, { error: 'agentId, guildId és érvényes csatornanév megadása kötelező.' }, 400)
+      return true
+    }
+    const env = { ...readEnvFile(), ...process.env }
+    const token = (env['DISCORD_BOT_TOKEN'] || '').trim()
+    if (!token) {
+      json(res, { error: 'DISCORD_BOT_TOKEN nincs beállítva.' }, 400)
+      return true
+    }
+    try {
+      const createRes = await fetch(`https://discord.com/api/v10/guilds/${encodeURIComponent(guildId)}/channels`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bot ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: rawName,
+          type: 0,
+          ...(body.categoryId ? { parent_id: body.categoryId } : {}),
+          topic: (body.topic || `Alfred Core dedikált chat szoba: ${agentId}`).slice(0, 200),
+        }),
+        signal: AbortSignal.timeout(10000),
+      })
+      const created = (await createRes.json().catch(() => ({}))) as { id?: string; name?: string; message?: string; code?: number }
+      if (!createRes.ok || !created.id) {
+        const hint = createRes.status === 403
+          ? ' (Ellenőrizd, hogy a Discord Bot szerepkörén engedélyezve van-e a "Manage Channels" jogosultság!)'
+          : ''
+        json(res, { error: `Discord csatorna létrehozás sikertelen (${createRes.status}): ${created.message || 'unknown'}${hint}` }, 502)
+        return true
+      }
+
+      const channelNameFormatted = `#${created.name || rawName}`
+      const targets = [
+        process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json'),
+        '/opt/alfred-prod/config/agents.json',
+      ].filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
+
+      for (const cfgPath of targets) {
+        const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+        const entry = (parsed.agents ?? []).find((a) => a.id === agentId)
+        if (!entry) continue
+        entry.channelName = channelNameFormatted
+        entry.channelId = created.id
+        atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+      }
+
+      json(res, {
+        ok: true,
+        agentId,
+        channel: { id: created.id, name: channelNameFormatted },
+      })
+    } catch (err) {
+      json(res, { error: err instanceof Error ? err.message : String(err) }, 502)
+    }
+    return true
+  }
+
   return false
+}
+
+interface StoredModelCatalog {
+  syncedAt: string
+  providers: Record<string, { models: string[]; error?: string }>
+}
+
+const DEFAULT_PROVIDER_MODELS: Record<string, string[]> = {
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  'vertex-eu': ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+  xai: ['grok-3', 'grok-3-mini', 'grok-4'],
+  openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'],
+}
+
+function resolveModelCatalogPath(): string {
+  return process.env['ALFRED_MODEL_CATALOG_PATH'] || join(process.cwd(), 'store', 'model-catalog.json')
+}
+
+function readModelCatalog(filePath: string): StoredModelCatalog | null {
+  try {
+    if (!existsSync(filePath)) return null
+    return JSON.parse(readFileSync(filePath, 'utf-8')) as StoredModelCatalog
+  } catch {
+    return null
+  }
+}
+
+function isProviderConfigured(provider: string, env: Record<string, string | undefined>): boolean {
+  if (provider === 'deepseek') return Boolean(env['DEEPSEEK_API_KEY']?.trim())
+  if (provider === 'openai') return Boolean(env['OPENAI_API_KEY']?.trim())
+  if (provider === 'xai') return Boolean(env['XAI_API_KEY']?.trim())
+  if (provider === 'gemini') return Boolean(env['GEMINI_API_KEY']?.trim())
+  if (provider === 'vertex-eu') return Boolean(env['GOOGLE_CLOUD_PROJECT']?.trim() || env['GOOGLE_APPLICATION_CREDENTIALS']?.trim())
+  return false
+}
+
+function buildProviderCatalogView(env: Record<string, string | undefined>, cached: StoredModelCatalog | null) {
+  const out: Record<string, { configured: boolean; models: string[]; error?: string }> = {}
+  for (const p of ALLOWED_PROVIDERS) {
+    const entry = cached?.providers?.[p]
+    out[p] = {
+      configured: isProviderConfigured(p, env),
+      models: entry?.models?.length ? entry.models : (DEFAULT_PROVIDER_MODELS[p] ?? []),
+      ...(entry?.error ? { error: entry.error } : {}),
+    }
+  }
+  return out
+}
+
+async function fetchOpenAiCompatModels(baseUrl: string, apiKey: string): Promise<string[]> {
+  const res = await fetch(`${baseUrl}/models`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(8000),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = (await res.json()) as { data?: Array<{ id?: string }> }
+  return (data.data ?? [])
+    .map((m) => m.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    .sort()
+}
+
+async function syncAllProviderModels(env: Record<string, string | undefined>): Promise<StoredModelCatalog> {
+  const providers: Record<string, { models: string[]; error?: string }> = {}
+  await Promise.all(
+    [...ALLOWED_PROVIDERS].map(async (p) => {
+      if (!isProviderConfigured(p, env)) {
+        providers[p] = { models: DEFAULT_PROVIDER_MODELS[p] ?? [] }
+        return
+      }
+      try {
+        if (p === 'deepseek') {
+          providers[p] = { models: await fetchOpenAiCompatModels('https://api.deepseek.com', env['DEEPSEEK_API_KEY']!.trim()) }
+        } else if (p === 'openai') {
+          const all = await fetchOpenAiCompatModels('https://api.openai.com/v1', env['OPENAI_API_KEY']!.trim())
+          const filtered = all.filter((id) => /^(gpt-|o1|o3|o4|chatgpt-)/.test(id))
+          providers[p] = { models: filtered.length ? filtered : all }
+        } else if (p === 'xai') {
+          providers[p] = { models: await fetchOpenAiCompatModels('https://api.x.ai/v1', env['XAI_API_KEY']!.trim()) }
+        } else if (p === 'gemini') {
+          const key = env['GEMINI_API_KEY']!.trim()
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`, {
+            signal: AbortSignal.timeout(8000),
+          })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const data = (await res.json()) as { models?: Array<{ name?: string; supportedGenerationMethods?: string[] }> }
+          const list = (data.models ?? [])
+            .filter((m) => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
+            .map((m) => (m.name || '').replace(/^models\//, ''))
+            .filter((id) => id.startsWith('gemini-'))
+            .sort()
+          providers[p] = { models: list.length ? list : DEFAULT_PROVIDER_MODELS['gemini'] }
+        } else if (p === 'vertex-eu') {
+          providers[p] = { models: DEFAULT_PROVIDER_MODELS['vertex-eu'] }
+        }
+      } catch (err) {
+        providers[p] = {
+          models: DEFAULT_PROVIDER_MODELS[p] ?? [],
+          error: err instanceof Error ? err.message : String(err),
+        }
+      }
+    }),
+  )
+  return { syncedAt: new Date().toISOString(), providers }
 }

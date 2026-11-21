@@ -2297,6 +2297,18 @@
       <div id="vpsSystemBar" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px">Betöltés...</div>
       <div id="vpsServicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px"></div>
 
+      <div id="vpsModelCatalogCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <strong>Modell Katalógus (API szinkron)</strong>
+            <span id="vpsModelCatalogSyncedAt" style="font-size:12px;opacity:.7;margin-left:8px"></span>
+          </div>
+          <button class="btn-primary btn-compact" id="vpsSyncModelsBtn">Modellek frissítése (API szinkron)</button>
+        </div>
+        <div id="vpsModelCatalogGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
+        <div id="vpsModelCatalogStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
+      </div>
+
       <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <strong>Ops műveletek</strong>
@@ -2771,6 +2783,15 @@
               <span class="meta-value" id="agentDetailContext">-</span>
             </div>
           </div>
+          <div class="agent-process-control" id="agentCoreStatusBar" hidden style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div class="process-status">
+              <span class="process-dot" style="background:#16a34a"></span>
+              <span id="agentCoreStatusText">Alfred Core aktív</span>
+            </div>
+            <div class="process-actions">
+              <button type="button" class="btn-primary btn-compact" id="agentCoreTerminalBtn">Terminál (élő nézet)</button>
+            </div>
+          </div>
           <div class="agent-process-control" id="agentProcessControl">
             <div class="process-status">
               <span class="process-dot" id="processDot"></span>
@@ -2806,11 +2827,18 @@
               <select id="agentCoreModelSel" class="input" style="flex:1;min-width:160px;padding:4px 8px;font-size:12px"></select>
               <input type="text" id="agentCoreModelInp" class="input" placeholder="Egyéni model ID" hidden style="flex:1;min-width:160px;padding:4px 8px;font-size:12px">
             </div>
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-              <button type="button" class="btn-primary btn-compact" id="agentCoreOverrideSaveBtn">Mentés</button>
-              <span id="agentCoreOverrideStatus" style="font-size:12px;opacity:.8"></span>
+          </div>
+          <div id="agentCoreMetaBox" hidden style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <label for="agentCoreBudgetInp" style="font-size:13px;font-weight:600;margin:0">Napi költségkeret (USD):</label>
+              <input type="number" id="agentCoreBudgetInp" class="input" min="0.05" max="100" step="0.25" style="width:100px;padding:4px 8px;font-size:12px">
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <span style="font-size:12px;font-weight:600;opacity:.8">Engedélyezett eszközök:</span>
+              <div id="agentCoreToolsList" style="display:flex;gap:4px;flex-wrap:wrap"></div>
             </div>
           </div>
+          <div id="legacyAgentSettingsWrap">
           <div class="form-group" id="alfredReadonlyNote" hidden>
             <div style="padding:12px 14px;background:var(--bg-input);border-radius:var(--radius);border-left:3px solid var(--accent);font-size:13px;line-height:1.5;color:var(--text-muted)">
               <strong style="color:var(--text)" data-i18n="agents.detail.main_readonly">Főagent konfiguráció -- csak olvasható</strong><br>
@@ -2958,6 +2986,7 @@
               <span data-i18n="agents.settings.ctx_guard_status_prefix">Állapot:</span> <strong id="cgPhaseDisplay">-</strong> &middot; <span data-i18n="agents.settings.ctx_guard_status_ctx">Kontextus:</span> <strong id="cgPctDisplay">-</strong>
             </div>
             <button class="btn-secondary btn-compact agent-save-section" id="saveContextGuardBtn" style="margin-top:10px" data-i18n="common.btn.save">Mentés</button>
+          </div>
           <div class="form-group" id="idleFlushGroup">
             <label data-i18n="agents.settings.idle_flush_label">Tétlen-ürítés</label>
             <p style="margin:4px 0 10px;font-size:12.5px;line-height:1.5;color:var(--text-muted)" data-i18n="agents.settings.idle_flush_desc">
@@ -3145,26 +3174,55 @@
             <small id="editAgentPlanDesc" style="display:block;margin-top:6px;color:var(--text-muted);font-size:12px;line-height:1.4"></small>
             <button class="btn-secondary btn-compact agent-save-section" id="savePlanBtn" data-i18n="common.btn.save">Mentés</button>
           </div>
-          <div class="form-group">
-            <label for="editClaudeMd">CLAUDE.md</label>
-            <textarea id="editClaudeMd" class="code-textarea" rows="12"></textarea>
-            <button class="btn-secondary btn-compact agent-save-section" id="saveClaudeMdBtn" data-i18n="common.btn.save">Mentés</button>
           </div>
-          <div class="form-group">
-            <label for="editSoulMd">SOUL.md</label>
-            <textarea id="editSoulMd" class="code-textarea" rows="10"></textarea>
-            <button class="btn-secondary btn-compact agent-save-section" id="saveSoulMdBtn" data-i18n="common.btn.save">Mentés</button>
+          <details class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">CLAUDE.md (Instrukciók)</summary>
+            <div style="margin-top:8px">
+              <textarea id="editClaudeMd" class="code-textarea" rows="10"></textarea>
+              <button class="btn-secondary btn-compact agent-save-section" id="saveClaudeMdBtn" data-i18n="common.btn.save">Mentés</button>
+            </div>
+          </details>
+          <details class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">SOUL.md (Személyiség)</summary>
+            <div style="margin-top:8px">
+              <textarea id="editSoulMd" class="code-textarea" rows="8"></textarea>
+              <button class="btn-secondary btn-compact agent-save-section" id="saveSoulMdBtn" data-i18n="common.btn.save">Mentés</button>
+            </div>
+          </details>
+          <details class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">.mcp.json (MCP konfiguráció)</summary>
+            <div style="margin-top:8px">
+              <textarea id="editMcpJson" class="code-textarea" rows="6"></textarea>
+              <button class="btn-secondary btn-compact agent-save-section" id="saveMcpJsonBtn" data-i18n="common.btn.save">Mentés</button>
+            </div>
+          </details>
+          <div id="agentSettingsSaveBar" hidden style="display:flex;align-items:center;gap:12px;padding-top:12px;margin-top:12px;border-top:1px solid var(--border)">
+            <button type="button" class="btn-primary" id="saveAllAgentSettingsBtn">Mentés</button>
+            <span id="agentSettingsSaveStatus" style="font-size:12px;opacity:.85"></span>
           </div>
-          <div class="form-group">
-            <label for="editMcpJson">.mcp.json</label>
-            <textarea id="editMcpJson" class="code-textarea" rows="8"></textarea>
-            <button class="btn-secondary btn-compact agent-save-section" id="saveMcpJsonBtn" data-i18n="common.btn.save">Mentés</button>
-          </div>
-        </div>
         </div>
 
         <!-- Tab: Channel -->
         <div class="tab-panel" id="tabChannel" hidden>
+          <div id="agentCoreChannelBox" hidden style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+              <div>
+                <strong style="font-size:13px">Alfred Core Discord Csatorna</strong>
+                <div id="agentCoreChannelCurrent" style="font-size:12px;opacity:.85;margin-top:2px"></div>
+              </div>
+              <button type="button" class="btn-secondary btn-compact" id="agentDcLoadGuildsBtn">Szerverek betöltése</button>
+            </div>
+            <div id="agentDcCreateWrap" style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+              <div style="font-size:12px;font-weight:600">+ Saját Discord chat szoba létrehozása (a Discord Bot által)</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="agentDcGuildSel" class="input" style="padding:4px 8px;font-size:12px;min-width:150px"><option value="">-- Válassz szervert --</option></select>
+                <select id="agentDcCategorySel" class="input" style="padding:4px 8px;font-size:12px;min-width:150px"><option value="">(Nincs kategória)</option></select>
+                <input type="text" id="agentDcChanName" class="input" placeholder="pl. alfred-architect" style="flex:1;min-width:140px;padding:4px 8px;font-size:12px">
+                <button type="button" class="btn-primary btn-compact" id="agentDcCreateChanBtn">Szoba létrehozása</button>
+              </div>
+              <div id="agentDcCreateStatus" style="font-size:12px;opacity:.85"></div>
+            </div>
+          </div>
           <div class="form-group" style="margin-bottom:16px;">
             <label for="chProviderSelect" data-i18n="agents.channel.provider_label">Csatorna provider</label>
             <select id="chProviderSelect" style="max-width:200px;">
@@ -3187,7 +3245,7 @@
             <div class="form-group" id="chDiscordChannelIdGroup">
               <label for="chDiscordChannelId">Discord Channel ID</label>
               <input type="text" id="chDiscordChannelId" placeholder="1234567890123456789">
-              <small style="display:block;margin-top:4px;color:var(--text-muted);font-size:12px" data-i18n="agents.channel.discord_channel_hint">Annak a server-csatornának az ID-je, amelyikbe a bot alapból ír. Discord &rarr; jobbklikk a csatornán &rarr; "Copy Channel ID" (Developer Mode kell hozzá).</small>
+              <small style="display:block;margin-top:4px;color:var(--text-muted);font-size:12px" data-i18n="agents.channel.discord_channel_hint">Annak a server-csatornának az ID-je, amelyikbe a bot alapból ír. Discord → jobbklikk a csatornán → "Copy Channel ID" (Developer Mode kell hozzá).</small>
             </div>
             <button class="btn-primary" id="chConnectBtn">
               <span class="btn-text" data-i18n="channel.connect_btn">Összekapcsolás</span>
@@ -3754,6 +3812,28 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- Simulated Alfred Core Live Terminal modal -->
+  <div class="modal-overlay" id="agentCoreTerminalOverlay" hidden>
+    <div class="modal terminal-modal" style="max-width:860px;width:95vw;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 id="agentCoreTermTitle" style="margin:0;font-size:16px">Terminál</h2>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="agentCoreTermAutoChk" checked> Élő (2s)
+          </label>
+          <button type="button" class="btn-secondary btn-compact" id="agentCoreTermRefreshBtn">Frissítés</button>
+          <button type="button" class="modal-close" id="agentCoreTermCloseBtn">&times;</button>
+        </div>
+      </div>
+      <div id="agentCoreTermOutput" style="background:#0d1117;color:#e6edf3;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;padding:12px;flex:1;min-height:360px;max-height:58vh;overflow:auto;white-space:pre-wrap;word-break:break-word"></div>
+      <div style="display:flex;gap:8px;align-items:center;padding:10px 12px;background:#161b22;border-top:1px solid #30363d;border-radius:0 0 8px 8px">
+        <span style="color:#58a6ff;font-family:monospace;font-weight:700">&gt;</span>
+        <input type="text" id="agentCoreTermInput" placeholder="Írj parancsot / üzenetet az ügynöknek..." style="flex:1;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:6px 10px;font-family:monospace;font-size:12px">
+        <button type="button" class="btn-primary btn-compact" id="agentCoreTermSendBtn">Küldés</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Terminal modal -->
   <div class="modal-overlay" id="terminalOverlay">

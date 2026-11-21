@@ -161,7 +161,7 @@
 
   window.loadAgentsRoles = async function () {
     try {
-      await ensureVpsRolesData(true)
+      await Promise.all([ensureVpsRolesData(true), ensureModelCatalog(false)])
       renderRolesGrid(vpsRolesCache, vpsAgentsCache)
     } catch { /* ignore */ }
   }
@@ -172,6 +172,57 @@
     gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
     xai: ['grok-3', 'grok-3-mini', 'grok-4'],
     openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'],
+  }
+
+  let vpsModelCatalogCache = null
+  let vpsModelSyncedAt = null
+  let vpsDiscordGuildsCache = []
+  const coreFileDirty = { claude: false, soul: false, mcp: false }
+
+  function getModelsForProvider(provider) {
+    const entry = vpsModelCatalogCache && vpsModelCatalogCache[provider]
+    if (entry && Array.isArray(entry.models) && entry.models.length > 0) return entry.models
+    return PROVIDER_MODELS[provider] || []
+  }
+
+  function renderModelCatalog() {
+    const grid = document.getElementById('vpsModelCatalogGrid')
+    const syncedEl = document.getElementById('vpsModelCatalogSyncedAt')
+    if (syncedEl) {
+      syncedEl.textContent = vpsModelSyncedAt
+        ? ('Utolsó szinkron: ' + vpsModelSyncedAt.slice(0, 19).replace('T', ' ') + ' UTC')
+        : 'Még nem volt API szinkron (alapértelmezett lista)'
+    }
+    if (!grid || !vpsModelCatalogCache) return
+    grid.innerHTML = PROVIDER_OPTIONS.map(function (p) {
+      const info = vpsModelCatalogCache[p] || { configured: false, models: PROVIDER_MODELS[p] || [] }
+      const badge = info.configured
+        ? '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#16a34a">API aktív</span>'
+        : '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#6b7280">nincs kulcs</span>'
+      const errHtml = info.error ? '<div style="font-size:11px;color:#dc2626">Hiba: ' + esc(info.error) + '</div>' : ''
+      const preview = (info.models || []).slice(0, 5).map(esc).join(', ') + ((info.models || []).length > 5 ? ' …' : '')
+      return (
+        '<div style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:4px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center"><strong>' + esc(p) + '</strong>' + badge + '</div>' +
+        '<div style="font-size:11px;opacity:.75">' + (info.models || []).length + ' modell</div>' +
+        '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word">' + (preview || '—') + '</div>' +
+        errHtml +
+        '</div>'
+      )
+    }).join('')
+  }
+
+  async function ensureModelCatalog(force) {
+    if (!force && vpsModelCatalogCache) {
+      renderModelCatalog()
+      return
+    }
+    try {
+      const data = await apiJson('/api/vps/models')
+      vpsModelCatalogCache = data.providers || null
+      vpsModelSyncedAt = data.syncedAt || null
+      renderModelCatalog()
+    } catch { /* fallback to defaults */ }
   }
 
   function updateInheritedRoleText() {
@@ -186,7 +237,7 @@
     const modelSel = document.getElementById('agentCoreModelSel')
     const modelInp = document.getElementById('agentCoreModelInp')
     if (!modelSel || !modelInp) return
-    const list = PROVIDER_MODELS[provider] || []
+    const list = getModelsForProvider(provider)
     modelSel.innerHTML =
       list.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>' }).join('') +
       '<option value="__custom__">Egyéni modell...</option>'
@@ -209,33 +260,98 @@
     }
   }
 
+  function applyCoreOverview(ag) {
+    const modelEl = document.getElementById('agentDetailModel')
+    const chEl = document.getElementById('agentDetailChStatus')
+    const ctxEl = document.getElementById('agentDetailContext')
+    const coreBar = document.getElementById('agentCoreStatusBar')
+    const coreTxt = document.getElementById('agentCoreStatusText')
+    const procBar = document.getElementById('agentProcessControl')
+    if (modelEl) {
+      modelEl.textContent = ag.provider + ' / ' + ag.model + (ag.hasOverride ? ' (egyedi)' : ' (munkakör)')
+    }
+    if (chEl) {
+      chEl.innerHTML = '<span class="tg-status"><span class="tg-dot connected"></span>' + esc(ag.channelName || '—') + '</span>'
+    }
+    if (ctxEl) {
+      ctxEl.textContent = '$' + Number(ag.dailyBudgetUsd || 0).toFixed(2) + ' / nap · ' + (ag.tools ? ag.tools.length : 0) + ' eszköz'
+    }
+    if (coreBar) {
+      coreBar.hidden = false
+      coreBar.style.display = 'flex'
+    }
+    if (coreTxt) {
+      const r = vpsRolesCache.find(function (item) { return item.id === ag.role })
+      coreTxt.textContent = 'Alfred Core aktív · ' + (r ? r.label : (ag.role || '—'))
+    }
+    if (procBar) procBar.hidden = true
+  }
+
+  function restoreLegacyModal() {
+    const box = document.getElementById('agentCoreOverrideBox')
+    const metaBox = document.getElementById('agentCoreMetaBox')
+    const legacyWrap = document.getElementById('legacyAgentSettingsWrap')
+    const saveBar = document.getElementById('agentSettingsSaveBar')
+    const coreBar = document.getElementById('agentCoreStatusBar')
+    const procBar = document.getElementById('agentProcessControl')
+    const coreCh = document.getElementById('agentCoreChannelBox')
+    if (box) box.hidden = true
+    if (metaBox) metaBox.hidden = true
+    if (legacyWrap) legacyWrap.hidden = false
+    if (saveBar) { saveBar.hidden = true; saveBar.style.display = 'none' }
+    if (coreBar) { coreBar.hidden = true; coreBar.style.display = 'none' }
+    if (procBar) procBar.hidden = false
+    if (coreCh) { coreCh.hidden = true; coreCh.style.display = 'none' }
+    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn'].forEach(function (id) {
+      const b = document.getElementById(id)
+      if (b) b.hidden = false
+    })
+  }
+
   window.syncAgentCoreOverride = async function (agentName) {
     const box = document.getElementById('agentCoreOverrideBox')
-    const legacyGroup = document.getElementById('legacyAgentModelGroup')
+    const metaBox = document.getElementById('agentCoreMetaBox')
+    const legacyWrap = document.getElementById('legacyAgentSettingsWrap')
+    const saveBar = document.getElementById('agentSettingsSaveBar')
     const chk = document.getElementById('agentCoreOverrideChk')
     const ovRow = document.getElementById('agentCoreOverrideRow')
     const roleSel = document.getElementById('agentCoreRoleSel')
     const provSel = document.getElementById('agentCoreProvSel')
-    const statusEl = document.getElementById('agentCoreOverrideStatus')
+    const budgetInp = document.getElementById('agentCoreBudgetInp')
+    const toolsList = document.getElementById('agentCoreToolsList')
+    const statusEl = document.getElementById('agentSettingsSaveStatus')
+    const coreCh = document.getElementById('agentCoreChannelBox')
+    const coreChCur = document.getElementById('agentCoreChannelCurrent')
+    const dcChanInp = document.getElementById('agentDcChanName')
     if (!box || !chk || !ovRow || !roleSel || !provSel) return
     try {
-      await ensureVpsRolesData(false)
+      await Promise.all([ensureVpsRolesData(false), ensureModelCatalog(false)])
     } catch {
-      box.hidden = true
-      if (legacyGroup) legacyGroup.hidden = false
+      restoreLegacyModal()
       return
     }
     const ag = vpsAgentsCache.find(function (a) { return a.id === agentName })
     if (!ag) {
-      box.hidden = true
-      if (legacyGroup) legacyGroup.hidden = false
+      restoreLegacyModal()
       currentModalAgentId = null
       return
     }
     currentModalAgentId = ag.id
+    coreFileDirty.claude = false
+    coreFileDirty.soul = false
+    coreFileDirty.mcp = false
+
     box.hidden = false
-    if (legacyGroup) legacyGroup.hidden = true
+    box.style.display = 'flex'
+    if (metaBox) { metaBox.hidden = false; metaBox.style.display = 'flex' }
+    if (legacyWrap) legacyWrap.hidden = true
+    if (saveBar) { saveBar.hidden = false; saveBar.style.display = 'flex' }
     if (statusEl) statusEl.textContent = ''
+    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn'].forEach(function (id) {
+      const b = document.getElementById(id)
+      if (b) b.hidden = true
+    })
+
     roleSel.innerHTML = vpsRolesCache
       .map(function (r) {
         return '<option value="' + esc(r.id) + '"' + (r.id === ag.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
@@ -249,6 +365,33 @@
     chk.checked = Boolean(ag.hasOverride)
     ovRow.hidden = !chk.checked
     ovRow.style.display = chk.checked ? 'flex' : 'none'
+
+    if (budgetInp) budgetInp.value = String(ag.dailyBudgetUsd ?? 2)
+    if (toolsList) {
+      const tools = Array.isArray(ag.tools) ? ag.tools : []
+      toolsList.innerHTML = tools.length
+        ? tools.map(function (t) {
+            return '<span style="padding:2px 7px;border-radius:999px;font-size:11px;border:1px solid var(--border);background:var(--surface)">' + esc(t) + '</span>'
+          }).join('')
+        : '<span style="font-size:12px;opacity:.6">Nincs engedélyezett eszköz (csak szöveges)</span>'
+    }
+
+    if (coreCh) {
+      coreCh.hidden = false
+      coreCh.style.display = 'flex'
+    }
+    if (coreChCur) {
+      coreChCur.textContent = 'Aktuális csatorna: ' + (ag.channelName || 'nincs hozzárendelve')
+    }
+    if (dcChanInp) {
+      dcChanInp.value = ag.id.toLowerCase().replace(/[^a-z0-9-_]+/g, '-')
+    }
+
+    // Apply overview immediately and once more after app.js finishes its async agent fetch
+    applyCoreOverview(ag)
+    setTimeout(function () {
+      if (currentModalAgentId === ag.id) applyCoreOverview(ag)
+    }, 350)
   }
 
   const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
@@ -266,6 +409,11 @@
         const opts = PROVIDER_OPTIONS.map(function (p) {
           return '<option value="' + p + '"' + (p === r.provider ? ' selected' : '') + '>' + p + '</option>'
         }).join('')
+        const modelList = getModelsForProvider(r.provider)
+        const allModels = modelList.indexOf(r.model) >= 0 ? modelList : [r.model].concat(modelList)
+        const modelOpts = allModels.filter(Boolean).map(function (m) {
+          return '<option value="' + esc(m) + '"' + (m === r.model ? ' selected' : '') + '>' + esc(m) + '</option>'
+        }).join('')
         return (
           '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
           '<div style="display:flex;justify-content:space-between;align-items:center"><strong>' + esc(r.label) + '</strong><span style="font-size:11px;opacity:.6">' + esc(r.id) + '</span></div>' +
@@ -273,13 +421,25 @@
           '<div style="font-size:11px;opacity:.8"><b>Ágensek:</b> ' + esc(assigned || '—') + '</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
           '<select class="input" data-role-provider="' + esc(r.id) + '" style="padding:4px 6px;font-size:12px">' + opts + '</select>' +
-          '<input type="text" class="input" data-role-model="' + esc(r.id) + '" value="' + esc(r.model) + '" style="flex:1;min-width:120px;padding:4px 6px;font-size:12px">' +
+          '<select class="input" data-role-model="' + esc(r.id) + '" style="flex:1;min-width:120px;padding:4px 6px;font-size:12px">' + modelOpts + '</select>' +
           '<button class="btn-primary btn-compact" data-role-save="' + esc(r.id) + '">Mentés</button>' +
           '</div>' +
           '</div>'
         )
       })
       .join('')
+
+    grid.querySelectorAll('[data-role-provider]').forEach(function (provEl) {
+      provEl.addEventListener('change', function () {
+        const roleId = provEl.getAttribute('data-role-provider')
+        const modEl = grid.querySelector('[data-role-model="' + roleId + '"]')
+        if (!modEl) return
+        const models = getModelsForProvider(provEl.value)
+        modEl.innerHTML = models.map(function (m) {
+          return '<option value="' + esc(m) + '">' + esc(m) + '</option>'
+        }).join('')
+      })
+    })
 
     grid.querySelectorAll('[data-role-save]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
@@ -512,14 +672,40 @@
       })
     }
 
-    // Agent modal override controls
+    // Model Catalog sync button
+    const syncModelsBtn = document.getElementById('vpsSyncModelsBtn')
+    if (syncModelsBtn) {
+      syncModelsBtn.addEventListener('click', async function () {
+        const statusEl = document.getElementById('vpsModelCatalogStatus')
+        syncModelsBtn.disabled = true
+        if (statusEl) statusEl.textContent = 'Modellek lekérdezése a beregisztrált API-któl...'
+        try {
+          const data = await apiJson('/api/vps/models/sync', { method: 'POST', body: '{}' })
+          vpsModelCatalogCache = data.providers || null
+          vpsModelSyncedAt = data.syncedAt || null
+          renderModelCatalog()
+          if (statusEl) statusEl.textContent = 'Modell katalógus frissítve!'
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          syncModelsBtn.disabled = false
+        }
+      })
+    }
+
+    // Track dirty state for CLAUDE.md / SOUL.md / .mcp.json
+    document.getElementById('editClaudeMd')?.addEventListener('input', function () { coreFileDirty.claude = true })
+    document.getElementById('editSoulMd')?.addEventListener('input', function () { coreFileDirty.soul = true })
+    document.getElementById('editMcpJson')?.addEventListener('input', function () { coreFileDirty.mcp = true })
+
+    // Agent modal override & unified save controls
     const ovChk = document.getElementById('agentCoreOverrideChk')
     const ovRow = document.getElementById('agentCoreOverrideRow')
     const ovRole = document.getElementById('agentCoreRoleSel')
     const ovProv = document.getElementById('agentCoreProvSel')
     const ovModelSel = document.getElementById('agentCoreModelSel')
     const ovModelInp = document.getElementById('agentCoreModelInp')
-    const ovSave = document.getElementById('agentCoreOverrideSaveBtn')
+    const saveAllBtn = document.getElementById('saveAllAgentSettingsBtn')
     if (ovRole) {
       ovRole.addEventListener('change', updateInheritedRoleText)
     }
@@ -541,18 +727,20 @@
         if (!isCustom) ovModelInp.value = ovModelSel.value
       })
     }
-    if (ovSave) {
-      ovSave.addEventListener('click', async function () {
+    if (saveAllBtn) {
+      saveAllBtn.addEventListener('click', async function () {
         if (!currentModalAgentId) return
         const roleSel = document.getElementById('agentCoreRoleSel')
         const provSel = document.getElementById('agentCoreProvSel')
         const modelSel = document.getElementById('agentCoreModelSel')
         const modelInp = document.getElementById('agentCoreModelInp')
-        const statusEl = document.getElementById('agentCoreOverrideStatus')
+        const budgetInp = document.getElementById('agentCoreBudgetInp')
+        const statusEl = document.getElementById('agentSettingsSaveStatus')
         if (!roleSel || !provSel || !modelSel || !modelInp) return
         const useOverride = Boolean(ovChk && ovChk.checked)
         const chosenModel = modelSel.value === '__custom__' ? modelInp.value.trim() : modelSel.value
-        ovSave.disabled = true
+        const budgetVal = budgetInp ? Number(budgetInp.value) : NaN
+        saveAllBtn.disabled = true
         if (statusEl) statusEl.textContent = 'Mentés...'
         try {
           const res = await apiJson('/api/vps/agent-override', {
@@ -562,25 +750,236 @@
               role: roleSel.value,
               provider: useOverride ? provSel.value : null,
               model: useOverride ? (chosenModel || null) : null,
+              dailyBudgetUsd: Number.isFinite(budgetVal) && budgetVal >= 0.05 ? budgetVal : null,
               restartServices: true,
             }),
           })
+          const fileSaves = []
+          if (coreFileDirty.claude) {
+            const val = document.getElementById('editClaudeMd')?.value ?? ''
+            fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/claude-md', { method: 'PUT', body: JSON.stringify({ content: val }) }))
+          }
+          if (coreFileDirty.soul) {
+            const val = document.getElementById('editSoulMd')?.value ?? ''
+            fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/soul-md', { method: 'PUT', body: JSON.stringify({ content: val }) }))
+          }
+          if (coreFileDirty.mcp) {
+            const val = document.getElementById('editMcpJson')?.value ?? ''
+            fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/mcp-json', { method: 'PUT', body: JSON.stringify({ content: val }) }))
+          }
+          if (fileSaves.length > 0) {
+            await Promise.all(fileSaves)
+            coreFileDirty.claude = false
+            coreFileDirty.soul = false
+            coreFileDirty.mcp = false
+          }
           const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
-          if (statusEl) statusEl.textContent = 'Mentve' + extra
+          if (statusEl) statusEl.textContent = 'Minden beállítás mentve' + extra
           await ensureVpsRolesData(true)
+          const updated = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+          if (updated) applyCoreOverview(updated)
           updateInheritedRoleText()
         } catch (err) {
           if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
         } finally {
-          ovSave.disabled = false
+          saveAllBtn.disabled = false
         }
       })
     }
+
+    // Discord Bot server/channel creator
+    const dcLoadBtn = document.getElementById('agentDcLoadGuildsBtn')
+    const dcGuildSel = document.getElementById('agentDcGuildSel')
+    const dcCatSel = document.getElementById('agentDcCategorySel')
+    const dcCreateBtn = document.getElementById('agentDcCreateChanBtn')
+    function syncDcCategories() {
+      if (!dcGuildSel || !dcCatSel) return
+      const g = vpsDiscordGuildsCache.find(function (item) { return item.id === dcGuildSel.value })
+      const cats = g ? (g.categories || []) : []
+      dcCatSel.innerHTML = '<option value="">(Nincs kategória)</option>' +
+        cats.map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>' }).join('')
+    }
+    if (dcGuildSel) dcGuildSel.addEventListener('change', syncDcCategories)
+    if (dcLoadBtn && dcGuildSel) {
+      dcLoadBtn.addEventListener('click', async function () {
+        const statusEl = document.getElementById('agentDcCreateStatus')
+        dcLoadBtn.disabled = true
+        if (statusEl) statusEl.textContent = 'Discord szerverek betöltése...'
+        try {
+          const data = await apiJson('/api/vps/discord/guilds')
+          vpsDiscordGuildsCache = data.guilds || []
+          dcGuildSel.innerHTML = vpsDiscordGuildsCache.length
+            ? vpsDiscordGuildsCache.map(function (g) { return '<option value="' + esc(g.id) + '">' + esc(g.name) + '</option>' }).join('')
+            : '<option value="">(Nincs elérhető szerver)</option>'
+          syncDcCategories()
+          if (statusEl) statusEl.textContent = vpsDiscordGuildsCache.length + ' szerver betöltve.'
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          dcLoadBtn.disabled = false
+        }
+      })
+    }
+    if (dcCreateBtn) {
+      dcCreateBtn.addEventListener('click', async function () {
+        if (!currentModalAgentId || !dcGuildSel) return
+        const guildId = dcGuildSel.value
+        const categoryId = dcCatSel ? dcCatSel.value : ''
+        const channelName = document.getElementById('agentDcChanName')?.value.trim() || ''
+        const statusEl = document.getElementById('agentDcCreateStatus')
+        if (!guildId || !channelName) {
+          if (statusEl) statusEl.textContent = 'Előbb töltsd be a szervereket és adj meg egy csatornanevet!'
+          return
+        }
+        dcCreateBtn.disabled = true
+        if (statusEl) statusEl.textContent = 'Discord szoba létrehozása...'
+        try {
+          const res = await apiJson('/api/vps/discord/create-channel', {
+            method: 'POST',
+            body: JSON.stringify({ agentId: currentModalAgentId, guildId, categoryId: categoryId || null, channelName }),
+          })
+          if (statusEl) statusEl.textContent = 'Létrehozva és bekötve: ' + res.channel.name + ' (ID: ' + res.channel.id + ')'
+          await ensureVpsRolesData(true)
+          const updated = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+          if (updated) {
+            applyCoreOverview(updated)
+            const cur = document.getElementById('agentCoreChannelCurrent')
+            if (cur) cur.textContent = 'Aktuális csatorna: ' + (updated.channelName || res.channel.name)
+          }
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          dcCreateBtn.disabled = false
+        }
+      })
+    }
+
+    // Simulated Live Agent Terminal modal
+    let coreTermTimer = null
+    let coreTermAgentId = null
+    const termOverlay = document.getElementById('agentCoreTerminalOverlay')
+    const termOut = document.getElementById('agentCoreTermOutput')
+    const termTitle = document.getElementById('agentCoreTermTitle')
+    const termAuto = document.getElementById('agentCoreTermAutoChk')
+    const termInp = document.getElementById('agentCoreTermInput')
+    const termSend = document.getElementById('agentCoreTermSendBtn')
+
+    const TERM_COLORS = {
+      user: '#58a6ff',
+      tool: '#d29922',
+      llm: '#bc8cff',
+      assistant: '#3fb950',
+      error: '#f85149',
+    }
+
+    async function refreshCoreTerminal() {
+      if (!coreTermAgentId || !termOut) return
+      try {
+        const data = await apiJson('/api/vps/agent-terminal?agentId=' + encodeURIComponent(coreTermAgentId) + '&limit=80')
+        const events = data.events || []
+        if (events.length === 0) {
+          termOut.innerHTML = '<div style="opacity:.6">Még nincs rögzített esemény ehhez az ügynökhöz. Írj egy üzenetet lent a kipróbáláshoz!</div>'
+          return
+        }
+        const atBottom = termOut.scrollHeight - termOut.scrollTop - termOut.clientHeight < 40
+        termOut.innerHTML = events
+          .map(function (ev) {
+            const color = TERM_COLORS[ev.kind] || '#e6edf3'
+            const t = (ev.ts || '').slice(11, 19) || '--:--:--'
+            return (
+              '<div style="margin-bottom:6px">' +
+              '<span style="color:#8b949e">[' + esc(t) + ']</span> ' +
+              '<strong style="color:' + color + '">' + esc(ev.title) + '</strong>' +
+              (ev.detail ? '\n<span style="color:#c9d1d9">' + esc(ev.detail) + '</span>' : '') +
+              '</div>'
+            )
+          })
+          .join('')
+        if (atBottom) termOut.scrollTop = termOut.scrollHeight
+      } catch (err) {
+        termOut.innerHTML = '<div style="color:#f85149">Hiba: ' + esc(err.message) + '</div>'
+      }
+    }
+
+    function stopCoreTermPolling() {
+      if (coreTermTimer) { clearInterval(coreTermTimer); coreTermTimer = null }
+    }
+
+    function startCoreTermPolling() {
+      stopCoreTermPolling()
+      if (termAuto && termAuto.checked && coreTermAgentId && termOverlay && !termOverlay.hidden) {
+        coreTermTimer = setInterval(refreshCoreTerminal, 2000)
+      }
+    }
+
+    function openCoreTerminal(agentId) {
+      if (!termOverlay || !agentId) return
+      coreTermAgentId = agentId
+      if (termTitle) termTitle.textContent = 'Terminál — ' + agentId
+      termOverlay.hidden = false
+      termOverlay.classList.add('active')
+      refreshCoreTerminal()
+      startCoreTermPolling()
+    }
+
+    function closeCoreTerminal() {
+      stopCoreTermPolling()
+      coreTermAgentId = null
+      if (termOverlay) {
+        termOverlay.classList.remove('active')
+        termOverlay.hidden = true
+      }
+    }
+
+    document.getElementById('agentCoreTerminalBtn')?.addEventListener('click', function () {
+      if (currentModalAgentId) openCoreTerminal(currentModalAgentId)
+    })
+    document.getElementById('agentCoreTermCloseBtn')?.addEventListener('click', closeCoreTerminal)
+    document.getElementById('agentCoreTermRefreshBtn')?.addEventListener('click', refreshCoreTerminal)
+    termAuto?.addEventListener('change', startCoreTermPolling)
+
+    async function sendCoreTermMessage() {
+      if (!coreTermAgentId || !termInp || !termSend) return
+      const text = termInp.value.trim()
+      if (!text) return
+      termSend.disabled = true
+      termInp.disabled = true
+      try {
+        if (document.getElementById('alfredTestBanner')) {
+          await apiJson('/api/test-sim/send', {
+            method: 'POST',
+            body: JSON.stringify({ agentId: coreTermAgentId, content: text }),
+          })
+        } else {
+          await apiJson('/api/vps/chat', {
+            method: 'POST',
+            body: JSON.stringify({ agentId: coreTermAgentId, message: text }),
+          })
+        }
+        termInp.value = ''
+        await refreshCoreTerminal()
+      } catch (err) {
+        if (termOut) termOut.innerHTML += '<div style="color:#f85149">Küldési hiba: ' + esc(err.message) + '</div>'
+      } finally {
+        termSend.disabled = false
+        termInp.disabled = false
+        termInp.focus()
+      }
+    }
+
+    termSend?.addEventListener('click', sendCoreTermMessage)
+    termInp?.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        sendCoreTermMessage()
+      }
+    })
   }
 
   window.loadVpsPage = function () {
     wireEvents()
     refreshVpsStatus()
+    ensureModelCatalog(false)
     refreshVpsLogs()
   }
 

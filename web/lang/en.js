@@ -401,7 +401,7 @@ window._i18n.en = {
   'agents.channel.tg_invite_desc':      'Generate a unique link. Anyone who clicks it will automatically start the bot, and you can approve it visibly in the UI immediately. Each link is single-use.',
   'agents.channel.tg_no_links':         'No active invite links.',
   'agents.channel.reconnecting':        'Channel disconnected. Automatic reconnection in progress, or use the button below.',
-  'agents.channel.discord_channel_hint': 'The ID of the server channel where the bot writes by default. Discord &rarr; right-click the channel &rarr; "Copy Channel ID" (requires Developer Mode).',
+  'agents.channel.discord_channel_hint': 'The ID of the server channel where the bot writes by default. Discord → right-click the channel → "Copy Channel ID" (requires Developer Mode).',
   'agents.channel.tg_howto_title':     'How to add more people or groups?',
   'agents.channel.tg_howto_dm_heading': '1. Add a new person (private chat):',
   'agents.channel.tg_howto_dm_1':       'Give the person the bot username (shown below).',

@@ -149,4 +149,23 @@ describe('alfred role-based model routing', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('serves default model catalog via GET /api/vps/models', async () => {
+    const { ctx, getStatus, getJson } = mockReqRes('GET', '/api/vps/models')
+    const handled = await tryHandleAlfredVps(ctx)
+    expect(handled).toBe(true)
+    expect(getStatus()).toBe(200)
+    const body = getJson()
+    expect(body.ok).toBe(true)
+    const providers = body.providers as Record<string, { models: string[] }>
+    expect(Array.isArray(providers.deepseek.models)).toBe(true)
+    expect(providers.deepseek.models).toContain('deepseek-chat')
+  })
+
+  it('validates agentId on GET /api/vps/agent-terminal', async () => {
+    const { ctx, getStatus } = mockReqRes('GET', '/api/vps/agent-terminal')
+    const handled = await tryHandleAlfredVps(ctx)
+    expect(handled).toBe(true)
+    expect(getStatus()).toBe(400)
+  })
 })

@@ -401,7 +401,7 @@ window._i18n.hu = {
   'agents.channel.tg_invite_desc':      'Generálj egy egyedi linket. Aki rákattint, automatikusan elindítja a botot, és Te a UI-n láthatóan azonnal jóváhagyhatod. Egy link csak egyszer használható.',
   'agents.channel.tg_no_links':         'Nincs aktív meghívó link.',
   'agents.channel.reconnecting':        'Csatorna leszakadt. Automatikus újracsatlakozás folyamatban, vagy használd a gombot lent.',
-  'agents.channel.discord_channel_hint': 'Annak a server-csatornának az ID-je, amelyikbe a bot alapból ír. Discord &rarr; jobbklikk a csatornán &rarr; "Copy Channel ID" (Developer Mode kell hozzá).',
+  'agents.channel.discord_channel_hint': 'Annak a server-csatornának az ID-je, amelyikbe a bot alapból ír. Discord → jobbklikk a csatornán → "Copy Channel ID" (Developer Mode kell hozzá).',
   'agents.channel.tg_howto_title':     'Hogyan adj hozzá több embert vagy csoportot?',
   'agents.channel.tg_howto_dm_heading': '1. Új ember (privát chat) hozzáadása:',
   'agents.channel.tg_howto_dm_1':       'Add meg az illetőnek a bot felhasználónevét (lent látható).',
