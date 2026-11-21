@@ -251,6 +251,14 @@ function readAgentCostsForEnv(
   }
 }
 
+function resolveWritableAgentConfigPaths(): string[] {
+  const primary = process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json')
+  const candidates = process.env['ALFRED_ENV'] === 'test'
+    ? [primary]
+    : [primary, '/opt/alfred-prod/config/agents.json']
+  return candidates.filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
+}
+
 function resolveEnvSpecById(envId: string): VpsEnvSpec | undefined {
   return resolveVpsEnvSpecs().find((s) => s.id === envId)
 }
@@ -339,10 +347,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       return true
     }
 
-    const targets = [
-      process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json'),
-      '/opt/alfred-prod/config/agents.json',
-    ].filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
+    const targets = resolveWritableAgentConfigPaths()
 
     if (targets.length === 0) {
       json(res, { error: 'config/agents.json not found' }, 404)
@@ -408,10 +413,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       return true
     }
 
-    const targets = [
-      process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json'),
-      '/opt/alfred-prod/config/agents.json',
-    ].filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
+    const targets = resolveWritableAgentConfigPaths()
 
     let found = false
     for (const cfgPath of targets) {
@@ -906,15 +908,13 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         const hint = createRes.status === 403
           ? ' (Ellenőrizd, hogy a Discord Bot szerepkörén engedélyezve van-e a "Manage Channels" jogosultság!)'
           : ''
-        json(res, { error: `Discord csatorna létrehozás sikertelen (${createRes.status}): ${created.message || 'unknown'}${hint}` }, 502)
+        const status = createRes.status === 403 ? 403 : 400
+        json(res, { error: `Discord csatorna létrehozás sikertelen (${createRes.status}): ${created.message || 'unknown'}${hint}` }, status)
         return true
       }
 
       const channelNameFormatted = `#${created.name || rawName}`
-      const targets = [
-        process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json'),
-        '/opt/alfred-prod/config/agents.json',
-      ].filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
+      const targets = resolveWritableAgentConfigPaths()
 
       for (const cfgPath of targets) {
         const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
