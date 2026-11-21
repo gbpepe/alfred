@@ -472,9 +472,21 @@
     // Apply overview immediately and once more after app.js finishes its async agent fetch
     applyCoreOverview(ag)
     loadCoreSkillsForModal(ag.id)
+    markAgentModalClean()
     setTimeout(function () {
-      if (currentModalAgentId === ag.id) applyCoreOverview(ag)
+      if (currentModalAgentId === ag.id) {
+        applyCoreOverview(ag)
+        markAgentModalClean()
+      }
     }, 350)
+  }
+
+  function markAgentModalClean() {
+    const ov = document.getElementById('agentDetailOverlay')
+    if (!ov || !ov._openValues) return
+    ov.querySelectorAll('input, textarea').forEach(function (el) {
+      ov._openValues.set(el, el.value)
+    })
   }
 
   let coreSkillsCache = []
@@ -931,6 +943,7 @@
           }
           const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
           if (statusEl) statusEl.textContent = 'Minden beállítás mentve' + extra
+          markAgentModalClean()
           await ensureVpsRolesData(true)
           const updated = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
           if (updated) applyCoreOverview(updated)
