@@ -39,7 +39,7 @@ function resolveVpsEnvSpecs(): VpsEnvSpec[] {
         label: 'Production',
         unit: 'alfred-prod',
         dir: process.env['ALFRED_PROD_DIR'] || '/opt/alfred-prod',
-        dbPath: process.env['ALFRED_PROD_DB_PATH'] || '/opt/alfred-prod/store/alfred.db',
+        dbPath: process.env['ALFRED_PROD_DB_PATH'] || '/opt/alfred-prod/store/alfred-prod.db',
       },
       {
         id: 'ops',
