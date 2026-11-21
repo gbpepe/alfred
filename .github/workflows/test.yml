@@ -6,7 +6,8 @@ on:
     branches: [develop, main, core-2nd-stage]
 
 jobs:
-  test:
+  core-and-dashboard:
+    name: Core + Active Dashboard Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -20,4 +21,13 @@ jobs:
       - run: npm run typecheck:alfred
       - run: npm run build:alfred
       - run: npm run build:web
-      - run: npm run test:alfred
+      - name: Run Alfred Core & VPS Web tests
+        run: npm run test:alfred
+      - name: Run Active Dashboard tests (Auth, CostOps, DB, Kanban)
+        run: >-
+          npx vitest run
+          src/__tests__/auth-*.test.ts
+          src/__tests__/costops-*.test.ts
+          src/__tests__/db.test.ts
+          src/__tests__/db-init-concurrent.test.ts
+          src/__tests__/kanban-*.test.ts

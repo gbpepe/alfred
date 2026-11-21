@@ -1,0 +1,28 @@
+name: full-test
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  full-regression:
+    name: Full Regression Suite (Pre-Merge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Stub the claude binary for PATH resolution
+        run: |
+          sudo install -m 755 /dev/stdin /usr/local/bin/claude <<'EOF'
+          #!/bin/sh
+          echo "claude CI stub: tests must not execute this binary" >&2
+          exit 1
+          EOF
+      - name: Run Full Regression Suite
+        run: npx vitest run --config vitest.full.config.ts
