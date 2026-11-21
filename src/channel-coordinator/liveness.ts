@@ -11,7 +11,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { execFileSync, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { resolveFromPath } from '../platform.js'
+import { makeLazyBinResolver } from '../platform.js'
 import { logger } from '../logger.js'
 import { PROJECT_ROOT } from '../config.js'
 import { channelStateDir, type ChannelProviderType } from '../channel-provider.js'
@@ -20,7 +20,7 @@ import { matchesProviderPollerCmd } from './provider-poller-match.js'
 import { exactTmuxTarget } from '../tmux-target.js'
 import { stateDirPluginPollerPids } from '../web/channel-poller-reap.js'
 
-const TMUX = resolveFromPath('tmux')
+const getTmux = makeLazyBinResolver('tmux')
 const execFileAsync = promisify(execFile)
 
 // Keep in sync with channel-monitor.ts. The scheduled keepalive refreshes
@@ -37,7 +37,7 @@ export const RESPAWN_STAMP_FILE = join(PROJECT_ROOT, 'store', '.channel-last-res
 
 export function getClaudePidForSession(session: string): number | null {
   try {
-    const out = execFileSync(TMUX, ['list-panes', '-t', exactTmuxTarget(session), '-F', '#{pane_pid}'], { timeout: 3000, encoding: 'utf-8' })
+    const out = execFileSync(getTmux(), ['list-panes', '-t', exactTmuxTarget(session), '-F', '#{pane_pid}'], { timeout: 3000, encoding: 'utf-8' })
     const panePid = parseInt(out.trim().split('\n')[0], 10)
     if (!panePid) return null
     const cmd = execFileSync('/bin/ps', ['-p', String(panePid), '-o', 'comm='], { timeout: 3000, encoding: 'utf-8' }).trim()
@@ -307,7 +307,7 @@ function livenessFromSnapshot(
 
 export async function getClaudePidForSessionAsync(session: string): Promise<number | null> {
   try {
-    const out = (await execFileAsync(TMUX, ['list-panes', '-t', exactTmuxTarget(session), '-F', '#{pane_pid}'], { timeout: 3000, encoding: 'utf-8' })).stdout
+    const out = (await execFileAsync(getTmux(), ['list-panes', '-t', exactTmuxTarget(session), '-F', '#{pane_pid}'], { timeout: 3000, encoding: 'utf-8' })).stdout
     const panePid = parseInt(out.trim().split('\n')[0], 10)
     if (!panePid) return null
     const cmd = (await execFileAsync('/bin/ps', ['-p', String(panePid), '-o', 'comm='], { timeout: 3000, encoding: 'utf-8' })).stdout.trim()

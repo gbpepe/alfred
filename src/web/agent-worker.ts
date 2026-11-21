@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync, readdirSync
 import { join } from 'node:path'
 import { homedir, tmpdir, userInfo } from 'node:os'
 import { createHash } from 'node:crypto'
-import { resolveFromPath, tryResolveFromPath } from '../platform.js'
+import { makeLazyBinResolver, resolveFromPath, tryResolveFromPath } from '../platform.js'
 import { logger } from '../logger.js'
 import { launchableInstallDefaultSync, launchableDistributionDefaultSync } from './default-model-guard.js'
 import { measureClaudeCliVersionSync } from './claude-cli-version.js'
@@ -49,7 +49,7 @@ import { injectDbWriteGate, injectEmailSendGate, pythonHookCommand, isUnsafeHook
 // answer to <reqid>.out and signal with <reqid>.done; runAgent polls the files.
 // =============================================================================
 
-const TMUX = resolveFromPath('tmux')
+const getTmux = makeLazyBinResolver('tmux')
 
 // ALFRED_WORKER_MODEL is an escape hatch (systemd `Environment=`); when set it
 // wins over everything else. Without it the worker inherits the main agent's
@@ -959,7 +959,7 @@ function startWorkerSessionFor(ctx: WorkerCtx): void {
     `${shArg(claudeLaunchBin)} --dangerously-skip-permissions --model ${shArg(workerModel)} ` +
     // WORKERMCPSEND1104 part 2: only the servers in the worker's own MCP config, nothing from any other source.
     `--strict-mcp-config --mcp-config ${shArg(workerMcpConfigPath(ctx))}`
-  execFileSync(TMUX, ['new-session', '-d', '-s', ctx.session, '-c', ctx.home, 'bash', '-lc', launch], { timeout: 8000 })
+  execFileSync(getTmux(), ['new-session', '-d', '-s', ctx.session, '-c', ctx.home, 'bash', '-lc', launch], { timeout: 8000 })
   logger.info({ session: ctx.session, cwd: ctx.home }, 'agent-worker: launched interactive worker session')
   // APRO920 (c)(2): same rationale as startAgentProcess's model-resolved log --
   // which config-chain element supplied the --model value.
@@ -1042,7 +1042,7 @@ function selfHealWorkerOnce(ctx: WorkerCtx): boolean {
   if (!shouldSelfHeal(cls)) return false
   logger.warn({ cls, session: ctx.session }, 'agent-worker: pane parked on unexpected chrome -- bounded Escape self-heal')
   for (let i = 0; i < WORKER_SELF_HEAL_MAX_ESCAPES; i++) {
-    try { execFileSync(TMUX, ['send-keys', '-t', exactTmuxTarget(ctx.session), 'Escape'], { timeout: 5000 }) } catch { break }
+    try { execFileSync(getTmux(), ['send-keys', '-t', exactTmuxTarget(ctx.session), 'Escape'], { timeout: 5000 }) } catch { break }
     try { execFileSync('/bin/sleep', ['0.5'], { timeout: 2000 }) } catch { /* best effort */ }
     const now = classifyWorkerPane(capturePane(ctx.session))
     if (now === 'idle' || now === 'busy') {
@@ -1145,16 +1145,16 @@ function restartWorkerSession(ctx: WorkerCtx): void {
   }
   // TMUXWINDOWATTR920: stderr piped; "not running" is the expected case here,
   // so it is logged at debug with the site instead of copied onto stderr.
-  try { execFileSync(TMUX, ['kill-session', '-t', exactTmuxTarget(ctx.session)], { timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'] }) } catch (err) { logger.debug({ site: 'agent-worker.restart', session: ctx.session, tmux: tmuxStderr(err) }, 'tmux kill-session: not running') }
+  try { execFileSync(getTmux(), ['kill-session', '-t', exactTmuxTarget(ctx.session)], { timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'] }) } catch (err) { logger.debug({ site: 'agent-worker.restart', session: ctx.session, tmux: tmuxStderr(err) }, 'tmux kill-session: not running') }
   try { startWorkerSessionFor(ctx) } catch (err) { logger.warn({ err, session: ctx.session }, 'agent-worker: restart failed') }
 }
 
 // Reset context between requests so unrelated one-shots never share/grow context.
 async function clearWorkerContext(ctx: WorkerCtx): Promise<void> {
   try {
-    execFileSync(TMUX, ['send-keys', '-t', exactTmuxTarget(ctx.session), '-l', '/clear'], { timeout: 5000 })
+    execFileSync(getTmux(), ['send-keys', '-t', exactTmuxTarget(ctx.session), '-l', '/clear'], { timeout: 5000 })
     execFileSync('/bin/sleep', ['0.2'], { timeout: 2000 })
-    execFileSync(TMUX, ['send-keys', '-t', exactTmuxTarget(ctx.session), 'Enter'], { timeout: 5000 })
+    execFileSync(getTmux(), ['send-keys', '-t', exactTmuxTarget(ctx.session), 'Enter'], { timeout: 5000 })
     // Typed-ahead floor (R1 review corner): see CLEAR_READY_SETTLE_MS. The pane can
     // still show the pre-/clear idle prompt until the TUI reads the Enter, so the
     // first readiness poll runs only after the old fixed-sleep floor has passed.
