@@ -1243,7 +1243,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       ...baseAgent,
       tools: [],
       resolvedSystemPrompt:
-        'You are a creative branding & persona designer for Alfred AI agents. Output ONLY valid JSON (no markdown fences) with keys: "suggestions" (array of 4 objects: { "displayName": string, "tagline": string (short Hungarian subtitle max 40 chars), "emoji": single emoji, "color": hex color like "#2563eb" }) and "soulDraft" (concise Hungarian SOUL.md Markdown starting with "# <Name>", max 12 lines).',
+        'You are a creative persona designer for Alfred AI team members. Suggest 4 warm, realistic, friendly HUMAN Hungarian or international first names (like Albert, Alfréd, Eszter, Bence, Nóra, Márton, Dóra, Gábor, Zsófia, Tamás — NEVER robotic or compound AI names like "CodeBot", "ArchitektAI", or "DevMaster"). Output ONLY valid JSON (no markdown fences) with keys: "suggestions" (array of 4 objects: { "displayName": string (human first name, e.g. "Márton"), "tagline": string (short Hungarian role subtitle max 40 chars), "emoji": single emoji, "color": hex color like "#2563eb" }) and "soulDraft" (concise Hungarian SOUL.md Markdown starting with "# <Name>", max 12 lines).',
     }
     try {
       const outcome = await runHybridAgentTurn({
@@ -1344,25 +1344,28 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     let pngBuf: Buffer | null = null
     let lastErr = ''
     if (geminiKey) {
-      try {
-        const resImg = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(geminiKey)}`,
-          {
+      for (const imgModel of ['gemini-2.5-flash-image', 'gemini-3.1-flash-image']) {
+        if (pngBuf) break
+        try {
+          const resImg = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/images/generations', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ instances: [{ prompt: desc }], parameters: { sampleCount: 1, aspectRatio: '1:1' } }),
-            signal: AbortSignal.timeout(30_000),
-          },
-        )
-        if (resImg.ok) {
-          const data = (await resImg.json()) as { predictions?: Array<{ bytesBase64Encoded?: string }> }
-          const b64 = data.predictions?.[0]?.bytesBase64Encoded
-          if (b64) pngBuf = Buffer.from(b64, 'base64')
-        } else {
-          lastErr = `Gemini Imagen HTTP ${resImg.status}`
+            headers: {
+              Authorization: `Bearer ${geminiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ model: imgModel, prompt: desc, response_format: 'b64_json', n: 1 }),
+            signal: AbortSignal.timeout(35_000),
+          })
+          if (resImg.ok) {
+            const data = (await resImg.json()) as { data?: Array<{ b64_json?: string }> }
+            const b64 = data.data?.[0]?.b64_json
+            if (b64) pngBuf = Buffer.from(b64, 'base64')
+          } else {
+            lastErr = `Gemini (${imgModel}) HTTP ${resImg.status}`
+          }
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e)
         }
-      } catch (e) {
-        lastErr = e instanceof Error ? e.message : String(e)
       }
     }
     if (!pngBuf && openaiKey) {
