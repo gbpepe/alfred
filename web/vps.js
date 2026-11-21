@@ -1177,12 +1177,57 @@
       }
     })
 
+    function renderSimpleLineDiff(beforeText, afterText) {
+      const a = String(beforeText || '').split(/\r?\n/)
+      const b = String(afterText || '').split(/\r?\n/)
+      const aSet = new Set(a.map(function (l) { return l.trim() }).filter(Boolean))
+      const bSet = new Set(b.map(function (l) { return l.trim() }).filter(Boolean))
+      const rows = []
+      a.forEach(function (line) {
+        if (line.trim() && !bSet.has(line.trim())) {
+          rows.push('<div style="background:rgba(220,38,38,.12);color:#dc2626;padding:1px 6px;border-radius:3px">- ' + esc(line) + '</div>')
+        }
+      })
+      b.forEach(function (line) {
+        if (line.trim() && !aSet.has(line.trim())) {
+          rows.push('<div style="background:rgba(22,163,74,.12);color:#15803d;padding:1px 6px;border-radius:3px">+ ' + esc(line) + '</div>')
+        }
+      })
+      if (rows.length === 0) return '<div style="opacity:.7;margin-top:6px">Nincs szöveges különbség.</div>'
+      return (
+        '<details open style="margin-top:8px">' +
+        '<summary style="cursor:pointer;font-weight:600;font-size:11px;user-select:none">Változások (diff: ' + rows.length + ' sor)</summary>' +
+        '<div style="margin-top:6px;max-height:180px;overflow:auto;font-family:monospace;font-size:11px;display:flex;flex-direction:column;gap:2px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">' +
+        rows.join('') +
+        '</div></details>'
+      )
+    }
+
+    function showOptimizeResult(msgEl, beforeText, opt, restoreFn) {
+      if (!msgEl) return
+      const stats = opt.tokensBeforeEst
+        ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
+        : ''
+      msgEl.hidden = false
+      msgEl.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span>⚡ Optimalizálva' + esc(stats) + ': ' + esc(opt.summary || '') + '</span>' +
+        '<button type="button" class="btn-secondary btn-compact" data-opt-restore style="font-size:11px;padding:2px 8px">Eredeti visszaállítása</button>' +
+        '</div>' +
+        renderSimpleLineDiff(beforeText, opt.content || '')
+      msgEl.querySelector('[data-opt-restore]')?.addEventListener('click', function () {
+        restoreFn()
+        msgEl.textContent = 'Eredeti tartalom visszaállítva.'
+      })
+    }
+
     document.getElementById('coreSkillAiOptBtn')?.addEventListener('click', async function () {
       const btn = document.getElementById('coreSkillAiOptBtn')
       const idInp = document.getElementById('coreSkillIdInp')
       const contInp = document.getElementById('coreSkillContentInp')
       const statusEl = document.getElementById('coreSkillEditorStatus')
-      const content = contInp ? contInp.value.trim() : ''
+      const beforeText = contInp ? contInp.value : ''
+      const content = beforeText.trim()
       if (!content) {
         if (statusEl) statusEl.textContent = 'Nincs mit optimalizálni — előbb nyiss meg vagy generálj egy skillt!'
         return
@@ -1196,10 +1241,7 @@
         })
         const opt = res.optimized || {}
         if (contInp && opt.content) contInp.value = opt.content
-        const stats = opt.tokensBeforeEst
-          ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
-          : ''
-        if (statusEl) statusEl.textContent = '⚡ Optimalizálva' + stats + ': ' + (opt.summary || '')
+        showOptimizeResult(statusEl, beforeText, opt, function () { if (contInp) contInp.value = beforeText })
       } catch (err) {
         if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
       } finally {
@@ -1246,7 +1288,8 @@
     if (gOptBtn) {
       gOptBtn.addEventListener('click', async function () {
         const nameInp = document.getElementById('skillName')
-        const content = gContent ? gContent.value.trim() : ''
+        const beforeText = gContent ? gContent.value : ''
+        const content = beforeText.trim()
         if (!content) return
         gOptBtn.disabled = true
         if (gStatus) gStatus.textContent = '⚡ Skill Optimalizáló Agent dolgozik...'
@@ -1257,10 +1300,7 @@
           })
           const opt = res.optimized || {}
           if (gContent && opt.content) gContent.value = opt.content
-          const stats = opt.tokensBeforeEst
-            ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
-            : ''
-          if (gStatus) gStatus.textContent = '⚡ Optimalizálva' + stats + ': ' + (opt.summary || '')
+          showOptimizeResult(gStatus, beforeText, opt, function () { if (gContent) gContent.value = beforeText })
         } catch (err) {
           if (gStatus) gStatus.textContent = 'Hiba: ' + err.message
         } finally {
@@ -1307,7 +1347,8 @@
       const titleEl = document.getElementById('skillDetailTitle')
       if (!editor) return
       if (editor.hidden && editBtn) editBtn.click()
-      const content = editor.value.trim()
+      const beforeText = editor.value
+      const content = beforeText.trim()
       if (!content) return
       if (btn) btn.disabled = true
       if (msgEl) { msgEl.hidden = false; msgEl.textContent = '⚡ Skill Optimalizáló Agent elemzi és tömöríti a SKILL.md fájlt...' }
@@ -1318,13 +1359,7 @@
         })
         const opt = res.optimized || {}
         if (opt.content) editor.value = opt.content
-        const stats = opt.tokensBeforeEst
-          ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
-          : ''
-        if (msgEl) {
-          msgEl.hidden = false
-          msgEl.textContent = '⚡ Optimalizálva' + stats + ': ' + (opt.summary || '') + ' — Nézd át és kattints a Mentés gombra!'
-        }
+        showOptimizeResult(msgEl, beforeText, opt, function () { editor.value = beforeText })
       } catch (err) {
         if (msgEl) { msgEl.hidden = false; msgEl.textContent = 'Hiba: ' + err.message }
       } finally {

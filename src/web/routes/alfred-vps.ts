@@ -1178,7 +1178,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       ...baseAgent,
       tools: [],
       resolvedSystemPrompt:
-        'You are a specialized Skill Optimizer Agent for Alfred AI agents. Your job is to rewrite a SKILL.md file so it is significantly shorter, sharper, token-efficient, and more actionable for an LLM while preserving 100% of safety constraints, YAML frontmatter (name, description), and concrete rules. Remove filler prose, deduplicate instructions, use concise numbered checklists. Output ONLY valid JSON (no markdown fences) with keys: "content" (the full optimized SKILL.md including YAML frontmatter) and "summary" (1-2 concise Hungarian sentences explaining what was improved/shortened).',
+        'You are a strict Skill Optimizer Agent for Alfred AI agents. Your goal is MAXIMUM signal-to-noise ratio and FEWER tokens. HARD RULES: (1) Output MUST be strictly shorter than or equal in character length to the input (never bloat a concise skill — aim for 20-40% fewer tokens while keeping 100% of original rules and YAML frontmatter). (2) Do NOT invent new rules or extra sections that were not requested. (3) Remove filler words, merge duplicates, use ultra-crisp bullet/numbered imperatives. Output ONLY valid JSON (no markdown fences) with keys: "content" (the full optimized SKILL.md including YAML frontmatter) and "summary" (1 concise Hungarian sentence describing the exact tightening).',
     }
     try {
       const outcome = await runHybridAgentTurn({
