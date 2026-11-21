@@ -19,10 +19,10 @@ Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=15s
 
-# Ultra-lightweight control plane for 2 GB RAM VPS
-MemoryHigh=160M
-MemoryMax=256M
-CPUQuota=25%
+# Ultra-lightweight control plane at idle (128M JS heap), with cgroup headroom for child tsc/vitest builds
+MemoryHigh=384M
+MemoryMax=640M
+CPUQuota=50%
 
 # Note: NoNewPrivileges=true is intentionally omitted so `alfred` can invoke scoped
 # `sudo systemctl` on alfred-test / alfred-prod as defined in `deploy/alfred-ops.sudoers.example`.

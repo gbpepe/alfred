@@ -9,6 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 ALFRED_BUILD_CMD="${ALFRED_BUILD_CMD:-npm run build:alfred}"
+# Child build/test processes (tsc, vitest) must NOT inherit alfred-ops's 128 MB NODE_OPTIONS cap.
+export NODE_OPTIONS="${ALFRED_CHILD_NODE_OPTIONS:---max-old-space-size=512}"
 PROD_SERVICE="${ALFRED_PROD_SERVICE:-alfred-prod}"
 TEST_SERVICE="${ALFRED_TEST_SERVICE:-alfred-test}"
 OPS_SERVICE="${ALFRED_OPS_SERVICE:-alfred-ops}"
