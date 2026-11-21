@@ -79,89 +79,73 @@
       }
 
       renderRolesGrid(data.roles || [], data.agents || [])
-      renderAgentOverrides(data.roles || [], data.agents || [])
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
   }
 
-  function renderAgentOverrides(roles, agents) {
-    const grid = document.getElementById('vpsAgentsOverrideGrid')
-    const statusEl = document.getElementById('vpsAgentOverrideStatus')
-    if (!grid) return
-    grid.innerHTML = agents
-      .map(function (a) {
-        const roleOpts = roles
-          .map(function (r) {
-            return '<option value="' + esc(r.id) + '"' + (r.id === a.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
-          })
-          .join('')
-        const provOpts = PROVIDER_OPTIONS.map(function (p) {
-          return '<option value="' + p + '"' + (p === a.provider ? ' selected' : '') + '>' + p + '</option>'
-        }).join('')
-        const isOv = Boolean(a.hasOverride)
-        const disAttr = isOv ? '' : ' disabled'
-        return (
-          '<div style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">' +
-          '<strong>' + esc(a.id) + '</strong>' +
-          '<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;user-select:none">' +
-          '<input type="checkbox" data-ag-override="' + esc(a.id) + '"' + (isOv ? ' checked' : '') + '> Felülír' +
-          '</label>' +
-          '</div>' +
-          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-          '<select class="input" data-ag-role="' + esc(a.id) + '" style="padding:4px 6px;font-size:12px">' + roleOpts + '</select>' +
-          '<select class="input" data-ag-prov="' + esc(a.id) + '"' + disAttr + ' style="padding:4px 6px;font-size:12px">' + provOpts + '</select>' +
-          '<input type="text" class="input" data-ag-model="' + esc(a.id) + '" value="' + esc(a.model) + '"' + disAttr + ' style="flex:1;min-width:110px;padding:4px 6px;font-size:12px">' +
-          '<button class="btn-secondary btn-compact" data-ag-save="' + esc(a.id) + '">Mentés</button>' +
-          '</div>' +
-          '</div>'
-        )
+  let vpsRolesCache = []
+  let vpsAgentsCache = []
+  let currentModalAgentId = null
+
+  async function ensureVpsRolesData(force) {
+    if (!force && vpsRolesCache.length > 0 && vpsAgentsCache.length > 0) return
+    const data = await apiJson('/api/vps/status')
+    vpsRolesCache = data.roles || []
+    vpsAgentsCache = data.agents || []
+    const chatSelect = document.getElementById('vpsChatAgent')
+    if (chatSelect && chatSelect.options.length === 0) {
+      vpsAgentsCache.forEach(function (a) {
+        const opt = document.createElement('option')
+        opt.value = a.id
+        opt.textContent = a.id + ' (' + (a.role || '') + ' · ' + a.model + ')'
+        chatSelect.appendChild(opt)
+      })
+    }
+  }
+
+  window.loadAgentsRoles = async function () {
+    try {
+      await ensureVpsRolesData(true)
+      renderRolesGrid(vpsRolesCache, vpsAgentsCache)
+    } catch { /* ignore */ }
+  }
+
+  window.syncAgentCoreOverride = async function (agentName) {
+    const box = document.getElementById('agentCoreOverrideBox')
+    const chk = document.getElementById('agentCoreOverrideChk')
+    const roleSel = document.getElementById('agentCoreRoleSel')
+    const provSel = document.getElementById('agentCoreProvSel')
+    const modelInp = document.getElementById('agentCoreModelInp')
+    const statusEl = document.getElementById('agentCoreOverrideStatus')
+    if (!box || !chk || !roleSel || !provSel || !modelInp) return
+    try {
+      await ensureVpsRolesData(false)
+    } catch {
+      box.hidden = true
+      return
+    }
+    const ag = vpsAgentsCache.find(function (a) { return a.id === agentName })
+    if (!ag) {
+      box.hidden = true
+      currentModalAgentId = null
+      return
+    }
+    currentModalAgentId = ag.id
+    box.hidden = false
+    if (statusEl) statusEl.textContent = ''
+    roleSel.innerHTML = vpsRolesCache
+      .map(function (r) {
+        return '<option value="' + esc(r.id) + '"' + (r.id === ag.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
       })
       .join('')
-
-    grid.querySelectorAll('[data-ag-override]').forEach(function (chk) {
-      chk.addEventListener('change', function () {
-        const agentId = chk.getAttribute('data-ag-override')
-        const provEl = grid.querySelector('[data-ag-prov="' + agentId + '"]')
-        const modEl = grid.querySelector('[data-ag-model="' + agentId + '"]')
-        if (provEl) provEl.disabled = !chk.checked
-        if (modEl) modEl.disabled = !chk.checked
-      })
-    })
-
-    grid.querySelectorAll('[data-ag-save]').forEach(function (btn) {
-      btn.addEventListener('click', async function () {
-        const agentId = btn.getAttribute('data-ag-save')
-        const chkEl = grid.querySelector('[data-ag-override="' + agentId + '"]')
-        const roleEl = grid.querySelector('[data-ag-role="' + agentId + '"]')
-        const provEl = grid.querySelector('[data-ag-prov="' + agentId + '"]')
-        const modEl = grid.querySelector('[data-ag-model="' + agentId + '"]')
-        if (!roleEl || !provEl || !modEl) return
-        const useOverride = Boolean(chkEl && chkEl.checked)
-        btn.disabled = true
-        if (statusEl) statusEl.textContent = 'Mentés...'
-        try {
-          const res = await apiJson('/api/vps/agent-override', {
-            method: 'POST',
-            body: JSON.stringify({
-              agentId,
-              role: roleEl.value,
-              provider: useOverride ? provEl.value : null,
-              model: useOverride ? (modEl.value.trim() || null) : null,
-              restartServices: true,
-            }),
-          })
-          const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
-          if (statusEl) statusEl.textContent = agentId + ' mentve' + extra
-          refreshVpsStatus()
-        } catch (err) {
-          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
-        } finally {
-          btn.disabled = false
-        }
-      })
-    })
+    provSel.innerHTML = PROVIDER_OPTIONS.map(function (p) {
+      return '<option value="' + p + '"' + (p === ag.provider ? ' selected' : '') + '>' + p + '</option>'
+    }).join('')
+    modelInp.value = ag.model || ''
+    chk.checked = Boolean(ag.hasOverride)
+    provSel.disabled = !chk.checked
+    modelInp.disabled = !chk.checked
   }
 
   const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
@@ -397,7 +381,6 @@
     document.getElementById('vpsRefreshBtn')?.addEventListener('click', function () {
       refreshVpsStatus()
       refreshVpsLogs()
-      refreshConversations()
     })
     document.getElementById('vpsLogUnit')?.addEventListener('change', refreshVpsLogs)
     document.getElementById('vpsConvEnv')?.addEventListener('change', refreshConversations)
@@ -413,13 +396,79 @@
         runOpsAction(btn.getAttribute('data-vps-ops'))
       })
     })
+
+    // Help-desk chat widget toggle
+    const hdBtn = document.getElementById('alfredHelpdeskBtn')
+    const hdBox = document.getElementById('alfredHelpdeskBox')
+    const hdClose = document.getElementById('alfredHelpdeskClose')
+    if (hdBox) hdBox.style.display = 'none'
+    if (hdBtn && hdBox) {
+      hdBtn.addEventListener('click', async function () {
+        const opening = hdBox.hidden || hdBox.style.display === 'none'
+        hdBox.hidden = !opening
+        hdBox.style.display = opening ? 'flex' : 'none'
+        if (opening) {
+          try { await ensureVpsRolesData(false) } catch { /* ignore */ }
+          refreshConversations()
+        }
+      })
+    }
+    if (hdClose && hdBox) {
+      hdClose.addEventListener('click', function () {
+        hdBox.hidden = true
+        hdBox.style.display = 'none'
+      })
+    }
+
+    // Agent modal override controls
+    const ovChk = document.getElementById('agentCoreOverrideChk')
+    const ovSave = document.getElementById('agentCoreOverrideSaveBtn')
+    if (ovChk) {
+      ovChk.addEventListener('change', function () {
+        const provSel = document.getElementById('agentCoreProvSel')
+        const modelInp = document.getElementById('agentCoreModelInp')
+        if (provSel) provSel.disabled = !ovChk.checked
+        if (modelInp) modelInp.disabled = !ovChk.checked
+      })
+    }
+    if (ovSave) {
+      ovSave.addEventListener('click', async function () {
+        if (!currentModalAgentId) return
+        const roleSel = document.getElementById('agentCoreRoleSel')
+        const provSel = document.getElementById('agentCoreProvSel')
+        const modelInp = document.getElementById('agentCoreModelInp')
+        const statusEl = document.getElementById('agentCoreOverrideStatus')
+        if (!roleSel || !provSel || !modelInp) return
+        const useOverride = Boolean(ovChk && ovChk.checked)
+        ovSave.disabled = true
+        if (statusEl) statusEl.textContent = 'Mentés...'
+        try {
+          const res = await apiJson('/api/vps/agent-override', {
+            method: 'POST',
+            body: JSON.stringify({
+              agentId: currentModalAgentId,
+              role: roleSel.value,
+              provider: useOverride ? provSel.value : null,
+              model: useOverride ? (modelInp.value.trim() || null) : null,
+              restartServices: true,
+            }),
+          })
+          const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
+          if (statusEl) statusEl.textContent = 'Mentve' + extra
+          await ensureVpsRolesData(true)
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          ovSave.disabled = false
+        }
+      })
+    }
   }
 
   window.loadVpsPage = function () {
     wireEvents()
     refreshVpsStatus()
     refreshVpsLogs()
-    refreshConversations()
   }
 
   wireEvents()

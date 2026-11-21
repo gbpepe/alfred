@@ -586,7 +586,7 @@ function switchPage(pageId) {
   if (pageId === 'projects') loadProjects()
   if (pageId === 'kanban') { if (typeof _initGanttViewSwitcher === 'function') _initGanttViewSwitcher(); loadKanban(); startKanbanRefresh() }
   if (pageId === 'tasks') loadSchedules()
-  if (pageId === 'agents') { loadAgents().then(() => _setAgentsView(_agentsActiveView || 'grid')); startAgentsBusyPoll() }
+  if (pageId === 'agents') { loadAgents().then(() => _setAgentsView(_agentsActiveView || 'grid')); startAgentsBusyPoll(); if (typeof window.loadAgentsRoles === 'function') window.loadAgentsRoles() }
   if (pageId === 'memories') { loadMemAgents(); loadMemStats(); loadMemories() }
   if (pageId === 'skills') loadGlobalSkills()
   if (pageId === 'connectors') loadConnectors()
@@ -655,7 +655,7 @@ const SIDEBAR_GROUPS = [
   { key: 'team',        labelKey: 'nav.group.team',        pages: ['agents', 'messages', 'tasks', 'bgTasks'] },
   { key: 'knowledge',   labelKey: 'nav.group.knowledge',   pages: ['memories', 'skills', 'research', 'ideas'] },
   { key: 'stats',       labelKey: 'nav.group.stats',       pages: ['costs', 'tokenUsage'] },
-  { key: 'system',      labelKey: 'nav.group.system',      pages: ['status', 'naplo', 'updates', 'settings', 'vault'] },
+  { key: 'system',      labelKey: 'nav.group.system',      pages: ['vps', 'status', 'naplo', 'updates', 'settings', 'vault'] },
   { key: 'connections', labelKey: 'nav.group.connections', pages: ['connectors', 'clitools', 'federation', 'migrate'] },
 ]
 const sidebarGroupEls = document.querySelectorAll('.sb-group[data-group]')
@@ -4983,6 +4983,7 @@ function openFederatedThread(qualifiedId) {
 
 // === Agent Detail ===
 async function openAgentDetail(agentName) {
+  if (typeof window.syncAgentCoreOverride === 'function') window.syncAgentCoreOverride(agentName)
   if (agentName === mainAgentId()) {
     return openAlfredDetail()
   }
