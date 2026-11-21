@@ -9,8 +9,10 @@ import { readEnvFile } from '../../env.js'
 import { logger } from '../../logger.js'
 import {
   ALLOWED_PROVIDERS,
+  CANONICAL_TOOLS,
   loadAlfredAgentsConfig,
   normalizeRoleId,
+  type AllowedToolName,
   type AlfredAgentDefinition,
   type AlfredProviderName,
 } from '../../alfred/agents-config.js'
@@ -395,6 +397,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       model?: string | null
       dailyBudgetUsd?: number | null
       voice?: string | null
+      tools?: string[] | null
       restartServices?: boolean
     }>(req)
     const agentId = typeof body?.agentId === 'string' ? body.agentId.trim() : ''
@@ -404,6 +407,19 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     }
     const displayName = typeof body?.displayName === 'string' && body.displayName.trim() ? body.displayName.trim().slice(0, 60) : null
     const voiceVal = typeof body?.voice === 'string' ? body.voice.trim().slice(0, 40) : undefined
+    let toolsVal: AllowedToolName[] | undefined
+    if (Array.isArray(body?.tools)) {
+      const seen = new Set<AllowedToolName>()
+      for (const raw of body.tools) {
+        const t = String(raw).trim() as AllowedToolName
+        if (!CANONICAL_TOOLS.has(t)) {
+          json(res, { error: `Unknown tool "${t}". Allowed: ${Array.from(CANONICAL_TOOLS).join(', ')}` }, 400)
+          return true
+        }
+        seen.add(t)
+      }
+      toolsVal = Array.from(seen)
+    }
     const roleId = body.role ? normalizeRoleId(body.role) : null
     if (body.role && !roleId) {
       json(res, { error: 'Unknown role. Allowed: tervezo, technikus, szakmunkas, segedmunkas' }, 400)
@@ -443,6 +459,9 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       if (voiceVal !== undefined) {
         if (voiceVal && voiceVal !== 'browser') entry.voice = voiceVal
         else delete entry.voice
+      }
+      if (toolsVal !== undefined) {
+        entry.tools = toolsVal
       }
       atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
     }

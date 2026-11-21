@@ -452,12 +452,23 @@
     if (displayNameInp) displayNameInp.value = ag.displayName || ag.id
     if (personaBox) { personaBox.hidden = true; personaBox.style.display = 'none'; personaBox.innerHTML = '' }
     if (toolsList) {
-      const tools = Array.isArray(ag.tools) ? ag.tools : []
-      toolsList.innerHTML = tools.length
-        ? tools.map(function (t) {
-            return '<span style="padding:2px 7px;border-radius:999px;font-size:11px;border:1px solid var(--border);background:var(--surface)">' + esc(t) + '</span>'
-          }).join('')
-        : '<span style="font-size:12px;opacity:.6">Nincs engedélyezett eszköz (csak szöveges)</span>'
+      const activeTools = new Set(Array.isArray(ag.tools) ? ag.tools : [])
+      const allTools = [
+        { id: 'fs_read', label: 'Fájl olvasás', hint: 'Fájlok olvasása a workspace-ben (fs_read)' },
+        { id: 'fs_write', label: 'Fájl írás', hint: 'Fájlok létrehozása és módosítása (fs_write)' },
+        { id: 'bash', label: 'Terminál (bash)', hint: 'Parancssori parancsok futtatása (bash)' },
+        { id: 'git', label: 'Git', hint: 'Git műveletek: branch, commit stb. (git)' },
+        { id: 'memory', label: 'Memória', hint: 'Hosszú távú memória olvasása és mentése (memory)' },
+      ]
+      toolsList.innerHTML = allTools.map(function (t) {
+        const checked = activeTools.has(t.id) ? ' checked' : ''
+        return (
+          '<label title="' + esc(t.hint) + '" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;user-select:none;margin:0">' +
+          '<input type="checkbox" data-core-tool-chk="' + esc(t.id) + '"' + checked + ' style="margin:0">' +
+          '<span>' + esc(t.label) + '</span>' +
+          '</label>'
+        )
+      }).join('')
     }
 
     if (coreCh) {
@@ -922,6 +933,9 @@
         try {
           const dispNameVal = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
           const voiceVal = document.getElementById('agentCoreVoiceSel')?.value || 'Kore'
+          const selectedTools = Array.from(document.querySelectorAll('[data-core-tool-chk]:checked'))
+            .map(function (el) { return el.getAttribute('data-core-tool-chk') })
+            .filter(Boolean)
           const res = await apiJson('/api/vps/agent-override', {
             method: 'POST',
             body: JSON.stringify({
@@ -932,6 +946,7 @@
               model: useOverride ? (chosenModel || null) : null,
               dailyBudgetUsd: Number.isFinite(budgetVal) && budgetVal >= 0.05 ? budgetVal : null,
               voice: voiceVal,
+              tools: selectedTools,
               restartServices: true,
             }),
           })
