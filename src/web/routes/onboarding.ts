@@ -262,6 +262,26 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
 
   // Onboarding state so the frontend knows which step to show.
   if (path === '/api/onboarding/status' && method === 'GET') {
+    if (process.env['WEB_ONLY'] === 'true') {
+      json(res, {
+        identityConfirmed: true,
+        currentAgentName: readEnvValue('BRAND_NAME') || readEnvValue('BOT_NAME') || 'Alfred',
+        currentOwnerName: readEnvValue('OWNER_NAME') || '',
+        claudeAuthPresent: true,
+        agentsRunning: true,
+        channelConfigured: true,
+        channelLive: true,
+        channelProvider: CHANNEL_PROVIDER,
+        agentId: MAIN_AGENT_ID,
+        existingBotToken: null,
+        paired: true,
+        needsOnboarding: false,
+        dismissed: true,
+        deployment: deployment(),
+        installLang: installLang(readEnvValue),
+      })
+      return true
+    }
     const claude = await claudeAuthPresent()
     const running = agentsRunning()
     const ch = channelConfigured()
