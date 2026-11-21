@@ -970,7 +970,7 @@ function isProviderConfigured(provider: string, env: Record<string, string | und
   if (provider === 'openai') return Boolean(env['OPENAI_API_KEY']?.trim())
   if (provider === 'xai') return Boolean(env['XAI_API_KEY']?.trim())
   if (provider === 'gemini') return Boolean(env['GEMINI_API_KEY']?.trim())
-  if (provider === 'vertex-eu') return Boolean(env['GOOGLE_CLOUD_PROJECT']?.trim() || env['GOOGLE_APPLICATION_CREDENTIALS']?.trim())
+  if (provider === 'vertex-eu') return Boolean(env['VERTEX_PROJECT_ID']?.trim() || env['GOOGLE_CLOUD_PROJECT']?.trim() || env['GOOGLE_APPLICATION_CREDENTIALS']?.trim())
   return false
 }
 

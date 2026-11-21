@@ -603,11 +603,13 @@
             method: 'POST',
             body: JSON.stringify({ providers: payload }),
           })
-          if (msgEl) {
-            msgEl.textContent = 'Mentve: ' + (res.updated || []).join(', ') + ' (újraindítás után lép életbe a többi szolgáltatásban).'
-            msgEl.className = 'onb-msg ok'
+          await openModelApiWizard()
+          const nextMsg = document.getElementById('vpsProvidersMsg')
+          if (nextMsg) {
+            nextMsg.textContent = 'Mentve: ' + (res.updated || []).join(', ') + ' (újraindítás után lép életbe a többi szolgáltatásban).'
+            nextMsg.className = 'onb-msg ok'
           }
-          body.querySelectorAll('[data-provider-key]').forEach(function (inp) { inp.value = '' })
+          ensureModelCatalog(true)
         } catch (err) {
           if (msgEl) { msgEl.textContent = 'Hiba: ' + err.message; msgEl.className = 'onb-msg err' }
         } finally {
