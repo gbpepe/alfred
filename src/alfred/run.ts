@@ -47,26 +47,37 @@ async function main(): Promise<void> {
     })
     : null
 
-  const gateway = new AlfredDiscordGateway({
-    db,
-    agentsConfig: cfg,
-    env,
-    runtimeEnv,
-    onFatalError: (err) => {
-      logger.error({ error: sanitizeStartupError(err) }, 'Fatal Discord Gateway error; exiting')
-      process.exit(1)
-    },
-  })
+  const simOnly = env['ALFRED_SIM_ONLY'] === 'true'
+  const gateway = simOnly
+    ? null
+    : new AlfredDiscordGateway({
+      db,
+      agentsConfig: cfg,
+      env,
+      runtimeEnv,
+      onFatalError: (err) => {
+        logger.error({ error: sanitizeStartupError(err) }, 'Fatal Discord Gateway error; exiting')
+        process.exit(1)
+      },
+    })
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'Stopping Alfred Discord Gateway')
-    gateway.stop()
+    gateway?.stop()
     simServer?.close()
     process.exit(0)
   }
 
   process.on('SIGINT', () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
+
+  if (!gateway) {
+    logger.info(
+      { alfredEnv: runtimeEnv.mode, dbPath: runtimeEnv.dbPath, simPort, simOnly: true },
+      'Alfred running in simulated-Discord test mode (real Discord Gateway disabled)',
+    )
+    return
+  }
 
   const ready = await gateway.start()
   logger.info(

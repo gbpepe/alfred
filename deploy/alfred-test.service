@@ -17,6 +17,7 @@ Environment=ALFRED_DB_PATH=store/alfred-test.db
 Environment=ALFRED_WORKSPACES_DIR=workspaces-test
 Environment=ALFRED_BUDGET_MULTIPLIER=0.2
 Environment=ALFRED_SIM_PORT=3421
+Environment=ALFRED_SIM_ONLY=true
 Environment=NODE_OPTIONS=--max-old-space-size=256
 ExecStart=/usr/bin/node /opt/alfred-worktrees/alfred-test/dist/alfred/run.js
 Restart=on-failure

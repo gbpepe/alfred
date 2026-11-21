@@ -17,6 +17,9 @@ done
 log_info "Tearing down staging environment (mode=$DEPLOY_MODE, dir=$TEST_DIR)"
 
 stop_instance "test" "$TEST_SERVICE" "$TEST_PID_FILE" "$DRY_RUN"
+if [[ "$DRY_RUN" == "0" && "$DEPLOY_MODE" == "systemd" && -f /etc/systemd/system/alfred-test-web.service ]]; then
+  sudo systemctl stop alfred-test-web || true
+fi
 
 if [[ "$DRY_RUN" == "1" ]]; then
   log_info "[DRY-RUN] Remove $TEST_DIR/store/alfred-test.db* and $TEST_DIR/workspaces-test"

@@ -63,9 +63,15 @@ log_info "Running typecheck, build, and isolated tests in $TEST_DIR..."
   cd "$TEST_DIR"
   npm run typecheck:alfred
   $ALFRED_BUILD_CMD
+  if [[ -f tsconfig.web.build.json ]]; then
+    npm run build:web
+  fi
   npm run test:alfred
 )
 
 start_instance "test" "$TEST_DIR" "$TEST_SERVICE" "$TEST_PID_FILE" "0"
 verify_instance_alive "test" "$TEST_SERVICE" "$TEST_PID_FILE" 5 "0"
+if [[ "$DEPLOY_MODE" == "systemd" && -f /etc/systemd/system/alfred-test-web.service ]]; then
+  sudo systemctl restart alfred-test-web || true
+fi
 log_info "Staging environment is UP on branch '$BRANCH' at $TEST_DIR"
