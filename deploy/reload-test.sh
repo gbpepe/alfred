@@ -5,14 +5,24 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 DRY_RUN=0
+TARGET_BRANCH=""
 for arg in "$@"; do
   if [[ "$arg" == "--dry-run" ]]; then
     DRY_RUN=1
+  elif [[ -z "$TARGET_BRANCH" ]]; then
+    TARGET_BRANCH="$arg"
   else
     log_err "Unexpected argument: $arg"
     exit 1
   fi
 done
+
+if [[ -n "$TARGET_BRANCH" ]]; then
+  validate_self_branch "$TARGET_BRANCH"
+  configure_test_target "$TARGET_BRANCH" "1"
+else
+  configure_test_target "" "0"
+fi
 
 if [[ ! -d "$TEST_DIR" ]]; then
   if [[ "$DRY_RUN" == "1" ]]; then
@@ -63,7 +73,9 @@ ensure_node_modules "$TEST_DIR" "$SOURCE_REPO"
 
 restart_instance "test" "$TEST_DIR" "$TEST_SERVICE" "$TEST_PID_FILE" "0"
 verify_instance_alive "test" "$TEST_SERVICE" "$TEST_PID_FILE" 5 "0"
-if [[ "$DEPLOY_MODE" == "systemd" && -f /etc/systemd/system/alfred-test-web.service ]]; then
-  sudo systemctl restart alfred-test-web || true
+if [[ "$DEPLOY_MODE" == "systemd" ]]; then
+  if [[ -n "$TEST_SLUG" || -f /etc/systemd/system/alfred-test-web.service ]]; then
+    run_systemctl restart "$TEST_WEB_SERVICE" || true
+  fi
 fi
 log_info "Staging environment reloaded cleanly on branch '$CURRENT_BRANCH'"

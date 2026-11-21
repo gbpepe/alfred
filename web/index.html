@@ -2306,6 +2306,11 @@
             <button class="btn-secondary btn-compact" data-vps-ops="teardown-test">Teardown Test</button>
           </div>
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+          <input type="text" id="vpsSpinupBranch" class="input" placeholder="Új branch teszt (pl. core-2nd-stage vagy feat/self-...)" style="flex:1;min-width:220px;padding:6px 10px;font-size:12px">
+          <button class="btn-primary btn-compact" id="vpsSpinupBranchBtn">Branch Teszt Indítása</button>
+        </div>
+        <div id="vpsMultiTestList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
         <pre id="vpsOpsOutput" hidden style="white-space:pre-wrap;font-family:monospace;font-size:12px;max-height:220px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
       </div>
 

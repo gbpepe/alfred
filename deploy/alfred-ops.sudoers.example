@@ -16,6 +16,14 @@ Cmnd_Alias ALFRED_SYSTEMCTL = \
   /bin/systemctl stop alfred-test-web, \
   /bin/systemctl restart alfred-test-web, \
   /bin/systemctl is-active alfred-test-web, \
+  /bin/systemctl start alfred-test@*, \
+  /bin/systemctl stop alfred-test@*, \
+  /bin/systemctl restart alfred-test@*, \
+  /bin/systemctl is-active alfred-test@*, \
+  /bin/systemctl start alfred-test-web@*, \
+  /bin/systemctl stop alfred-test-web@*, \
+  /bin/systemctl restart alfred-test-web@*, \
+  /bin/systemctl is-active alfred-test-web@*, \
   /bin/systemctl restart alfred-prod, \
   /bin/systemctl is-active alfred-prod, \
   /usr/bin/systemctl start alfred-test, \
@@ -26,6 +34,14 @@ Cmnd_Alias ALFRED_SYSTEMCTL = \
   /usr/bin/systemctl stop alfred-test-web, \
   /usr/bin/systemctl restart alfred-test-web, \
   /usr/bin/systemctl is-active alfred-test-web, \
+  /usr/bin/systemctl start alfred-test@*, \
+  /usr/bin/systemctl stop alfred-test@*, \
+  /usr/bin/systemctl restart alfred-test@*, \
+  /usr/bin/systemctl is-active alfred-test@*, \
+  /usr/bin/systemctl start alfred-test-web@*, \
+  /usr/bin/systemctl stop alfred-test-web@*, \
+  /usr/bin/systemctl restart alfred-test-web@*, \
+  /usr/bin/systemctl is-active alfred-test-web@*, \
   /usr/bin/systemctl restart alfred-prod, \
   /usr/bin/systemctl is-active alfred-prod
 

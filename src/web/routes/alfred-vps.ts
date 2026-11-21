@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -34,7 +34,49 @@ async function readJsonBody<T>(req: RouteContext['req']): Promise<T> {
 }
 
 const ALLOWED_LOG_UNITS = new Set(['alfred-prod', 'alfred-ops', 'alfred-test', 'alfred-web'])
-const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'reload-test', 'teardown-test'])
+const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'spinup-test', 'reload-test', 'teardown-test'])
+const SAFE_BRANCH_RE = /^((feat|fix)\/(self|core)-[a-z0-9._/-]{0,79}|core-[a-z0-9._/-]{1,79})$/
+
+function validateOpsBranch(branch: string): boolean {
+  if (!SAFE_BRANCH_RE.test(branch)) return false
+  if (branch.includes('..') || branch.includes('//') || branch.startsWith('-') || branch.endsWith('.') || branch.endsWith('/') || branch.endsWith('.lock')) {
+    return false
+  }
+  return true
+}
+
+async function listMultiBranchTests(): Promise<Array<{
+  slug: string
+  branch: string
+  host: string
+  webPort: number
+  simPort: number
+  active: string
+  webActive: string
+}>> {
+  const worktreeBase = process.env['ALFRED_WORKTREE_BASE'] || '/opt/alfred-worktrees'
+  if (process.platform !== 'linux' || !existsSync(worktreeBase)) return []
+  const entries = readdirSync(worktreeBase, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.startsWith('alfred-test-'))
+  const results = await Promise.all(
+    entries.map(async (d) => {
+      const portsPath = join(worktreeBase, d.name, '.env.ports')
+      if (!existsSync(portsPath)) return null
+      const vars = readEnvFile([portsPath])
+      const slug = vars['ALFRED_TEST_SLUG'] || d.name.replace(/^alfred-test-/, '')
+      const branch = vars['ALFRED_TEST_BRANCH'] || slug
+      const host = vars['ALFRED_TEST_HOST'] || `${slug}-test-alfred.princicol.co.uk`
+      const webPort = Number(vars['WEB_PORT'] || 0)
+      const simPort = Number(vars['ALFRED_SIM_PORT'] || 0)
+      const [active, webActive] = await Promise.all([
+        getUnitStatus(`alfred-test@${slug}`),
+        getUnitStatus(`alfred-test-web@${slug}`),
+      ])
+      return { slug, branch, host, webPort, simPort, active, webActive }
+    }),
+  )
+  return results.filter((r): r is NonNullable<typeof r> => r !== null)
+}
 
 interface VpsEnvSpec {
   id: 'prod' | 'ops' | 'test'
@@ -220,7 +262,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     const specs = resolveVpsEnvSpecs()
     const env = { ...readEnvFile(), ...process.env }
     const cfg = loadAlfredAgentsConfig({ env })
-    const [services, disk] = await Promise.all([
+    const [services, disk, multiTests] = await Promise.all([
       Promise.all(
         specs.map(async (s) => {
           const [active, git] = await Promise.all([getUnitStatus(s.unit), getGitSummary(s.dir)])
@@ -237,6 +279,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         }),
       ),
       getDiskSummary(),
+      listMultiBranchTests(),
     ])
     const sys = getSystemMetrics()
     sys.diskSummary = disk
@@ -258,6 +301,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       ok: true,
       system: sys,
       services,
+      multiTests,
       roles: cfg ? Object.values(cfg.roles) : [],
       agents: (cfg?.agents ?? []).map((a) => ({
         id: a.id,
@@ -431,10 +475,19 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   }
 
   if (path === '/api/vps/ops' && method === 'POST') {
-    const body = await readJsonBody<{ action?: string }>(req)
+    const body = await readJsonBody<{ action?: string; branch?: string }>(req)
     const action = (body?.action || '').trim()
+    const branch = typeof body?.branch === 'string' ? body.branch.trim() : ''
     if (!ALLOWED_OPS_ACTIONS.has(action)) {
       json(res, { error: `Unsupported ops action: ${action}` }, 400)
+      return true
+    }
+    if (action === 'spinup-test' && !branch) {
+      json(res, { error: 'Branch name is required for spinup-test' }, 400)
+      return true
+    }
+    if (branch && !validateOpsBranch(branch)) {
+      json(res, { error: 'Invalid branch name (must match feat/self-*, fix/self-*, feat/core-*, or core-*)' }, 400)
       return true
     }
     const opsDir = process.env['ALFRED_OPS_DIR'] || '/opt/alfred-ops'
@@ -443,8 +496,9 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { error: `Deploy script not found: ${scriptPath}` }, 404)
       return true
     }
+    const args = branch && action !== 'check-health' ? [scriptPath, branch] : [scriptPath]
     try {
-      const { stdout, stderr } = await execFileAsync('bash', [scriptPath], {
+      const { stdout, stderr } = await execFileAsync('bash', args, {
         cwd: opsDir,
         timeout: 120_000,
         maxBuffer: 1024 * 1024,

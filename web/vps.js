@@ -46,14 +46,14 @@
           const gitText = s.git ? esc(s.git.branch) + '@' + esc(s.git.sha) : 'nincs worktree'
           const costHtml = s.costs
             ? '<div style="margin-top:8px;font-size:12px;opacity:.9">' +
-              '<b>Napi költés:</b> $' + s.costs.globalSpendUsd.toFixed(4) + ' / $' + s.costs.globalBudgetUsd.toFixed(2) +
-              '<div style="margin-top:4px">' +
-              s.costs.agents
-                .map(function (a) {
-                  return '<div>• ' + esc(a.id) + ' (' + esc(a.model) + '): $' + a.spendUsd.toFixed(4) + ' / $' + a.dailyBudgetUsd.toFixed(2) + '</div>'
-                })
-                .join('') +
-              '</div></div>'
+            '<b>Napi költés:</b> $' + s.costs.globalSpendUsd.toFixed(4) + ' / $' + s.costs.globalBudgetUsd.toFixed(2) +
+            '<div style="margin-top:4px">' +
+            s.costs.agents
+              .map(function (a) {
+                return '<div>• ' + esc(a.id) + ' (' + esc(a.model) + '): $' + a.spendUsd.toFixed(4) + ' / $' + a.dailyBudgetUsd.toFixed(2) + '</div>'
+              })
+              .join('') +
+            '</div></div>'
             : '<div style="margin-top:8px;font-size:12px;opacity:.6">Nincs DB adat</div>'
 
           return (
@@ -79,8 +79,63 @@
       }
 
       renderRolesGrid(data.roles || [], data.agents || [])
+      renderMultiTests(data.multiTests || [])
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
+    }
+  }
+
+  function renderMultiTests(items) {
+    const listEl = document.getElementById('vpsMultiTestList')
+    if (!listEl) return
+    if (!items || items.length === 0) {
+      listEl.innerHTML = ''
+      return
+    }
+    listEl.innerHTML = items
+      .map(function (t) {
+        return (
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<strong>' + esc(t.branch) + '</strong>' +
+          '<a href="https://' + esc(t.host) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">' + esc(t.host) + ' ↗</a>' +
+          '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:' + badgeColor(t.active) + '">core: ' + esc(t.active) + '</span>' +
+          '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:' + badgeColor(t.webActive) + '">web: ' + esc(t.webActive) + '</span>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px">' +
+          '<button class="btn-secondary btn-compact" data-multi-ops="reload-test" data-branch="' + esc(t.branch) + '">Reload</button>' +
+          '<button class="btn-secondary btn-compact" data-multi-ops="teardown-test" data-branch="' + esc(t.branch) + '">Teardown</button>' +
+          '</div>' +
+          '</div>'
+        )
+      })
+      .join('')
+
+    listEl.querySelectorAll('[data-multi-ops]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        runOpsAction(btn.getAttribute('data-multi-ops'), btn.getAttribute('data-branch'), btn)
+      })
+    })
+  }
+
+  async function runOpsAction(action, branch, btn) {
+    const outEl = document.getElementById('vpsOpsOutput')
+    if (btn) btn.disabled = true
+    if (outEl) {
+      outEl.hidden = false
+      outEl.textContent = 'Futtatás: ' + action + (branch ? ' (' + branch + ')' : '') + '...'
+    }
+    try {
+      const data = await apiJson('/api/vps/ops', {
+        method: 'POST',
+        body: JSON.stringify({ action: action, branch: branch || undefined }),
+      })
+      if (outEl) outEl.textContent = data.output || 'Kész.'
+      refreshVpsStatus()
+    } catch (err) {
+      if (outEl) outEl.textContent = 'Hiba: ' + err.message
+    } finally {
+      if (btn) btn.disabled = false
     }
   }
 
@@ -247,23 +302,6 @@
     }
   }
 
-  async function runOpsAction(action) {
-    const outEl = document.getElementById('vpsOpsOutput')
-    if (!outEl) return
-    outEl.hidden = false
-    outEl.textContent = 'Futtatás: ' + action + ' ...'
-    try {
-      const data = await apiJson('/api/vps/ops', {
-        method: 'POST',
-        body: JSON.stringify({ action }),
-      })
-      outEl.textContent = data.output || 'Kész.'
-      refreshVpsStatus()
-    } catch (err) {
-      outEl.textContent = 'Hiba: ' + err.message
-    }
-  }
-
   async function sendVpsChat() {
     const agentEl = document.getElementById('vpsChatAgent')
     const inputEl = document.getElementById('vpsChatInput')
@@ -393,8 +431,14 @@
     })
     document.querySelectorAll('[data-vps-ops]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        runOpsAction(btn.getAttribute('data-vps-ops'))
+        runOpsAction(btn.getAttribute('data-vps-ops'), null, btn)
       })
+    })
+    document.getElementById('vpsSpinupBranchBtn')?.addEventListener('click', function () {
+      const inp = document.getElementById('vpsSpinupBranch')
+      const branch = inp ? inp.value.trim() : ''
+      if (!branch) return
+      runOpsAction('spinup-test', branch, document.getElementById('vpsSpinupBranchBtn'))
     })
 
     // Help-desk chat widget toggle

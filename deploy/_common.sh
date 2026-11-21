@@ -253,3 +253,65 @@ verify_instance_alive() {
   fi
   log_info "Health check PASSED: $role is active (${wait_sec}s liveness verified)"
 }
+
+branch_to_slug() {
+  local branch="${1:-}"
+  node "$SCRIPT_DIR/cf-test-route.mjs" slug "$branch"
+}
+
+multi_test_enabled() {
+  if [[ "${ALFRED_MULTI_TEST:-0}" == "1" ]]; then
+    return 0
+  fi
+  if [[ "$DEPLOY_MODE" == "systemd" && -f /etc/systemd/system/alfred-test@.service ]]; then
+    return 0
+  fi
+  return 1
+}
+
+configure_test_target() {
+  local branch="${1:-}"
+  local force_multi="${2:-0}"
+  TEST_SLUG=""
+  TEST_WEB_SERVICE="alfred-test-web"
+  if [[ -n "$branch" ]] && { [[ "$force_multi" == "1" ]] || multi_test_enabled; }; then
+    TEST_SLUG="$(branch_to_slug "$branch")"
+    if [[ "$DEPLOY_MODE" == "systemd" ]]; then
+      TEST_DIR="/opt/alfred-worktrees/alfred-test-${TEST_SLUG}"
+    else
+      TEST_DIR="$(dirname "$REPO_ROOT")/alfred-test-${TEST_SLUG}"
+    fi
+    TEST_SERVICE="alfred-test@${TEST_SLUG}"
+    TEST_WEB_SERVICE="alfred-test-web@${TEST_SLUG}"
+    TEST_PID_FILE="$TEST_DIR/store/alfred-test.pid"
+  fi
+}
+
+write_test_ports_file() {
+  local dir="$1"
+  local branch="$2"
+  local slug="$3"
+  local ports_file="$dir/.env.ports"
+  if [[ -f "$ports_file" ]]; then
+    return 0
+  fi
+  local worktree_base
+  worktree_base="$(dirname "$dir")"
+  local web_port=3430
+  local sim_port=3530
+  while grep -qs "WEB_PORT=${web_port}" "$worktree_base"/alfred-test*/.env.ports 2>/dev/null; do
+    web_port=$((web_port + 1))
+    sim_port=$((sim_port + 1))
+  done
+  local host
+  host="$(node "$SCRIPT_DIR/cf-test-route.mjs" hostname "$branch")"
+  cat > "$ports_file" <<EOF
+WEB_PORT=${web_port}
+ALFRED_WEB_PORT=${web_port}
+ALFRED_SIM_PORT=${sim_port}
+ALFRED_TEST_SLUG=${slug}
+ALFRED_TEST_BRANCH=${branch}
+ALFRED_TEST_HOST=${host}
+EOF
+  chmod 600 "$ports_file" || true
+}
