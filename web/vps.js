@@ -159,10 +159,27 @@
     }
   }
 
+  function applyDisplayNamesToCards() {
+    if (!vpsAgentsCache || vpsAgentsCache.length === 0) return
+    const map = {}
+    vpsAgentsCache.forEach(function (a) {
+      if (a.displayName && a.displayName !== a.id) map[a.id.toLowerCase()] = a.displayName
+    })
+    document.querySelectorAll('#agentsGridView .agent-card, #agentsPage [data-agent]').forEach(function (card) {
+      const id = (card.getAttribute('data-agent') || card.getAttribute('data-agent-name') || '').toLowerCase()
+      const nameEl = card.querySelector('.agent-card-name, .agent-name, h3')
+      if (!nameEl) return
+      const key = id || (nameEl.textContent || '').trim().toLowerCase()
+      if (map[key]) nameEl.textContent = map[key]
+    })
+  }
+
   window.loadAgentsRoles = async function () {
     try {
       await Promise.all([ensureVpsRolesData(true), ensureModelCatalog(false)])
       renderRolesGrid(vpsRolesCache, vpsAgentsCache)
+      applyDisplayNamesToCards()
+      setTimeout(applyDisplayNamesToCards, 500)
     } catch { /* ignore */ }
   }
 
@@ -307,12 +324,19 @@
   }
 
   function applyCoreOverview(ag) {
+    const titleEl = document.getElementById('agentDetailTitle')
+    const nameEl = document.getElementById('agentDetailName')
+    const descEl = document.getElementById('agentDetailDesc')
     const modelEl = document.getElementById('agentDetailModel')
     const chEl = document.getElementById('agentDetailChStatus')
     const ctxEl = document.getElementById('agentDetailContext')
     const coreBar = document.getElementById('agentCoreStatusBar')
     const coreTxt = document.getElementById('agentCoreStatusText')
     const procBar = document.getElementById('agentProcessControl')
+    const shownName = ag.displayName || ag.id
+    if (titleEl) titleEl.textContent = shownName
+    if (nameEl) nameEl.textContent = shownName
+    if (descEl && ag.displayName && ag.displayName !== ag.id) descEl.textContent = ag.id
     if (modelEl) {
       modelEl.textContent = ag.provider + ' / ' + ag.model + (ag.hasOverride ? ' (egyedi)' : ' (munkakör)')
     }
@@ -424,7 +448,7 @@
 
     if (budgetInp) budgetInp.value = String(ag.dailyBudgetUsd ?? 2)
     if (displayNameInp) displayNameInp.value = ag.displayName || ag.id
-    if (personaBox) { personaBox.hidden = true; personaBox.innerHTML = '' }
+    if (personaBox) { personaBox.hidden = true; personaBox.style.display = 'none'; personaBox.innerHTML = '' }
     if (toolsList) {
       const tools = Array.isArray(ag.tools) ? ag.tools : []
       toolsList.innerHTML = tools.length
