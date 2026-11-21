@@ -3239,10 +3239,6 @@
               <button class="btn-secondary btn-compact agent-save-section" id="saveMcpJsonBtn" data-i18n="common.btn.save">Mentés</button>
             </div>
           </details>
-          <div id="agentSettingsSaveBar" hidden style="display:flex;align-items:center;gap:12px;padding-top:12px;margin-top:12px;border-top:1px solid var(--border)">
-            <button type="button" class="btn-primary" id="saveAllAgentSettingsBtn">Mentés</button>
-            <span id="agentSettingsSaveStatus" style="font-size:12px;opacity:.85"></span>
-          </div>
         </div>
 
         <!-- Tab: Channel -->
@@ -3473,9 +3469,15 @@
         </div>
 
         <!-- Bottom actions -->
-        <div class="detail-actions agent-detail-bottom" id="agentDetailActions">
-          <button class="btn-secondary" id="exportAgentBtn" data-i18n="agents.export.confirm_ok">Exportálás</button>
-          <button class="btn-danger" id="deleteAgentBtn" data-i18n="common.btn.delete">Törlés</button>
+        <div class="detail-actions agent-detail-bottom" id="agentDetailActions" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div id="agentSettingsSaveBar" hidden style="display:none;align-items:center;gap:10px;flex-wrap:wrap">
+            <button type="button" class="btn-primary btn-compact" id="saveAllAgentSettingsBtn" style="width:auto">Mentés</button>
+            <span id="agentSettingsSaveStatus" style="font-size:12px;opacity:.85"></span>
+          </div>
+          <div style="display:flex;gap:8px;margin-left:auto">
+            <button class="btn-secondary" id="exportAgentBtn" data-i18n="agents.export.confirm_ok">Exportálás</button>
+            <button class="btn-danger" id="deleteAgentBtn" data-i18n="common.btn.delete">Törlés</button>
+          </div>
         </div>
       </div>
     </div>
