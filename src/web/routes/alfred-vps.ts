@@ -27,6 +27,12 @@ import type { RouteContext } from './types.js'
 
 const execFileAsync = promisify(execFile)
 
+async function readJsonBody<T>(req: RouteContext['req']): Promise<T> {
+  const buf = await readBody(req)
+  if (!buf || buf.length === 0) return {} as T
+  return JSON.parse(buf.toString('utf-8')) as T
+}
+
 const ALLOWED_LOG_UNITS = new Set(['alfred-prod', 'alfred-ops', 'alfred-test', 'alfred-web'])
 const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'reload-test', 'teardown-test'])
 
@@ -258,7 +264,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { ...OWNER_SESSION_REQUIRED, error: 'Updating role models requires an owner session.' }, 403)
       return true
     }
-    const body = (await readBody(req)) as { role?: string; provider?: string; model?: string }
+    const body = await readJsonBody<{ role?: string; provider?: string; model?: string }>(req)
     const roleId = typeof body?.role === 'string' ? normalizeRoleId(body.role) : null
     const provider = typeof body?.provider === 'string' ? body.provider.trim() : ''
     const model = typeof body?.model === 'string' ? body.model.trim() : ''
@@ -333,7 +339,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   }
 
   if (path === '/api/vps/ops' && method === 'POST') {
-    const body = (await readBody(req)) as { action?: string }
+    const body = await readJsonBody<{ action?: string }>(req)
     const action = (body?.action || '').trim()
     if (!ALLOWED_OPS_ACTIONS.has(action)) {
       json(res, { error: `Unsupported ops action: ${action}` }, 400)
@@ -403,7 +409,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   }
 
   if (path === '/api/vps/chat' && method === 'POST') {
-    const body = (await readBody(req)) as { agentId?: string; message?: string; chatId?: string }
+    const body = await readJsonBody<{ agentId?: string; message?: string; chatId?: string }>(req)
     const agentId = (body?.agentId || 'alfred-core').trim()
     const message = (body?.message || '').trim()
     const chatId = (body?.chatId || 'web-dashboard').trim()

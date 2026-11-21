@@ -90,6 +90,18 @@ describe('alfred-vps web routes', () => {
     expect(await tryHandleAlfredVps(ctx)).toBe(true)
     expect(getStatus()).toBe(403)
   })
+
+  it('validates provider on authenticated POST /api/vps/roles', async () => {
+    const { ctx, getStatus, getJson } = mockReqRes('POST', '/api/vps/roles', {
+      role: 'szakmunkas',
+      provider: 'bogus-provider',
+      model: 'grok-3-mini',
+    })
+    ctx.auth = { kind: 'session', user: 'gbpepe' }
+    expect(await tryHandleAlfredVps(ctx)).toBe(true)
+    expect(getStatus()).toBe(400)
+    expect(getJson()['error']).toMatch(/Unsupported provider/)
+  })
 })
 
 describe('alfred role-based model routing', () => {
