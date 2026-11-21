@@ -83,6 +83,7 @@ export async function tryHandleAlfred(ctx: RouteContext, webDir: string): Promis
     const descFromPersonality = soulSection.split('\n').filter(l => l.trim()).slice(0, 2).join(' ').slice(0, 200)
     const description = firstLine || descFromPersonality || `${currentOwnerName()} AI asszisztense`
     const dc = readAlfredDiscordConfig()
+    const envHasDiscord = process.env['WEB_ONLY'] === 'true' && Boolean((process.env['DISCORD_BOT_TOKEN'] ?? '').trim())
     // Brand-relevant identity core. `name` = main agent display name (BOT_NAME),
     // `brandName` = product brand for the dashboard chrome (defaults to BOT_NAME;
     // the client falls back to its own HTML default "Alfred" if absent on a
@@ -106,7 +107,7 @@ export async function tryHandleAlfred(ctx: RouteContext, webDir: string): Promis
       // right store entry.
       autoRestart: readAutoRestartConfig(MAIN_AGENT_ID),
       contextTokens: readContextTokensFromProjectDir(PROJECT_ROOT, configDirFor(MAIN_AGENT_ID)),
-      hasDiscord: dc.hasDiscord,
+      hasDiscord: dc.hasDiscord || envHasDiscord,
       personality: soulSection,
       claudeMd,
       soulMd,
@@ -117,7 +118,7 @@ export async function tryHandleAlfred(ctx: RouteContext, webDir: string): Promis
       channelProvider: CHANNEL_PROVIDER,
       // CHANNELUNCONF1110: the provider whose token is missing (the session then runs without its channel), or null.
       // The launch rule itself (main-channel-configured.ts), so the banner goes the moment a token is saved.
-      mainChannelUnconfigured: mainChannelUnconfigured(CHANNEL_PROVIDER) ? CHANNEL_PROVIDER : null,
+      mainChannelUnconfigured: envHasDiscord ? null : (mainChannelUnconfigured(CHANNEL_PROVIDER) ? CHANNEL_PROVIDER : null),
       // Resolved through the settings overrides layer so the UI hot-reloads.
       kanbanAging: {
         warnH: getEffectiveSettingValue('KANBAN_AGING_WARN_H'),
