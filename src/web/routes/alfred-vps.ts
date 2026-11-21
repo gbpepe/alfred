@@ -1155,6 +1155,74 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     return true
   }
 
+  if (path === '/api/vps/skills/optimize' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Optimizing skills requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ content?: string; id?: string; agentId?: string }>(req)
+    const content = (body?.content || '').trim()
+    if (!content) {
+      json(res, { error: 'Add meg az optimalizálandó SKILL.md tartalmat!' }, 400)
+      return true
+    }
+    const env = { ...readEnvFile(), ...process.env }
+    const cfg = loadAlfredAgentsConfig({ env })
+    const baseAgent =
+      (body.agentId ? cfg?.agents.find((a) => a.id === body.agentId) : undefined) ?? cfg?.agents[0]
+    if (!baseAgent) {
+      json(res, { error: 'Nincs konfigurált Alfred Core ügynök az optimalizáláshoz.' }, 400)
+      return true
+    }
+    const optAgent: AlfredAgentDefinition = {
+      ...baseAgent,
+      tools: [],
+      resolvedSystemPrompt:
+        'You are a specialized Skill Optimizer Agent for Alfred AI agents. Your job is to rewrite a SKILL.md file so it is significantly shorter, sharper, token-efficient, and more actionable for an LLM while preserving 100% of safety constraints, YAML frontmatter (name, description), and concrete rules. Remove filler prose, deduplicate instructions, use concise numbered checklists. Output ONLY valid JSON (no markdown fences) with keys: "content" (the full optimized SKILL.md including YAML frontmatter) and "summary" (1-2 concise Hungarian sentences explaining what was improved/shortened).',
+    }
+    try {
+      const outcome = await runHybridAgentTurn({
+        db: getDb(),
+        agent: optAgent,
+        globalDailyBudgetUsd: cfg.global.dailyBudgetUsd,
+        userMessage: `Optimalizáld ezt a SKILL.md fájlt${body.id ? ` (${body.id})` : ''}:\n\n${content}`,
+        conversationHistory: [],
+        sessionId: `skill-opt:${Date.now()}`,
+        chatId: 'web-skill-opt',
+        env,
+        nowSec: Math.floor(Date.now() / 1000),
+      })
+      if (!outcome.ok) {
+        json(res, { error: outcome.discordMessage }, 429)
+        return true
+      }
+      const raw = outcome.replyText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+      let parsed: { content?: string; summary?: string }
+      try {
+        parsed = JSON.parse(raw) as { content?: string; summary?: string }
+      } catch {
+        parsed = { content: raw, summary: 'Tömörítve és strukturálva.' }
+      }
+      const optimizedContent = (parsed.content || raw).trim()
+      const tokensBeforeEst = Math.max(1, Math.ceil(content.length / 4))
+      const tokensAfterEst = Math.max(1, Math.ceil(optimizedContent.length / 4))
+      const savedPct = Math.round(((tokensBeforeEst - tokensAfterEst) / tokensBeforeEst) * 100)
+      json(res, {
+        ok: true,
+        optimized: {
+          content: optimizedContent,
+          summary: parsed.summary || 'Tömörítve és strukturálva.',
+          tokensBeforeEst,
+          tokensAfterEst,
+          savedPct,
+        },
+      })
+    } catch (err) {
+      json(res, { error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+    return true
+  }
+
   return false
 }
 

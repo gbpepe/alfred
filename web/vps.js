@@ -1177,6 +1177,161 @@
       }
     })
 
+    document.getElementById('coreSkillAiOptBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('coreSkillAiOptBtn')
+      const idInp = document.getElementById('coreSkillIdInp')
+      const contInp = document.getElementById('coreSkillContentInp')
+      const statusEl = document.getElementById('coreSkillEditorStatus')
+      const content = contInp ? contInp.value.trim() : ''
+      if (!content) {
+        if (statusEl) statusEl.textContent = 'Nincs mit optimalizálni — előbb nyiss meg vagy generálj egy skillt!'
+        return
+      }
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = '⚡ Skill Optimalizáló Agent dolgozik...'
+      try {
+        const res = await apiJson('/api/vps/skills/optimize', {
+          method: 'POST',
+          body: JSON.stringify({ content, id: idInp ? idInp.value.trim() : undefined, agentId: currentModalAgentId || undefined }),
+        })
+        const opt = res.optimized || {}
+        if (contInp && opt.content) contInp.value = opt.content
+        const stats = opt.tokensBeforeEst
+          ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
+          : ''
+        if (statusEl) statusEl.textContent = '⚡ Optimalizálva' + stats + ': ' + (opt.summary || '')
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    // Global #skills page AI Skill Wizard & Optimizer
+    const gGenBtn = document.getElementById('globalSkillAiGenBtn')
+    const gOptBtn = document.getElementById('globalSkillAiOptBtn')
+    const gSaveBtn = document.getElementById('globalSkillSaveBtn')
+    const gPrevWrap = document.getElementById('globalSkillPreviewWrap')
+    const gContent = document.getElementById('globalSkillContent')
+    const gStatus = document.getElementById('globalSkillStatus')
+    if (gGenBtn) {
+      gGenBtn.addEventListener('click', async function () {
+        const nameInp = document.getElementById('skillName')
+        const descInp = document.getElementById('skillDescription')
+        const promptText = [nameInp?.value.trim(), descInp?.value.trim()].filter(Boolean).join(': ')
+        if (!promptText) {
+          if (gStatus) gStatus.textContent = 'Írd le röviden, mit csináljon a skill!'
+          return
+        }
+        gGenBtn.disabled = true
+        if (gStatus) gStatus.textContent = '✨ AI Skill Varázsló generál...'
+        try {
+          const res = await apiJson('/api/vps/skills/generate', {
+            method: 'POST',
+            body: JSON.stringify({ prompt: promptText }),
+          })
+          const d = res.draft || {}
+          if (nameInp && !nameInp.value.trim() && d.id) nameInp.value = d.id
+          if (gContent) gContent.value = d.content || ''
+          if (gPrevWrap) { gPrevWrap.hidden = false; gPrevWrap.style.display = 'flex' }
+          if (gOptBtn) gOptBtn.hidden = false
+          if (gStatus) gStatus.textContent = 'Elkészült! Szerkesztheted, optimalizálhatod vagy elmentheted.'
+        } catch (err) {
+          if (gStatus) gStatus.textContent = 'Hiba: ' + err.message
+        } finally {
+          gGenBtn.disabled = false
+        }
+      })
+    }
+    if (gOptBtn) {
+      gOptBtn.addEventListener('click', async function () {
+        const nameInp = document.getElementById('skillName')
+        const content = gContent ? gContent.value.trim() : ''
+        if (!content) return
+        gOptBtn.disabled = true
+        if (gStatus) gStatus.textContent = '⚡ Skill Optimalizáló Agent dolgozik...'
+        try {
+          const res = await apiJson('/api/vps/skills/optimize', {
+            method: 'POST',
+            body: JSON.stringify({ content, id: nameInp?.value.trim() || undefined }),
+          })
+          const opt = res.optimized || {}
+          if (gContent && opt.content) gContent.value = opt.content
+          const stats = opt.tokensBeforeEst
+            ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
+            : ''
+          if (gStatus) gStatus.textContent = '⚡ Optimalizálva' + stats + ': ' + (opt.summary || '')
+        } catch (err) {
+          if (gStatus) gStatus.textContent = 'Hiba: ' + err.message
+        } finally {
+          gOptBtn.disabled = false
+        }
+      })
+    }
+    if (gSaveBtn) {
+      gSaveBtn.addEventListener('click', async function () {
+        const nameInp = document.getElementById('skillName')
+        const descInp = document.getElementById('skillDescription')
+        const id = nameInp ? nameInp.value.trim() : ''
+        const content = gContent ? gContent.value.trim() : ''
+        if (!id || !content) {
+          if (gStatus) gStatus.textContent = 'Add meg a skill nevét és tartalmát!'
+          return
+        }
+        gSaveBtn.disabled = true
+        if (gStatus) gStatus.textContent = 'Mentés a Skill Könyvtárba...'
+        try {
+          const res = await apiJson('/api/vps/skills/save', {
+            method: 'POST',
+            body: JSON.stringify({ id, description: descInp?.value.trim() || id, content }),
+          })
+          if (gStatus) gStatus.textContent = 'Elmentve: ' + res.id
+          const overlay = document.getElementById('skillModalOverlay')
+          if (overlay) { overlay.classList.remove('active'); overlay.hidden = true }
+          if (typeof window.loadSkillsPage === 'function') window.loadSkillsPage()
+          else location.reload()
+        } catch (err) {
+          if (gStatus) gStatus.textContent = 'Hiba: ' + err.message
+        } finally {
+          gSaveBtn.disabled = false
+        }
+      })
+    }
+
+    // Skill Detail modal AI Optimizer button
+    document.getElementById('skillDetailOptimizeBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('skillDetailOptimizeBtn')
+      const editor = document.getElementById('skillDetailEditor')
+      const editBtn = document.getElementById('skillDetailEditBtn')
+      const msgEl = document.getElementById('skillDetailOptimizeMsg')
+      const titleEl = document.getElementById('skillDetailTitle')
+      if (!editor) return
+      if (editor.hidden && editBtn) editBtn.click()
+      const content = editor.value.trim()
+      if (!content) return
+      if (btn) btn.disabled = true
+      if (msgEl) { msgEl.hidden = false; msgEl.textContent = '⚡ Skill Optimalizáló Agent elemzi és tömöríti a SKILL.md fájlt...' }
+      try {
+        const res = await apiJson('/api/vps/skills/optimize', {
+          method: 'POST',
+          body: JSON.stringify({ content, id: titleEl?.textContent?.trim() || undefined }),
+        })
+        const opt = res.optimized || {}
+        if (opt.content) editor.value = opt.content
+        const stats = opt.tokensBeforeEst
+          ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
+          : ''
+        if (msgEl) {
+          msgEl.hidden = false
+          msgEl.textContent = '⚡ Optimalizálva' + stats + ': ' + (opt.summary || '') + ' — Nézd át és kattints a Mentés gombra!'
+        }
+      } catch (err) {
+        if (msgEl) { msgEl.hidden = false; msgEl.textContent = 'Hiba: ' + err.message }
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
     document.getElementById('coreSkillSaveFileBtn')?.addEventListener('click', async function () {
       const btn = document.getElementById('coreSkillSaveFileBtn')
       const statusEl = document.getElementById('coreSkillEditorStatus')

@@ -3360,6 +3360,7 @@
                 <div style="display:flex;gap:6px;flex-wrap:wrap">
                   <input type="text" id="coreSkillAiPrompt" class="input" placeholder="Írd le 1 mondatban mit tudjon a skill (pl. PR biztonsági review)..." style="flex:1;min-width:200px;padding:6px 8px;font-size:12px">
                   <button type="button" class="btn-secondary btn-compact" id="coreSkillAiGenBtn">✨ Generálás AI-val</button>
+                  <button type="button" class="btn-secondary btn-compact" id="coreSkillAiOptBtn">⚡ Optimalizálás AI-val</button>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
                   <input type="text" id="coreSkillIdInp" class="input" placeholder="skill-id (pl. code-review)" style="width:180px;padding:6px 8px;font-size:12px">
@@ -3459,10 +3460,22 @@
             <label for="skillDescription" data-i18n="skills.modal.desc_label">Írd le szabadon, mit csináljon ez a skill</label>
             <textarea id="skillDescription" rows="5" placeholder="pl. Piackutatási riportokat készít: versenytárs elemzés, piaci trendek, SWOT analízis. A riportot strukturáltan, táblázatokkal adja vissza magyarul." data-i18n-placeholder="skills.create.desc_ph"></textarea>
           </div>
-          <button class="btn-primary" id="saveSkillBtn">
-            <span class="btn-text" data-i18n="skills.modal.generate_btn">Skill generálás</span>
-            <span class="btn-loading" hidden><span class="spinner"></span> <span data-i18n="common.generating">Generálás...</span></span>
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+            <button type="button" class="btn-primary" id="globalSkillAiGenBtn">✨ Generálás AI-val</button>
+            <button type="button" class="btn-secondary" id="globalSkillAiOptBtn" hidden>⚡ Optimalizálás AI-val</button>
+            <button class="btn-secondary" id="saveSkillBtn" hidden>
+              <span class="btn-text" data-i18n="skills.modal.generate_btn">Skill generálás</span>
+              <span class="btn-loading" hidden><span class="spinner"></span> <span data-i18n="common.generating">Generálás...</span></span>
+            </button>
+          </div>
+          <div id="globalSkillPreviewWrap" hidden style="display:flex;flex-direction:column;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--border)">
+            <label for="globalSkillContent" style="font-size:12px;font-weight:600;margin:0">Generált SKILL.md (szerkeszthető)</label>
+            <textarea id="globalSkillContent" class="code-textarea" rows="10" spellcheck="false"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button type="button" class="btn-primary" id="globalSkillSaveBtn">Mentés a Skill Könyvtárba</button>
+            </div>
+          </div>
+          <div id="globalSkillStatus" style="font-size:12px;margin-top:8px;opacity:.85"></div>
         </div>
 
         <div class="skill-tab-panel" id="skillTabImport" hidden>
@@ -3780,11 +3793,13 @@
       <div class="modal-header">
         <h2 id="skillDetailTitle">Skill reszletek</h2>
         <div style="display:flex;gap:8px;align-items:center">
+          <button type="button" class="btn-secondary btn-compact" id="skillDetailOptimizeBtn">⚡ Optimalizálás AI-val</button>
           <button class="btn-secondary btn-compact" id="skillDetailEditBtn" data-i18n="skills.btn.edit">Szerkesztés</button>
           <button class="modal-close" id="skillDetailClose">&times;</button>
         </div>
       </div>
       <div class="modal-body">
+        <div id="skillDetailOptimizeMsg" hidden style="margin-bottom:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);font-size:12px"></div>
         <div class="skill-detail-desc" id="skillDetailDesc"></div>
         <div class="skill-detail-meta" id="skillDetailMeta"></div>
         <div class="skill-detail-keywords" id="skillDetailKeywords" hidden></div>
