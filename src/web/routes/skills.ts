@@ -8,6 +8,8 @@ import { logger } from '../../logger.js'
 import { atomicWriteFileSync } from '../atomic-write.js'
 import { AGENTS_BASE_DIR, listAgentNames, readFileOr, agentDir } from '../agent-config.js'
 import { MAIN_AGENT_ID, PROJECT_ROOT } from '../../config.js'
+import { loadAlfredAgentsConfig } from '../../alfred/agents-config.js'
+import { readEnvFile } from '../../env.js'
 import { generateSkillMd } from '../agent-scaffold.js'
 import {
   appendSkillAudit, approvePending, archiveSuperseded, getPending, importArchiveToPending, listPending, liveOrPending, nameConflict, quarantineOn, queueGeneratedSkill, queueProposedSkill, parseProposedFiles, MAX_PROPOSED_SKILL_BYTES, rejectPending, targetRoot,
@@ -137,6 +139,44 @@ export async function tryHandleSkills(ctx: RouteContext): Promise<boolean> {
           keywords: parseSkillKeywords(content),
           agents: allAgents,
           path: join(USER_SKILLS_DIR, dir),
+          mtime,
+          source: 'user',
+        })
+      }
+    }
+
+    const CORE_SKILLS_DIR = process.env['ALFRED_SKILLS_DIR'] || join(PROJECT_ROOT, 'skills')
+    const seenUserSkills = new Set<string>(skills.map((s) => s.name))
+    if (existsSync(CORE_SKILLS_DIR)) {
+      let coreAgentsBySkill = new Map<string, string[]>()
+      try {
+        const cfg = loadAlfredAgentsConfig({ env: { ...readEnvFile(), ...process.env } })
+        for (const ag of cfg?.agents ?? []) {
+          for (const sk of ag.skills ?? []) {
+            const arr = coreAgentsBySkill.get(sk) ?? []
+            arr.push(ag.id)
+            coreAgentsBySkill.set(sk, arr)
+          }
+        }
+      } catch { /* ignore */ }
+      const dirs = readdirSync(CORE_SKILLS_DIR).filter((f) => {
+        if (f.startsWith('.')) return false
+        try { return statSync(join(CORE_SKILLS_DIR, f)).isDirectory() } catch { return false }
+      })
+      for (const dir of dirs) {
+        if (seenUserSkills.has(dir)) continue
+        const skillMdPath = join(CORE_SKILLS_DIR, dir, 'SKILL.md')
+        if (!existsSync(skillMdPath)) continue
+        const content = readFileOr(skillMdPath, '')
+        let mtime = 0
+        try { mtime = statSync(skillMdPath).mtimeMs } catch { /* no-op */ }
+        skills.push({
+          name: dir,
+          label: dir,
+          description: parseSkillDescription(content),
+          keywords: parseSkillKeywords(content),
+          agents: coreAgentsBySkill.get(dir) ?? [],
+          path: join(CORE_SKILLS_DIR, dir),
           mtime,
           source: 'user',
         })
@@ -418,12 +458,18 @@ export async function tryHandleSkills(ctx: RouteContext): Promise<boolean> {
     }
 
     const GLOBAL_SKILLS_DIR = join(homedir(), '.claude', 'skills')
-    const skillDir = join(GLOBAL_SKILLS_DIR, skillName)
-    if (!skillDir.startsWith(GLOBAL_SKILLS_DIR + sep)) {
+    const CORE_SKILLS_DIR = process.env['ALFRED_SKILLS_DIR'] || join(PROJECT_ROOT, 'skills')
+    let baseDir = GLOBAL_SKILLS_DIR
+    let skillDir = join(GLOBAL_SKILLS_DIR, skillName)
+    if (!existsSync(skillDir) && existsSync(join(CORE_SKILLS_DIR, skillName))) {
+      baseDir = CORE_SKILLS_DIR
+      skillDir = join(CORE_SKILLS_DIR, skillName)
+    }
+    if (!skillDir.startsWith(baseDir + sep)) {
       json(res, { error: 'Skill not found' }, 404)
       return true
     }
-    const within = skillMdWithin(skillDir, GLOBAL_SKILLS_DIR)
+    const within = skillMdWithin(skillDir, baseDir)
     if (within === null) { json(res, { error: 'Skill not found' }, 404); return true }
 
     const content = readFileOr(within.md, '')
@@ -662,13 +708,19 @@ export async function tryHandleSkills(ctx: RouteContext): Promise<boolean> {
     }
 
     const GLOBAL_SKILLS_DIR = join(homedir(), '.claude', 'skills')
-    const skillDir = join(GLOBAL_SKILLS_DIR, skillName)
-    if (!skillDir.startsWith(GLOBAL_SKILLS_DIR + sep)) {
+    const CORE_SKILLS_DIR = process.env['ALFRED_SKILLS_DIR'] || join(PROJECT_ROOT, 'skills')
+    let baseDir = GLOBAL_SKILLS_DIR
+    let skillDir = join(GLOBAL_SKILLS_DIR, skillName)
+    if (!existsSync(skillDir) && existsSync(join(CORE_SKILLS_DIR, skillName))) {
+      baseDir = CORE_SKILLS_DIR
+      skillDir = join(CORE_SKILLS_DIR, skillName)
+    }
+    if (!skillDir.startsWith(baseDir + sep)) {
       json(res, { error: 'Invalid skill name' }, 400)
       return true
     }
     if (!existsSync(skillDir)) { json(res, { error: 'Skill not found' }, 404); return true }
-    const within = skillMdWithin(skillDir, GLOBAL_SKILLS_DIR)
+    const within = skillMdWithin(skillDir, baseDir)
     if (within === null) { json(res, { error: 'The skill folder points outside its own skills folder' }, 400); return true }
     const body = await readBody(req)
     const { content } = JSON.parse(body.toString()) as { content: string }

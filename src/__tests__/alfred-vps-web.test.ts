@@ -149,4 +149,84 @@ describe('alfred role-based model routing', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('serves default model catalog via GET /api/vps/models', async () => {
+    const prev = process.env['ALFRED_MODEL_CATALOG_PATH']
+    process.env['ALFRED_MODEL_CATALOG_PATH'] = join(tmpdir(), `nonexistent-catalog-${Date.now()}.json`)
+    try {
+      const { ctx, getStatus, getJson } = mockReqRes('GET', '/api/vps/models')
+      const handled = await tryHandleAlfredVps(ctx)
+      expect(handled).toBe(true)
+      expect(getStatus()).toBe(200)
+      const body = getJson()
+      expect(body.ok).toBe(true)
+      const providers = body.providers as Record<string, { models: string[] }>
+      expect(Array.isArray(providers.deepseek.models)).toBe(true)
+      expect(providers.deepseek.models).toContain('deepseek-chat')
+    } finally {
+      if (prev === undefined) delete process.env['ALFRED_MODEL_CATALOG_PATH']
+      else process.env['ALFRED_MODEL_CATALOG_PATH'] = prev
+    }
+  })
+
+  it('validates agentId on GET /api/vps/agent-terminal', async () => {
+    const { ctx, getStatus } = mockReqRes('GET', '/api/vps/agent-terminal')
+    const handled = await tryHandleAlfredVps(ctx)
+    expect(handled).toBe(true)
+    expect(getStatus()).toBe(400)
+  })
+
+  it('lists global skills via GET /api/vps/skills and injects attached skills into agent system prompt', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-skills-'))
+    const prevSkills = process.env['ALFRED_SKILLS_DIR']
+    try {
+      mkdirSync(join(dir, 'skills', 'demo-skill'), { recursive: true })
+      mkdirSync(join(dir, 'config'), { recursive: true })
+      writeFileSync(
+        join(dir, 'skills', 'demo-skill', 'SKILL.md'),
+        '---\nname: demo-skill\ndescription: Teszt skill leiras\n---\n\n# Demo\nAlways reply concisely.\n',
+      )
+      writeFileSync(
+        join(dir, 'config', 'agents.json'),
+        JSON.stringify({
+          version: 1,
+          global: { defaultProvider: 'deepseek', defaultModel: 'deepseek-chat', dailyBudgetUsd: 5 },
+          agents: [{ id: 'skilled-agent', role: 'tervezo', skills: ['demo-skill'], tools: [] }],
+        }),
+      )
+      const cfg = loadAlfredAgentsConfig({ projectRoot: dir, env: {} })
+      const ag = cfg.agents.find((a) => a.id === 'skilled-agent')
+      expect(ag?.skills).toEqual(['demo-skill'])
+      expect(ag?.resolvedSystemPrompt).toContain('## ACTIVE SKILLS')
+      expect(ag?.resolvedSystemPrompt).toContain('Always reply concisely.')
+
+      process.env['ALFRED_SKILLS_DIR'] = join(dir, 'skills')
+      const { ctx, getStatus, getJson } = mockReqRes('GET', '/api/vps/skills')
+      const handled = await tryHandleAlfredVps(ctx)
+      expect(handled).toBe(true)
+      expect(getStatus()).toBe(200)
+      const body = getJson()
+      const list = body.skills as Array<{ id: string; description: string }>
+      expect(list).toHaveLength(1)
+      expect(list[0]).toMatchObject({ id: 'demo-skill', description: 'Teszt skill leiras' })
+    } finally {
+      if (prevSkills === undefined) delete process.env['ALFRED_SKILLS_DIR']
+      else process.env['ALFRED_SKILLS_DIR'] = prevSkills
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects unauthenticated POST /api/vps/tts', async () => {
+    const { ctx, getStatus } = mockReqRes('POST', '/api/vps/tts', { text: 'Szia' })
+    const handled = await tryHandleAlfredVps(ctx)
+    expect(handled).toBe(true)
+    expect(getStatus()).toBe(403)
+  })
+
+  it('rejects unauthenticated POST /api/vps/global-config', async () => {
+    const { ctx, getStatus } = mockReqRes('POST', '/api/vps/global-config', { dailyBudgetUsd: 20 })
+    const handled = await tryHandleAlfredVps(ctx)
+    expect(handled).toBe(true)
+    expect(getStatus()).toBe(403)
+  })
 })

@@ -1,8 +1,20 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join, basename } from 'node:path'
 import { serveFile, MIME } from '../http-helpers.js'
 import { PROJECT_ROOT, BRAND_NAME } from '../../config.js'
 import type { RouteContext } from './types.js'
+
+let cachedBranch: string | null | undefined
+function currentGitBranch(): string | null {
+  if (cachedBranch !== undefined) return cachedBranch
+  try {
+    cachedBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: PROJECT_ROOT, encoding: 'utf8' }).trim() || null
+  } catch {
+    cachedBranch = null
+  }
+  return cachedBranch
+}
 
 // Substitute the configured brand into the PWA manifest's user-visible fields
 // (name/short_name) so an install that sets BRAND_NAME shows its own name on
@@ -37,7 +49,9 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
     const s = statSync(filePath)
     // Both versioned asset tokens are part of the index ETag: a cached
     // index.html must be invalidated whenever the rewritten ?v= URLs change.
-    const etag = `"${s.mtimeMs}-${s.size}-${assetVersion(webDir, 'app.js')}-${assetVersion(webDir, 'vps.js')}-${assetVersion(webDir, 'style.css')}-${process.env['ALFRED_ENV'] ?? 'prod'}"`
+    const isTestEnv = process.env['ALFRED_ENV'] === 'test'
+    const branch = isTestEnv ? currentGitBranch() : null
+    const etag = `"${s.mtimeMs}-${s.size}-${assetVersion(webDir, 'app.js')}-${assetVersion(webDir, 'vps.js')}-${assetVersion(webDir, 'style.css')}-${process.env['ALFRED_ENV'] ?? 'prod'}-${branch ?? ''}"`
     const ifNoneMatch = req.headers['if-none-match']
     if (ifNoneMatch === etag) {
       res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' })
@@ -67,12 +81,15 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
         /(<meta name="apple-mobile-web-app-title" content=")[^"]*(">)/,
         `$1${escapeAttr(process.env['ALFRED_ENV'] === 'test' ? '🧪 TEST — ' + BRAND_NAME : BRAND_NAME)}$2`,
       )
-    const finalHtml = process.env['ALFRED_ENV'] === 'test'
+    const testBannerText = branch
+      ? `🧪 TEST KÖRNYEZET (${escapeAttr(branch)})`
+      : '🧪 TEST KÖRNYEZET'
+    const finalHtml = isTestEnv
       ? html
         .replace('<title>Alfred</title>', '<title>🧪 TEST — Alfred</title>')
         .replace(
           '<body>',
-          '<body><style>body{padding-top:38px!important}@media(min-width:769px){.sidebar{top:38px!important;height:calc(100vh - 38px)!important}}</style><div id="alfredTestBanner" style="position:fixed;top:0;left:0;right:0;height:38px;display:flex;align-items:center;justify-content:center;z-index:9999;background:#d97706;color:#fff;font-weight:800;font-size:14px;letter-spacing:.06em;padding:0 12px;box-shadow:0 2px 10px rgba(0,0,0,.3)">🧪 TEST KÖRNYEZET — Szimulált Discord · Elkülönített DB</div>',
+          `<body><style>body{padding-top:38px!important}@media(min-width:769px){.sidebar{top:38px!important;height:calc(100vh - 38px)!important}}</style><div id="alfredTestBanner" style="position:fixed;top:0;left:0;right:0;height:38px;display:flex;align-items:center;justify-content:center;z-index:9999;background:#d97706;color:#fff;font-weight:800;font-size:14px;letter-spacing:.06em;padding:0 12px;box-shadow:0 2px 10px rgba(0,0,0,.3)">${testBannerText}</div>`,
         )
       : html
     res.writeHead(200, {

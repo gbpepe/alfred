@@ -84,10 +84,6 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>
         <span class="sb-label">Kanban</span>
       </a>
-      <a href="#" class="sb-link" data-page="vps">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><circle cx="6" cy="6.5" r="1"/><circle cx="6" cy="17.5" r="1"/></svg>
-        <span class="sb-label">VPS &amp; Chat</span>
-      </a>
       <a href="#" class="sb-link" data-page="testsim" id="sbTestSim" hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6v4l4 8a3 3 0 0 1-2.7 4.3H7.7A3 3 0 0 1 5 15l4-8V3z"/></svg>
         <span class="sb-label">🧪 Teszt Sandbox</span>
@@ -188,6 +184,10 @@
           <svg class="sb-group-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
         <div class="sb-group-items" id="sbGroupSystem">
+          <a href="#" class="sb-link" data-page="vps">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><circle cx="6" cy="6.5" r="1"/><circle cx="6" cy="17.5" r="1"/></svg>
+            <span class="sb-label">VPS</span>
+          </a>
           <a href="#" class="sb-link" data-page="status">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span class="sb-label">Státusz</span>
@@ -604,6 +604,23 @@
         </div>
       </div>
       <div id="agentsModelAnalysis" style="display:none;margin:0 0 16px"></div>
+      <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <strong>Munkakörök és Modellek</strong>
+          <span id="vpsRolesStatus" style="font-size:12px;opacity:.75"></span>
+        </div>
+        <div id="vpsRolesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px"></div>
+        <div id="vpsGlobalConfigBar" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <strong style="font-size:12px">Globális beállítások:</strong>
+          <label for="vpsGlobalBudgetInp" style="font-size:12px;margin:0">Napi keret (USD):</label>
+          <input type="number" id="vpsGlobalBudgetInp" class="input" min="0.5" max="500" step="0.5" style="width:85px;padding:4px 6px;font-size:12px">
+          <label for="vpsGlobalProvSel" style="font-size:12px;margin:0">Tartalék modell:</label>
+          <select id="vpsGlobalProvSel" class="input" style="padding:4px 6px;font-size:12px"></select>
+          <select id="vpsGlobalModelSel" class="input" style="min-width:140px;padding:4px 6px;font-size:12px"></select>
+          <button type="button" class="btn-primary btn-compact" id="vpsGlobalSaveBtn" style="font-size:12px;padding:4px 10px">Mentés</button>
+          <span id="vpsGlobalStatus" style="font-size:12px;opacity:.75"></span>
+        </div>
+      </div>
       <!-- Grid view -->
       <div id="agentsGridView">
         <div class="agents-grid" id="agentsGrid">
@@ -2281,7 +2298,7 @@
 
     <section class="page" id="vpsPage" hidden>
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-        <h1 style="margin:0">VPS &amp; Alfred Chat</h1>
+        <h1 style="margin:0">VPS</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-primary btn-compact" id="vpsOpenApiWizardBtn">Model API varázsló</button>
           <button class="btn-secondary btn-compact" id="vpsRefreshBtn">Frissítés</button>
@@ -2290,19 +2307,16 @@
       <div id="vpsSystemBar" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px">Betöltés...</div>
       <div id="vpsServicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px"></div>
 
-      <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+      <div id="vpsModelCatalogCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <strong>Munkakörök és Modellek</strong>
-          <span id="vpsRolesStatus" style="font-size:12px;opacity:.75"></span>
-        </div>
-        <div id="vpsRolesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px"></div>
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <strong style="font-size:13px">Ágens-szintű felülbírálás (opcionális — üresen hagyva a munkakört örökli)</strong>
-            <span id="vpsAgentOverrideStatus" style="font-size:12px;opacity:.75"></span>
+          <div>
+            <strong>Modell Katalógus (API szinkron)</strong>
+            <span id="vpsModelCatalogSyncedAt" style="font-size:12px;opacity:.7;margin-left:8px"></span>
           </div>
-          <div id="vpsAgentsOverrideGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px"></div>
+          <button class="btn-primary btn-compact" id="vpsSyncModelsBtn">Modellek frissítése (API szinkron)</button>
         </div>
+        <div id="vpsModelCatalogGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
+        <div id="vpsModelCatalogStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
       </div>
 
       <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
@@ -2314,42 +2328,25 @@
             <button class="btn-secondary btn-compact" data-vps-ops="teardown-test">Teardown Test</button>
           </div>
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+          <input type="text" id="vpsSpinupBranch" class="input" placeholder="Új branch teszt (pl. core-2nd-stage vagy feat/self-...)" style="flex:1;min-width:220px;padding:6px 10px;font-size:12px">
+          <button class="btn-primary btn-compact" id="vpsSpinupBranchBtn">Branch Teszt Indítása</button>
+        </div>
+        <div id="vpsMultiTestList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
         <pre id="vpsOpsOutput" hidden style="white-space:pre-wrap;font-family:monospace;font-size:12px;max-height:220px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
-        <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-            <strong>Alfred Chat</strong>
-            <div style="display:flex;gap:8px;align-items:center">
-              <select id="vpsConvEnv" class="input" style="padding:4px 8px;font-size:12px">
-                <option value="prod">prod</option>
-                <option value="ops">ops</option>
-                <option value="test">test</option>
-              </select>
-              <select id="vpsChatAgent" class="input" style="padding:4px 8px;font-size:12px"></select>
-            </div>
-          </div>
-          <div id="vpsChatHistory" style="height:280px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" id="vpsChatInput" class="input" placeholder="Üzenet Alfrednek..." style="flex:1">
-            <button class="btn-primary btn-compact" id="vpsChatSend">Küldés</button>
-          </div>
-          <div id="vpsChatStatus" style="font-size:12px;opacity:.75"></div>
+      <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <strong>Szolgáltatás naplók (journalctl)</strong>
+          <select id="vpsLogUnit" class="input" style="padding:4px 8px;font-size:12px">
+            <option value="alfred-prod">alfred-prod</option>
+            <option value="alfred-ops">alfred-ops</option>
+            <option value="alfred-test">alfred-test</option>
+            <option value="alfred-web">alfred-web</option>
+          </select>
         </div>
-
-        <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <strong>Szolgáltatás naplók (journalctl)</strong>
-            <select id="vpsLogUnit" class="input" style="padding:4px 8px;font-size:12px">
-              <option value="alfred-prod">alfred-prod</option>
-              <option value="alfred-ops">alfred-ops</option>
-              <option value="alfred-test">alfred-test</option>
-              <option value="alfred-web">alfred-web</option>
-            </select>
-          </div>
-          <pre id="vpsLogOutput" style="white-space:pre-wrap;font-family:monospace;font-size:11px;height:320px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
-        </div>
+        <pre id="vpsLogOutput" style="white-space:pre-wrap;font-family:monospace;font-size:11px;height:320px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
       </div>
     </section>
 
@@ -2360,6 +2357,7 @@
           <div style="font-size:12px;opacity:.75">Teljesen elszigetelt tesztkörnyezet (<code>alfred-test.db</code> + <code>workspaces-test</code> + <code>feat/self-sandbox</code>)</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn-secondary btn-compact" id="simTtsToggle" title="Automatikus felolvasás">🔇 Felolvasás KI</button>
           <button class="btn-secondary btn-compact" id="simReloadBtn">Frissítés</button>
         </div>
       </div>
@@ -2382,7 +2380,8 @@
           <div id="simChannelHeader" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--border)"></div>
           <div id="simMessagesBox" style="height:360px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
           <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" id="simInput" class="input" placeholder="Írj a szimulált Discord csatornába..." style="flex:1">
+            <button type="button" class="btn-secondary btn-compact" id="simMicBtn" title="Beszéd bevitel (magyar STT)" style="padding:6px 10px">🎤</button>
+            <input type="text" id="simInput" class="input" placeholder="Írj vagy diktálj a szimulált Discord csatornába..." style="flex:1">
             <button class="btn-primary btn-compact" id="simSendBtn">Küldés</button>
           </div>
           <div id="simSendStatus" style="font-size:12px;opacity:.75"></div>
@@ -2760,6 +2759,43 @@
             </div>
           </div>
           <div class="detail-avatar-gallery" id="detailAvatarGallery" hidden>
+            <div id="agentPictogramStudio" style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:12px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+                <strong style="font-size:12px">🎨 Piktogram & AI Avatar Stúdió</strong>
+                <button type="button" class="btn-secondary btn-compact" id="agentAiAvatarGenBtn" style="font-size:11px;padding:3px 8px">✨ AI Avatar generálása</button>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <canvas id="agentPictoCanvas" width="128" height="128" style="width:56px;height:56px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></canvas>
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:180px">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                    <select id="agentPictoIconSel" class="input" style="padding:3px 6px;font-size:13px">
+                      <option value="🏛️">🏛️ Tervező</option>
+                      <option value="💻">💻 Kódoló</option>
+                      <option value="🧪">🧪 QA / Teszt</option>
+                      <option value="🛠️">🛠️ Ops / Technikus</option>
+                      <option value="🧠">🧠 Stratéga</option>
+                      <option value="🚀">🚀 Fejlesztő</option>
+                      <option value="🛡️">🛡️ Biztonság</option>
+                      <option value="📊">📊 Elemző</option>
+                      <option value="⚡">⚡ Gyors</option>
+                      <option value="🤖">🤖 Asszisztens</option>
+                    </select>
+                    <input type="color" id="agentPictoColor1" value="#2563eb" title="Háttérszín 1" style="width:32px;height:28px;border:none;background:none;cursor:pointer">
+                    <input type="color" id="agentPictoColor2" value="#7c3aed" title="Háttérszín 2" style="width:32px;height:28px;border:none;background:none;cursor:pointer">
+                    <button type="button" class="btn-primary btn-compact" id="agentPictoSaveBtn" style="font-size:11px;padding:4px 10px">Piktogram mentése</button>
+                  </div>
+                  <div id="agentPictoStatus" style="font-size:11px;opacity:.8"></div>
+                </div>
+              </div>
+              <div id="agentAiAvatarPicker" hidden style="display:none;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+                <div style="font-size:12px;font-weight:600">Válassz egyet a generált Chibi avatarok közül (vagy vesd el):</div>
+                <div id="agentAiAvatarCandidates" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button type="button" class="btn-primary btn-compact" id="agentAiAvatarApplyBtn" disabled>Kiválasztott mentése</button>
+                  <button type="button" class="btn-secondary btn-compact" id="agentAiAvatarDiscardBtn">Elvetés</button>
+                </div>
+              </div>
+            </div>
             <label class="form-label-sm" data-i18n="agents.detail.select_avatar">Válassz új avatart</label>
             <div class="avatar-grid" id="detailAvatarGrid"></div>
             <div class="avatar-upload-divider"><span>vagy</span></div>
@@ -2796,6 +2832,15 @@
               <span class="meta-value" id="agentDetailContext">-</span>
             </div>
           </div>
+          <div class="agent-process-control" id="agentCoreStatusBar" hidden style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div class="process-status">
+              <span class="process-dot" style="background:#16a34a"></span>
+              <span id="agentCoreStatusText">Alfred Core aktív</span>
+            </div>
+            <div class="process-actions">
+              <button type="button" class="btn-primary btn-compact" id="agentCoreTerminalBtn">Terminál (élő nézet)</button>
+            </div>
+          </div>
           <div class="agent-process-control" id="agentProcessControl">
             <div class="process-status">
               <span class="process-dot" id="processDot"></span>
@@ -2815,6 +2860,98 @@
 
         <!-- Tab: Settings -->
         <div class="tab-panel" id="tabSettings" hidden>
+          <div id="agentCoreOverrideBox" hidden style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <label for="agentCoreDisplayNameInp" style="font-size:13px;font-weight:600;margin:0">Megjelenített név:</label>
+              <input type="text" id="agentCoreDisplayNameInp" class="input" placeholder="pl. Architekt Alfréd" style="flex:1;min-width:150px;padding:4px 8px;font-size:12px">
+              <button type="button" class="btn-secondary btn-compact" id="agentCoreSuggestPersonaBtn" style="font-size:12px">✨ Név &amp; SOUL javaslat</button>
+            </div>
+            <div id="agentCorePersonaSuggestions" hidden style="display:none;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <label for="agentCoreRoleSel" style="font-size:13px;font-weight:600;margin:0">Munkakör:</label>
+              <select id="agentCoreRoleSel" class="input" style="padding:4px 8px;font-size:12px"></select>
+              <span id="agentCoreInheritedText" style="font-size:12px;opacity:.85"></span>
+            </div>
+            <div>
+              <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none">
+                <input type="checkbox" id="agentCoreOverrideChk"> Felülír (egyedi modell)
+              </label>
+            </div>
+            <div id="agentCoreOverrideRow" hidden style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <select id="agentCoreProvSel" class="input" style="padding:4px 8px;font-size:12px"></select>
+              <select id="agentCoreModelSel" class="input" style="flex:1;min-width:160px;padding:4px 8px;font-size:12px"></select>
+              <input type="text" id="agentCoreModelInp" class="input" placeholder="Egyéni model ID" hidden style="flex:1;min-width:160px;padding:4px 8px;font-size:12px">
+            </div>
+          </div>
+          <div id="agentCoreMetaBox" hidden style="margin-bottom:14px;display:flex;flex-direction:column;gap:14px">
+            <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:13px;font-weight:600">🔊 Hangprofil (TTS)</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="agentCoreVoiceSel" class="input" style="flex:1;min-width:200px;max-width:300px;padding:5px 8px;font-size:12px">
+                  <option value="Kore">Kore (női · Gemini)</option>
+                  <option value="Aoede">Aoede (női lágy · Gemini)</option>
+                  <option value="Puck">Puck (férfi élénk · Gemini)</option>
+                  <option value="Charon">Charon (férfi mély · Gemini)</option>
+                  <option value="nova">Nova (női · OpenAI)</option>
+                  <option value="alloy">Alloy (semleges · OpenAI)</option>
+                  <option value="browser">Böngésző hang (ingyenes)</option>
+                </select>
+                <button type="button" class="btn-secondary btn-compact" id="agentCoreVoiceTestBtn" style="font-size:12px;padding:5px 10px">🔊 Próba</button>
+              </div>
+            </div>
+            <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                <label for="agentCoreBudgetInp" style="font-size:13px;font-weight:600;margin:0">Napi költségkeret (USD):</label>
+                <input type="number" id="agentCoreBudgetInp" class="input" min="0.05" max="100" step="0.25" style="width:110px;padding:5px 8px;font-size:12px">
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:6px;border-top:1px solid var(--border)">
+                <span style="font-size:12px;font-weight:600;opacity:.8">Engedélyezett eszközök:</span>
+                <div id="agentCoreToolsList" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+              </div>
+            </div>
+            <details id="agentCoreAdvancedDetails" style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+              <summary style="font-size:13px;font-weight:600;cursor:pointer;user-select:none">⚙️ Haladó rendszer- és biztonsági beállítások</summary>
+              <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+                <div>
+                  <label for="agentCoreSystemPromptInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Alap szerepkör (systemPrompt):</label>
+                  <textarea id="agentCoreSystemPromptInp" class="input" rows="2" placeholder="Rövid alap szerepkör-definíció (a SOUL.md elé kerül)" style="width:100%;font-size:12px;padding:6px 8px;resize:vertical"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+                  <div>
+                    <label for="agentCoreWorkspaceInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Munkakönyvtár (workspace):</label>
+                    <input type="text" id="agentCoreWorkspaceInp" class="input" placeholder="pl. workspaces/alfred-architect" style="width:100%;font-size:12px;padding:5px 8px">
+                  </div>
+                  <div>
+                    <label for="agentCoreMemNsInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Memória névtér (memoryNamespace):</label>
+                    <input type="text" id="agentCoreMemNsInp" class="input" placeholder="pl. alfred-architect" style="width:100%;font-size:12px;padding:5px 8px">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+                  <div>
+                    <label for="agentCoreMaxIterInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Max. eszköz-lépés / üzenet (1–50):</label>
+                    <input type="number" id="agentCoreMaxIterInp" class="input" min="1" max="50" step="1" placeholder="alapértelmezett" style="width:100%;font-size:12px;padding:5px 8px">
+                  </div>
+                  <div>
+                    <label for="agentCoreBashTimeoutInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Bash időtúllépés (ms, 1000–600000):</label>
+                    <input type="number" id="agentCoreBashTimeoutInp" class="input" min="1000" max="600000" step="1000" placeholder="alapértelmezett (30000)" style="width:100%;font-size:12px;padding:5px 8px">
+                  </div>
+                </div>
+                <div>
+                  <label for="agentCoreAllowedUsersInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Engedélyezett Discord User ID-k (vesszővel elválasztva; üres = globális):</label>
+                  <input type="text" id="agentCoreAllowedUsersInp" class="input" placeholder="pl. 123456789012345678, ..." style="width:100%;font-size:12px;padding:5px 8px">
+                </div>
+                <div>
+                  <label for="agentCoreProtectedPathsInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Védett útvonalak (soronként 1 — írás/olvasás tiltva):</label>
+                  <textarea id="agentCoreProtectedPathsInp" class="input" rows="3" placeholder=".env&#10;store/&#10;deploy/" style="width:100%;font-size:12px;font-family:monospace;padding:6px 8px;resize:vertical"></textarea>
+                </div>
+                <div>
+                  <label for="agentCoreAllowedBashInp" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Engedélyezett bash parancsok (soronként 1; üres = nincs külön whitelist):</label>
+                  <textarea id="agentCoreAllowedBashInp" class="input" rows="3" placeholder="pl. bash deploy/check-health.sh" style="width:100%;font-size:12px;font-family:monospace;padding:6px 8px;resize:vertical"></textarea>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div id="legacyAgentSettingsWrap">
           <div class="form-group" id="alfredReadonlyNote" hidden>
             <div style="padding:12px 14px;background:var(--bg-input);border-radius:var(--radius);border-left:3px solid var(--accent);font-size:13px;line-height:1.5;color:var(--text-muted)">
               <strong style="color:var(--text)" data-i18n="agents.detail.main_readonly">Főagent konfiguráció -- csak olvasható</strong><br>
@@ -2825,7 +2962,7 @@
               vagy szólj az agent-nek Discordon, hogy módosítsa.
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="legacyAgentModelGroup">
             <label for="editAgentModel" data-i18n="agents.detail.model_label">Modell</label>
             <select id="editAgentModel">
               <optgroup label="☁️ Claude (felhő)">
@@ -2962,6 +3099,7 @@
               <span data-i18n="agents.settings.ctx_guard_status_prefix">Állapot:</span> <strong id="cgPhaseDisplay">-</strong> &middot; <span data-i18n="agents.settings.ctx_guard_status_ctx">Kontextus:</span> <strong id="cgPctDisplay">-</strong>
             </div>
             <button class="btn-secondary btn-compact agent-save-section" id="saveContextGuardBtn" style="margin-top:10px" data-i18n="common.btn.save">Mentés</button>
+          </div>
           <div class="form-group" id="idleFlushGroup">
             <label data-i18n="agents.settings.idle_flush_label">Tétlen-ürítés</label>
             <p style="margin:4px 0 10px;font-size:12.5px;line-height:1.5;color:var(--text-muted)" data-i18n="agents.settings.idle_flush_desc">
@@ -3149,26 +3287,51 @@
             <small id="editAgentPlanDesc" style="display:block;margin-top:6px;color:var(--text-muted);font-size:12px;line-height:1.4"></small>
             <button class="btn-secondary btn-compact agent-save-section" id="savePlanBtn" data-i18n="common.btn.save">Mentés</button>
           </div>
-          <div class="form-group">
-            <label for="editClaudeMd">CLAUDE.md</label>
-            <textarea id="editClaudeMd" class="code-textarea" rows="12"></textarea>
-            <button class="btn-secondary btn-compact agent-save-section" id="saveClaudeMdBtn" data-i18n="common.btn.save">Mentés</button>
           </div>
-          <div class="form-group">
-            <label for="editSoulMd">SOUL.md</label>
-            <textarea id="editSoulMd" class="code-textarea" rows="10"></textarea>
-            <button class="btn-secondary btn-compact agent-save-section" id="saveSoulMdBtn" data-i18n="common.btn.save">Mentés</button>
-          </div>
-          <div class="form-group">
-            <label for="editMcpJson">.mcp.json</label>
-            <textarea id="editMcpJson" class="code-textarea" rows="8"></textarea>
-            <button class="btn-secondary btn-compact agent-save-section" id="saveMcpJsonBtn" data-i18n="common.btn.save">Mentés</button>
-          </div>
-        </div>
+          <details id="agentClaudeMdDetails" class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">CLAUDE.md (Instrukciók)</summary>
+            <div style="margin-top:8px">
+              <textarea id="editClaudeMd" class="code-textarea" rows="10"></textarea>
+              <button class="btn-secondary btn-compact agent-save-section" id="saveClaudeMdBtn" data-i18n="common.btn.save">Mentés</button>
+            </div>
+          </details>
+          <details id="agentSoulMdDetails" class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">SOUL.md (Személyiség és alap-instrukciók)</summary>
+            <div style="margin-top:8px">
+              <textarea id="editSoulMd" class="code-textarea" rows="8"></textarea>
+              <button class="btn-secondary btn-compact agent-save-section" id="saveSoulMdBtn" data-i18n="common.btn.save">Mentés</button>
+            </div>
+          </details>
+          <details id="agentMcpJsonDetails" class="form-group" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+            <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">.mcp.json (MCP konfiguráció)</summary>
+            <div style="margin-top:8px">
+              <textarea id="editMcpJson" class="code-textarea" rows="6"></textarea>
+              <button class="btn-secondary btn-compact agent-save-section" id="saveMcpJsonBtn" data-i18n="common.btn.save">Mentés</button>
+            </div>
+          </details>
         </div>
 
         <!-- Tab: Channel -->
         <div class="tab-panel" id="tabChannel" hidden>
+          <div id="agentCoreChannelBox" hidden style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+              <div>
+                <strong style="font-size:13px">Alfred Core Discord Csatorna</strong>
+                <div id="agentCoreChannelCurrent" style="font-size:12px;opacity:.85;margin-top:2px"></div>
+              </div>
+              <button type="button" class="btn-secondary btn-compact" id="agentDcLoadGuildsBtn">Szerverek betöltése</button>
+            </div>
+            <div id="agentDcCreateWrap" style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+              <div style="font-size:12px;font-weight:600">+ Saját Discord chat szoba létrehozása (a Discord Bot által)</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="agentDcGuildSel" class="input" style="padding:4px 8px;font-size:12px;min-width:150px"><option value="">-- Válassz szervert --</option></select>
+                <select id="agentDcCategorySel" class="input" style="padding:4px 8px;font-size:12px;min-width:150px"><option value="">(Nincs kategória)</option></select>
+                <input type="text" id="agentDcChanName" class="input" placeholder="pl. alfred-architect" style="flex:1;min-width:140px;padding:4px 8px;font-size:12px">
+                <button type="button" class="btn-primary btn-compact" id="agentDcCreateChanBtn">Szoba létrehozása</button>
+              </div>
+              <div id="agentDcCreateStatus" style="font-size:12px;opacity:.85"></div>
+            </div>
+          </div>
           <div class="form-group" style="margin-bottom:16px;">
             <label for="chProviderSelect" data-i18n="agents.channel.provider_label">Csatorna provider</label>
             <select id="chProviderSelect" style="max-width:200px;">
@@ -3191,7 +3354,7 @@
             <div class="form-group" id="chDiscordChannelIdGroup">
               <label for="chDiscordChannelId">Discord Channel ID</label>
               <input type="text" id="chDiscordChannelId" placeholder="1234567890123456789">
-              <small style="display:block;margin-top:4px;color:var(--text-muted);font-size:12px" data-i18n="agents.channel.discord_channel_hint">Annak a server-csatornának az ID-je, amelyikbe a bot alapból ír. Discord &rarr; jobbklikk a csatornán &rarr; "Copy Channel ID" (Developer Mode kell hozzá).</small>
+              <small style="display:block;margin-top:4px;color:var(--text-muted);font-size:12px" data-i18n="agents.channel.discord_channel_hint">Annak a server-csatornának az ID-je, amelyikbe a bot alapból ír. Discord → jobbklikk a csatornán → "Copy Channel ID" (Developer Mode kell hozzá).</small>
             </div>
             <button class="btn-primary" id="chConnectBtn">
               <span class="btn-text" data-i18n="channel.connect_btn">Összekapcsolás</span>
@@ -3286,6 +3449,41 @@
 
         <!-- Tab: Skills -->
         <div class="tab-panel" id="tabSkills" hidden>
+          <div id="agentCoreSkillsBox" hidden style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+              <div>
+                <strong style="font-size:13px">Alfred Core Skillek</strong>
+                <div style="font-size:12px;opacity:.75">A bepipált skillek automatikusan betöltődnek az ügynök system promptjába.</div>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="btn-secondary btn-compact" id="coreSkillNewBtn">+ Új skill</button>
+                <button type="button" class="btn-primary btn-compact" id="coreSkillAssignSaveBtn">Hozzárendelés mentése</button>
+              </div>
+            </div>
+            <div id="coreSkillsList" style="display:flex;flex-direction:column;gap:8px"></div>
+            <div id="coreSkillsStatus" style="font-size:12px;opacity:.85"></div>
+
+            <details id="coreSkillEditorDetails" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+              <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">✨ Skill létrehozása / szerkesztése (AI varázslóval)</summary>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <input type="text" id="coreSkillAiPrompt" class="input" placeholder="Írd le 1 mondatban mit tudjon a skill (pl. PR biztonsági review)..." style="flex:1;min-width:200px;padding:6px 8px;font-size:12px">
+                  <button type="button" class="btn-secondary btn-compact" id="coreSkillAiGenBtn">✨ Generálás AI-val</button>
+                  <button type="button" class="btn-secondary btn-compact" id="coreSkillAiOptBtn">⚡ Optimalizálás AI-val</button>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <input type="text" id="coreSkillIdInp" class="input" placeholder="skill-id (pl. code-review)" style="width:180px;padding:6px 8px;font-size:12px">
+                  <input type="text" id="coreSkillDescInp" class="input" placeholder="Rövid leírás" style="flex:1;min-width:180px;padding:6px 8px;font-size:12px">
+                </div>
+                <textarea id="coreSkillContentInp" class="code-textarea" rows="8" placeholder="# Skill instrukciók..."></textarea>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button type="button" class="btn-primary btn-compact" id="coreSkillSaveFileBtn">Skill mentése és csatolása</button>
+                  <span id="coreSkillEditorStatus" style="font-size:12px;opacity:.85"></span>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div id="legacySkillsWrap">
           <div class="skill-header">
             <h4 data-i18n="agents.skills.tab_title">Ügynök skilljei</h4>
             <button class="btn-secondary btn-compact" id="addSkillBtn" data-i18n="skills.btn.new_skill">
@@ -3298,6 +3496,7 @@
           <div class="skill-list" id="skillList"></div>
           <div class="skill-empty" id="skillEmpty">
             <p data-i18n="agents.skills.empty">Nincsenek skillek hozzáadva</p>
+          </div>
           </div>
         </div>
 
@@ -3340,9 +3539,15 @@
         </div>
 
         <!-- Bottom actions -->
-        <div class="detail-actions agent-detail-bottom" id="agentDetailActions">
-          <button class="btn-secondary" id="exportAgentBtn" data-i18n="agents.export.confirm_ok">Exportálás</button>
-          <button class="btn-danger" id="deleteAgentBtn" data-i18n="common.btn.delete">Törlés</button>
+        <div class="detail-actions agent-detail-bottom" id="agentDetailActions" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div id="agentSettingsSaveBar" hidden style="display:none;align-items:center;gap:10px;flex-wrap:wrap">
+            <button type="button" class="btn-primary btn-compact" id="saveAllAgentSettingsBtn" style="width:auto">Mentés</button>
+            <span id="agentSettingsSaveStatus" style="font-size:12px;opacity:.85"></span>
+          </div>
+          <div style="display:flex;gap:8px;margin-left:auto">
+            <button class="btn-secondary" id="exportAgentBtn" data-i18n="agents.export.confirm_ok">Exportálás</button>
+            <button class="btn-danger" id="deleteAgentBtn" data-i18n="common.btn.delete">Törlés</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3370,10 +3575,22 @@
             <label for="skillDescription" data-i18n="skills.modal.desc_label">Írd le szabadon, mit csináljon ez a skill</label>
             <textarea id="skillDescription" rows="5" placeholder="pl. Piackutatási riportokat készít: versenytárs elemzés, piaci trendek, SWOT analízis. A riportot strukturáltan, táblázatokkal adja vissza magyarul." data-i18n-placeholder="skills.create.desc_ph"></textarea>
           </div>
-          <button class="btn-primary" id="saveSkillBtn">
-            <span class="btn-text" data-i18n="skills.modal.generate_btn">Skill generálás</span>
-            <span class="btn-loading" hidden><span class="spinner"></span> <span data-i18n="common.generating">Generálás...</span></span>
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+            <button type="button" class="btn-primary" id="globalSkillAiGenBtn">✨ Generálás AI-val</button>
+            <button type="button" class="btn-secondary" id="globalSkillAiOptBtn" hidden>⚡ Optimalizálás AI-val</button>
+            <button class="btn-secondary" id="saveSkillBtn" hidden>
+              <span class="btn-text" data-i18n="skills.modal.generate_btn">Skill generálás</span>
+              <span class="btn-loading" hidden><span class="spinner"></span> <span data-i18n="common.generating">Generálás...</span></span>
+            </button>
+          </div>
+          <div id="globalSkillPreviewWrap" hidden style="display:flex;flex-direction:column;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--border)">
+            <label for="globalSkillContent" style="font-size:12px;font-weight:600;margin:0">Generált SKILL.md (szerkeszthető)</label>
+            <textarea id="globalSkillContent" class="code-textarea" rows="10" spellcheck="false"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button type="button" class="btn-primary" id="globalSkillSaveBtn">Mentés a Skill Könyvtárba</button>
+            </div>
+          </div>
+          <div id="globalSkillStatus" style="font-size:12px;margin-top:8px;opacity:.85"></div>
         </div>
 
         <div class="skill-tab-panel" id="skillTabImport" hidden>
@@ -3691,11 +3908,13 @@
       <div class="modal-header">
         <h2 id="skillDetailTitle">Skill reszletek</h2>
         <div style="display:flex;gap:8px;align-items:center">
+          <button type="button" class="btn-secondary btn-compact" id="skillDetailOptimizeBtn">⚡ Optimalizálás AI-val</button>
           <button class="btn-secondary btn-compact" id="skillDetailEditBtn" data-i18n="skills.btn.edit">Szerkesztés</button>
           <button class="modal-close" id="skillDetailClose">&times;</button>
         </div>
       </div>
       <div class="modal-body">
+        <div id="skillDetailOptimizeMsg" hidden style="margin-bottom:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);font-size:12px"></div>
         <div class="skill-detail-desc" id="skillDetailDesc"></div>
         <div class="skill-detail-meta" id="skillDetailMeta"></div>
         <div class="skill-detail-keywords" id="skillDetailKeywords" hidden></div>
@@ -3759,6 +3978,28 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- Simulated Alfred Core Live Terminal modal -->
+  <div class="modal-overlay" id="agentCoreTerminalOverlay" hidden>
+    <div class="modal terminal-modal" style="max-width:860px;width:95vw;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 id="agentCoreTermTitle" style="margin:0;font-size:16px">Terminál</h2>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="agentCoreTermAutoChk" checked> Élő (2s)
+          </label>
+          <button type="button" class="btn-secondary btn-compact" id="agentCoreTermRefreshBtn">Frissítés</button>
+          <button type="button" class="modal-close" id="agentCoreTermCloseBtn">&times;</button>
+        </div>
+      </div>
+      <div id="agentCoreTermOutput" style="background:#0d1117;color:#e6edf3;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;padding:12px;flex:1;min-height:360px;max-height:58vh;overflow:auto;white-space:pre-wrap;word-break:break-word"></div>
+      <div style="display:flex;gap:8px;align-items:center;padding:10px 12px;background:#161b22;border-top:1px solid #30363d;border-radius:0 0 8px 8px">
+        <span style="color:#58a6ff;font-family:monospace;font-weight:700">&gt;</span>
+        <input type="text" id="agentCoreTermInput" placeholder="Írj parancsot / üzenetet az ügynöknek..." style="flex:1;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:6px 10px;font-family:monospace;font-size:12px">
+        <button type="button" class="btn-primary btn-compact" id="agentCoreTermSendBtn">Küldés</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Terminal modal -->
   <div class="modal-overlay" id="terminalOverlay">
     <div class="modal terminal-modal">
@@ -3806,6 +4047,34 @@
         <p class="mobile-login-warn" data-i18n="mobile_login.warn">A kód a hozzáférési tokent tartalmazza. Csak a saját eszközöddel olvasd be, ne oszd meg és ne fotózd le másnak.</p>
       </div>
     </div>
+  </div>
+
+  <div id="alfredHelpdeskWrap" style="position:fixed;right:18px;bottom:18px;z-index:9500;display:flex;flex-direction:column;align-items:flex-end;gap:10px">
+    <div id="alfredHelpdeskBox" hidden style="width:min(360px,calc(100vw - 24px));border:1px solid var(--border);border-radius:14px;background:var(--surface, #fff);box-shadow:0 12px 32px rgba(0,0,0,.22);padding:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <strong style="font-size:14px">💬 Alfred Chat</strong>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button type="button" id="vpsChatTtsToggle" title="Automatikus felolvasás ki/be" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;cursor:pointer">🔇</button>
+          <select id="vpsConvEnv" class="input" style="padding:3px 6px;font-size:11px">
+            <option value="prod">prod</option>
+            <option value="ops">ops</option>
+            <option value="test">test</option>
+          </select>
+          <select id="vpsChatAgent" class="input" style="padding:3px 6px;font-size:11px;max-width:130px"></select>
+          <button type="button" id="alfredHelpdeskClose" style="background:none;border:none;font-size:18px;cursor:pointer;line-height:1">&times;</button>
+        </div>
+      </div>
+      <div id="vpsChatHistory" style="height:260px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button type="button" class="btn-secondary btn-compact" id="vpsChatMicBtn" title="Beszéd bevitel (magyar STT)" style="padding:5px 8px">🎤</button>
+        <input type="text" id="vpsChatInput" class="input" placeholder="Üzenet vagy diktálás..." style="flex:1;font-size:13px">
+        <button type="button" class="btn-primary btn-compact" id="vpsChatSend">Küldés</button>
+      </div>
+      <div id="vpsChatStatus" style="font-size:11px;opacity:.75"></div>
+    </div>
+    <button type="button" id="alfredHelpdeskBtn" title="Alfred Chat" style="height:48px;padding:0 16px;border-radius:999px;border:none;background:var(--accent, #d97706);color:#fff;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;align-items:center;gap:6px">
+      💬 <span>Alfred Chat</span>
+    </button>
   </div>
 
   <script src="/vps.js"></script>

@@ -1,5 +1,6 @@
 import { readPlanTokenStatus, type PlanTokenLaunchStatus } from '../plan-token-launch.js'
-import { isSingleLineEnvValue } from '../../env.js'
+import { isSingleLineEnvValue, readEnvFile } from '../../env.js'
+import { loadAlfredAgentsConfig } from '../../alfred/agents-config.js'
 import { existsSync, readFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync, copyFileSync } from 'node:fs'
 import { join, extname, dirname } from 'node:path'
 import { homedir, platform, tmpdir } from 'node:os'
@@ -947,7 +948,24 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
   }
 
   if (path === '/api/agents' && method === 'GET') {
-    jsonMaybeGzip(req, res, listAgentSummaries())
+    const summaries = listAgentSummaries() as unknown as Array<Record<string, unknown>>
+    try {
+      const cfg = loadAlfredAgentsConfig({ env: { ...readEnvFile(), ...process.env } })
+      const coreById = new Map((cfg?.agents ?? []).map((a) => [a.id, a]))
+      for (const s of summaries) {
+        const id = typeof s.name === 'string' ? s.name : ''
+        const core = coreById.get(id)
+        if (!core) continue
+        s.displayName = core.displayName || id
+        s.model = `${core.provider}/${core.model}`
+        s.activeModel = `${core.provider}/${core.model}`
+        s.running = true
+        s.status = 'running'
+        s.channelConnected = true
+        s.skillCount = Array.isArray(core.skills) ? core.skills.length : 0
+      }
+    } catch { /* fallback to base summaries */ }
+    jsonMaybeGzip(req, res, summaries)
     return true
   }
 

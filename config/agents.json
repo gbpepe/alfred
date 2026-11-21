@@ -20,13 +20,13 @@
       "model": "gemini-3.8-flash"
     },
     "szakmunkas": {
-      "label": "Szakmunkás",
+      "label": "Szakértő",
       "description": "Kódolás, implementáció, tool-használat",
       "provider": "deepseek",
       "model": "deepseek-chat"
     },
     "segedmunkas": {
-      "label": "Segédmunkás",
+      "label": "Segítő",
       "description": "Gyors, olcsó rutin feladatok és összefoglalás",
       "provider": "vertex-eu",
       "model": "gemini-3.5-flash-lite"

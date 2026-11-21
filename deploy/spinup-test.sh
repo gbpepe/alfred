@@ -6,10 +6,13 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 DRY_RUN=0
+MULTI=0
 BRANCH=""
 for arg in "$@"; do
   if [[ "$arg" == "--dry-run" ]]; then
     DRY_RUN=1
+  elif [[ "$arg" == "--multi" ]]; then
+    MULTI=1
   elif [[ -z "$BRANCH" ]]; then
     BRANCH="$arg"
   else
@@ -19,6 +22,7 @@ for arg in "$@"; do
 done
 
 validate_self_branch "$BRANCH"
+configure_test_target "$BRANCH" "$MULTI"
 
 if ! git -C "$SOURCE_REPO" rev-parse --verify --quiet "${BRANCH}^{commit}" >/dev/null; then
   log_err "Branch '$BRANCH' does not exist in $SOURCE_REPO"
@@ -55,6 +59,9 @@ mkdir -p "$TEST_DIR/store"
 cp "$TEST_ENV_FILE" "$TEST_DIR/.env"
 chmod 600 "$TEST_DIR/.env" || true
 rm -f "$TEST_DIR/store/alfred-test.db" "$TEST_DIR/store/alfred-test.db-wal" "$TEST_DIR/store/alfred-test.db-shm"
+if [[ -n "$TEST_SLUG" ]]; then
+  write_test_ports_file "$TEST_DIR" "$BRANCH" "$TEST_SLUG"
+fi
 
 ensure_node_modules "$TEST_DIR" "$SOURCE_REPO"
 
@@ -71,7 +78,13 @@ log_info "Running typecheck, build, and isolated tests in $TEST_DIR..."
 
 start_instance "test" "$TEST_DIR" "$TEST_SERVICE" "$TEST_PID_FILE" "0"
 verify_instance_alive "test" "$TEST_SERVICE" "$TEST_PID_FILE" 5 "0"
-if [[ "$DEPLOY_MODE" == "systemd" && -f /etc/systemd/system/alfred-test-web.service ]]; then
-  sudo systemctl restart alfred-test-web || true
+if [[ "$DEPLOY_MODE" == "systemd" ]]; then
+  if [[ -n "$TEST_SLUG" || -f "/etc/systemd/system/${TEST_WEB_SERVICE}.service" ]]; then
+    run_systemctl restart "$TEST_WEB_SERVICE" || true
+  fi
+fi
+if [[ -n "$TEST_SLUG" && -f "$TEST_DIR/.env.ports" ]]; then
+  WEB_PORT_VAL="$(awk -F= '/^WEB_PORT=/{print $2}' "$TEST_DIR/.env.ports")"
+  node "$SCRIPT_DIR/cf-test-route.mjs" up "$BRANCH" "$WEB_PORT_VAL" || true
 fi
 log_info "Staging environment is UP on branch '$BRANCH' at $TEST_DIR"

@@ -46,14 +46,14 @@
           const gitText = s.git ? esc(s.git.branch) + '@' + esc(s.git.sha) : 'nincs worktree'
           const costHtml = s.costs
             ? '<div style="margin-top:8px;font-size:12px;opacity:.9">' +
-              '<b>Napi költés:</b> $' + s.costs.globalSpendUsd.toFixed(4) + ' / $' + s.costs.globalBudgetUsd.toFixed(2) +
-              '<div style="margin-top:4px">' +
-              s.costs.agents
-                .map(function (a) {
-                  return '<div>• ' + esc(a.id) + ' (' + esc(a.model) + '): $' + a.spendUsd.toFixed(4) + ' / $' + a.dailyBudgetUsd.toFixed(2) + '</div>'
-                })
-                .join('') +
-              '</div></div>'
+            '<b>Napi költés:</b> $' + s.costs.globalSpendUsd.toFixed(4) + ' / $' + s.costs.globalBudgetUsd.toFixed(2) +
+            '<div style="margin-top:4px">' +
+            s.costs.agents
+              .map(function (a) {
+                return '<div>• ' + esc(a.id) + ' (' + esc(a.model) + '): $' + a.spendUsd.toFixed(4) + ' / $' + a.dailyBudgetUsd.toFixed(2) + '</div>'
+              })
+              .join('') +
+            '</div></div>'
             : '<div style="margin-top:8px;font-size:12px;opacity:.6">Nincs DB adat</div>'
 
           return (
@@ -79,63 +79,248 @@
       }
 
       renderRolesGrid(data.roles || [], data.agents || [])
-      renderAgentOverrides(data.roles || [], data.agents || [])
+      renderMultiTests(data.multiTests || [])
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
   }
 
-  function renderAgentOverrides(roles, agents) {
-    const grid = document.getElementById('vpsAgentsOverrideGrid')
-    const statusEl = document.getElementById('vpsAgentOverrideStatus')
-    if (!grid) return
-    grid.innerHTML = agents
-      .map(function (a) {
-        const roleOpts = roles
-          .map(function (r) {
-            return '<option value="' + esc(r.id) + '"' + (r.id === a.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
-          })
-          .join('')
-        const provOpts = [''].concat(PROVIDER_OPTIONS).map(function (p) {
-          return '<option value="' + p + '"' + (p === a.provider ? ' selected' : '') + '>' + (p || '(munkakörből)') + '</option>'
-        }).join('')
+  function renderMultiTests(items) {
+    const listEl = document.getElementById('vpsMultiTestList')
+    if (!listEl) return
+    if (!items || items.length === 0) {
+      listEl.innerHTML = ''
+      return
+    }
+    listEl.innerHTML = items
+      .map(function (t) {
         return (
-          '<div style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><strong>' + esc(a.id) + '</strong><span style="font-size:11px;opacity:.7">' + esc(a.channelName || '') + '</span></div>' +
-          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-          '<select class="input" data-ag-role="' + esc(a.id) + '" style="padding:4px 6px;font-size:12px">' + roleOpts + '</select>' +
-          '<select class="input" data-ag-prov="' + esc(a.id) + '" style="padding:4px 6px;font-size:12px">' + provOpts + '</select>' +
-          '<input type="text" class="input" data-ag-model="' + esc(a.id) + '" value="' + esc(a.model) + '" placeholder="(munkakörből)" style="flex:1;min-width:110px;padding:4px 6px;font-size:12px">' +
-          '<button class="btn-secondary btn-compact" data-ag-save="' + esc(a.id) + '">Mentés</button>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<strong>' + esc(t.branch) + '</strong>' +
+          '<a href="https://' + esc(t.host) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">' + esc(t.host) + ' ↗</a>' +
+          '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:' + badgeColor(t.active) + '">core: ' + esc(t.active) + '</span>' +
+          '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:' + badgeColor(t.webActive) + '">web: ' + esc(t.webActive) + '</span>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px">' +
+          '<button class="btn-secondary btn-compact" data-multi-ops="reload-test" data-branch="' + esc(t.branch) + '">Reload</button>' +
+          '<button class="btn-secondary btn-compact" data-multi-ops="teardown-test" data-branch="' + esc(t.branch) + '">Teardown</button>' +
           '</div>' +
           '</div>'
         )
       })
       .join('')
 
-    grid.querySelectorAll('[data-ag-save]').forEach(function (btn) {
+    listEl.querySelectorAll('[data-multi-ops]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        runOpsAction(btn.getAttribute('data-multi-ops'), btn.getAttribute('data-branch'), btn)
+      })
+    })
+  }
+
+  async function runOpsAction(action, branch, btn) {
+    const outEl = document.getElementById('vpsOpsOutput')
+    if (btn) btn.disabled = true
+    if (outEl) {
+      outEl.hidden = false
+      outEl.textContent = 'Futtatás: ' + action + (branch ? ' (' + branch + ')' : '') + '...'
+    }
+    try {
+      const data = await apiJson('/api/vps/ops', {
+        method: 'POST',
+        body: JSON.stringify({ action: action, branch: branch || undefined }),
+      })
+      if (outEl) outEl.textContent = data.output || 'Kész.'
+      refreshVpsStatus()
+    } catch (err) {
+      if (outEl) outEl.textContent = 'Hiba: ' + err.message
+    } finally {
+      if (btn) btn.disabled = false
+    }
+  }
+
+  let vpsRolesCache = []
+  let vpsAgentsCache = []
+  let vpsGlobalCache = null
+  let currentModalAgentId = null
+
+  async function ensureVpsRolesData(force) {
+    if (!force && vpsRolesCache.length > 0 && vpsAgentsCache.length > 0) return
+    const data = await apiJson('/api/vps/status')
+    vpsRolesCache = data.roles || []
+    vpsAgentsCache = data.agents || []
+    vpsGlobalCache = data.global || null
+    const chatSelect = document.getElementById('vpsChatAgent')
+    if (chatSelect && chatSelect.options.length === 0) {
+      vpsAgentsCache.forEach(function (a) {
+        const opt = document.createElement('option')
+        opt.value = a.id
+        opt.textContent = a.id + ' (' + (a.role || '') + ' · ' + a.model + ')'
+        chatSelect.appendChild(opt)
+      })
+    }
+  }
+
+  function applyDisplayNamesToCards() {
+    if (!vpsAgentsCache || vpsAgentsCache.length === 0) return
+    const map = {}
+    vpsAgentsCache.forEach(function (a) {
+      if (a.displayName && a.displayName !== a.id) map[a.id.toLowerCase()] = a.displayName
+    })
+    document.querySelectorAll('#agentsGridView .agent-card, #agentsPage [data-agent]').forEach(function (card) {
+      const id = (card.getAttribute('data-agent') || card.getAttribute('data-agent-name') || '').toLowerCase()
+      const nameEl = card.querySelector('.agent-card-name, .agent-name, h3')
+      if (!nameEl) return
+      const key = id || (nameEl.textContent || '').trim().toLowerCase()
+      if (map[key]) nameEl.textContent = map[key]
+    })
+  }
+
+  let vpsGlobalWired = false
+  function renderGlobalConfigBar() {
+    const budgetInp = document.getElementById('vpsGlobalBudgetInp')
+    const provSel = document.getElementById('vpsGlobalProvSel')
+    const modelSel = document.getElementById('vpsGlobalModelSel')
+    const saveBtn = document.getElementById('vpsGlobalSaveBtn')
+    const statusEl = document.getElementById('vpsGlobalStatus')
+    if (!budgetInp || !provSel || !modelSel || !vpsGlobalCache) return
+    budgetInp.value = String(vpsGlobalCache.dailyBudgetUsd ?? 15)
+    provSel.innerHTML = PROVIDER_OPTIONS.map(function (p) {
+      return '<option value="' + p + '"' + (p === vpsGlobalCache.defaultProvider ? ' selected' : '') + '>' + p + '</option>'
+    }).join('')
+    function fillGlobalModels(prov, curModel) {
+      const list = getModelsForProvider(prov)
+      const all = curModel && list.indexOf(curModel) < 0 ? [curModel].concat(list) : list
+      modelSel.innerHTML = all.filter(Boolean).map(function (m) {
+        return '<option value="' + esc(m) + '"' + (m === curModel ? ' selected' : '') + '>' + esc(m) + '</option>'
+      }).join('')
+    }
+    fillGlobalModels(vpsGlobalCache.defaultProvider || 'deepseek', vpsGlobalCache.defaultModel || '')
+    if (!vpsGlobalWired) {
+      vpsGlobalWired = true
+      provSel.addEventListener('change', function () {
+        fillGlobalModels(provSel.value, '')
+      })
+      if (saveBtn) {
+        saveBtn.addEventListener('click', async function () {
+          const bVal = Number(budgetInp.value)
+          saveBtn.disabled = true
+          if (statusEl) statusEl.textContent = 'Mentés...'
+          try {
+            const res = await apiJson('/api/vps/global-config', {
+              method: 'POST',
+              body: JSON.stringify({
+                dailyBudgetUsd: Number.isFinite(bVal) ? bVal : null,
+                defaultProvider: provSel.value,
+                defaultModel: modelSel.value,
+              }),
+            })
+            vpsGlobalCache = res.global || vpsGlobalCache
+            if (statusEl) statusEl.textContent = 'Globális beállítások mentve!'
+            refreshVpsStatus()
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+          } finally {
+            saveBtn.disabled = false
+          }
+        })
+      }
+    }
+  }
+
+  window.loadAgentsRoles = async function () {
+    try {
+      await Promise.all([ensureVpsRolesData(true), ensureModelCatalog(false)])
+      renderRolesGrid(vpsRolesCache, vpsAgentsCache)
+      renderGlobalConfigBar()
+      applyDisplayNamesToCards()
+      setTimeout(applyDisplayNamesToCards, 500)
+    } catch { /* ignore */ }
+  }
+
+  const PROVIDER_MODELS = {
+    deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+    'vertex-eu': ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    xai: ['grok-3', 'grok-3-mini', 'grok-4'],
+    openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'],
+  }
+
+  let vpsModelCatalogCache = null
+  let vpsModelSyncedAt = null
+  let vpsDiscordGuildsCache = []
+  const coreFileDirty = { claude: false, soul: false, mcp: false }
+
+  function getModelsForProvider(provider) {
+    const entry = vpsModelCatalogCache && vpsModelCatalogCache[provider]
+    if (entry && Array.isArray(entry.models) && entry.models.length > 0) return entry.models
+    return PROVIDER_MODELS[provider] || []
+  }
+
+  const CATALOG_PROVIDER_META = {
+    deepseek: { key: 'DEEPSEEK_API_KEY', placeholder: 'DeepSeek API kulcs (sk-...)', secret: true },
+    'vertex-eu': { key: 'VERTEX_PROJECT_ID', placeholder: 'GCP Project ID (pl. alferd-hq-gc)', secret: false },
+    gemini: { key: 'GEMINI_API_KEY', placeholder: 'Gemini API kulcs (AIza...)', secret: true },
+    xai: { key: 'XAI_API_KEY', placeholder: 'xAI API kulcs (xai-...)', secret: true },
+    openai: { key: 'OPENAI_API_KEY', placeholder: 'OpenAI API kulcs (sk-...)', secret: true },
+  }
+
+  function renderModelCatalog() {
+    const grid = document.getElementById('vpsModelCatalogGrid')
+    const syncedEl = document.getElementById('vpsModelCatalogSyncedAt')
+    const statusEl = document.getElementById('vpsModelCatalogStatus')
+    if (syncedEl) {
+      syncedEl.textContent = vpsModelSyncedAt
+        ? ('Utolsó szinkron: ' + vpsModelSyncedAt.slice(0, 19).replace('T', ' ') + ' UTC')
+        : 'Még nem volt API szinkron (alapértelmezett lista)'
+    }
+    if (!grid || !vpsModelCatalogCache) return
+    grid.innerHTML = PROVIDER_OPTIONS.map(function (p) {
+      const info = vpsModelCatalogCache[p] || { configured: false, models: PROVIDER_MODELS[p] || [] }
+      const meta = CATALOG_PROVIDER_META[p] || { key: '', placeholder: 'API kulcs...', secret: true }
+      const badge = info.configured
+        ? '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#16a34a">API aktív</span>'
+        : '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#6b7280">nincs kulcs</span>'
+      const errHtml = info.error ? '<div style="font-size:11px;color:#dc2626">Hiba: ' + esc(info.error) + '</div>' : ''
+      const preview = (info.models || []).slice(0, 5).map(esc).join(', ') + ((info.models || []).length > 5 ? ' …' : '')
+      return (
+        '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center"><strong>' + esc(p) + '</strong>' + badge + '</div>' +
+        '<div style="font-size:11px;opacity:.75">' + (info.models || []).length + ' modell</div>' +
+        '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word;flex:1">' + (preview || '—') + '</div>' +
+        errHtml +
+        '<div style="display:flex;gap:4px;margin-top:2px">' +
+        '<input type="' + (meta.secret ? 'password' : 'text') + '" class="input" data-cat-key="' + esc(meta.key) + '" placeholder="' + esc(meta.placeholder) + '" autocomplete="off" style="flex:1;min-width:0;padding:4px 6px;font-size:11px">' +
+        '<button type="button" class="btn-secondary btn-compact" data-cat-save="' + esc(p) + '" data-cat-env="' + esc(meta.key) + '" style="padding:4px 8px;font-size:11px">Mentés</button>' +
+        '</div>' +
+        '</div>'
+      )
+    }).join('')
+
+    grid.querySelectorAll('[data-cat-save]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
-        const agentId = btn.getAttribute('data-ag-save')
-        const roleEl = grid.querySelector('[data-ag-role="' + agentId + '"]')
-        const provEl = grid.querySelector('[data-ag-prov="' + agentId + '"]')
-        const modEl = grid.querySelector('[data-ag-model="' + agentId + '"]')
-        if (!roleEl || !provEl || !modEl) return
+        const prov = btn.getAttribute('data-cat-save')
+        const envKey = btn.getAttribute('data-cat-env')
+        const inp = grid.querySelector('[data-cat-key="' + envKey + '"]')
+        const val = inp ? inp.value.trim() : ''
+        if (!envKey || !val) {
+          if (statusEl) statusEl.textContent = 'Adj meg egy kulcsot a(z) ' + prov + ' mezőben!'
+          return
+        }
         btn.disabled = true
-        if (statusEl) statusEl.textContent = 'Mentés...'
+        if (statusEl) statusEl.textContent = prov + ' kulcs mentése és modellek szinkronizálása...'
         try {
-          const res = await apiJson('/api/vps/agent-override', {
+          const payload = {}
+          payload[envKey] = val
+          await apiJson('/api/onboarding/providers', {
             method: 'POST',
-            body: JSON.stringify({
-              agentId,
-              role: roleEl.value,
-              provider: provEl.value || null,
-              model: modEl.value.trim() || null,
-              restartServices: true,
-            }),
+            body: JSON.stringify({ providers: payload }),
           })
-          const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
-          if (statusEl) statusEl.textContent = agentId + ' mentve' + extra
-          refreshVpsStatus()
+          const synced = await apiJson('/api/vps/models/sync', { method: 'POST', body: '{}' })
+          vpsModelCatalogCache = synced.providers || null
+          vpsModelSyncedAt = synced.syncedAt || null
+          renderModelCatalog()
+          if (statusEl) statusEl.textContent = prov + ' kulcs elmentve és modellek frissítve!'
         } catch (err) {
           if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
         } finally {
@@ -143,6 +328,324 @@
         }
       })
     })
+  }
+
+  async function ensureModelCatalog(force) {
+    if (!force && vpsModelCatalogCache) {
+      renderModelCatalog()
+      return
+    }
+    try {
+      const data = await apiJson('/api/vps/models')
+      vpsModelCatalogCache = data.providers || null
+      vpsModelSyncedAt = data.syncedAt || null
+      renderModelCatalog()
+    } catch { /* fallback to defaults */ }
+  }
+
+  function updateInheritedRoleText() {
+    const roleSel = document.getElementById('agentCoreRoleSel')
+    const txtEl = document.getElementById('agentCoreInheritedText')
+    if (!roleSel || !txtEl) return
+    const r = vpsRolesCache.find(function (item) { return item.id === roleSel.value })
+    txtEl.textContent = r ? ('Örökölt modell: ' + r.provider + ' / ' + r.model) : ''
+  }
+
+  function populateCoreModelSelect(provider, currentModel) {
+    const modelSel = document.getElementById('agentCoreModelSel')
+    const modelInp = document.getElementById('agentCoreModelInp')
+    if (!modelSel || !modelInp) return
+    const list = getModelsForProvider(provider)
+    modelSel.innerHTML =
+      list.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>' }).join('') +
+      '<option value="__custom__">Egyéni modell...</option>'
+    if (currentModel && list.indexOf(currentModel) >= 0) {
+      modelSel.value = currentModel
+      modelInp.hidden = true
+      modelInp.value = currentModel
+    } else if (currentModel) {
+      modelSel.value = '__custom__'
+      modelInp.hidden = false
+      modelInp.value = currentModel
+    } else if (list.length > 0) {
+      modelSel.value = list[0]
+      modelInp.hidden = true
+      modelInp.value = list[0]
+    } else {
+      modelSel.value = '__custom__'
+      modelInp.hidden = false
+      modelInp.value = ''
+    }
+  }
+
+  function applyCoreOverview(ag) {
+    const titleEl = document.getElementById('agentDetailTitle')
+    const nameEl = document.getElementById('agentDetailName')
+    const descEl = document.getElementById('agentDetailDesc')
+    const modelEl = document.getElementById('agentDetailModel')
+    const chEl = document.getElementById('agentDetailChStatus')
+    const ctxEl = document.getElementById('agentDetailContext')
+    const coreBar = document.getElementById('agentCoreStatusBar')
+    const coreTxt = document.getElementById('agentCoreStatusText')
+    const procBar = document.getElementById('agentProcessControl')
+    const shownName = ag.displayName || ag.id
+    if (titleEl) titleEl.textContent = shownName
+    if (nameEl) nameEl.textContent = shownName
+    if (descEl && ag.displayName && ag.displayName !== ag.id) descEl.textContent = ag.id
+    if (modelEl) {
+      modelEl.textContent = ag.provider + ' / ' + ag.model + (ag.hasOverride ? ' (egyedi)' : ' (munkakör)')
+    }
+    if (chEl) {
+      chEl.innerHTML = '<span class="tg-status"><span class="tg-dot connected"></span>' + esc(ag.channelName || '—') + '</span>'
+    }
+    if (ctxEl) {
+      ctxEl.textContent = '$' + Number(ag.dailyBudgetUsd || 0).toFixed(2) + ' / nap · ' + (ag.tools ? ag.tools.length : 0) + ' eszköz'
+    }
+    const skillCntEl = document.getElementById('agentDetailSkillCount')
+    if (skillCntEl) {
+      skillCntEl.textContent = String(Array.isArray(ag.skills) ? ag.skills.length : 0)
+    }
+    if (coreBar) {
+      coreBar.hidden = false
+      coreBar.style.display = 'flex'
+    }
+    if (coreTxt) {
+      const r = vpsRolesCache.find(function (item) { return item.id === ag.role })
+      coreTxt.textContent = 'Alfred Core aktív · ' + (r ? r.label : (ag.role || '—'))
+    }
+    if (procBar) { procBar.hidden = true; procBar.style.display = 'none' }
+  }
+
+  function restoreLegacyModal() {
+    const box = document.getElementById('agentCoreOverrideBox')
+    const metaBox = document.getElementById('agentCoreMetaBox')
+    const legacyWrap = document.getElementById('legacyAgentSettingsWrap')
+    const saveBar = document.getElementById('agentSettingsSaveBar')
+    const coreBar = document.getElementById('agentCoreStatusBar')
+    const procBar = document.getElementById('agentProcessControl')
+    const coreCh = document.getElementById('agentCoreChannelBox')
+    const coreSkills = document.getElementById('agentCoreSkillsBox')
+    const legacySkills = document.getElementById('legacySkillsWrap')
+    if (box) { box.hidden = true; box.style.display = 'none' }
+    if (metaBox) { metaBox.hidden = true; metaBox.style.display = 'none' }
+    if (legacyWrap) legacyWrap.hidden = false
+    if (saveBar) { saveBar.hidden = true; saveBar.style.display = 'none' }
+    if (coreBar) { coreBar.hidden = true; coreBar.style.display = 'none' }
+    if (procBar) { procBar.hidden = false; procBar.style.display = '' }
+    if (coreCh) { coreCh.hidden = true; coreCh.style.display = 'none' }
+    if (coreSkills) { coreSkills.hidden = true; coreSkills.style.display = 'none' }
+    if (legacySkills) legacySkills.hidden = false
+    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
+      const b = document.getElementById(id)
+      if (b) b.hidden = false
+    })
+  }
+
+  window.syncAgentCoreOverride = async function (agentName) {
+    const box = document.getElementById('agentCoreOverrideBox')
+    const metaBox = document.getElementById('agentCoreMetaBox')
+    const legacyWrap = document.getElementById('legacyAgentSettingsWrap')
+    const saveBar = document.getElementById('agentSettingsSaveBar')
+    const chk = document.getElementById('agentCoreOverrideChk')
+    const ovRow = document.getElementById('agentCoreOverrideRow')
+    const roleSel = document.getElementById('agentCoreRoleSel')
+    const provSel = document.getElementById('agentCoreProvSel')
+    const budgetInp = document.getElementById('agentCoreBudgetInp')
+    const displayNameInp = document.getElementById('agentCoreDisplayNameInp')
+    const personaBox = document.getElementById('agentCorePersonaSuggestions')
+    const toolsList = document.getElementById('agentCoreToolsList')
+    const statusEl = document.getElementById('agentSettingsSaveStatus')
+    const coreCh = document.getElementById('agentCoreChannelBox')
+    const coreChCur = document.getElementById('agentCoreChannelCurrent')
+    const dcChanInp = document.getElementById('agentDcChanName')
+    if (!box || !chk || !ovRow || !roleSel || !provSel) return
+    try {
+      await Promise.all([ensureVpsRolesData(false), ensureModelCatalog(false)])
+    } catch {
+      restoreLegacyModal()
+      return
+    }
+    const ag = vpsAgentsCache.find(function (a) { return a.id === agentName })
+    if (!ag) {
+      restoreLegacyModal()
+      currentModalAgentId = null
+      return
+    }
+    currentModalAgentId = ag.id
+    coreFileDirty.claude = false
+    coreFileDirty.soul = false
+    coreFileDirty.mcp = false
+
+    box.hidden = false
+    box.style.display = 'flex'
+    if (metaBox) { metaBox.hidden = false; metaBox.style.display = 'flex' }
+    if (legacyWrap) legacyWrap.hidden = true
+    if (saveBar) { saveBar.hidden = false; saveBar.style.display = 'flex' }
+    if (statusEl) statusEl.textContent = ''
+    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
+      const b = document.getElementById(id)
+      if (b) b.hidden = true
+    })
+
+    roleSel.innerHTML = vpsRolesCache
+      .map(function (r) {
+        return '<option value="' + esc(r.id) + '"' + (r.id === ag.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
+      })
+      .join('')
+    updateInheritedRoleText()
+    provSel.innerHTML = PROVIDER_OPTIONS.map(function (p) {
+      return '<option value="' + p + '"' + (p === ag.provider ? ' selected' : '') + '>' + p + '</option>'
+    }).join('')
+    populateCoreModelSelect(ag.provider, ag.model || '')
+    chk.checked = Boolean(ag.hasOverride)
+    ovRow.hidden = !chk.checked
+    ovRow.style.display = chk.checked ? 'flex' : 'none'
+
+    if (budgetInp) budgetInp.value = String(ag.dailyBudgetUsd ?? 2)
+    const voiceSel = document.getElementById('agentCoreVoiceSel')
+    if (voiceSel) voiceSel.value = ag.voice || 'Kore'
+    if (displayNameInp) displayNameInp.value = ag.displayName || ag.id
+    if (personaBox) { personaBox.hidden = true; personaBox.style.display = 'none'; personaBox.innerHTML = '' }
+    if (toolsList) {
+      const activeTools = new Set(Array.isArray(ag.tools) ? ag.tools : [])
+      const allTools = [
+        { id: 'fs_read', label: 'Fájl olvasás', hint: 'Fájlok olvasása a workspace-ben (fs_read)' },
+        { id: 'fs_write', label: 'Fájl írás', hint: 'Fájlok létrehozása és módosítása (fs_write)' },
+        { id: 'bash', label: 'Terminál (bash)', hint: 'Parancssori parancsok futtatása (bash)' },
+        { id: 'git', label: 'Git', hint: 'Git műveletek: branch, commit stb. (git)' },
+        { id: 'memory', label: 'Memória', hint: 'Hosszú távú memória olvasása és mentése (memory)' },
+      ]
+      toolsList.innerHTML = allTools.map(function (t) {
+        const checked = activeTools.has(t.id) ? ' checked' : ''
+        return (
+          '<label title="' + esc(t.hint) + '" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;user-select:none;margin:0">' +
+          '<input type="checkbox" data-core-tool-chk="' + esc(t.id) + '"' + checked + ' style="margin:0">' +
+          '<span>' + esc(t.label) + '</span>' +
+          '</label>'
+        )
+      }).join('')
+    }
+    const sysPromptInp = document.getElementById('agentCoreSystemPromptInp')
+    const wsInp = document.getElementById('agentCoreWorkspaceInp')
+    const memNsInp = document.getElementById('agentCoreMemNsInp')
+    const maxIterInp = document.getElementById('agentCoreMaxIterInp')
+    const bashToInp = document.getElementById('agentCoreBashTimeoutInp')
+    const allowedUsersInp = document.getElementById('agentCoreAllowedUsersInp')
+    const protPathsInp = document.getElementById('agentCoreProtectedPathsInp')
+    const allowedBashInp = document.getElementById('agentCoreAllowedBashInp')
+    if (sysPromptInp) sysPromptInp.value = ag.systemPrompt || ''
+    if (wsInp) wsInp.value = ag.workspace || ''
+    if (memNsInp) memNsInp.value = ag.memoryNamespace || ''
+    if (maxIterInp) maxIterInp.value = ag.maxToolIterations != null ? String(ag.maxToolIterations) : ''
+    if (bashToInp) bashToInp.value = ag.bashTimeoutMs != null ? String(ag.bashTimeoutMs) : ''
+    if (allowedUsersInp) allowedUsersInp.value = Array.isArray(ag.allowedUserIds) ? ag.allowedUserIds.join(', ') : ''
+    if (protPathsInp) protPathsInp.value = Array.isArray(ag.protectedPaths) ? ag.protectedPaths.join('\n') : ''
+    if (allowedBashInp) allowedBashInp.value = Array.isArray(ag.allowedBashCommands) ? ag.allowedBashCommands.join('\n') : ''
+
+    if (coreCh) {
+      coreCh.hidden = false
+      coreCh.style.display = 'flex'
+    }
+    if (coreChCur) {
+      coreChCur.textContent = 'Aktuális csatorna: ' + (ag.channelName || 'nincs hozzárendelve')
+    }
+    if (dcChanInp) {
+      dcChanInp.value = ag.id.toLowerCase().replace(/[^a-z0-9-_]+/g, '-')
+    }
+
+    // Apply overview immediately and once more after app.js finishes its async agent fetch
+    applyCoreOverview(ag)
+    loadCoreSkillsForModal(ag.id)
+    markAgentModalClean()
+    setTimeout(function () {
+      if (currentModalAgentId === ag.id) {
+        applyCoreOverview(ag)
+        markAgentModalClean()
+      }
+    }, 350)
+  }
+
+  function markAgentModalClean() {
+    const ov = document.getElementById('agentDetailOverlay')
+    if (!ov || !ov._openValues) return
+    ov.querySelectorAll('input, textarea').forEach(function (el) {
+      ov._openValues.set(el, el.value)
+    })
+  }
+
+  let coreSkillsCache = []
+
+  async function loadCoreSkillsForModal(agentId) {
+    const coreSkills = document.getElementById('agentCoreSkillsBox')
+    const legacySkills = document.getElementById('legacySkillsWrap')
+    const listEl = document.getElementById('coreSkillsList')
+    const statusEl = document.getElementById('coreSkillsStatus')
+    if (!coreSkills || !listEl) return
+    coreSkills.hidden = false
+    coreSkills.style.display = 'flex'
+    if (legacySkills) legacySkills.hidden = true
+    if (statusEl) statusEl.textContent = ''
+    try {
+      const data = await apiJson('/api/vps/skills?agentId=' + encodeURIComponent(agentId))
+      coreSkillsCache = data.skills || []
+      if (coreSkillsCache.length === 0) {
+        listEl.innerHTML = '<div style="font-size:12px;opacity:.65">Még nincs globális skill. Hozz létre egyet lent az AI varázslóval!</div>'
+        return
+      }
+      listEl.innerHTML = coreSkillsCache
+        .map(function (s) {
+          const usageBadge = s.usageCount > 0
+            ? '<span style="font-size:11px;opacity:.7;margin-left:6px">(' + s.usageCount + '× használva)</span>'
+            : ''
+          return (
+            '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);display:flex;justify-content:space-between;align-items:flex-start;gap:10px">' +
+            '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;flex:1;margin:0">' +
+            '<input type="checkbox" data-core-skill-chk="' + esc(s.id) + '"' + (s.enabled ? ' checked' : '') + ' style="margin-top:3px">' +
+            '<div><div style="font-size:13px;font-weight:600">' + esc(s.id) + usageBadge + '</div>' +
+            '<div style="font-size:12px;opacity:.8;margin-top:2px">' + esc(s.description || '—') + '</div></div>' +
+            '</label>' +
+            '<div style="display:flex;gap:4px;flex-shrink:0">' +
+            '<button type="button" class="btn-secondary btn-compact" data-core-skill-edit="' + esc(s.id) + '" style="font-size:11px;padding:3px 7px">Szerkeszt</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-core-skill-del="' + esc(s.id) + '" style="font-size:11px;padding:3px 7px;color:#dc2626">×</button>' +
+            '</div>' +
+            '</div>'
+          )
+        })
+        .join('')
+
+      listEl.querySelectorAll('[data-core-skill-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const id = btn.getAttribute('data-core-skill-edit')
+          const sk = coreSkillsCache.find(function (x) { return x.id === id })
+          if (!sk) return
+          const det = document.getElementById('coreSkillEditorDetails')
+          if (det) det.open = true
+          const idInp = document.getElementById('coreSkillIdInp')
+          const descInp = document.getElementById('coreSkillDescInp')
+          const contInp = document.getElementById('coreSkillContentInp')
+          if (idInp) idInp.value = sk.id
+          if (descInp) descInp.value = sk.description || ''
+          if (contInp) contInp.value = sk.content || ''
+        })
+      })
+
+      listEl.querySelectorAll('[data-core-skill-del]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const id = btn.getAttribute('data-core-skill-del')
+          if (!id || !confirm('Biztosan törlöd a "' + id + '" skillt?')) return
+          try {
+            await apiJson('/api/vps/skills?id=' + encodeURIComponent(id), { method: 'DELETE' })
+            if (statusEl) statusEl.textContent = 'Törölve: ' + id
+            await ensureVpsRolesData(true)
+            if (currentModalAgentId) loadCoreSkillsForModal(currentModalAgentId)
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+          }
+        })
+      })
+    } catch (err) {
+      listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Hiba: ' + esc(err.message) + '</div>'
+    }
   }
 
   const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
@@ -160,6 +663,11 @@
         const opts = PROVIDER_OPTIONS.map(function (p) {
           return '<option value="' + p + '"' + (p === r.provider ? ' selected' : '') + '>' + p + '</option>'
         }).join('')
+        const modelList = getModelsForProvider(r.provider)
+        const allModels = modelList.indexOf(r.model) >= 0 ? modelList : [r.model].concat(modelList)
+        const modelOpts = allModels.filter(Boolean).map(function (m) {
+          return '<option value="' + esc(m) + '"' + (m === r.model ? ' selected' : '') + '>' + esc(m) + '</option>'
+        }).join('')
         return (
           '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
           '<div style="display:flex;justify-content:space-between;align-items:center"><strong>' + esc(r.label) + '</strong><span style="font-size:11px;opacity:.6">' + esc(r.id) + '</span></div>' +
@@ -167,13 +675,25 @@
           '<div style="font-size:11px;opacity:.8"><b>Ágensek:</b> ' + esc(assigned || '—') + '</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
           '<select class="input" data-role-provider="' + esc(r.id) + '" style="padding:4px 6px;font-size:12px">' + opts + '</select>' +
-          '<input type="text" class="input" data-role-model="' + esc(r.id) + '" value="' + esc(r.model) + '" style="flex:1;min-width:120px;padding:4px 6px;font-size:12px">' +
+          '<select class="input" data-role-model="' + esc(r.id) + '" style="flex:1;min-width:120px;padding:4px 6px;font-size:12px">' + modelOpts + '</select>' +
           '<button class="btn-primary btn-compact" data-role-save="' + esc(r.id) + '">Mentés</button>' +
           '</div>' +
           '</div>'
         )
       })
       .join('')
+
+    grid.querySelectorAll('[data-role-provider]').forEach(function (provEl) {
+      provEl.addEventListener('change', function () {
+        const roleId = provEl.getAttribute('data-role-provider')
+        const modEl = grid.querySelector('[data-role-model="' + roleId + '"]')
+        if (!modEl) return
+        const models = getModelsForProvider(provEl.value)
+        modEl.innerHTML = models.map(function (m) {
+          return '<option value="' + esc(m) + '">' + esc(m) + '</option>'
+        }).join('')
+      })
+    })
 
     grid.querySelectorAll('[data-role-save]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
@@ -244,23 +764,6 @@
     }
   }
 
-  async function runOpsAction(action) {
-    const outEl = document.getElementById('vpsOpsOutput')
-    if (!outEl) return
-    outEl.hidden = false
-    outEl.textContent = 'Futtatás: ' + action + ' ...'
-    try {
-      const data = await apiJson('/api/vps/ops', {
-        method: 'POST',
-        body: JSON.stringify({ action }),
-      })
-      outEl.textContent = data.output || 'Kész.'
-      refreshVpsStatus()
-    } catch (err) {
-      outEl.textContent = 'Hiba: ' + err.message
-    }
-  }
-
   async function sendVpsChat() {
     const agentEl = document.getElementById('vpsChatAgent')
     const inputEl = document.getElementById('vpsChatInput')
@@ -279,6 +782,9 @@
       inputEl.value = ''
       if (statusEl) statusEl.textContent = res.model + ' · kész'
       await refreshConversations()
+      if (vpsChatTtsEnabled && res.replyText) {
+        speakAgentText(res.replyText, agentEl.value)
+      }
     } catch (err) {
       if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
     } finally {
@@ -354,11 +860,13 @@
             method: 'POST',
             body: JSON.stringify({ providers: payload }),
           })
-          if (msgEl) {
-            msgEl.textContent = 'Mentve: ' + (res.updated || []).join(', ') + ' (újraindítás után lép életbe a többi szolgáltatásban).'
-            msgEl.className = 'onb-msg ok'
+          await openModelApiWizard()
+          const nextMsg = document.getElementById('vpsProvidersMsg')
+          if (nextMsg) {
+            nextMsg.textContent = 'Mentve: ' + (res.updated || []).join(', ') + ' (újraindítás után lép életbe a többi szolgáltatásban).'
+            nextMsg.className = 'onb-msg ok'
           }
-          body.querySelectorAll('[data-provider-key]').forEach(function (inp) { inp.value = '' })
+          ensureModelCatalog(true)
         } catch (err) {
           if (msgEl) { msgEl.textContent = 'Hiba: ' + err.message; msgEl.className = 'onb-msg err' }
         } finally {
@@ -378,7 +886,6 @@
     document.getElementById('vpsRefreshBtn')?.addEventListener('click', function () {
       refreshVpsStatus()
       refreshVpsLogs()
-      refreshConversations()
     })
     document.getElementById('vpsLogUnit')?.addEventListener('change', refreshVpsLogs)
     document.getElementById('vpsConvEnv')?.addEventListener('change', refreshConversations)
@@ -391,22 +898,1023 @@
     })
     document.querySelectorAll('[data-vps-ops]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        runOpsAction(btn.getAttribute('data-vps-ops'))
+        runOpsAction(btn.getAttribute('data-vps-ops'), null, btn)
       })
+    })
+    document.getElementById('vpsSpinupBranchBtn')?.addEventListener('click', function () {
+      const inp = document.getElementById('vpsSpinupBranch')
+      const branch = inp ? inp.value.trim() : ''
+      if (!branch) return
+      runOpsAction('spinup-test', branch, document.getElementById('vpsSpinupBranchBtn'))
+    })
+
+    // Help-desk chat widget toggle
+    const hdBtn = document.getElementById('alfredHelpdeskBtn')
+    const hdBox = document.getElementById('alfredHelpdeskBox')
+    const hdClose = document.getElementById('alfredHelpdeskClose')
+    if (hdBox) hdBox.style.display = 'none'
+    if (hdBtn && hdBox) {
+      hdBtn.addEventListener('click', async function () {
+        const opening = hdBox.hidden || hdBox.style.display === 'none'
+        hdBox.hidden = !opening
+        hdBox.style.display = opening ? 'flex' : 'none'
+        if (opening) {
+          try { await ensureVpsRolesData(false) } catch { /* ignore */ }
+          refreshConversations()
+        }
+      })
+    }
+    if (hdClose && hdBox) {
+      hdClose.addEventListener('click', function () {
+        hdBox.hidden = true
+        hdBox.style.display = 'none'
+      })
+    }
+
+    // Model Catalog sync button
+    const syncModelsBtn = document.getElementById('vpsSyncModelsBtn')
+    if (syncModelsBtn) {
+      syncModelsBtn.addEventListener('click', async function () {
+        const statusEl = document.getElementById('vpsModelCatalogStatus')
+        syncModelsBtn.disabled = true
+        if (statusEl) statusEl.textContent = 'Modellek lekérdezése a beregisztrált API-któl...'
+        try {
+          const data = await apiJson('/api/vps/models/sync', { method: 'POST', body: '{}' })
+          vpsModelCatalogCache = data.providers || null
+          vpsModelSyncedAt = data.syncedAt || null
+          renderModelCatalog()
+          if (statusEl) statusEl.textContent = 'Modell katalógus frissítve!'
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          syncModelsBtn.disabled = false
+        }
+      })
+    }
+
+    // Track dirty state for CLAUDE.md / SOUL.md / .mcp.json
+    document.getElementById('editClaudeMd')?.addEventListener('input', function () { coreFileDirty.claude = true })
+    document.getElementById('editSoulMd')?.addEventListener('input', function () { coreFileDirty.soul = true })
+    document.getElementById('editMcpJson')?.addEventListener('input', function () { coreFileDirty.mcp = true })
+
+    // Agent modal override & unified save controls
+    const ovChk = document.getElementById('agentCoreOverrideChk')
+    const ovRow = document.getElementById('agentCoreOverrideRow')
+    const ovRole = document.getElementById('agentCoreRoleSel')
+    const ovProv = document.getElementById('agentCoreProvSel')
+    const ovModelSel = document.getElementById('agentCoreModelSel')
+    const ovModelInp = document.getElementById('agentCoreModelInp')
+    const saveAllBtn = document.getElementById('saveAllAgentSettingsBtn')
+    if (ovRole) {
+      ovRole.addEventListener('change', updateInheritedRoleText)
+    }
+    if (ovChk && ovRow) {
+      ovChk.addEventListener('change', function () {
+        ovRow.hidden = !ovChk.checked
+        ovRow.style.display = ovChk.checked ? 'flex' : 'none'
+      })
+    }
+    if (ovProv) {
+      ovProv.addEventListener('change', function () {
+        populateCoreModelSelect(ovProv.value, '')
+      })
+    }
+    if (ovModelSel && ovModelInp) {
+      ovModelSel.addEventListener('change', function () {
+        const isCustom = ovModelSel.value === '__custom__'
+        ovModelInp.hidden = !isCustom
+        if (!isCustom) ovModelInp.value = ovModelSel.value
+      })
+    }
+    if (saveAllBtn) {
+      saveAllBtn.addEventListener('click', async function () {
+        if (!currentModalAgentId) return
+        const roleSel = document.getElementById('agentCoreRoleSel')
+        const provSel = document.getElementById('agentCoreProvSel')
+        const modelSel = document.getElementById('agentCoreModelSel')
+        const modelInp = document.getElementById('agentCoreModelInp')
+        const budgetInp = document.getElementById('agentCoreBudgetInp')
+        const statusEl = document.getElementById('agentSettingsSaveStatus')
+        if (!roleSel || !provSel || !modelSel || !modelInp) return
+        const useOverride = Boolean(ovChk && ovChk.checked)
+        const chosenModel = modelSel.value === '__custom__' ? modelInp.value.trim() : modelSel.value
+        const budgetVal = budgetInp ? Number(budgetInp.value) : NaN
+        saveAllBtn.disabled = true
+        if (statusEl) statusEl.textContent = 'Mentés...'
+        try {
+          const dispNameVal = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
+          const voiceVal = document.getElementById('agentCoreVoiceSel')?.value || 'Kore'
+          const selectedTools = Array.from(document.querySelectorAll('[data-core-tool-chk]:checked'))
+            .map(function (el) { return el.getAttribute('data-core-tool-chk') })
+            .filter(Boolean)
+          const sysPromptVal = document.getElementById('agentCoreSystemPromptInp')?.value ?? ''
+          const wsVal = document.getElementById('agentCoreWorkspaceInp')?.value.trim() || null
+          const memNsVal = document.getElementById('agentCoreMemNsInp')?.value.trim() || null
+          const maxIterRaw = document.getElementById('agentCoreMaxIterInp')?.value.trim() || ''
+          const maxIterVal = maxIterRaw ? Number(maxIterRaw) : null
+          const bashToRaw = document.getElementById('agentCoreBashTimeoutInp')?.value.trim() || ''
+          const bashToVal = bashToRaw ? Number(bashToRaw) : null
+          const allowedUsersRaw = document.getElementById('agentCoreAllowedUsersInp')?.value || ''
+          const allowedUsersVal = allowedUsersRaw.split(/[\s,]+/).map(function (s) { return s.trim() }).filter(Boolean)
+          const protPathsRaw = document.getElementById('agentCoreProtectedPathsInp')?.value || ''
+          const protPathsVal = protPathsRaw.split(/\r?\n/).map(function (s) { return s.trim() }).filter(Boolean)
+          const allowedBashRaw = document.getElementById('agentCoreAllowedBashInp')?.value || ''
+          const allowedBashVal = allowedBashRaw.split(/\r?\n/).map(function (s) { return s.trim() }).filter(Boolean)
+          const res = await apiJson('/api/vps/agent-override', {
+            method: 'POST',
+            body: JSON.stringify({
+              agentId: currentModalAgentId,
+              displayName: dispNameVal || null,
+              role: roleSel.value,
+              provider: useOverride ? provSel.value : null,
+              model: useOverride ? (chosenModel || null) : null,
+              dailyBudgetUsd: Number.isFinite(budgetVal) && budgetVal >= 0.05 ? budgetVal : null,
+              voice: voiceVal,
+              tools: selectedTools,
+              systemPrompt: sysPromptVal,
+              workspace: wsVal,
+              memoryNamespace: memNsVal,
+              maxToolIterations: Number.isFinite(maxIterVal) ? maxIterVal : null,
+              bashTimeoutMs: Number.isFinite(bashToVal) ? bashToVal : null,
+              allowedUserIds: allowedUsersVal,
+              protectedPaths: protPathsVal,
+              allowedBashCommands: allowedBashVal,
+              restartServices: true,
+            }),
+          })
+          const filePatch = {}
+          if (coreFileDirty.claude) filePatch.claudeMd = document.getElementById('editClaudeMd')?.value ?? ''
+          if (coreFileDirty.soul) filePatch.soulMd = document.getElementById('editSoulMd')?.value ?? ''
+          if (coreFileDirty.mcp) filePatch.mcpJson = document.getElementById('editMcpJson')?.value ?? ''
+          if (Object.keys(filePatch).length > 0) {
+            await apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId), {
+              method: 'PUT',
+              body: JSON.stringify(filePatch),
+            })
+            coreFileDirty.claude = false
+            coreFileDirty.soul = false
+            coreFileDirty.mcp = false
+          }
+          const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
+          if (statusEl) statusEl.textContent = 'Minden beállítás mentve' + extra
+          markAgentModalClean()
+          await ensureVpsRolesData(true)
+          const updated = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+          if (updated) applyCoreOverview(updated)
+          if (typeof window.loadAgents === 'function') window.loadAgents()
+          setTimeout(applyDisplayNamesToCards, 300)
+          updateInheritedRoleText()
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          saveAllBtn.disabled = false
+        }
+      })
+    }
+
+    // Discord Bot server/channel creator
+    const dcLoadBtn = document.getElementById('agentDcLoadGuildsBtn')
+    const dcGuildSel = document.getElementById('agentDcGuildSel')
+    const dcCatSel = document.getElementById('agentDcCategorySel')
+    const dcCreateBtn = document.getElementById('agentDcCreateChanBtn')
+    function syncDcCategories() {
+      if (!dcGuildSel || !dcCatSel) return
+      const g = vpsDiscordGuildsCache.find(function (item) { return item.id === dcGuildSel.value })
+      const cats = g ? (g.categories || []) : []
+      dcCatSel.innerHTML = '<option value="">(Nincs kategória)</option>' +
+        cats.map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>' }).join('')
+    }
+    if (dcGuildSel) dcGuildSel.addEventListener('change', syncDcCategories)
+    if (dcLoadBtn && dcGuildSel) {
+      dcLoadBtn.addEventListener('click', async function () {
+        const statusEl = document.getElementById('agentDcCreateStatus')
+        dcLoadBtn.disabled = true
+        if (statusEl) statusEl.textContent = 'Discord szerverek betöltése...'
+        try {
+          const data = await apiJson('/api/vps/discord/guilds')
+          vpsDiscordGuildsCache = data.guilds || []
+          dcGuildSel.innerHTML = vpsDiscordGuildsCache.length
+            ? vpsDiscordGuildsCache.map(function (g) { return '<option value="' + esc(g.id) + '">' + esc(g.name) + '</option>' }).join('')
+            : '<option value="">(Nincs elérhető szerver)</option>'
+          syncDcCategories()
+          if (statusEl) statusEl.textContent = vpsDiscordGuildsCache.length + ' szerver betöltve.'
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          dcLoadBtn.disabled = false
+        }
+      })
+    }
+    if (dcCreateBtn) {
+      dcCreateBtn.addEventListener('click', async function () {
+        if (!currentModalAgentId || !dcGuildSel) return
+        const guildId = dcGuildSel.value
+        const categoryId = dcCatSel ? dcCatSel.value : ''
+        const channelName = document.getElementById('agentDcChanName')?.value.trim() || ''
+        const statusEl = document.getElementById('agentDcCreateStatus')
+        if (!guildId || !channelName) {
+          if (statusEl) statusEl.textContent = 'Előbb töltsd be a szervereket és adj meg egy csatornanevet!'
+          return
+        }
+        dcCreateBtn.disabled = true
+        if (statusEl) statusEl.textContent = 'Discord szoba létrehozása...'
+        try {
+          const res = await apiJson('/api/vps/discord/create-channel', {
+            method: 'POST',
+            body: JSON.stringify({ agentId: currentModalAgentId, guildId, categoryId: categoryId || null, channelName }),
+          })
+          if (statusEl) statusEl.textContent = 'Létrehozva és bekötve: ' + res.channel.name + ' (ID: ' + res.channel.id + ')'
+          await ensureVpsRolesData(true)
+          const updated = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+          if (updated) {
+            applyCoreOverview(updated)
+            const cur = document.getElementById('agentCoreChannelCurrent')
+            if (cur) cur.textContent = 'Aktuális csatorna: ' + (updated.channelName || res.channel.name)
+          }
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          dcCreateBtn.disabled = false
+        }
+      })
+    }
+
+    // Simulated Live Agent Terminal modal
+    let coreTermTimer = null
+    let coreTermAgentId = null
+    const termOverlay = document.getElementById('agentCoreTerminalOverlay')
+    const termOut = document.getElementById('agentCoreTermOutput')
+    const termTitle = document.getElementById('agentCoreTermTitle')
+    const termAuto = document.getElementById('agentCoreTermAutoChk')
+    const termInp = document.getElementById('agentCoreTermInput')
+    const termSend = document.getElementById('agentCoreTermSendBtn')
+
+    const TERM_COLORS = {
+      user: '#58a6ff',
+      tool: '#d29922',
+      llm: '#bc8cff',
+      assistant: '#3fb950',
+      error: '#f85149',
+    }
+
+    async function refreshCoreTerminal() {
+      if (!coreTermAgentId || !termOut) return
+      try {
+        const data = await apiJson('/api/vps/agent-terminal?agentId=' + encodeURIComponent(coreTermAgentId) + '&limit=80')
+        const events = data.events || []
+        if (events.length === 0) {
+          termOut.innerHTML = '<div style="opacity:.6">Még nincs rögzített esemény ehhez az ügynökhöz. Írj egy üzenetet lent a kipróbáláshoz!</div>'
+          return
+        }
+        const atBottom = termOut.scrollHeight - termOut.scrollTop - termOut.clientHeight < 40
+        termOut.innerHTML = events
+          .map(function (ev) {
+            const color = TERM_COLORS[ev.kind] || '#e6edf3'
+            const t = (ev.ts || '').slice(11, 19) || '--:--:--'
+            return (
+              '<div style="margin-bottom:6px">' +
+              '<span style="color:#8b949e">[' + esc(t) + ']</span> ' +
+              '<strong style="color:' + color + '">' + esc(ev.title) + '</strong>' +
+              (ev.detail ? '\n<span style="color:#c9d1d9">' + esc(ev.detail) + '</span>' : '') +
+              '</div>'
+            )
+          })
+          .join('')
+        if (atBottom) termOut.scrollTop = termOut.scrollHeight
+      } catch (err) {
+        termOut.innerHTML = '<div style="color:#f85149">Hiba: ' + esc(err.message) + '</div>'
+      }
+    }
+
+    function stopCoreTermPolling() {
+      if (coreTermTimer) { clearInterval(coreTermTimer); coreTermTimer = null }
+    }
+
+    function startCoreTermPolling() {
+      stopCoreTermPolling()
+      if (termAuto && termAuto.checked && coreTermAgentId && termOverlay && !termOverlay.hidden) {
+        coreTermTimer = setInterval(refreshCoreTerminal, 2000)
+      }
+    }
+
+    function openCoreTerminal(agentId) {
+      if (!termOverlay || !agentId) return
+      coreTermAgentId = agentId
+      if (termTitle) termTitle.textContent = 'Terminál — ' + agentId
+      termOverlay.hidden = false
+      termOverlay.classList.add('active')
+      refreshCoreTerminal()
+      startCoreTermPolling()
+    }
+
+    function closeCoreTerminal() {
+      stopCoreTermPolling()
+      coreTermAgentId = null
+      if (termOverlay) {
+        termOverlay.classList.remove('active')
+        termOverlay.hidden = true
+      }
+    }
+
+    document.getElementById('agentCoreTerminalBtn')?.addEventListener('click', function () {
+      if (currentModalAgentId) openCoreTerminal(currentModalAgentId)
+    })
+    document.getElementById('agentCoreTermCloseBtn')?.addEventListener('click', closeCoreTerminal)
+    document.getElementById('agentCoreTermRefreshBtn')?.addEventListener('click', refreshCoreTerminal)
+    termAuto?.addEventListener('change', startCoreTermPolling)
+
+    async function sendCoreTermMessage() {
+      if (!coreTermAgentId || !termInp || !termSend) return
+      const text = termInp.value.trim()
+      if (!text) return
+      termSend.disabled = true
+      termInp.disabled = true
+      try {
+        if (document.getElementById('alfredTestBanner')) {
+          await apiJson('/api/test-sim/send', {
+            method: 'POST',
+            body: JSON.stringify({ agentId: coreTermAgentId, content: text }),
+          })
+        } else {
+          await apiJson('/api/vps/chat', {
+            method: 'POST',
+            body: JSON.stringify({ agentId: coreTermAgentId, message: text }),
+          })
+        }
+        termInp.value = ''
+        await refreshCoreTerminal()
+      } catch (err) {
+        if (termOut) termOut.innerHTML += '<div style="color:#f85149">Küldési hiba: ' + esc(err.message) + '</div>'
+      } finally {
+        termSend.disabled = false
+        termInp.disabled = false
+        termInp.focus()
+      }
+    }
+
+    termSend?.addEventListener('click', sendCoreTermMessage)
+    termInp?.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        sendCoreTermMessage()
+      }
+    })
+
+    // Alfred Core Skills tab wiring
+    document.getElementById('coreSkillNewBtn')?.addEventListener('click', function () {
+      const det = document.getElementById('coreSkillEditorDetails')
+      if (det) det.open = true
+      const idInp = document.getElementById('coreSkillIdInp')
+      const descInp = document.getElementById('coreSkillDescInp')
+      const contInp = document.getElementById('coreSkillContentInp')
+      if (idInp) { idInp.value = ''; idInp.focus() }
+      if (descInp) descInp.value = ''
+      if (contInp) contInp.value = ''
+    })
+
+    document.getElementById('coreSkillAssignSaveBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId) return
+      const btn = document.getElementById('coreSkillAssignSaveBtn')
+      const statusEl = document.getElementById('coreSkillsStatus')
+      const selected = []
+      document.querySelectorAll('[data-core-skill-chk]:checked').forEach(function (chk) {
+        const id = chk.getAttribute('data-core-skill-chk')
+        if (id) selected.push(id)
+      })
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = 'Mentés...'
+      try {
+        await apiJson('/api/vps/skills/assign', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, skills: selected }),
+        })
+        if (statusEl) statusEl.textContent = 'Skillek elmentve (' + selected.length + ' aktív).'
+        await ensureVpsRolesData(true)
+        const ag = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+        if (ag) applyCoreOverview(ag)
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    document.getElementById('coreSkillAiGenBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('coreSkillAiGenBtn')
+      const promptInp = document.getElementById('coreSkillAiPrompt')
+      const statusEl = document.getElementById('coreSkillEditorStatus')
+      const promptText = promptInp ? promptInp.value.trim() : ''
+      if (!promptText) {
+        if (statusEl) statusEl.textContent = 'Írj be egy rövid leírást a generáláshoz!'
+        return
+      }
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = '✨ AI generálás folyamatban...'
+      try {
+        const res = await apiJson('/api/vps/skills/generate', {
+          method: 'POST',
+          body: JSON.stringify({ prompt: promptText, agentId: currentModalAgentId || undefined }),
+        })
+        const d = res.draft || {}
+        const idInp = document.getElementById('coreSkillIdInp')
+        const descInp = document.getElementById('coreSkillDescInp')
+        const contInp = document.getElementById('coreSkillContentInp')
+        if (idInp) idInp.value = d.id || ''
+        if (descInp) descInp.value = d.description || ''
+        if (contInp) contInp.value = d.content || ''
+        if (statusEl) statusEl.textContent = 'Javaslat elkészült! Nézd át és kattints a Mentés gombra.'
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    function renderSimpleLineDiff(beforeText, afterText) {
+      const a = String(beforeText || '').split(/\r?\n/)
+      const b = String(afterText || '').split(/\r?\n/)
+      const aSet = new Set(a.map(function (l) { return l.trim() }).filter(Boolean))
+      const bSet = new Set(b.map(function (l) { return l.trim() }).filter(Boolean))
+      const rows = []
+      a.forEach(function (line) {
+        if (line.trim() && !bSet.has(line.trim())) {
+          rows.push('<div style="background:rgba(220,38,38,.12);color:#dc2626;padding:1px 6px;border-radius:3px">- ' + esc(line) + '</div>')
+        }
+      })
+      b.forEach(function (line) {
+        if (line.trim() && !aSet.has(line.trim())) {
+          rows.push('<div style="background:rgba(22,163,74,.12);color:#15803d;padding:1px 6px;border-radius:3px">+ ' + esc(line) + '</div>')
+        }
+      })
+      if (rows.length === 0) return '<div style="opacity:.7;margin-top:6px">Nincs szöveges különbség.</div>'
+      return (
+        '<details open style="margin-top:8px">' +
+        '<summary style="cursor:pointer;font-weight:600;font-size:11px;user-select:none">Változások (diff: ' + rows.length + ' sor)</summary>' +
+        '<div style="margin-top:6px;max-height:180px;overflow:auto;font-family:monospace;font-size:11px;display:flex;flex-direction:column;gap:2px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">' +
+        rows.join('') +
+        '</div></details>'
+      )
+    }
+
+    function showOptimizeResult(msgEl, beforeText, opt, restoreFn) {
+      if (!msgEl) return
+      const stats = opt.tokensBeforeEst
+        ? ' (~' + opt.tokensBeforeEst + ' → ~' + opt.tokensAfterEst + ' token, ' + (opt.savedPct >= 0 ? '-' + opt.savedPct : '+' + Math.abs(opt.savedPct)) + '%)'
+        : ''
+      msgEl.hidden = false
+      msgEl.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span>⚡ Optimalizálva' + esc(stats) + ': ' + esc(opt.summary || '') + '</span>' +
+        '<button type="button" class="btn-secondary btn-compact" data-opt-restore style="font-size:11px;padding:2px 8px">Eredeti visszaállítása</button>' +
+        '</div>' +
+        renderSimpleLineDiff(beforeText, opt.content || '')
+      msgEl.querySelector('[data-opt-restore]')?.addEventListener('click', function () {
+        restoreFn()
+        msgEl.textContent = 'Eredeti tartalom visszaállítva.'
+      })
+    }
+
+    document.getElementById('coreSkillAiOptBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('coreSkillAiOptBtn')
+      const idInp = document.getElementById('coreSkillIdInp')
+      const contInp = document.getElementById('coreSkillContentInp')
+      const statusEl = document.getElementById('coreSkillEditorStatus')
+      const beforeText = contInp ? contInp.value : ''
+      const content = beforeText.trim()
+      if (!content) {
+        if (statusEl) statusEl.textContent = 'Nincs mit optimalizálni — előbb nyiss meg vagy generálj egy skillt!'
+        return
+      }
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = '⚡ Skill Optimalizáló Agent dolgozik...'
+      try {
+        const res = await apiJson('/api/vps/skills/optimize', {
+          method: 'POST',
+          body: JSON.stringify({ content, id: idInp ? idInp.value.trim() : undefined, agentId: currentModalAgentId || undefined }),
+        })
+        const opt = res.optimized || {}
+        if (contInp && opt.content) contInp.value = opt.content
+        showOptimizeResult(statusEl, beforeText, opt, function () { if (contInp) contInp.value = beforeText })
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    // Global #skills page AI Skill Wizard & Optimizer
+    const gGenBtn = document.getElementById('globalSkillAiGenBtn')
+    const gOptBtn = document.getElementById('globalSkillAiOptBtn')
+    const gSaveBtn = document.getElementById('globalSkillSaveBtn')
+    const gPrevWrap = document.getElementById('globalSkillPreviewWrap')
+    const gContent = document.getElementById('globalSkillContent')
+    const gStatus = document.getElementById('globalSkillStatus')
+    if (gGenBtn) {
+      gGenBtn.addEventListener('click', async function () {
+        const nameInp = document.getElementById('skillName')
+        const descInp = document.getElementById('skillDescription')
+        const promptText = [nameInp?.value.trim(), descInp?.value.trim()].filter(Boolean).join(': ')
+        if (!promptText) {
+          if (gStatus) gStatus.textContent = 'Írd le röviden, mit csináljon a skill!'
+          return
+        }
+        gGenBtn.disabled = true
+        if (gStatus) gStatus.textContent = '✨ AI Skill Varázsló generál...'
+        try {
+          const res = await apiJson('/api/vps/skills/generate', {
+            method: 'POST',
+            body: JSON.stringify({ prompt: promptText }),
+          })
+          const d = res.draft || {}
+          if (nameInp && !nameInp.value.trim() && d.id) nameInp.value = d.id
+          if (gContent) gContent.value = d.content || ''
+          if (gPrevWrap) { gPrevWrap.hidden = false; gPrevWrap.style.display = 'flex' }
+          if (gOptBtn) gOptBtn.hidden = false
+          if (gStatus) gStatus.textContent = 'Elkészült! Szerkesztheted, optimalizálhatod vagy elmentheted.'
+        } catch (err) {
+          if (gStatus) gStatus.textContent = 'Hiba: ' + err.message
+        } finally {
+          gGenBtn.disabled = false
+        }
+      })
+    }
+    if (gOptBtn) {
+      gOptBtn.addEventListener('click', async function () {
+        const nameInp = document.getElementById('skillName')
+        const beforeText = gContent ? gContent.value : ''
+        const content = beforeText.trim()
+        if (!content) return
+        gOptBtn.disabled = true
+        if (gStatus) gStatus.textContent = '⚡ Skill Optimalizáló Agent dolgozik...'
+        try {
+          const res = await apiJson('/api/vps/skills/optimize', {
+            method: 'POST',
+            body: JSON.stringify({ content, id: nameInp?.value.trim() || undefined }),
+          })
+          const opt = res.optimized || {}
+          if (gContent && opt.content) gContent.value = opt.content
+          showOptimizeResult(gStatus, beforeText, opt, function () { if (gContent) gContent.value = beforeText })
+        } catch (err) {
+          if (gStatus) gStatus.textContent = 'Hiba: ' + err.message
+        } finally {
+          gOptBtn.disabled = false
+        }
+      })
+    }
+    if (gSaveBtn) {
+      gSaveBtn.addEventListener('click', async function () {
+        const nameInp = document.getElementById('skillName')
+        const descInp = document.getElementById('skillDescription')
+        const id = nameInp ? nameInp.value.trim() : ''
+        const content = gContent ? gContent.value.trim() : ''
+        if (!id || !content) {
+          if (gStatus) gStatus.textContent = 'Add meg a skill nevét és tartalmát!'
+          return
+        }
+        gSaveBtn.disabled = true
+        if (gStatus) gStatus.textContent = 'Mentés a Skill Könyvtárba...'
+        try {
+          const res = await apiJson('/api/vps/skills/save', {
+            method: 'POST',
+            body: JSON.stringify({ id, description: descInp?.value.trim() || id, content }),
+          })
+          if (gStatus) gStatus.textContent = 'Elmentve: ' + res.id
+          const overlay = document.getElementById('skillModalOverlay')
+          if (overlay) { overlay.classList.remove('active'); overlay.hidden = true }
+          if (typeof window.loadSkillsPage === 'function') window.loadSkillsPage()
+          else location.reload()
+        } catch (err) {
+          if (gStatus) gStatus.textContent = 'Hiba: ' + err.message
+        } finally {
+          gSaveBtn.disabled = false
+        }
+      })
+    }
+
+    // Skill Detail modal AI Optimizer button
+    document.getElementById('skillDetailOptimizeBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('skillDetailOptimizeBtn')
+      const editor = document.getElementById('skillDetailEditor')
+      const editBtn = document.getElementById('skillDetailEditBtn')
+      const msgEl = document.getElementById('skillDetailOptimizeMsg')
+      const titleEl = document.getElementById('skillDetailTitle')
+      if (!editor) return
+      if (editor.hidden && editBtn) editBtn.click()
+      const beforeText = editor.value
+      const content = beforeText.trim()
+      if (!content) return
+      if (btn) btn.disabled = true
+      if (msgEl) { msgEl.hidden = false; msgEl.textContent = '⚡ Skill Optimalizáló Agent elemzi és tömöríti a SKILL.md fájlt...' }
+      try {
+        const res = await apiJson('/api/vps/skills/optimize', {
+          method: 'POST',
+          body: JSON.stringify({ content, id: titleEl?.textContent?.trim() || undefined }),
+        })
+        const opt = res.optimized || {}
+        if (opt.content) editor.value = opt.content
+        showOptimizeResult(msgEl, beforeText, opt, function () { editor.value = beforeText })
+      } catch (err) {
+        if (msgEl) { msgEl.hidden = false; msgEl.textContent = 'Hiba: ' + err.message }
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    // Phase 3: Pictogram Studio, AI Avatar & AI Persona Suggestions
+    const pictoCanvas = document.getElementById('agentPictoCanvas')
+    const pictoIcon = document.getElementById('agentPictoIconSel')
+    const pictoC1 = document.getElementById('agentPictoColor1')
+    const pictoC2 = document.getElementById('agentPictoColor2')
+    const pictoStatus = document.getElementById('agentPictoStatus')
+
+    function drawPictogramCanvas() {
+      if (!pictoCanvas) return
+      const ctx = pictoCanvas.getContext('2d')
+      if (!ctx) return
+      const w = pictoCanvas.width
+      const h = pictoCanvas.height
+      const grad = ctx.createLinearGradient(0, 0, w, h)
+      grad.addColorStop(0, pictoC1 ? pictoC1.value : '#2563eb')
+      grad.addColorStop(1, pictoC2 ? pictoC2.value : '#7c3aed')
+      ctx.clearRect(0, 0, w, h)
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.font = Math.round(w * 0.48) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(pictoIcon ? pictoIcon.value : '🤖', w / 2, h / 2 + 4)
+    }
+
+    drawPictogramCanvas()
+    pictoIcon?.addEventListener('change', drawPictogramCanvas)
+    pictoC1?.addEventListener('input', drawPictogramCanvas)
+    pictoC2?.addEventListener('input', drawPictogramCanvas)
+
+    function refreshModalAvatarUrl(url) {
+      const avEl = document.getElementById('agentDetailAvatar')
+      if (avEl && url) {
+        avEl.innerHTML = '<img src="' + esc(url) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+      }
+      if (currentModalAgentId && url) {
+        document.querySelectorAll('#agentsGridView img[src*="/api/agents/' + currentModalAgentId + '/avatar"]').forEach(function (img) {
+          img.src = url
+        })
+      }
+      if (typeof window.loadAgents === 'function') window.loadAgents()
+    }
+
+    document.getElementById('agentPictoSaveBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId || !pictoCanvas) return
+      const btn = document.getElementById('agentPictoSaveBtn')
+      drawPictogramCanvas()
+      const dataUrl = pictoCanvas.toDataURL('image/png')
+      if (btn) btn.disabled = true
+      if (pictoStatus) pictoStatus.textContent = 'Mentés...'
+      try {
+        const res = await apiJson('/api/vps/agents/personalize', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, avatarDataUrl: dataUrl }),
+        })
+        if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
+        if (pictoStatus) pictoStatus.textContent = '✓ Piktogram avatar elmentve!'
+      } catch (err) {
+        if (pictoStatus) pictoStatus.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    let selectedAiAvatarDataUrl = null
+    const aiPicker = document.getElementById('agentAiAvatarPicker')
+    const aiCandidatesEl = document.getElementById('agentAiAvatarCandidates')
+    const aiApplyBtn = document.getElementById('agentAiAvatarApplyBtn')
+    const aiDiscardBtn = document.getElementById('agentAiAvatarDiscardBtn')
+
+    function clearAiAvatarPicker() {
+      selectedAiAvatarDataUrl = null
+      if (aiCandidatesEl) aiCandidatesEl.innerHTML = ''
+      if (aiPicker) { aiPicker.hidden = true; aiPicker.style.display = 'none' }
+      if (aiApplyBtn) aiApplyBtn.disabled = true
+    }
+
+    document.getElementById('agentAiAvatarGenBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId) return
+      const btn = document.getElementById('agentAiAvatarGenBtn')
+      const dispName = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || currentModalAgentId
+      const roleVal = document.getElementById('agentCoreRoleSel')?.value || ''
+      if (btn) btn.disabled = true
+      clearAiAvatarPicker()
+      if (pictoStatus) pictoStatus.textContent = '✨ 3 Chibi avatar variáció generálása (név + SOUL.md + skillek alapján)...'
+      try {
+        const res = await apiJson('/api/vps/agents/generate-avatar', {
+          method: 'POST',
+          body: JSON.stringify({
+            agentId: currentModalAgentId,
+            displayName: dispName,
+            role: roleVal,
+            count: 3,
+          }),
+        })
+        const list = res.candidates || []
+        if (list.length === 0) {
+          if (pictoStatus) pictoStatus.textContent = 'Nem érkezett kép.'
+          return
+        }
+        if (aiPicker) { aiPicker.hidden = false; aiPicker.style.display = 'flex' }
+        if (aiCandidatesEl) {
+          aiCandidatesEl.innerHTML = list
+            .map(function (url, idx) {
+              return (
+                '<button type="button" data-ai-cand="' + idx + '" style="padding:3px;border-radius:50%;border:3px solid transparent;background:none;cursor:pointer">' +
+                '<img src="' + url + '" alt="Chibi ' + (idx + 1) + '" style="width:78px;height:78px;border-radius:50%;object-fit:cover;display:block">' +
+                '</button>'
+              )
+            })
+            .join('')
+          aiCandidatesEl.querySelectorAll('[data-ai-cand]').forEach(function (candBtn) {
+            candBtn.addEventListener('click', function () {
+              const idx = Number(candBtn.getAttribute('data-ai-cand'))
+              selectedAiAvatarDataUrl = list[idx] || null
+              aiCandidatesEl.querySelectorAll('[data-ai-cand]').forEach(function (other) {
+                other.style.borderColor = other === candBtn ? '#d97706' : 'transparent'
+              })
+              if (aiApplyBtn) aiApplyBtn.disabled = !selectedAiAvatarDataUrl
+            })
+          })
+        }
+        if (pictoStatus) pictoStatus.textContent = 'Kattints a kedvenc Chibi avatarodra, majd a "Kiválasztott mentése" gombra!'
+      } catch (err) {
+        if (pictoStatus) pictoStatus.textContent = err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    function resizeDataUrlToPng256(dataUrl) {
+      return new Promise(function (resolve) {
+        const img = new Image()
+        img.onload = function () {
+          try {
+            const c = document.createElement('canvas')
+            c.width = 256
+            c.height = 256
+            const ctx = c.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, 256, 256)
+              resolve(c.toDataURL('image/png'))
+              return
+            }
+          } catch { /* fallback */ }
+          resolve(dataUrl)
+        }
+        img.onerror = function () { resolve(dataUrl) }
+        img.src = dataUrl
+      })
+    }
+
+    aiApplyBtn?.addEventListener('click', async function () {
+      if (!currentModalAgentId || !selectedAiAvatarDataUrl) return
+      aiApplyBtn.disabled = true
+      if (pictoStatus) pictoStatus.textContent = 'Avatar mentése...'
+      try {
+        const compactPng = await resizeDataUrlToPng256(selectedAiAvatarDataUrl)
+        const res = await apiJson('/api/vps/agents/personalize', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, avatarDataUrl: compactPng }),
+        })
+        if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
+        clearAiAvatarPicker()
+        if (pictoStatus) pictoStatus.textContent = '✓ Kiválasztott Chibi avatar elmentve!'
+      } catch (err) {
+        if (pictoStatus) pictoStatus.textContent = 'Hiba: ' + err.message
+        aiApplyBtn.disabled = false
+      }
+    })
+
+    aiDiscardBtn?.addEventListener('click', function () {
+      clearAiAvatarPicker()
+      if (pictoStatus) pictoStatus.textContent = 'Generált variációk elvetve (az eredeti avatar maradt).'
+    })
+
+    document.getElementById('agentCoreSuggestPersonaBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId) return
+      const btn = document.getElementById('agentCoreSuggestPersonaBtn')
+      const box = document.getElementById('agentCorePersonaSuggestions')
+      const roleSel = document.getElementById('agentCoreRoleSel')
+      if (!box) return
+      if (btn) btn.disabled = true
+      box.hidden = false
+      box.style.display = 'flex'
+      box.innerHTML = '<div style="font-size:12px;opacity:.8">✨ Név- és személyiség-javaslatok generálása...</div>'
+      try {
+        const res = await apiJson('/api/vps/agents/suggest-persona', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, role: roleSel ? roleSel.value : undefined }),
+        })
+        const items = res.suggestions || []
+        const soulDraft = res.soulDraft || ''
+        const chips = items
+          .map(function (s, idx) {
+            return (
+              '<button type="button" class="btn-secondary btn-compact" data-persona-pick="' + idx + '" style="text-align:left;padding:5px 8px;font-size:12px">' +
+              esc((s.emoji || '🤖') + ' ' + (s.displayName || '')) +
+              (s.tagline ? ' <span style="opacity:.7">— ' + esc(s.tagline) + '</span>' : '') +
+              '</button>'
+            )
+          })
+          .join('')
+        box.innerHTML =
+          '<div style="font-size:11px;font-weight:600;opacity:.75">Kattints egy névre az alkalmazáshoz:</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' + (chips || '<span>Nincs javaslat</span>') + '</div>' +
+          (soulDraft ? '<div style="margin-top:4px"><button type="button" class="btn-secondary btn-compact" id="applyPersonaSoulBtn" style="font-size:11px">SOUL.md vázlat beillesztése</button></div>' : '')
+
+        box.querySelectorAll('[data-persona-pick]').forEach(function (pickBtn) {
+          pickBtn.addEventListener('click', function () {
+            const s = items[Number(pickBtn.getAttribute('data-persona-pick'))]
+            if (!s) return
+            const nameInp = document.getElementById('agentCoreDisplayNameInp')
+            if (nameInp && s.displayName) nameInp.value = s.displayName
+            if (s.emoji && pictoIcon) {
+              const hasOpt = Array.from(pictoIcon.options).some(function (o) { return o.value === s.emoji })
+              if (hasOpt) pictoIcon.value = s.emoji
+            }
+            if (s.color && /^#[0-9a-f]{6}$/i.test(s.color) && pictoC1) pictoC1.value = s.color
+            drawPictogramCanvas()
+          })
+        })
+        document.getElementById('applyPersonaSoulBtn')?.addEventListener('click', function () {
+          const soulArea = document.getElementById('editSoulMd')
+          if (soulArea && soulDraft) {
+            const chosenName = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
+            let finalSoul = soulDraft
+            if (chosenName) {
+              const firstSug = items[0] && items[0].displayName ? String(items[0].displayName).trim() : ''
+              if (firstSug && firstSug !== chosenName) {
+                finalSoul = finalSoul.split(firstSug).join(chosenName)
+              }
+              finalSoul = finalSoul.replace(/^#\s+.+$/m, '# ' + chosenName)
+            }
+            soulArea.value = finalSoul
+            coreFileDirty.soul = true
+            const det = soulArea.closest('details')
+            if (det) det.open = true
+          }
+        })
+      } catch (err) {
+        box.innerHTML = '<div style="font-size:12px;color:#dc2626">Hiba: ' + esc(err.message) + '</div>'
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    document.getElementById('coreSkillSaveFileBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('coreSkillSaveFileBtn')
+      const statusEl = document.getElementById('coreSkillEditorStatus')
+      const id = document.getElementById('coreSkillIdInp')?.value.trim() || ''
+      const description = document.getElementById('coreSkillDescInp')?.value.trim() || ''
+      const content = document.getElementById('coreSkillContentInp')?.value.trim() || ''
+      if (!id || !content) {
+        if (statusEl) statusEl.textContent = 'A skill ID és a tartalom kötelező!'
+        return
+      }
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = 'Mentés...'
+      try {
+        const res = await apiJson('/api/vps/skills/save', {
+          method: 'POST',
+          body: JSON.stringify({ id, description, content, agentId: currentModalAgentId || undefined }),
+        })
+        if (statusEl) statusEl.textContent = 'Skill elmentve és csatolva: ' + res.id
+        await ensureVpsRolesData(true)
+        if (currentModalAgentId) {
+          await loadCoreSkillsForModal(currentModalAgentId)
+          const ag = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+          if (ag) applyCoreOverview(ag)
+        }
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
     })
   }
 
   window.loadVpsPage = function () {
     wireEvents()
     refreshVpsStatus()
+    ensureModelCatalog(false)
     refreshVpsLogs()
-    refreshConversations()
   }
 
   wireEvents()
   if (location.hash === '#vps' || !document.getElementById('vpsPage')?.hidden) {
     window.loadVpsPage()
   }
+
+  // === Phase 4: Voice Communication (Browser STT + AI/Browser TTS) ===
+  let vpsChatTtsEnabled = false
+  let simTtsEnabled = false
+  let activeAudioEl = null
+  let activeRecognition = null
+
+  function speakBrowserFallback(text) {
+    if (!window.speechSynthesis) return
+    try {
+      window.speechSynthesis.cancel()
+      const clean = String(text || '').replace(/```[\s\S]*?```/g, ' kódblokk ').replace(/[`*_#>~]+/g, ' ').slice(0, 800)
+      const u = new SpeechSynthesisUtterance(clean)
+      u.lang = 'hu-HU'
+      u.rate = 1.02
+      window.speechSynthesis.speak(u)
+    } catch { /* ignore */ }
+  }
+
+  async function speakAgentText(text, agentId, voiceOverride) {
+    if (!text) return
+    if (activeAudioEl) {
+      try { activeAudioEl.pause() } catch { /* ignore */ }
+      activeAudioEl = null
+    }
+    try {
+      const res = await apiJson('/api/vps/tts', {
+        method: 'POST',
+        body: JSON.stringify({ text, agentId: agentId || undefined, voice: voiceOverride || undefined }),
+      })
+      if (res.audioDataUrl) {
+        activeAudioEl = new Audio(res.audioDataUrl)
+        await activeAudioEl.play()
+        return
+      }
+    } catch { /* fallback to browser TTS */ }
+    speakBrowserFallback(text)
+  }
+
+  function toggleVoiceDictation(inputEl, btnEl, statusEl) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) {
+      if (statusEl) statusEl.textContent = 'A böngésződ nem támogatja a beszédfelismerést (Chrome / Edge ajánlott).'
+      return
+    }
+    if (activeRecognition) {
+      try { activeRecognition.stop() } catch { /* ignore */ }
+      activeRecognition = null
+      if (btnEl) { btnEl.textContent = '🎤'; btnEl.style.background = ''; btnEl.style.color = '' }
+      return
+    }
+    const rec = new SR()
+    rec.lang = 'hu-HU'
+    rec.interimResults = true
+    rec.continuous = false
+    const baseText = inputEl ? inputEl.value.trim() : ''
+    activeRecognition = rec
+    if (btnEl) { btnEl.textContent = '⏹️'; btnEl.style.background = '#dc2626'; btnEl.style.color = '#fff' }
+    if (statusEl) statusEl.textContent = '🎤 Hallgatlak (beszélj magyarul)...'
+    rec.onresult = function (event) {
+      let transcript = ''
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript
+      }
+      if (inputEl) inputEl.value = (baseText ? baseText + ' ' : '') + transcript.trim()
+    }
+    rec.onerror = function (ev) {
+      if (statusEl) statusEl.textContent = 'Mikrofon hiba: ' + (ev.error || 'ismeretlen')
+    }
+    rec.onend = function () {
+      activeRecognition = null
+      if (btnEl) { btnEl.textContent = '🎤'; btnEl.style.background = ''; btnEl.style.color = '' }
+      if (statusEl && statusEl.textContent.indexOf('Hallgatlak') >= 0) {
+        statusEl.textContent = 'Diktálás kész — nyomj Entert a küldéshez.'
+      }
+      if (inputEl) inputEl.focus()
+    }
+    rec.start()
+  }
+
+  document.getElementById('vpsChatTtsToggle')?.addEventListener('click', function () {
+    vpsChatTtsEnabled = !vpsChatTtsEnabled
+    const btn = document.getElementById('vpsChatTtsToggle')
+    if (btn) btn.textContent = vpsChatTtsEnabled ? '🔊' : '🔇'
+  })
+  document.getElementById('vpsChatMicBtn')?.addEventListener('click', function () {
+    toggleVoiceDictation(
+      document.getElementById('vpsChatInput'),
+      document.getElementById('vpsChatMicBtn'),
+      document.getElementById('vpsChatStatus'),
+    )
+  })
+  document.getElementById('agentCoreVoiceTestBtn')?.addEventListener('click', async function () {
+    const btn = document.getElementById('agentCoreVoiceTestBtn')
+    const voice = document.getElementById('agentCoreVoiceSel')?.value || 'Kore'
+    const name = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || currentModalAgentId || 'Alfréd'
+    if (btn) btn.disabled = true
+    try {
+      await speakAgentText('Szia! ' + name + ' vagyok, készen állok a közös munkára!', currentModalAgentId, voice)
+    } finally {
+      if (btn) btn.disabled = false
+    }
+  })
 
   // === Simulated Discord Test Sandbox ===
   let simActiveAgentId = null
@@ -520,6 +2028,9 @@
       if (status) status.textContent = 'Kész (' + (res.status || 'ok') + ')'
       await refreshSimMessages()
       await refreshTestSim()
+      if (simTtsEnabled && res.replyText) {
+        speakAgentText(res.replyText, simActiveAgentId)
+      }
     } catch (err) {
       if (status) status.textContent = 'Hiba: ' + err.message
     } finally {
@@ -532,6 +2043,18 @@
     simWired = true
     document.getElementById('simReloadBtn')?.addEventListener('click', refreshTestSim)
     document.getElementById('simSendBtn')?.addEventListener('click', sendSimMessage)
+    document.getElementById('simTtsToggle')?.addEventListener('click', function () {
+      simTtsEnabled = !simTtsEnabled
+      const btn = document.getElementById('simTtsToggle')
+      if (btn) btn.textContent = simTtsEnabled ? '🔊 Felolvasás BE' : '🔇 Felolvasás KI'
+    })
+    document.getElementById('simMicBtn')?.addEventListener('click', function () {
+      toggleVoiceDictation(
+        document.getElementById('simInput'),
+        document.getElementById('simMicBtn'),
+        document.getElementById('simSendStatus'),
+      )
+    })
     document.getElementById('simInput')?.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
