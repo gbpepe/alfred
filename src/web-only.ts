@@ -11,7 +11,7 @@ import { resolveAlfredRuntimeEnv } from './alfred/runtime-env.js'
 import { startWebServer } from './web.js'
 
 const runtimeEnv = resolveAlfredRuntimeEnv()
-const dbPath = (process.env['ALFRED_DB_PATH'] ?? '').trim() || runtimeEnv.dbPath
+const dbPath = (process.env['ALFRED_WEB_DB_PATH'] ?? '').trim() || (process.env['ALFRED_DB_PATH'] ?? '').trim() || runtimeEnv.dbPath
 if (dbPath !== ':memory:') {
   mkdirSync(dirname(dbPath), { recursive: true })
 }

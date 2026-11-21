@@ -13,7 +13,7 @@ Environment=NODE_ENV=production
 Environment=WEB_ONLY=true
 Environment=WEB_HOST=127.0.0.1
 Environment=WEB_PORT=3420
-Environment=ALFRED_DB_PATH=/opt/alfred-prod/store/alfred-prod.db
+Environment=ALFRED_WEB_DB_PATH=/opt/alfred-prod/store/alfred-prod.db
 Environment=ALFRED_OPS_DIR=/opt/alfred-ops
 Environment=NODE_OPTIONS=--max-old-space-size=256
 ExecStart=/usr/bin/node /opt/alfred-ops/dist/web-only.js
