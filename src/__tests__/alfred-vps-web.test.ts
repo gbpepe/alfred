@@ -151,15 +151,22 @@ describe('alfred role-based model routing', () => {
   })
 
   it('serves default model catalog via GET /api/vps/models', async () => {
-    const { ctx, getStatus, getJson } = mockReqRes('GET', '/api/vps/models')
-    const handled = await tryHandleAlfredVps(ctx)
-    expect(handled).toBe(true)
-    expect(getStatus()).toBe(200)
-    const body = getJson()
-    expect(body.ok).toBe(true)
-    const providers = body.providers as Record<string, { models: string[] }>
-    expect(Array.isArray(providers.deepseek.models)).toBe(true)
-    expect(providers.deepseek.models).toContain('deepseek-chat')
+    const prev = process.env['ALFRED_MODEL_CATALOG_PATH']
+    process.env['ALFRED_MODEL_CATALOG_PATH'] = join(tmpdir(), `nonexistent-catalog-${Date.now()}.json`)
+    try {
+      const { ctx, getStatus, getJson } = mockReqRes('GET', '/api/vps/models')
+      const handled = await tryHandleAlfredVps(ctx)
+      expect(handled).toBe(true)
+      expect(getStatus()).toBe(200)
+      const body = getJson()
+      expect(body.ok).toBe(true)
+      const providers = body.providers as Record<string, { models: string[] }>
+      expect(Array.isArray(providers.deepseek.models)).toBe(true)
+      expect(providers.deepseek.models).toContain('deepseek-chat')
+    } finally {
+      if (prev === undefined) delete process.env['ALFRED_MODEL_CATALOG_PATH']
+      else process.env['ALFRED_MODEL_CATALOG_PATH'] = prev
+    }
   })
 
   it('validates agentId on GET /api/vps/agent-terminal', async () => {
