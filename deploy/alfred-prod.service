@@ -27,7 +27,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/alfred-prod/store /opt/alfred-prod/workspaces /opt/alfred-prod/.claude
+ReadWritePaths=/opt/alfred-prod/store -/opt/alfred-prod/workspaces -/opt/alfred-prod/.claude
 SyslogIdentifier=alfred-prod
 
 [Install]

@@ -133,7 +133,7 @@ if ! id "$ALFRED_USER" >/dev/null 2>&1; then
 fi
 
 log_info "Preparing $OPS_DIR and $PROD_DIR..."
-run_cmd mkdir -p "$OPS_DIR" "$PROD_DIR"
+run_cmd mkdir -p "$OPS_DIR/store" "$OPS_DIR/.claude" "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude"
 run_cmd chown -R "$ALFRED_USER:$ALFRED_USER" "$OPS_DIR" "$PROD_DIR"
 
 # 2. Clone or update repositories and build dist/alfred/run.js

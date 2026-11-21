@@ -27,9 +27,8 @@ CPUQuota=25%
 # Note: NoNewPrivileges=true is intentionally omitted so `alfred` can invoke scoped
 # `sudo systemctl` on alfred-test / alfred-prod as defined in `deploy/alfred-ops.sudoers.example`.
 PrivateTmp=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/alfred-ops /opt/alfred-test /opt/alfred-prod
 SyslogIdentifier=alfred-ops
 
 [Install]
