@@ -141,6 +141,7 @@
 
   let vpsRolesCache = []
   let vpsAgentsCache = []
+  let vpsGlobalCache = null
   let currentModalAgentId = null
 
   async function ensureVpsRolesData(force) {
@@ -148,6 +149,7 @@
     const data = await apiJson('/api/vps/status')
     vpsRolesCache = data.roles || []
     vpsAgentsCache = data.agents || []
+    vpsGlobalCache = data.global || null
     const chatSelect = document.getElementById('vpsChatAgent')
     if (chatSelect && chatSelect.options.length === 0) {
       vpsAgentsCache.forEach(function (a) {
@@ -174,10 +176,63 @@
     })
   }
 
+  let vpsGlobalWired = false
+  function renderGlobalConfigBar() {
+    const budgetInp = document.getElementById('vpsGlobalBudgetInp')
+    const provSel = document.getElementById('vpsGlobalProvSel')
+    const modelSel = document.getElementById('vpsGlobalModelSel')
+    const saveBtn = document.getElementById('vpsGlobalSaveBtn')
+    const statusEl = document.getElementById('vpsGlobalStatus')
+    if (!budgetInp || !provSel || !modelSel || !vpsGlobalCache) return
+    budgetInp.value = String(vpsGlobalCache.dailyBudgetUsd ?? 15)
+    provSel.innerHTML = PROVIDER_OPTIONS.map(function (p) {
+      return '<option value="' + p + '"' + (p === vpsGlobalCache.defaultProvider ? ' selected' : '') + '>' + p + '</option>'
+    }).join('')
+    function fillGlobalModels(prov, curModel) {
+      const list = getModelsForProvider(prov)
+      const all = curModel && list.indexOf(curModel) < 0 ? [curModel].concat(list) : list
+      modelSel.innerHTML = all.filter(Boolean).map(function (m) {
+        return '<option value="' + esc(m) + '"' + (m === curModel ? ' selected' : '') + '>' + esc(m) + '</option>'
+      }).join('')
+    }
+    fillGlobalModels(vpsGlobalCache.defaultProvider || 'deepseek', vpsGlobalCache.defaultModel || '')
+    if (!vpsGlobalWired) {
+      vpsGlobalWired = true
+      provSel.addEventListener('change', function () {
+        fillGlobalModels(provSel.value, '')
+      })
+      if (saveBtn) {
+        saveBtn.addEventListener('click', async function () {
+          const bVal = Number(budgetInp.value)
+          saveBtn.disabled = true
+          if (statusEl) statusEl.textContent = 'Mentés...'
+          try {
+            const res = await apiJson('/api/vps/global-config', {
+              method: 'POST',
+              body: JSON.stringify({
+                dailyBudgetUsd: Number.isFinite(bVal) ? bVal : null,
+                defaultProvider: provSel.value,
+                defaultModel: modelSel.value,
+              }),
+            })
+            vpsGlobalCache = res.global || vpsGlobalCache
+            if (statusEl) statusEl.textContent = 'Globális beállítások mentve!'
+            refreshVpsStatus()
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+          } finally {
+            saveBtn.disabled = false
+          }
+        })
+      }
+    }
+  }
+
   window.loadAgentsRoles = async function () {
     try {
       await Promise.all([ensureVpsRolesData(true), ensureModelCatalog(false)])
       renderRolesGrid(vpsRolesCache, vpsAgentsCache)
+      renderGlobalConfigBar()
       applyDisplayNamesToCards()
       setTimeout(applyDisplayNamesToCards, 500)
     } catch { /* ignore */ }
@@ -470,6 +525,22 @@
         )
       }).join('')
     }
+    const sysPromptInp = document.getElementById('agentCoreSystemPromptInp')
+    const wsInp = document.getElementById('agentCoreWorkspaceInp')
+    const memNsInp = document.getElementById('agentCoreMemNsInp')
+    const maxIterInp = document.getElementById('agentCoreMaxIterInp')
+    const bashToInp = document.getElementById('agentCoreBashTimeoutInp')
+    const allowedUsersInp = document.getElementById('agentCoreAllowedUsersInp')
+    const protPathsInp = document.getElementById('agentCoreProtectedPathsInp')
+    const allowedBashInp = document.getElementById('agentCoreAllowedBashInp')
+    if (sysPromptInp) sysPromptInp.value = ag.systemPrompt || ''
+    if (wsInp) wsInp.value = ag.workspace || ''
+    if (memNsInp) memNsInp.value = ag.memoryNamespace || ''
+    if (maxIterInp) maxIterInp.value = ag.maxToolIterations != null ? String(ag.maxToolIterations) : ''
+    if (bashToInp) bashToInp.value = ag.bashTimeoutMs != null ? String(ag.bashTimeoutMs) : ''
+    if (allowedUsersInp) allowedUsersInp.value = Array.isArray(ag.allowedUserIds) ? ag.allowedUserIds.join(', ') : ''
+    if (protPathsInp) protPathsInp.value = Array.isArray(ag.protectedPaths) ? ag.protectedPaths.join('\n') : ''
+    if (allowedBashInp) allowedBashInp.value = Array.isArray(ag.allowedBashCommands) ? ag.allowedBashCommands.join('\n') : ''
 
     if (coreCh) {
       coreCh.hidden = false
@@ -936,6 +1007,19 @@
           const selectedTools = Array.from(document.querySelectorAll('[data-core-tool-chk]:checked'))
             .map(function (el) { return el.getAttribute('data-core-tool-chk') })
             .filter(Boolean)
+          const sysPromptVal = document.getElementById('agentCoreSystemPromptInp')?.value ?? ''
+          const wsVal = document.getElementById('agentCoreWorkspaceInp')?.value.trim() || null
+          const memNsVal = document.getElementById('agentCoreMemNsInp')?.value.trim() || null
+          const maxIterRaw = document.getElementById('agentCoreMaxIterInp')?.value.trim() || ''
+          const maxIterVal = maxIterRaw ? Number(maxIterRaw) : null
+          const bashToRaw = document.getElementById('agentCoreBashTimeoutInp')?.value.trim() || ''
+          const bashToVal = bashToRaw ? Number(bashToRaw) : null
+          const allowedUsersRaw = document.getElementById('agentCoreAllowedUsersInp')?.value || ''
+          const allowedUsersVal = allowedUsersRaw.split(/[\s,]+/).map(function (s) { return s.trim() }).filter(Boolean)
+          const protPathsRaw = document.getElementById('agentCoreProtectedPathsInp')?.value || ''
+          const protPathsVal = protPathsRaw.split(/\r?\n/).map(function (s) { return s.trim() }).filter(Boolean)
+          const allowedBashRaw = document.getElementById('agentCoreAllowedBashInp')?.value || ''
+          const allowedBashVal = allowedBashRaw.split(/\r?\n/).map(function (s) { return s.trim() }).filter(Boolean)
           const res = await apiJson('/api/vps/agent-override', {
             method: 'POST',
             body: JSON.stringify({
@@ -947,6 +1031,14 @@
               dailyBudgetUsd: Number.isFinite(budgetVal) && budgetVal >= 0.05 ? budgetVal : null,
               voice: voiceVal,
               tools: selectedTools,
+              systemPrompt: sysPromptVal,
+              workspace: wsVal,
+              memoryNamespace: memNsVal,
+              maxToolIterations: Number.isFinite(maxIterVal) ? maxIterVal : null,
+              bashTimeoutMs: Number.isFinite(bashToVal) ? bashToVal : null,
+              allowedUserIds: allowedUsersVal,
+              protectedPaths: protPathsVal,
+              allowedBashCommands: allowedBashVal,
               restartServices: true,
             }),
           })

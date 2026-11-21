@@ -222,4 +222,11 @@ describe('alfred role-based model routing', () => {
     expect(handled).toBe(true)
     expect(getStatus()).toBe(403)
   })
+
+  it('rejects unauthenticated POST /api/vps/global-config', async () => {
+    const { ctx, getStatus } = mockReqRes('POST', '/api/vps/global-config', { dailyBudgetUsd: 20 })
+    const handled = await tryHandleAlfredVps(ctx)
+    expect(handled).toBe(true)
+    expect(getStatus()).toBe(403)
+  })
 })

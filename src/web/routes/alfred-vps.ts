@@ -316,6 +316,14 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       system: sys,
       services,
       multiTests,
+      global: cfg
+        ? {
+            dailyBudgetUsd: cfg.global.dailyBudgetUsd,
+            defaultProvider: cfg.global.defaultProvider,
+            defaultModel: cfg.global.defaultModel,
+            workspacesRoot: cfg.global.workspacesRoot,
+          }
+        : null,
       roles: cfg ? Object.values(cfg.roles) : [],
       agents: (cfg?.agents ?? []).map((a) => ({
         id: a.id,
@@ -329,8 +337,62 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         tools: a.tools,
         skills: a.skills ?? [],
         voice: rawAgentVoice.get(a.id) ?? null,
+        systemPrompt: a.systemPrompt ?? '',
+        workspace: a.workspace,
+        memoryNamespace: a.memoryNamespace,
+        maxToolIterations: a.maxToolIterations ?? null,
+        bashTimeoutMs: a.bashTimeoutMs ?? null,
+        allowedUserIds: a.allowedUserIds,
+        protectedPaths: a.protectedPaths ?? [],
+        allowedBashCommands: a.allowedBashCommands ?? [],
       })),
     })
+    return true
+  }
+
+  if (path === '/api/vps/global-config' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Updating global config requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{
+      dailyBudgetUsd?: number | null
+      defaultProvider?: string | null
+      defaultModel?: string | null
+      workspacesRoot?: string | null
+    }>(req)
+    const dailyBudgetUsd =
+      typeof body?.dailyBudgetUsd === 'number' && Number.isFinite(body.dailyBudgetUsd)
+        ? Math.round(body.dailyBudgetUsd * 100) / 100
+        : null
+    if (dailyBudgetUsd !== null && (dailyBudgetUsd < 0.5 || dailyBudgetUsd > 500)) {
+      json(res, { error: 'dailyBudgetUsd must be between 0.5 and 500' }, 400)
+      return true
+    }
+    const defaultProvider = typeof body?.defaultProvider === 'string' && body.defaultProvider.trim() ? body.defaultProvider.trim() : null
+    if (defaultProvider && !ALLOWED_PROVIDERS.has(defaultProvider as AlfredProviderName)) {
+      json(res, { error: `Unsupported provider "${defaultProvider}"` }, 400)
+      return true
+    }
+    const defaultModel = typeof body?.defaultModel === 'string' && body.defaultModel.trim() ? body.defaultModel.trim().slice(0, 120) : null
+    const workspacesRoot = typeof body?.workspacesRoot === 'string' && body.workspacesRoot.trim() ? body.workspacesRoot.trim().slice(0, 120) : null
+    if (workspacesRoot && workspacesRoot.includes('..')) {
+      json(res, { error: 'workspacesRoot cannot contain ".."' }, 400)
+      return true
+    }
+    const targets = resolveWritableAgentConfigPaths()
+    for (const cfgPath of targets) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { global?: Record<string, unknown> }
+      parsed.global = parsed.global && typeof parsed.global === 'object' ? parsed.global : {}
+      if (dailyBudgetUsd !== null) parsed.global.dailyBudgetUsd = dailyBudgetUsd
+      if (defaultProvider) parsed.global.defaultProvider = defaultProvider
+      if (defaultModel) parsed.global.defaultModel = defaultModel
+      if (workspacesRoot) parsed.global.workspacesRoot = workspacesRoot
+      atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+    }
+    const env = { ...readEnvFile(), ...process.env }
+    const updatedCfg = loadAlfredAgentsConfig({ env })
+    json(res, { ok: true, global: updatedCfg.global })
     return true
   }
 
@@ -398,6 +460,14 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       dailyBudgetUsd?: number | null
       voice?: string | null
       tools?: string[] | null
+      systemPrompt?: string | null
+      workspace?: string | null
+      memoryNamespace?: string | null
+      maxToolIterations?: number | null
+      bashTimeoutMs?: number | null
+      allowedUserIds?: string[] | null
+      protectedPaths?: string[] | null
+      allowedBashCommands?: string[] | null
       restartServices?: boolean
     }>(req)
     const agentId = typeof body?.agentId === 'string' ? body.agentId.trim() : ''
@@ -420,6 +490,47 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       }
       toolsVal = Array.from(seen)
     }
+    const systemPromptVal = typeof body?.systemPrompt === 'string' ? body.systemPrompt.trim().slice(0, 2000) : undefined
+    const workspaceVal = typeof body?.workspace === 'string' && body.workspace.trim() ? body.workspace.trim().slice(0, 200) : undefined
+    if (workspaceVal && workspaceVal.includes('..')) {
+      json(res, { error: 'workspace cannot contain ".."' }, 400)
+      return true
+    }
+    const memoryNsVal = typeof body?.memoryNamespace === 'string' && body.memoryNamespace.trim() ? body.memoryNamespace.trim().slice(0, 80) : undefined
+    const hasMaxIter = body && Object.prototype.hasOwnProperty.call(body, 'maxToolIterations')
+    const maxIterVal =
+      typeof body?.maxToolIterations === 'number' && Number.isFinite(body.maxToolIterations)
+        ? Math.floor(body.maxToolIterations)
+        : null
+    if (hasMaxIter && maxIterVal !== null && (maxIterVal < 1 || maxIterVal > 50)) {
+      json(res, { error: 'maxToolIterations must be between 1 and 50' }, 400)
+      return true
+    }
+    const hasBashTimeout = body && Object.prototype.hasOwnProperty.call(body, 'bashTimeoutMs')
+    const bashTimeoutVal =
+      typeof body?.bashTimeoutMs === 'number' && Number.isFinite(body.bashTimeoutMs)
+        ? Math.floor(body.bashTimeoutMs)
+        : null
+    if (hasBashTimeout && bashTimeoutVal !== null && (bashTimeoutVal < 1000 || bashTimeoutVal > 600000)) {
+      json(res, { error: 'bashTimeoutMs must be between 1000 and 600000' }, 400)
+      return true
+    }
+    let allowedUserIdsVal: string[] | undefined
+    if (Array.isArray(body?.allowedUserIds)) {
+      allowedUserIdsVal = body.allowedUserIds.map((u) => String(u).trim()).filter(Boolean)
+      for (const uid of allowedUserIdsVal) {
+        if (!/^[0-9]{15,22}$/.test(uid)) {
+          json(res, { error: `Invalid Discord User ID "${uid}" (expected 15-22 digits)` }, 400)
+          return true
+        }
+      }
+    }
+    const protectedPathsVal = Array.isArray(body?.protectedPaths)
+      ? body.protectedPaths.map((p) => String(p).trim()).filter(Boolean)
+      : undefined
+    const allowedBashVal = Array.isArray(body?.allowedBashCommands)
+      ? body.allowedBashCommands.map((c) => String(c).trim()).filter(Boolean)
+      : undefined
     const roleId = body.role ? normalizeRoleId(body.role) : null
     if (body.role && !roleId) {
       json(res, { error: 'Unknown role. Allowed: tervezo, technikus, szakmunkas, segedmunkas' }, 400)
@@ -462,6 +573,31 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       }
       if (toolsVal !== undefined) {
         entry.tools = toolsVal
+      }
+      if (systemPromptVal !== undefined) {
+        if (systemPromptVal) entry.systemPrompt = systemPromptVal
+        else delete entry.systemPrompt
+      }
+      if (workspaceVal) entry.workspace = workspaceVal
+      if (memoryNsVal) entry.memoryNamespace = memoryNsVal
+      if (hasMaxIter) {
+        if (maxIterVal !== null) entry.maxToolIterations = maxIterVal
+        else delete entry.maxToolIterations
+      }
+      if (hasBashTimeout) {
+        if (bashTimeoutVal !== null) entry.bashTimeoutMs = bashTimeoutVal
+        else delete entry.bashTimeoutMs
+      }
+      if (allowedUserIdsVal !== undefined) {
+        entry.allowedUserIds = allowedUserIdsVal
+      }
+      if (protectedPathsVal !== undefined) {
+        if (protectedPathsVal.length > 0) entry.protectedPaths = protectedPathsVal
+        else delete entry.protectedPaths
+      }
+      if (allowedBashVal !== undefined) {
+        if (allowedBashVal.length > 0) entry.allowedBashCommands = allowedBashVal
+        else delete entry.allowedBashCommands
       }
       atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
     }
