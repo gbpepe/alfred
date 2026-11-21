@@ -15383,7 +15383,7 @@ function updateBranchDriftUI(status) {
   if (!banner) return
   const branch = status && status.branch
   const drifted = !!branch && branch !== 'main'
-  if (!drifted || branchDriftDismissed(branch)) {
+  if (!drifted || branchDriftDismissed(branch) || document.getElementById('alfredTestBanner')) {
     banner.hidden = true
     return
   }
