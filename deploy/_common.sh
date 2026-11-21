@@ -68,8 +68,8 @@ validate_self_branch() {
     log_err "Branch name is required (must match feat/self-* or fix/self-*)"
     return 1
   fi
-  if [[ ! "$branch" =~ ^(feat|fix)/self-[a-z0-9][a-z0-9._/-]{0,79}$ ]]; then
-    log_err "Invalid branch name '$branch': must match ^(feat|fix)/self-[a-z0-9][a-z0-9._/-]{0,79}$"
+  if [[ ! "$branch" =~ ^((feat|fix)/(self|core)-[a-z0-9._/-]{0,79}|core-[a-z0-9._/-]{1,79})$ ]]; then
+    log_err "Invalid branch name '$branch': must match feat/self-*, fix/self-*, feat/core-*, or core-*"
     return 1
   fi
   if [[ "$branch" == *".."* || "$branch" == *"//"* || "$branch" == -* || "$branch" == *. || "$branch" == */ || "$branch" == *.lock ]]; then
