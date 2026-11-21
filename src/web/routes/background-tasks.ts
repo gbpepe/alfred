@@ -6,7 +6,7 @@ import {
   getBackgroundTask, getRunningBackgroundTasks, markOrphanedTasksFailed,
   type BackgroundTask,
 } from '../../db.js'
-import { resolveFromPath } from '../../platform.js'
+import { makeLazyBinResolver } from '../../platform.js'
 import { APP_TZ } from '../../config.js'
 import { logger } from '../../logger.js'
 import { fleetVenvPathPrefix } from '../agent-process.js'
@@ -16,8 +16,8 @@ import { exactTmuxTarget } from '../../tmux-target.js'
 
 const execFileAsync = promisify(execFile)
 
-const TMUX = resolveFromPath('tmux')
-const CLAUDE = resolveFromPath('claude')
+const getTmux = makeLazyBinResolver('tmux')
+const getClaude = makeLazyBinResolver('claude')
 const MAX_CONCURRENT = 3
 const TIMEOUT_MS = 30 * 60 * 1000
 
@@ -32,7 +32,7 @@ function bgSessionName(id: string): string {
 // a non-zero tmux exit (e.g. 1, "no server running") means the session is really gone.
 async function bgSessionState(session: string): Promise<'alive' | 'dead' | 'unknown'> {
   try {
-    const { stdout } = await execFileAsync(TMUX, ['list-sessions', '-F', '#{session_name}'], { timeout: 3000, encoding: 'utf-8' })
+    const { stdout } = await execFileAsync(getTmux(), ['list-sessions', '-F', '#{session_name}'], { timeout: 3000, encoding: 'utf-8' })
     return stdout.split('\n').some(l => l.trim() === session) ? 'alive' : 'dead'
   } catch (err) {
     if (typeof (err as { code?: unknown }).code === 'number') return 'dead'
@@ -43,7 +43,7 @@ async function bgSessionState(session: string): Promise<'alive' | 'dead' | 'unkn
 
 async function captureSession(session: string): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync(TMUX, ['capture-pane', '-t', exactTmuxTarget(session), '-p', '-S', '-500'], { timeout: 5000, encoding: 'utf-8' })
+    const { stdout } = await execFileAsync(getTmux(), ['capture-pane', '-t', exactTmuxTarget(session), '-p', '-S', '-500'], { timeout: 5000, encoding: 'utf-8' })
     return stdout
   } catch {
     return null
@@ -52,7 +52,7 @@ async function captureSession(session: string): Promise<string | null> {
 
 async function killSession(session: string): Promise<void> {
   try {
-    await execFileAsync(TMUX, ['kill-session', '-t', exactTmuxTarget(session)], { timeout: 3000 })
+    await execFileAsync(getTmux(), ['kill-session', '-t', exactTmuxTarget(session)], { timeout: 3000 })
   } catch { /* already dead */ }
 }
 
@@ -68,11 +68,11 @@ export async function spawnBackgroundTask(agentId: string, prompt: string): Prom
   const shellCmd = [
     // FLEETVENV923: the fleet venv's bin/ first, as in every agent launch.
     `export PATH="${fleetVenvPathPrefix()}/opt/homebrew/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"`,
-    `${CLAUDE} -p "$BG_PROMPT" --output-format text 2>&1`,
+    `${getClaude()} -p "$BG_PROMPT" --output-format text 2>&1`,
   ].join(' && ')
 
   try {
-    await execFileAsync(TMUX, [
+    await execFileAsync(getTmux(), [
       'new-session', '-d', '-s', session, '-x', '200', '-y', '50',
       `${shellCmd}; echo '___BG_DONE___'; sleep 5`,
     ], {
