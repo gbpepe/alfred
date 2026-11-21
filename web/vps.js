@@ -358,7 +358,7 @@
       const r = vpsRolesCache.find(function (item) { return item.id === ag.role })
       coreTxt.textContent = 'Alfred Core aktív · ' + (r ? r.label : (ag.role || '—'))
     }
-    if (procBar) procBar.hidden = true
+    if (procBar) { procBar.hidden = true; procBar.style.display = 'none' }
   }
 
   function restoreLegacyModal() {
@@ -371,12 +371,12 @@
     const coreCh = document.getElementById('agentCoreChannelBox')
     const coreSkills = document.getElementById('agentCoreSkillsBox')
     const legacySkills = document.getElementById('legacySkillsWrap')
-    if (box) box.hidden = true
-    if (metaBox) metaBox.hidden = true
+    if (box) { box.hidden = true; box.style.display = 'none' }
+    if (metaBox) { metaBox.hidden = true; metaBox.style.display = 'none' }
     if (legacyWrap) legacyWrap.hidden = false
     if (saveBar) { saveBar.hidden = true; saveBar.style.display = 'none' }
     if (coreBar) { coreBar.hidden = true; coreBar.style.display = 'none' }
-    if (procBar) procBar.hidden = false
+    if (procBar) { procBar.hidden = false; procBar.style.display = '' }
     if (coreCh) { coreCh.hidden = true; coreCh.style.display = 'none' }
     if (coreSkills) { coreSkills.hidden = true; coreSkills.style.display = 'none' }
     if (legacySkills) legacySkills.hidden = false
