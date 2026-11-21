@@ -24,7 +24,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/alfred-prod/store /opt/alfred-ops/store /opt/alfred-prod/.env /opt/alfred-prod/config/agents.json /opt/alfred-ops/config/agents.json
+ReadWritePaths=/opt/alfred-prod/store /opt/alfred-ops/store /opt/alfred-prod/.env /opt/alfred-prod/config /opt/alfred-ops/config
 MemoryHigh=256M
 MemoryMax=384M
 
