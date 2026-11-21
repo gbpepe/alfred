@@ -175,7 +175,7 @@
     const steps = document.getElementById('onboardingSteps')
     const note = document.getElementById('onbFlowNote')
     if (!overlay || !body) return
-    if (steps) steps.hidden = true
+    if (steps) { steps.hidden = true; steps.style.display = 'none' }
     if (note) note.textContent = 'Add meg vagy frissítsd a használt Model API kulcsokat (üresen hagyva a meglévő érték megmarad).'
     body.innerHTML = '<div style="padding:12px 0">Betöltés...</div>'
     overlay.hidden = false
@@ -210,7 +210,7 @@
       const closeModal = function () {
         overlay.classList.remove('active')
         overlay.hidden = true
-        if (steps) steps.hidden = false
+        if (steps) { steps.hidden = false; steps.style.display = '' }
         document.body.style.overflow = ''
       }
       document.getElementById('vpsCloseProvidersBtn')?.addEventListener('click', closeModal)
