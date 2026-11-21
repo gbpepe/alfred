@@ -96,16 +96,23 @@
             return '<option value="' + esc(r.id) + '"' + (r.id === a.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
           })
           .join('')
-        const provOpts = [''].concat(PROVIDER_OPTIONS).map(function (p) {
-          return '<option value="' + p + '"' + (p === a.provider ? ' selected' : '') + '>' + (p || '(munkakörből)') + '</option>'
+        const provOpts = PROVIDER_OPTIONS.map(function (p) {
+          return '<option value="' + p + '"' + (p === a.provider ? ' selected' : '') + '>' + p + '</option>'
         }).join('')
+        const isOv = Boolean(a.hasOverride)
+        const disAttr = isOv ? '' : ' disabled'
         return (
           '<div style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><strong>' + esc(a.id) + '</strong><span style="font-size:11px;opacity:.7">' + esc(a.channelName || '') + '</span></div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">' +
+          '<strong>' + esc(a.id) + '</strong>' +
+          '<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;user-select:none">' +
+          '<input type="checkbox" data-ag-override="' + esc(a.id) + '"' + (isOv ? ' checked' : '') + '> Felülír' +
+          '</label>' +
+          '</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
           '<select class="input" data-ag-role="' + esc(a.id) + '" style="padding:4px 6px;font-size:12px">' + roleOpts + '</select>' +
-          '<select class="input" data-ag-prov="' + esc(a.id) + '" style="padding:4px 6px;font-size:12px">' + provOpts + '</select>' +
-          '<input type="text" class="input" data-ag-model="' + esc(a.id) + '" value="' + esc(a.model) + '" placeholder="(munkakörből)" style="flex:1;min-width:110px;padding:4px 6px;font-size:12px">' +
+          '<select class="input" data-ag-prov="' + esc(a.id) + '"' + disAttr + ' style="padding:4px 6px;font-size:12px">' + provOpts + '</select>' +
+          '<input type="text" class="input" data-ag-model="' + esc(a.id) + '" value="' + esc(a.model) + '"' + disAttr + ' style="flex:1;min-width:110px;padding:4px 6px;font-size:12px">' +
           '<button class="btn-secondary btn-compact" data-ag-save="' + esc(a.id) + '">Mentés</button>' +
           '</div>' +
           '</div>'
@@ -113,13 +120,25 @@
       })
       .join('')
 
+    grid.querySelectorAll('[data-ag-override]').forEach(function (chk) {
+      chk.addEventListener('change', function () {
+        const agentId = chk.getAttribute('data-ag-override')
+        const provEl = grid.querySelector('[data-ag-prov="' + agentId + '"]')
+        const modEl = grid.querySelector('[data-ag-model="' + agentId + '"]')
+        if (provEl) provEl.disabled = !chk.checked
+        if (modEl) modEl.disabled = !chk.checked
+      })
+    })
+
     grid.querySelectorAll('[data-ag-save]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         const agentId = btn.getAttribute('data-ag-save')
+        const chkEl = grid.querySelector('[data-ag-override="' + agentId + '"]')
         const roleEl = grid.querySelector('[data-ag-role="' + agentId + '"]')
         const provEl = grid.querySelector('[data-ag-prov="' + agentId + '"]')
         const modEl = grid.querySelector('[data-ag-model="' + agentId + '"]')
         if (!roleEl || !provEl || !modEl) return
+        const useOverride = Boolean(chkEl && chkEl.checked)
         btn.disabled = true
         if (statusEl) statusEl.textContent = 'Mentés...'
         try {
@@ -128,8 +147,8 @@
             body: JSON.stringify({
               agentId,
               role: roleEl.value,
-              provider: provEl.value || null,
-              model: modEl.value.trim() || null,
+              provider: useOverride ? provEl.value : null,
+              model: useOverride ? (modEl.value.trim() || null) : null,
               restartServices: true,
             }),
           })

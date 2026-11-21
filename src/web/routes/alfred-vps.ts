@@ -241,6 +241,19 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     const sys = getSystemMetrics()
     sys.diskSummary = disk
 
+    const rawAgentsOverride = new Set<string>()
+    try {
+      const cfgFile = process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json')
+      if (existsSync(cfgFile)) {
+        const rawParsed = JSON.parse(readFileSync(cfgFile, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+        for (const entry of rawParsed.agents ?? []) {
+          if (typeof entry.id === 'string' && (entry.provider !== undefined || entry.model !== undefined)) {
+            rawAgentsOverride.add(entry.id)
+          }
+        }
+      }
+    } catch { /* ignore */ }
+
     json(res, {
       ok: true,
       system: sys,
@@ -249,6 +262,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       agents: (cfg?.agents ?? []).map((a) => ({
         id: a.id,
         role: a.role ?? null,
+        hasOverride: rawAgentsOverride.has(a.id),
         channelName: a.channelName,
         provider: a.provider,
         model: a.model,
