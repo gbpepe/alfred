@@ -158,6 +158,23 @@ async function main() {
     console.log(`[alfred-cf] Cloudflare credentials incomplete; skipping route ${cmd} for ${hostname}`)
     return
   }
+  if (cmd === 'verify') {
+    const checks = [
+      ['token', 'GET', '/user/tokens/verify'],
+      ['dns', 'GET', `/zones/${cfg.zoneId}/dns_records?per_page=1`],
+      ['tunnel', 'GET', `/accounts/${cfg.accountId}/cfd_tunnel/${cfg.tunnelId}/configurations`],
+      ...(cfg.accessAppId ? [['access', 'GET', `/accounts/${cfg.accountId}/access/apps/${cfg.accessAppId}`]] : []),
+    ]
+    for (const [name, method, path] of checks) {
+      try {
+        const res = await cfApi(cfg, path, { method })
+        console.log(`[alfred-cf] ${name}: OK`, res?.status ? `(${res.status})` : '')
+      } catch (err) {
+        console.log(`[alfred-cf] ${name}: FAIL - ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+    return
+  }
   if (cmd === 'up') {
     const webPort = Number(portArg)
     if (!Number.isInteger(webPort) || webPort < 1024 || webPort > 65535) {
