@@ -312,6 +312,84 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     return true
   }
 
+  if (path === '/api/vps/agent-override' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Updating agent overrides requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{
+      agentId?: string
+      role?: string | null
+      provider?: string | null
+      model?: string | null
+      restartServices?: boolean
+    }>(req)
+    const agentId = typeof body?.agentId === 'string' ? body.agentId.trim() : ''
+    if (!agentId) {
+      json(res, { error: 'agentId is required' }, 400)
+      return true
+    }
+    const roleId = body.role ? normalizeRoleId(body.role) : null
+    if (body.role && !roleId) {
+      json(res, { error: 'Unknown role. Allowed: tervezo, technikus, szakmunkas, segedmunkas' }, 400)
+      return true
+    }
+    const provider = typeof body.provider === 'string' && body.provider.trim() ? body.provider.trim() : null
+    if (provider && !ALLOWED_PROVIDERS.has(provider as AlfredProviderName)) {
+      json(res, { error: `Unsupported provider "${provider}"` }, 400)
+      return true
+    }
+    const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : null
+
+    const targets = [
+      process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json'),
+      '/opt/alfred-prod/config/agents.json',
+    ].filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
+
+    let found = false
+    for (const cfgPath of targets) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+      const list = Array.isArray(parsed.agents) ? parsed.agents : []
+      const entry = list.find((a) => a.id === agentId)
+      if (!entry) continue
+      found = true
+      if (roleId) entry.role = roleId
+      if (provider) entry.provider = provider
+      else delete entry.provider
+      if (model) entry.model = model
+      else delete entry.model
+      atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+    }
+    if (!found) {
+      json(res, { error: `Unknown agent: ${agentId}` }, 404)
+      return true
+    }
+
+    let restarted: string[] = []
+    if (body.restartServices && process.platform === 'linux') {
+      for (const unit of ['alfred-prod', 'alfred-ops']) {
+        try {
+          await execFileAsync('sudo', ['-n', 'systemctl', 'restart', unit], { timeout: 15000 })
+          restarted.push(unit)
+        } catch { /* ignore if unit not present or sudo unavailable */ }
+      }
+    }
+
+    const env = { ...readEnvFile(), ...process.env }
+    const updatedCfg = loadAlfredAgentsConfig({ env })
+    json(res, {
+      ok: true,
+      restarted,
+      agents: updatedCfg.agents.map((a) => ({
+        id: a.id,
+        role: a.role ?? null,
+        provider: a.provider,
+        model: a.model,
+      })),
+    })
+    return true
+  }
+
   if (path === '/api/vps/logs' && method === 'GET') {
     const unit = url.searchParams.get('unit') || 'alfred-prod'
     if (!ALLOWED_LOG_UNITS.has(unit)) {

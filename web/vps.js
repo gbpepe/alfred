@@ -79,9 +79,70 @@
       }
 
       renderRolesGrid(data.roles || [], data.agents || [])
+      renderAgentOverrides(data.roles || [], data.agents || [])
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
+  }
+
+  function renderAgentOverrides(roles, agents) {
+    const grid = document.getElementById('vpsAgentsOverrideGrid')
+    const statusEl = document.getElementById('vpsAgentOverrideStatus')
+    if (!grid) return
+    grid.innerHTML = agents
+      .map(function (a) {
+        const roleOpts = roles
+          .map(function (r) {
+            return '<option value="' + esc(r.id) + '"' + (r.id === a.role ? ' selected' : '') + '>' + esc(r.label) + '</option>'
+          })
+          .join('')
+        const provOpts = [''].concat(PROVIDER_OPTIONS).map(function (p) {
+          return '<option value="' + p + '"' + (p === a.provider ? ' selected' : '') + '>' + (p || '(munkakörből)') + '</option>'
+        }).join('')
+        return (
+          '<div style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><strong>' + esc(a.id) + '</strong><span style="font-size:11px;opacity:.7">' + esc(a.channelName || '') + '</span></div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          '<select class="input" data-ag-role="' + esc(a.id) + '" style="padding:4px 6px;font-size:12px">' + roleOpts + '</select>' +
+          '<select class="input" data-ag-prov="' + esc(a.id) + '" style="padding:4px 6px;font-size:12px">' + provOpts + '</select>' +
+          '<input type="text" class="input" data-ag-model="' + esc(a.id) + '" value="' + esc(a.model) + '" placeholder="(munkakörből)" style="flex:1;min-width:110px;padding:4px 6px;font-size:12px">' +
+          '<button class="btn-secondary btn-compact" data-ag-save="' + esc(a.id) + '">Mentés</button>' +
+          '</div>' +
+          '</div>'
+        )
+      })
+      .join('')
+
+    grid.querySelectorAll('[data-ag-save]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const agentId = btn.getAttribute('data-ag-save')
+        const roleEl = grid.querySelector('[data-ag-role="' + agentId + '"]')
+        const provEl = grid.querySelector('[data-ag-prov="' + agentId + '"]')
+        const modEl = grid.querySelector('[data-ag-model="' + agentId + '"]')
+        if (!roleEl || !provEl || !modEl) return
+        btn.disabled = true
+        if (statusEl) statusEl.textContent = 'Mentés...'
+        try {
+          const res = await apiJson('/api/vps/agent-override', {
+            method: 'POST',
+            body: JSON.stringify({
+              agentId,
+              role: roleEl.value,
+              provider: provEl.value || null,
+              model: modEl.value.trim() || null,
+              restartServices: true,
+            }),
+          })
+          const extra = res.restarted && res.restarted.length ? ' · újraindítva: ' + res.restarted.join(', ') : ''
+          if (statusEl) statusEl.textContent = agentId + ' mentve' + extra
+          refreshVpsStatus()
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+        } finally {
+          btn.disabled = false
+        }
+      })
+    })
   }
 
   const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
