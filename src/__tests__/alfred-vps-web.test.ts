@@ -175,4 +175,44 @@ describe('alfred role-based model routing', () => {
     expect(handled).toBe(true)
     expect(getStatus()).toBe(400)
   })
+
+  it('lists global skills via GET /api/vps/skills and injects attached skills into agent system prompt', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'alfred-skills-'))
+    const prevSkills = process.env['ALFRED_SKILLS_DIR']
+    try {
+      mkdirSync(join(dir, 'skills', 'demo-skill'), { recursive: true })
+      mkdirSync(join(dir, 'config'), { recursive: true })
+      writeFileSync(
+        join(dir, 'skills', 'demo-skill', 'SKILL.md'),
+        '---\nname: demo-skill\ndescription: Teszt skill leiras\n---\n\n# Demo\nAlways reply concisely.\n',
+      )
+      writeFileSync(
+        join(dir, 'config', 'agents.json'),
+        JSON.stringify({
+          version: 1,
+          global: { defaultProvider: 'deepseek', defaultModel: 'deepseek-chat', dailyBudgetUsd: 5 },
+          agents: [{ id: 'skilled-agent', role: 'tervezo', skills: ['demo-skill'], tools: [] }],
+        }),
+      )
+      const cfg = loadAlfredAgentsConfig({ projectRoot: dir, env: {} })
+      const ag = cfg.agents.find((a) => a.id === 'skilled-agent')
+      expect(ag?.skills).toEqual(['demo-skill'])
+      expect(ag?.resolvedSystemPrompt).toContain('## ACTIVE SKILLS')
+      expect(ag?.resolvedSystemPrompt).toContain('Always reply concisely.')
+
+      process.env['ALFRED_SKILLS_DIR'] = join(dir, 'skills')
+      const { ctx, getStatus, getJson } = mockReqRes('GET', '/api/vps/skills')
+      const handled = await tryHandleAlfredVps(ctx)
+      expect(handled).toBe(true)
+      expect(getStatus()).toBe(200)
+      const body = getJson()
+      const list = body.skills as Array<{ id: string; description: string }>
+      expect(list).toHaveLength(1)
+      expect(list[0]).toMatchObject({ id: 'demo-skill', description: 'Teszt skill leiras' })
+    } finally {
+      if (prevSkills === undefined) delete process.env['ALFRED_SKILLS_DIR']
+      else process.env['ALFRED_SKILLS_DIR'] = prevSkills
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })

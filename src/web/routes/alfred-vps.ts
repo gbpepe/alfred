@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
@@ -320,6 +320,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         model: a.model,
         dailyBudgetUsd: a.dailyBudgetUsd,
         tools: a.tools,
+        skills: a.skills ?? [],
       })),
     })
     return true
@@ -936,7 +937,238 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     return true
   }
 
+  if (path === '/api/vps/skills' && method === 'GET') {
+    const agentId = (url.searchParams.get('agentId') || '').trim()
+    const env = { ...readEnvFile(), ...process.env }
+    const cfg = loadAlfredAgentsConfig({ env })
+    const ag = agentId ? cfg?.agents.find((a) => a.id === agentId) : undefined
+    const assignedSet = new Set<string>(ag?.skills ?? [])
+    const skillsDir = resolveSkillsRootDir()
+    const usageMap = new Map<string, number>()
+    try {
+      const db = getDb()
+      const rows = db
+        .prepare(`SELECT skill_name, COUNT(*) AS cnt FROM skill_usage GROUP BY skill_name`)
+        .all() as Array<{ skill_name: string; cnt: number }>
+      for (const r of rows) usageMap.set(r.skill_name, Number(r.cnt || 0))
+    } catch { /* optional table */ }
+
+    const skills: Array<{ id: string; description: string; content: string; enabled: boolean; usageCount: number }> = []
+    if (existsSync(skillsDir)) {
+      const dirs = readdirSync(skillsDir, { withFileTypes: true }).filter((d) => d.isDirectory())
+      for (const d of dirs) {
+        if (!SAFE_SKILL_ID_RE.test(d.name)) continue
+        const mdPath = join(skillsDir, d.name, 'SKILL.md')
+        if (!existsSync(mdPath)) continue
+        try {
+          const raw = readFileSync(mdPath, 'utf-8')
+          skills.push({
+            id: d.name,
+            description: extractSkillDescription(raw),
+            content: raw,
+            enabled: assignedSet.has(d.name),
+            usageCount: usageMap.get(d.name) ?? 0,
+          })
+        } catch { /* ignore */ }
+      }
+    }
+    skills.sort((a, b) => a.id.localeCompare(b.id))
+    json(res, { ok: true, agentId: agentId || null, skills })
+    return true
+  }
+
+  if (path === '/api/vps/skills/assign' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Assigning skills requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ agentId?: string; skills?: unknown }>(req)
+    const agentId = (body?.agentId || '').trim()
+    if (!agentId || !Array.isArray(body?.skills)) {
+      json(res, { error: 'agentId and skills[] are required' }, 400)
+      return true
+    }
+    const cleanSkills = Array.from(
+      new Set(
+        body.skills
+          .filter((s): s is string => typeof s === 'string')
+          .map((s) => s.trim())
+          .filter((s) => SAFE_SKILL_ID_RE.test(s)),
+      ),
+    )
+    const targets = resolveWritableAgentConfigPaths()
+    let found = false
+    for (const cfgPath of targets) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+      const entry = (parsed.agents ?? []).find((a) => a.id === agentId)
+      if (!entry) continue
+      found = true
+      if (cleanSkills.length > 0) entry.skills = cleanSkills
+      else delete entry.skills
+      atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+    }
+    if (!found) {
+      json(res, { error: `Unknown agent: ${agentId}` }, 404)
+      return true
+    }
+    json(res, { ok: true, agentId, skills: cleanSkills })
+    return true
+  }
+
+  if (path === '/api/vps/skills/save' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Saving skills requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ id?: string; description?: string; content?: string; agentId?: string }>(req)
+    const rawId = (body?.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
+    if (!rawId || !SAFE_SKILL_ID_RE.test(rawId)) {
+      json(res, { error: 'Érvényes skill ID megadása kötelező (a-z, 0-9, -, _).' }, 400)
+      return true
+    }
+    const desc = (body?.description || '').trim().replace(/\r?\n/g, ' ').slice(0, 260)
+    let content = (body?.content || '').trim()
+    if (!content) {
+      json(res, { error: 'A SKILL.md tartalma nem lehet üres.' }, 400)
+      return true
+    }
+    if (!content.startsWith('---')) {
+      content = `---\nname: ${rawId}\ndescription: ${desc || rawId}\n---\n\n${content}\n`
+    } else if (!content.endsWith('\n')) {
+      content += '\n'
+    }
+    const dir = join(resolveSkillsRootDir(), rawId)
+    mkdirSync(dir, { recursive: true })
+    atomicWriteFileSync(join(dir, 'SKILL.md'), content)
+
+    const agentId = (body?.agentId || '').trim()
+    if (agentId) {
+      for (const cfgPath of resolveWritableAgentConfigPaths()) {
+        const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+        const entry = (parsed.agents ?? []).find((a) => a.id === agentId)
+        if (!entry) continue
+        const cur = Array.isArray(entry.skills) ? entry.skills.map(String) : []
+        if (!cur.includes(rawId)) {
+          entry.skills = [...cur, rawId]
+          atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+        }
+      }
+    }
+    json(res, { ok: true, id: rawId })
+    return true
+  }
+
+  if (path === '/api/vps/skills' && method === 'DELETE') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Deleting skills requires an owner session.' }, 403)
+      return true
+    }
+    const id = (url.searchParams.get('id') || '').trim()
+    if (!id || !SAFE_SKILL_ID_RE.test(id)) {
+      json(res, { error: 'Invalid skill id' }, 400)
+      return true
+    }
+    const dir = join(resolveSkillsRootDir(), id)
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true })
+    }
+    for (const cfgPath of resolveWritableAgentConfigPaths()) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+      let changed = false
+      for (const entry of parsed.agents ?? []) {
+        if (Array.isArray(entry.skills) && entry.skills.includes(id)) {
+          const next = entry.skills.filter((s) => s !== id)
+          if (next.length > 0) entry.skills = next
+          else delete entry.skills
+          changed = true
+        }
+      }
+      if (changed) atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+    }
+    json(res, { ok: true, deleted: id })
+    return true
+  }
+
+  if (path === '/api/vps/skills/generate' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Generating skills requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ prompt?: string; agentId?: string }>(req)
+    const promptText = (body?.prompt || '').trim()
+    if (!promptText) {
+      json(res, { error: 'Add meg röviden, mit csináljon a skill!' }, 400)
+      return true
+    }
+    const env = { ...readEnvFile(), ...process.env }
+    const cfg = loadAlfredAgentsConfig({ env })
+    const baseAgent =
+      (body.agentId ? cfg?.agents.find((a) => a.id === body.agentId) : undefined) ?? cfg?.agents[0]
+    if (!baseAgent) {
+      json(res, { error: 'Nincs konfigurált Alfred Core ügynök a generáláshoz.' }, 400)
+      return true
+    }
+    const genAgent: AlfredAgentDefinition = {
+      ...baseAgent,
+      tools: [],
+      resolvedSystemPrompt:
+        'You are a skill author for Alfred AI agents. Given a user request, output ONLY valid JSON (no markdown fences) with keys: "id" (lowercase kebab-case slug, max 32 chars), "description" (1 concise Hungarian sentence), "content" (clear actionable Markdown instructions in Hungarian starting with "# <Title>").',
+    }
+    try {
+      const outcome = await runHybridAgentTurn({
+        db: getDb(),
+        agent: genAgent,
+        globalDailyBudgetUsd: cfg.global.dailyBudgetUsd,
+        userMessage: `Készíts egy új ügynök skillt ehhez a feladathoz:\n${promptText}`,
+        conversationHistory: [],
+        sessionId: `skill-gen:${Date.now()}`,
+        chatId: 'web-skill-gen',
+        env,
+        nowSec: Math.floor(Date.now() / 1000),
+      })
+      if (!outcome.ok) {
+        json(res, { error: outcome.discordMessage }, 429)
+        return true
+      }
+      const raw = outcome.replyText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+      let parsed: { id?: string; description?: string; content?: string }
+      try {
+        parsed = JSON.parse(raw) as { id?: string; description?: string; content?: string }
+      } catch {
+        parsed = {
+          id: promptText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28) || 'uj-skill',
+          description: promptText.slice(0, 140),
+          content: raw,
+        }
+      }
+      json(res, {
+        ok: true,
+        draft: {
+          id: (parsed.id || 'uj-skill').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 40),
+          description: parsed.description || promptText.slice(0, 140),
+          content: parsed.content || raw,
+        },
+      })
+    } catch (err) {
+      json(res, { error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+    return true
+  }
+
   return false
+}
+
+const SAFE_SKILL_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i
+
+function resolveSkillsRootDir(): string {
+  return process.env['ALFRED_SKILLS_DIR'] || join(process.cwd(), 'skills')
+}
+
+function extractSkillDescription(md: string): string {
+  const fm = md.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+  const block = fm ? fm[1] : md.slice(0, 500)
+  const m = block.match(/^description:\s*(.+)$/m)
+  return m ? m[1].trim().replace(/^["']|["']$/g, '').slice(0, 260) : ''
 }
 
 interface StoredModelCatalog {

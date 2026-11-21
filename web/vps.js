@@ -322,6 +322,10 @@
     if (ctxEl) {
       ctxEl.textContent = '$' + Number(ag.dailyBudgetUsd || 0).toFixed(2) + ' / nap · ' + (ag.tools ? ag.tools.length : 0) + ' eszköz'
     }
+    const skillCntEl = document.getElementById('agentDetailSkillCount')
+    if (skillCntEl) {
+      skillCntEl.textContent = String(Array.isArray(ag.skills) ? ag.skills.length : 0)
+    }
     if (coreBar) {
       coreBar.hidden = false
       coreBar.style.display = 'flex'
@@ -341,6 +345,8 @@
     const coreBar = document.getElementById('agentCoreStatusBar')
     const procBar = document.getElementById('agentProcessControl')
     const coreCh = document.getElementById('agentCoreChannelBox')
+    const coreSkills = document.getElementById('agentCoreSkillsBox')
+    const legacySkills = document.getElementById('legacySkillsWrap')
     if (box) box.hidden = true
     if (metaBox) metaBox.hidden = true
     if (legacyWrap) legacyWrap.hidden = false
@@ -348,6 +354,8 @@
     if (coreBar) { coreBar.hidden = true; coreBar.style.display = 'none' }
     if (procBar) procBar.hidden = false
     if (coreCh) { coreCh.hidden = true; coreCh.style.display = 'none' }
+    if (coreSkills) { coreSkills.hidden = true; coreSkills.style.display = 'none' }
+    if (legacySkills) legacySkills.hidden = false
     ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn'].forEach(function (id) {
       const b = document.getElementById(id)
       if (b) b.hidden = false
@@ -435,9 +443,85 @@
 
     // Apply overview immediately and once more after app.js finishes its async agent fetch
     applyCoreOverview(ag)
+    loadCoreSkillsForModal(ag.id)
     setTimeout(function () {
       if (currentModalAgentId === ag.id) applyCoreOverview(ag)
     }, 350)
+  }
+
+  let coreSkillsCache = []
+
+  async function loadCoreSkillsForModal(agentId) {
+    const coreSkills = document.getElementById('agentCoreSkillsBox')
+    const legacySkills = document.getElementById('legacySkillsWrap')
+    const listEl = document.getElementById('coreSkillsList')
+    const statusEl = document.getElementById('coreSkillsStatus')
+    if (!coreSkills || !listEl) return
+    coreSkills.hidden = false
+    coreSkills.style.display = 'flex'
+    if (legacySkills) legacySkills.hidden = true
+    if (statusEl) statusEl.textContent = ''
+    try {
+      const data = await apiJson('/api/vps/skills?agentId=' + encodeURIComponent(agentId))
+      coreSkillsCache = data.skills || []
+      if (coreSkillsCache.length === 0) {
+        listEl.innerHTML = '<div style="font-size:12px;opacity:.65">Még nincs globális skill. Hozz létre egyet lent az AI varázslóval!</div>'
+        return
+      }
+      listEl.innerHTML = coreSkillsCache
+        .map(function (s) {
+          const usageBadge = s.usageCount > 0
+            ? '<span style="font-size:11px;opacity:.7;margin-left:6px">(' + s.usageCount + '× használva)</span>'
+            : ''
+          return (
+            '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);display:flex;justify-content:space-between;align-items:flex-start;gap:10px">' +
+            '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;flex:1;margin:0">' +
+            '<input type="checkbox" data-core-skill-chk="' + esc(s.id) + '"' + (s.enabled ? ' checked' : '') + ' style="margin-top:3px">' +
+            '<div><div style="font-size:13px;font-weight:600">' + esc(s.id) + usageBadge + '</div>' +
+            '<div style="font-size:12px;opacity:.8;margin-top:2px">' + esc(s.description || '—') + '</div></div>' +
+            '</label>' +
+            '<div style="display:flex;gap:4px;flex-shrink:0">' +
+            '<button type="button" class="btn-secondary btn-compact" data-core-skill-edit="' + esc(s.id) + '" style="font-size:11px;padding:3px 7px">Szerkeszt</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-core-skill-del="' + esc(s.id) + '" style="font-size:11px;padding:3px 7px;color:#dc2626">×</button>' +
+            '</div>' +
+            '</div>'
+          )
+        })
+        .join('')
+
+      listEl.querySelectorAll('[data-core-skill-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const id = btn.getAttribute('data-core-skill-edit')
+          const sk = coreSkillsCache.find(function (x) { return x.id === id })
+          if (!sk) return
+          const det = document.getElementById('coreSkillEditorDetails')
+          if (det) det.open = true
+          const idInp = document.getElementById('coreSkillIdInp')
+          const descInp = document.getElementById('coreSkillDescInp')
+          const contInp = document.getElementById('coreSkillContentInp')
+          if (idInp) idInp.value = sk.id
+          if (descInp) descInp.value = sk.description || ''
+          if (contInp) contInp.value = sk.content || ''
+        })
+      })
+
+      listEl.querySelectorAll('[data-core-skill-del]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const id = btn.getAttribute('data-core-skill-del')
+          if (!id || !confirm('Biztosan törlöd a "' + id + '" skillt?')) return
+          try {
+            await apiJson('/api/vps/skills?id=' + encodeURIComponent(id), { method: 'DELETE' })
+            if (statusEl) statusEl.textContent = 'Törölve: ' + id
+            await ensureVpsRolesData(true)
+            if (currentModalAgentId) loadCoreSkillsForModal(currentModalAgentId)
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+          }
+        })
+      })
+    } catch (err) {
+      listEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Hiba: ' + esc(err.message) + '</div>'
+    }
   }
 
   const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
@@ -1020,6 +1104,107 @@
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         sendCoreTermMessage()
+      }
+    })
+
+    // Alfred Core Skills tab wiring
+    document.getElementById('coreSkillNewBtn')?.addEventListener('click', function () {
+      const det = document.getElementById('coreSkillEditorDetails')
+      if (det) det.open = true
+      const idInp = document.getElementById('coreSkillIdInp')
+      const descInp = document.getElementById('coreSkillDescInp')
+      const contInp = document.getElementById('coreSkillContentInp')
+      if (idInp) { idInp.value = ''; idInp.focus() }
+      if (descInp) descInp.value = ''
+      if (contInp) contInp.value = ''
+    })
+
+    document.getElementById('coreSkillAssignSaveBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId) return
+      const btn = document.getElementById('coreSkillAssignSaveBtn')
+      const statusEl = document.getElementById('coreSkillsStatus')
+      const selected = []
+      document.querySelectorAll('[data-core-skill-chk]:checked').forEach(function (chk) {
+        const id = chk.getAttribute('data-core-skill-chk')
+        if (id) selected.push(id)
+      })
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = 'Mentés...'
+      try {
+        await apiJson('/api/vps/skills/assign', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, skills: selected }),
+        })
+        if (statusEl) statusEl.textContent = 'Skillek elmentve (' + selected.length + ' aktív).'
+        await ensureVpsRolesData(true)
+        const ag = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+        if (ag) applyCoreOverview(ag)
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    document.getElementById('coreSkillAiGenBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('coreSkillAiGenBtn')
+      const promptInp = document.getElementById('coreSkillAiPrompt')
+      const statusEl = document.getElementById('coreSkillEditorStatus')
+      const promptText = promptInp ? promptInp.value.trim() : ''
+      if (!promptText) {
+        if (statusEl) statusEl.textContent = 'Írj be egy rövid leírást a generáláshoz!'
+        return
+      }
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = '✨ AI generálás folyamatban...'
+      try {
+        const res = await apiJson('/api/vps/skills/generate', {
+          method: 'POST',
+          body: JSON.stringify({ prompt: promptText, agentId: currentModalAgentId || undefined }),
+        })
+        const d = res.draft || {}
+        const idInp = document.getElementById('coreSkillIdInp')
+        const descInp = document.getElementById('coreSkillDescInp')
+        const contInp = document.getElementById('coreSkillContentInp')
+        if (idInp) idInp.value = d.id || ''
+        if (descInp) descInp.value = d.description || ''
+        if (contInp) contInp.value = d.content || ''
+        if (statusEl) statusEl.textContent = 'Javaslat elkészült! Nézd át és kattints a Mentés gombra.'
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    document.getElementById('coreSkillSaveFileBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('coreSkillSaveFileBtn')
+      const statusEl = document.getElementById('coreSkillEditorStatus')
+      const id = document.getElementById('coreSkillIdInp')?.value.trim() || ''
+      const description = document.getElementById('coreSkillDescInp')?.value.trim() || ''
+      const content = document.getElementById('coreSkillContentInp')?.value.trim() || ''
+      if (!id || !content) {
+        if (statusEl) statusEl.textContent = 'A skill ID és a tartalom kötelező!'
+        return
+      }
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = 'Mentés...'
+      try {
+        const res = await apiJson('/api/vps/skills/save', {
+          method: 'POST',
+          body: JSON.stringify({ id, description, content, agentId: currentModalAgentId || undefined }),
+        })
+        if (statusEl) statusEl.textContent = 'Skill elmentve és csatolva: ' + res.id
+        await ensureVpsRolesData(true)
+        if (currentModalAgentId) {
+          await loadCoreSkillsForModal(currentModalAgentId)
+          const ag = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
+          if (ag) applyCoreOverview(ag)
+        }
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
       }
     })
   }

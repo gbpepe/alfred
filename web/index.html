@@ -3340,6 +3340,40 @@
 
         <!-- Tab: Skills -->
         <div class="tab-panel" id="tabSkills" hidden>
+          <div id="agentCoreSkillsBox" hidden style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+              <div>
+                <strong style="font-size:13px">Alfred Core Skillek</strong>
+                <div style="font-size:12px;opacity:.75">A bepipált skillek automatikusan betöltődnek az ügynök system promptjába.</div>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="btn-secondary btn-compact" id="coreSkillNewBtn">+ Új skill</button>
+                <button type="button" class="btn-primary btn-compact" id="coreSkillAssignSaveBtn">Hozzárendelés mentése</button>
+              </div>
+            </div>
+            <div id="coreSkillsList" style="display:flex;flex-direction:column;gap:8px"></div>
+            <div id="coreSkillsStatus" style="font-size:12px;opacity:.85"></div>
+
+            <details id="coreSkillEditorDetails" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">
+              <summary style="cursor:pointer;font-weight:600;font-size:13px;user-select:none">✨ Skill létrehozása / szerkesztése (AI varázslóval)</summary>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <input type="text" id="coreSkillAiPrompt" class="input" placeholder="Írd le 1 mondatban mit tudjon a skill (pl. PR biztonsági review)..." style="flex:1;min-width:200px;padding:6px 8px;font-size:12px">
+                  <button type="button" class="btn-secondary btn-compact" id="coreSkillAiGenBtn">✨ Generálás AI-val</button>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <input type="text" id="coreSkillIdInp" class="input" placeholder="skill-id (pl. code-review)" style="width:180px;padding:6px 8px;font-size:12px">
+                  <input type="text" id="coreSkillDescInp" class="input" placeholder="Rövid leírás" style="flex:1;min-width:180px;padding:6px 8px;font-size:12px">
+                </div>
+                <textarea id="coreSkillContentInp" class="code-textarea" rows="8" placeholder="# Skill instrukciók..."></textarea>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button type="button" class="btn-primary btn-compact" id="coreSkillSaveFileBtn">Skill mentése és csatolása</button>
+                  <span id="coreSkillEditorStatus" style="font-size:12px;opacity:.85"></span>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div id="legacySkillsWrap">
           <div class="skill-header">
             <h4 data-i18n="agents.skills.tab_title">Ügynök skilljei</h4>
             <button class="btn-secondary btn-compact" id="addSkillBtn" data-i18n="skills.btn.new_skill">
@@ -3352,6 +3386,7 @@
           <div class="skill-list" id="skillList"></div>
           <div class="skill-empty" id="skillEmpty">
             <p data-i18n="agents.skills.empty">Nincsenek skillek hozzáadva</p>
+          </div>
           </div>
         </div>
 

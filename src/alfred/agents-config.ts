@@ -112,9 +112,11 @@ export interface AlfredAgentDefinition {
   maxToolIterations?: number
   /** Optional relative path to the agent's SOUL.md file (loaded as stable system prompt prefix for caching) */
   soulFile?: string
+  /** Optional list of global skill IDs (loaded from skills/<id>/SKILL.md) */
+  skills?: string[]
   /** Fallback or supplementary system prompt */
   systemPrompt?: string
-  /** Resolved stable system prompt (SOUL.md content + systemPrompt, if any) */
+  /** Resolved stable system prompt (SOUL.md content + systemPrompt + attached skills, if any) */
   resolvedSystemPrompt: string
 }
 
@@ -204,6 +206,7 @@ export function loadAgentSystemPrompt(
   projectRoot: string,
   soulFile: string | undefined,
   systemPrompt: string | undefined,
+  skills?: string[],
 ): string {
   const parts: string[] = []
   if (soulFile && soulFile.trim()) {
@@ -220,6 +223,22 @@ export function loadAgentSystemPrompt(
     // If soulFile is absent or doesn't already include the systemPrompt line, append it
     if (parts.length === 0 || !parts[0].includes(systemPrompt.trim())) {
       parts.push(systemPrompt.trim())
+    }
+  }
+  if (Array.isArray(skills) && skills.length > 0) {
+    const skillBlocks: string[] = []
+    for (const rawId of skills) {
+      const skillId = String(rawId || '').trim()
+      if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(skillId)) continue
+      const skillFile = join(projectRoot, 'skills', skillId, 'SKILL.md')
+      if (!existsSync(skillFile)) continue
+      try {
+        const md = readFileSync(skillFile, 'utf-8').trim()
+        if (md) skillBlocks.push(`### Skill: ${skillId}\n${md}`)
+      } catch { /* ignore unreadable skill */ }
+    }
+    if (skillBlocks.length > 0) {
+      parts.push(`## ACTIVE SKILLS\n\n${skillBlocks.join('\n\n')}`)
     }
   }
   return parts.join('\n\n')
@@ -524,7 +543,10 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
 
       const soulFile = typeof a.soulFile === 'string' && a.soulFile.trim() ? a.soulFile.trim() : undefined
       const systemPrompt = typeof a.systemPrompt === 'string' && a.systemPrompt.trim() ? a.systemPrompt.trim() : undefined
-      const resolvedSystemPrompt = loadAgentSystemPrompt(projectRoot, soulFile, systemPrompt)
+      const skills = Array.isArray(a.skills)
+        ? a.skills.filter((s): s is string => typeof s === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(s.trim())).map((s) => s.trim())
+        : undefined
+      const resolvedSystemPrompt = loadAgentSystemPrompt(projectRoot, soulFile, systemPrompt, skills)
 
       agents.push({
         id,
@@ -545,6 +567,7 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
         ...(bashTimeoutMs !== undefined ? { bashTimeoutMs } : {}),
         ...(maxToolIterations !== undefined ? { maxToolIterations } : {}),
         soulFile,
+        ...(skills && skills.length > 0 ? { skills } : {}),
         systemPrompt,
         resolvedSystemPrompt,
       })
