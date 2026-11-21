@@ -1330,7 +1330,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { ...OWNER_SESSION_REQUIRED, error: 'Generating AI avatars requires an owner session.' }, 403)
       return true
     }
-    const body = await readJsonBody<{ agentId?: string; prompt?: string }>(req)
+    const body = await readJsonBody<{ agentId?: string; displayName?: string; role?: string; prompt?: string }>(req)
     const agentId = (body?.agentId || '').trim()
     if (!agentId || !/^[a-zA-Z0-9_-]{1,64}$/.test(agentId)) {
       json(res, { error: 'Valid agentId is required' }, 400)
@@ -1339,7 +1339,19 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     const env = { ...readEnvFile(), ...process.env }
     const openaiKey = (env['OPENAI_API_KEY'] || '').trim()
     const geminiKey = (env['GEMINI_API_KEY'] || '').trim()
-    const desc = (body?.prompt || `Minimalist modern flat vector pictogram avatar icon for an AI assistant named ${agentId}, clean dark slate background, vibrant accent, no text`).slice(0, 400)
+    const roleThemeMap: Record<string, string> = {
+      tervezo: 'wearing smart glasses and a neat blazer, holding a tiny glowing blueprint scroll',
+      szakmunkas: 'wearing a cozy tech hoodie and headphones, holding a tiny glowing laptop',
+      technikus: 'wearing a sleek tech visor and utility vest, holding a tiny diagnostic wrench and checklist',
+      segedmunkas: 'wearing a friendly casual sweater, smiling warmly with a tiny notebook',
+    }
+    const roleKey = body?.role ? (normalizeRoleId(body.role) ?? '') : ''
+    const roleTheme = roleThemeMap[roleKey] || 'wearing a neat modern smart-casual tech outfit'
+    const charName = (body?.displayName || agentId).trim().slice(0, 40)
+    const desc = (
+      body?.prompt ||
+      `Adorable Chibi (Super Deformed) anime/manga character portrait avatar for a friendly team member named ${charName}, ${roleTheme}. Classic 2-to-3-head-tall chibi proportions with an oversized head, huge sparkling expressive eyes, tiny cute hands, clean crisp cel-shaded anime lineart, vibrant soft studio gradient background, centered head-and-shoulders framing for a circular profile avatar, NO text, NO letters, NO watermark.`
+    ).slice(0, 600)
 
     let pngBuf: Buffer | null = null
     let lastErr = ''

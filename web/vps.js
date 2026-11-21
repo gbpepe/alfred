@@ -1439,18 +1439,20 @@
       if (!currentModalAgentId) return
       const btn = document.getElementById('agentAiAvatarGenBtn')
       const dispName = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || currentModalAgentId
+      const roleVal = document.getElementById('agentCoreRoleSel')?.value || ''
       if (btn) btn.disabled = true
-      if (pictoStatus) pictoStatus.textContent = '✨ AI avatar generálása...'
+      if (pictoStatus) pictoStatus.textContent = '✨ Chibi AI avatar generálása...'
       try {
         const res = await apiJson('/api/vps/agents/generate-avatar', {
           method: 'POST',
           body: JSON.stringify({
             agentId: currentModalAgentId,
-            prompt: 'Clean minimalist modern flat avatar icon for an AI agent named ' + dispName + ', bold geometric motif, vibrant gradient background, no text',
+            displayName: dispName,
+            role: roleVal,
           }),
         })
         if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
-        if (pictoStatus) pictoStatus.textContent = '✓ AI avatar elkészült és elmentve!'
+        if (pictoStatus) pictoStatus.textContent = '✓ Chibi AI avatar elkészült és elmentve!'
       } catch (err) {
         if (pictoStatus) pictoStatus.textContent = err.message
       } finally {
