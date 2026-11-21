@@ -72,7 +72,7 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
         .replace('<title>Alfred</title>', '<title>🧪 TEST — Alfred</title>')
         .replace(
           '<body>',
-          '<body><div id="alfredTestBanner" style="position:sticky;top:0;z-index:9999;background:#d97706;color:#fff;text-align:center;font-weight:800;font-size:15px;letter-spacing:.06em;padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,.3)">🧪 TEST KÖRNYEZET — Szimulált Discord · Elkülönített DB</div>',
+          '<body><style>body{padding-top:38px!important}@media(min-width:769px){.sidebar{top:38px!important;height:calc(100vh - 38px)!important}}</style><div id="alfredTestBanner" style="position:fixed;top:0;left:0;right:0;height:38px;display:flex;align-items:center;justify-content:center;z-index:9999;background:#d97706;color:#fff;font-weight:800;font-size:14px;letter-spacing:.06em;padding:0 12px;box-shadow:0 2px 10px rgba(0,0,0,.3)">🧪 TEST KÖRNYEZET — Szimulált Discord · Elkülönített DB</div>',
         )
       : html
     res.writeHead(200, {
