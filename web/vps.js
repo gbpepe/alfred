@@ -563,6 +563,9 @@
   }
 
   wireSimEvents()
+  if (!location.hash && document.getElementById('alfredTestBanner')) {
+    location.hash = 'testsim'
+  }
   if (location.hash === '#testsim' || !document.getElementById('testsimPage')?.hidden) {
     window.loadTestSimPage()
   }

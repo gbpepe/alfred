@@ -37,7 +37,7 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
     const s = statSync(filePath)
     // Both versioned asset tokens are part of the index ETag: a cached
     // index.html must be invalidated whenever the rewritten ?v= URLs change.
-    const etag = `"${s.mtimeMs}-${s.size}-${assetVersion(webDir, 'app.js')}-${assetVersion(webDir, 'vps.js')}-${assetVersion(webDir, 'style.css')}"`
+    const etag = `"${s.mtimeMs}-${s.size}-${assetVersion(webDir, 'app.js')}-${assetVersion(webDir, 'vps.js')}-${assetVersion(webDir, 'style.css')}-${process.env['ALFRED_ENV'] ?? 'prod'}"`
     const ifNoneMatch = req.headers['if-none-match']
     if (ifNoneMatch === etag) {
       res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' })
@@ -65,14 +65,22 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
       // at "Add to Home Screen" time regardless of script timing.
       .replace(
         /(<meta name="apple-mobile-web-app-title" content=")[^"]*(">)/,
-        `$1${escapeAttr(BRAND_NAME)}$2`,
+        `$1${escapeAttr(process.env['ALFRED_ENV'] === 'test' ? '🧪 TEST — ' + BRAND_NAME : BRAND_NAME)}$2`,
       )
+    const finalHtml = process.env['ALFRED_ENV'] === 'test'
+      ? html
+        .replace('<title>Alfred</title>', '<title>🧪 TEST — Alfred</title>')
+        .replace(
+          '<body>',
+          '<body><div id="alfredTestBanner" style="position:sticky;top:0;z-index:9999;background:#d97706;color:#fff;text-align:center;font-weight:800;font-size:15px;letter-spacing:.06em;padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,.3)">🧪 TEST KÖRNYEZET — Szimulált Discord · Elkülönített DB</div>',
+        )
+      : html
     res.writeHead(200, {
       'Content-Type': MIME['.html'],
       ETag: etag,
       'Cache-Control': 'no-cache',
     })
-    res.end(html)
+    res.end(finalHtml)
   } catch {
     res.writeHead(404); res.end('Not found')
   }
