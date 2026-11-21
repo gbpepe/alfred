@@ -2873,25 +2873,31 @@
               <input type="text" id="agentCoreModelInp" class="input" placeholder="Egyéni model ID" hidden style="flex:1;min-width:160px;padding:4px 8px;font-size:12px">
             </div>
           </div>
-          <div id="agentCoreMetaBox" hidden style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-              <label for="agentCoreBudgetInp" style="font-size:13px;font-weight:600;margin:0">Napi költségkeret (USD):</label>
-              <input type="number" id="agentCoreBudgetInp" class="input" min="0.05" max="100" step="0.25" style="width:100px;padding:4px 8px;font-size:12px">
-              <label for="agentCoreVoiceSel" style="font-size:13px;font-weight:600;margin:0 0 0 8px">Hangprofil (TTS):</label>
-              <select id="agentCoreVoiceSel" class="input" style="padding:4px 8px;font-size:12px">
-                <option value="Kore">Kore (női · Gemini)</option>
-                <option value="Aoede">Aoede (női lágy · Gemini)</option>
-                <option value="Puck">Puck (férfi élénk · Gemini)</option>
-                <option value="Charon">Charon (férfi mély · Gemini)</option>
-                <option value="nova">Nova (női · OpenAI)</option>
-                <option value="alloy">Alloy (semleges · OpenAI)</option>
-                <option value="browser">Böngésző hang (ingyenes)</option>
-              </select>
-              <button type="button" class="btn-secondary btn-compact" id="agentCoreVoiceTestBtn" style="font-size:11px;padding:4px 8px">🔊 Próba</button>
+          <div id="agentCoreMetaBox" hidden style="margin-bottom:14px;display:flex;flex-direction:column;gap:14px">
+            <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:13px;font-weight:600">🔊 Hangprofil (TTS)</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="agentCoreVoiceSel" class="input" style="flex:1;min-width:200px;max-width:300px;padding:5px 8px;font-size:12px">
+                  <option value="Kore">Kore (női · Gemini)</option>
+                  <option value="Aoede">Aoede (női lágy · Gemini)</option>
+                  <option value="Puck">Puck (férfi élénk · Gemini)</option>
+                  <option value="Charon">Charon (férfi mély · Gemini)</option>
+                  <option value="nova">Nova (női · OpenAI)</option>
+                  <option value="alloy">Alloy (semleges · OpenAI)</option>
+                  <option value="browser">Böngésző hang (ingyenes)</option>
+                </select>
+                <button type="button" class="btn-secondary btn-compact" id="agentCoreVoiceTestBtn" style="font-size:12px;padding:5px 10px">🔊 Próba</button>
+              </div>
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-              <span style="font-size:12px;font-weight:600;opacity:.8">Engedélyezett eszközök:</span>
-              <div id="agentCoreToolsList" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+            <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                <label for="agentCoreBudgetInp" style="font-size:13px;font-weight:600;margin:0">Napi költségkeret (USD):</label>
+                <input type="number" id="agentCoreBudgetInp" class="input" min="0.05" max="100" step="0.25" style="width:110px;padding:5px 8px;font-size:12px">
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:6px;border-top:1px solid var(--border)">
+                <span style="font-size:12px;font-weight:600;opacity:.8">Engedélyezett eszközök:</span>
+                <div id="agentCoreToolsList" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+              </div>
             </div>
           </div>
           <div id="legacyAgentSettingsWrap">
