@@ -14,6 +14,7 @@ Environment=WEB_ONLY=true
 Environment=WEB_HOST=127.0.0.1
 Environment=WEB_PORT=3420
 Environment=ALFRED_WEB_DB_PATH=/opt/alfred-prod/store/alfred-prod.db
+Environment=ALFRED_PROD_ENV_FILE=/opt/alfred-prod/.env
 Environment=ALFRED_OPS_DIR=/opt/alfred-ops
 Environment=NODE_OPTIONS=--max-old-space-size=256
 ExecStart=/usr/bin/node /opt/alfred-ops/dist/web-only.js
@@ -23,7 +24,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/alfred-prod/store /opt/alfred-ops/store
+ReadWritePaths=/opt/alfred-prod/store /opt/alfred-ops/store /opt/alfred-prod/.env
 MemoryHigh=256M
 MemoryMax=384M
 

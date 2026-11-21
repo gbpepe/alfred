@@ -43,12 +43,25 @@ const execFileAsync = promisify(execFile)
 // instead of SSH + .env edits. All endpoints sit behind the dashboard token.
 
 const ENV_FILE = join(PROJECT_ROOT, '.env')
+const TARGET_ENV_FILE = (process.env['ALFRED_PROD_ENV_FILE'] || '').trim() || ENV_FILE
 const HOME_CREDENTIALS = join(homedir(), '.claude', '.credentials.json')
 const FLEET_TOKEN_FILE = join(STORE_DIR, '.claude-oauth-token')
 
-function readEnvValue(key: string): string | null {
+const PROVIDER_SPECS = [
+  { key: 'DEEPSEEK_API_KEY', label: 'DeepSeek API Key', placeholder: 'sk-...', secret: true },
+  { key: 'GEMINI_API_KEY', label: 'Google Gemini API Key', placeholder: 'AIza...', secret: true },
+  { key: 'VERTEX_PROJECT_ID', label: 'Google Vertex Project ID', placeholder: 'alferd-hq-gc', secret: false },
+  { key: 'VERTEX_LOCATION', label: 'Google Vertex Location', placeholder: 'europe-west1', secret: false },
+  { key: 'XAI_API_KEY', label: 'Grok / xAI API Key', placeholder: 'xai-...', secret: true },
+  { key: 'OPENAI_API_KEY', label: 'OpenAI API Key', placeholder: 'sk-...', secret: true },
+  { key: 'ANTHROPIC_API_KEY', label: 'Anthropic / Claude API Key', placeholder: 'sk-ant-...', secret: true },
+] as const
+
+const ALLOWED_PROVIDER_KEYS = new Set<string>(PROVIDER_SPECS.map((p) => p.key))
+
+function readEnvValue(key: string, file: string = ENV_FILE): string | null {
   try {
-    for (const line of readFileSync(ENV_FILE, 'utf-8').split('\n')) {
+    for (const line of readFileSync(file, 'utf-8').split('\n')) {
       if (line.startsWith(key + '=')) {
         const v = line.slice(key.length + 1).trim()
         return v.length > 0 ? v : null
@@ -199,13 +212,13 @@ function agentsRunning(): boolean {
 
 // Atomic, idempotent .env update for one key: drop any prior line for the key,
 // keep every other line verbatim, append the new value, chmod 600. Never sed.
-function setEnvKey(key: string, value: string): void {
+function setEnvKey(key: string, value: string, file: string = ENV_FILE): void {
   assertEnvEntry(key, value)
   let lines: string[] = []
-  try { lines = readFileSync(ENV_FILE, 'utf-8').split('\n') } catch { /* fresh .env */ }
+  try { lines = readFileSync(file, 'utf-8').split('\n') } catch { /* fresh .env */ }
   const kept = lines.filter((l) => l.length > 0 && !l.startsWith(key + '='))
   kept.push(`${key}=${value}`)
-  atomicWriteFileSync(ENV_FILE, kept.join('\n') + '\n', { mode: 0o600 })
+  atomicWriteFileSync(file, kept.join('\n') + '\n', { mode: 0o600 })
 }
 
 // Replace every standalone occurrence of `from` with `to` in a persona file
@@ -328,6 +341,69 @@ export async function tryHandleOnboarding(ctx: RouteContext): Promise<boolean> {
       deployment: deployment(),
       installLang: installLang(readEnvValue),
     })
+    return true
+  }
+
+  if (path === '/api/onboarding/providers' && method === 'GET') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Viewing provider status requires an owner session.' }, 403)
+      return true
+    }
+    const providers = PROVIDER_SPECS.map((spec) => {
+      const val = readEnvValue(spec.key, TARGET_ENV_FILE) ?? readEnvValue(spec.key, ENV_FILE)
+      const configured = Boolean(val)
+      const hint = !val ? null : spec.secret ? `...${val.slice(-4)}` : val
+      return {
+        key: spec.key,
+        label: spec.label,
+        placeholder: spec.placeholder,
+        secret: spec.secret,
+        configured,
+        hint,
+      }
+    })
+    json(res, { ok: true, providers })
+    return true
+  }
+
+  if (path === '/api/onboarding/providers' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Saving provider keys requires an owner session.' }, 403)
+      return true
+    }
+    const raw = await readBodyOrRefuse(req, res)
+    if (!raw) return true
+    let body: { providers?: Record<string, unknown> }
+    try {
+      body = JSON.parse(raw.toString()) as { providers?: Record<string, unknown> }
+    } catch {
+      json(res, { error: 'Invalid JSON body' }, 400)
+      return true
+    }
+    const entries = body?.providers
+    if (!entries || typeof entries !== 'object') {
+      json(res, { error: 'providers object is required' }, 400)
+      return true
+    }
+    const updated: string[] = []
+    try {
+      for (const [key, rawVal] of Object.entries(entries)) {
+        if (!ALLOWED_PROVIDER_KEYS.has(key)) {
+          json(res, { error: `Unsupported provider key: ${key}` }, 400)
+          return true
+        }
+        if (typeof rawVal !== 'string') continue
+        const val = rawVal.trim()
+        if (!val) continue
+        setEnvKey(key, val, TARGET_ENV_FILE)
+        process.env[key] = val
+        updated.push(key)
+      }
+      logger.info({ updated }, 'onboarding: provider keys updated')
+      json(res, { ok: true, updated })
+    } catch (err) {
+      json(res, { error: err instanceof Error ? err.message : 'Failed to save provider keys' }, 400)
+    }
     return true
   }
 

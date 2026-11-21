@@ -2278,7 +2278,10 @@
     <section class="page" id="vpsPage" hidden>
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
         <h1 style="margin:0">VPS &amp; Alfred Chat</h1>
-        <button class="btn-secondary btn-compact" id="vpsRefreshBtn">Frissítés</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-primary btn-compact" id="vpsOpenApiWizardBtn">Model API varázsló</button>
+          <button class="btn-secondary btn-compact" id="vpsRefreshBtn">Frissítés</button>
+        </div>
       </div>
       <div id="vpsSystemBar" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px">Betöltés...</div>
       <div id="vpsServicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px"></div>

@@ -169,10 +169,92 @@
     }
   }
 
+  async function openModelApiWizard() {
+    const overlay = document.getElementById('onboardingOverlay')
+    const body = document.getElementById('onboardingBody')
+    const steps = document.getElementById('onboardingSteps')
+    const note = document.getElementById('onbFlowNote')
+    if (!overlay || !body) return
+    if (steps) steps.hidden = true
+    if (note) note.textContent = 'Add meg vagy frissítsd a használt Model API kulcsokat (üresen hagyva a meglévő érték megmarad).'
+    body.innerHTML = '<div style="padding:12px 0">Betöltés...</div>'
+    overlay.hidden = false
+    overlay.classList.add('active')
+    document.body.style.overflow = 'hidden'
+    try {
+      const data = await apiJson('/api/onboarding/providers')
+      const rows = (data.providers || [])
+        .map(function (p) {
+          const badge = p.configured
+            ? '<span style="color:#22c55e;font-size:12px;font-weight:600">✓ Beállítva (' + esc(p.hint || '') + ')</span>'
+            : '<span style="opacity:.6;font-size:12px">Nincs beállítva</span>'
+          return (
+            '<div style="margin-bottom:10px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">' +
+            '<label class="form-label-sm" style="margin:0">' + esc(p.label) + '</label>' +
+            badge +
+            '</div>' +
+            '<input type="' + (p.secret ? 'password' : 'text') + '" class="onb-input" data-provider-key="' + esc(p.key) + '" placeholder="' + esc(p.placeholder) + '" autocomplete="off" style="margin-bottom:0">' +
+            '</div>'
+          )
+        })
+        .join('')
+      body.innerHTML =
+        '<div style="max-height:55vh;overflow:auto;padding-right:4px">' + rows + '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px;align-items:center">' +
+        '<button class="btn-primary btn-compact" id="vpsSaveProvidersBtn">Kulcsok mentése</button>' +
+        '<button class="btn-secondary btn-compact" id="vpsCloseProvidersBtn">Bezárás</button>' +
+        '</div>' +
+        '<div id="vpsProvidersMsg" class="onb-msg" style="margin-top:8px"></div>'
+
+      const closeModal = function () {
+        overlay.classList.remove('active')
+        overlay.hidden = true
+        if (steps) steps.hidden = false
+        document.body.style.overflow = ''
+      }
+      document.getElementById('vpsCloseProvidersBtn')?.addEventListener('click', closeModal)
+      document.getElementById('onboardingClose')?.addEventListener('click', closeModal, { once: true })
+      document.getElementById('vpsSaveProvidersBtn')?.addEventListener('click', async function () {
+        const btn = document.getElementById('vpsSaveProvidersBtn')
+        const msgEl = document.getElementById('vpsProvidersMsg')
+        const payload = {}
+        body.querySelectorAll('[data-provider-key]').forEach(function (inp) {
+          const val = inp.value.trim()
+          if (val) payload[inp.getAttribute('data-provider-key')] = val
+        })
+        if (Object.keys(payload).length === 0) {
+          if (msgEl) { msgEl.textContent = 'Adj meg legalább egy új vagy frissítendő értéket.'; msgEl.className = 'onb-msg err' }
+          return
+        }
+        btn.disabled = true
+        if (msgEl) { msgEl.textContent = 'Mentés...'; msgEl.className = 'onb-msg' }
+        try {
+          const res = await apiJson('/api/onboarding/providers', {
+            method: 'POST',
+            body: JSON.stringify({ providers: payload }),
+          })
+          if (msgEl) {
+            msgEl.textContent = 'Mentve: ' + (res.updated || []).join(', ') + ' (újraindítás után lép életbe a többi szolgáltatásban).'
+            msgEl.className = 'onb-msg ok'
+          }
+          body.querySelectorAll('[data-provider-key]').forEach(function (inp) { inp.value = '' })
+        } catch (err) {
+          if (msgEl) { msgEl.textContent = 'Hiba: ' + err.message; msgEl.className = 'onb-msg err' }
+        } finally {
+          btn.disabled = false
+        }
+      })
+    } catch (err) {
+      body.innerHTML = '<div class="onb-msg err">Hiba: ' + esc(err.message) + '</div>'
+    }
+  }
+
   let wired = false
   function wireEvents() {
     if (wired) return
     wired = true
+    document.getElementById('vpsOpenApiWizardBtn')?.addEventListener('click', openModelApiWizard)
     document.getElementById('vpsRefreshBtn')?.addEventListener('click', function () {
       refreshVpsStatus()
       refreshVpsLogs()
