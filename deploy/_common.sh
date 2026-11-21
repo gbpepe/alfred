@@ -32,7 +32,7 @@ DEPLOY_MODE="$(detect_deploy_mode)"
 
 if [[ "$DEPLOY_MODE" == "systemd" ]]; then
   PROD_DIR="${ALFRED_PROD_DIR:-/opt/alfred-prod}"
-  TEST_DIR="${ALFRED_TEST_DIR:-/opt/alfred-test}"
+  TEST_DIR="${ALFRED_TEST_DIR:-/opt/alfred-worktrees/alfred-test}"
   OPS_DIR="${ALFRED_OPS_DIR:-/opt/alfred-ops}"
 else
   PROD_DIR="${ALFRED_PROD_DIR:-$REPO_ROOT}"

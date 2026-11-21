@@ -11,6 +11,7 @@ BRANCH="${ALFRED_BRANCH:-feat/alfred-core}"
 ALFRED_USER="${ALFRED_SYSTEM_USER:-alfred}"
 OPS_DIR="/opt/alfred-ops"
 PROD_DIR="/opt/alfred-prod"
+WORKTREES_DIR="/opt/alfred-worktrees"
 DRY_RUN=0
 SKIP_START=0
 FORCE_START=0
@@ -132,9 +133,9 @@ if ! id "$ALFRED_USER" >/dev/null 2>&1; then
   run_cmd useradd -r -m -s /bin/bash "$ALFRED_USER"
 fi
 
-log_info "Preparing $OPS_DIR and $PROD_DIR..."
-run_cmd mkdir -p "$OPS_DIR/store" "$OPS_DIR/.claude" "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude"
-run_cmd chown -R "$ALFRED_USER:$ALFRED_USER" "$OPS_DIR" "$PROD_DIR"
+log_info "Preparing $OPS_DIR, $PROD_DIR, and $WORKTREES_DIR..."
+run_cmd mkdir -p "$OPS_DIR/store" "$OPS_DIR/.claude" "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude" "$WORKTREES_DIR"
+run_cmd chown -R "$ALFRED_USER:$ALFRED_USER" "$OPS_DIR" "$PROD_DIR" "$WORKTREES_DIR"
 
 # 2. Clone or update repositories and build dist/alfred/run.js
 sync_and_build_repo() {

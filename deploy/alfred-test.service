@@ -9,15 +9,15 @@ Wants=network-online.target
 Type=simple
 User=alfred
 Group=alfred
-WorkingDirectory=/opt/alfred-test
-EnvironmentFile=/opt/alfred-test/.env
+WorkingDirectory=/opt/alfred-worktrees/alfred-test
+EnvironmentFile=/opt/alfred-worktrees/alfred-test/.env
 Environment=NODE_ENV=production
 Environment=ALFRED_ENV=test
 Environment=ALFRED_DB_PATH=store/alfred-test.db
 Environment=ALFRED_WORKSPACES_DIR=workspaces-test
 Environment=ALFRED_BUDGET_MULTIPLIER=0.2
 Environment=NODE_OPTIONS=--max-old-space-size=256
-ExecStart=/usr/bin/node /opt/alfred-test/dist/alfred/run.js
+ExecStart=/usr/bin/node /opt/alfred-worktrees/alfred-test/dist/alfred/run.js
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=15s
@@ -31,7 +31,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/alfred-test
+ReadWritePaths=/opt/alfred-worktrees/alfred-test
 SyslogIdentifier=alfred-test
 
 [Install]
