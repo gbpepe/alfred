@@ -916,21 +916,15 @@
               restartServices: true,
             }),
           })
-          const fileSaves = []
-          if (coreFileDirty.claude) {
-            const val = document.getElementById('editClaudeMd')?.value ?? ''
-            fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/claude-md', { method: 'PUT', body: JSON.stringify({ content: val }) }))
-          }
-          if (coreFileDirty.soul) {
-            const val = document.getElementById('editSoulMd')?.value ?? ''
-            fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/soul-md', { method: 'PUT', body: JSON.stringify({ content: val }) }))
-          }
-          if (coreFileDirty.mcp) {
-            const val = document.getElementById('editMcpJson')?.value ?? ''
-            fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/mcp-json', { method: 'PUT', body: JSON.stringify({ content: val }) }))
-          }
-          if (fileSaves.length > 0) {
-            await Promise.all(fileSaves)
+          const filePatch = {}
+          if (coreFileDirty.claude) filePatch.claudeMd = document.getElementById('editClaudeMd')?.value ?? ''
+          if (coreFileDirty.soul) filePatch.soulMd = document.getElementById('editSoulMd')?.value ?? ''
+          if (coreFileDirty.mcp) filePatch.mcpJson = document.getElementById('editMcpJson')?.value ?? ''
+          if (Object.keys(filePatch).length > 0) {
+            await apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId), {
+              method: 'PUT',
+              body: JSON.stringify(filePatch),
+            })
             coreFileDirty.claude = false
             coreFileDirty.soul = false
             coreFileDirty.mcp = false
@@ -940,7 +934,8 @@
           await ensureVpsRolesData(true)
           const updated = vpsAgentsCache.find(function (a) { return a.id === currentModalAgentId })
           if (updated) applyCoreOverview(updated)
-          applyDisplayNamesToCards()
+          if (typeof window.loadAgents === 'function') window.loadAgents()
+          setTimeout(applyDisplayNamesToCards, 300)
           updateInheritedRoleText()
         } catch (err) {
           if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
@@ -1435,6 +1430,12 @@
       if (avEl && url) {
         avEl.innerHTML = '<img src="' + esc(url) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
       }
+      if (currentModalAgentId && url) {
+        document.querySelectorAll('#agentsGridView img[src*="/api/agents/' + currentModalAgentId + '/avatar"]').forEach(function (img) {
+          img.src = url
+        })
+      }
+      if (typeof window.loadAgents === 'function') window.loadAgents()
     }
 
     document.getElementById('agentPictoSaveBtn')?.addEventListener('click', async function () {
@@ -1619,7 +1620,16 @@
         document.getElementById('applyPersonaSoulBtn')?.addEventListener('click', function () {
           const soulArea = document.getElementById('editSoulMd')
           if (soulArea && soulDraft) {
-            soulArea.value = soulDraft
+            const chosenName = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
+            let finalSoul = soulDraft
+            if (chosenName) {
+              const firstSug = items[0] && items[0].displayName ? String(items[0].displayName).trim() : ''
+              if (firstSug && firstSug !== chosenName) {
+                finalSoul = finalSoul.split(firstSug).join(chosenName)
+              }
+              finalSoul = finalSoul.replace(/^#\s+.+$/m, '# ' + chosenName)
+            }
+            soulArea.value = finalSoul
             coreFileDirty.soul = true
             const det = soulArea.closest('details')
             if (det) det.open = true
