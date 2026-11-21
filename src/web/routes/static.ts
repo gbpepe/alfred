@@ -82,8 +82,8 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
         `$1${escapeAttr(process.env['ALFRED_ENV'] === 'test' ? '🧪 TEST — ' + BRAND_NAME : BRAND_NAME)}$2`,
       )
     const testBannerText = branch
-      ? `🧪 TEST KÖRNYEZET (${escapeAttr(branch)}) — Szimulált Discord · Elkülönített DB`
-      : '🧪 TEST KÖRNYEZET — Szimulált Discord · Elkülönített DB'
+      ? `🧪 TEST KÖRNYEZET (${escapeAttr(branch)})`
+      : '🧪 TEST KÖRNYEZET'
     const finalHtml = isTestEnv
       ? html
         .replace('<title>Alfred</title>', '<title>🧪 TEST — Alfred</title>')
