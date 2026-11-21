@@ -13,6 +13,7 @@ Environment=NODE_ENV=production
 Environment=WEB_ONLY=true
 Environment=WEB_HOST=127.0.0.1
 Environment=WEB_PORT=3422
+Environment=ALFRED_WEB_PORT=3422
 Environment=ALFRED_ENV=test
 Environment=ALFRED_WEB_DB_PATH=/opt/alfred-worktrees/alfred-test/store/alfred-test.db
 Environment=ALFRED_SIM_PORT=3421

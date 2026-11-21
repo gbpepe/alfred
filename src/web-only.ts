@@ -12,13 +12,14 @@ import { startWebServer } from './web.js'
 
 const runtimeEnv = resolveAlfredRuntimeEnv()
 const dbPath = (process.env['ALFRED_WEB_DB_PATH'] ?? '').trim() || (process.env['ALFRED_DB_PATH'] ?? '').trim() || runtimeEnv.dbPath
+const webPort = Number(process.env['ALFRED_WEB_PORT'] || '') || WEB_PORT
 if (dbPath !== ':memory:') {
   mkdirSync(dirname(dbPath), { recursive: true })
 }
 initDatabase(dbPath)
 
-const server = startWebServer(WEB_PORT)
-logger.info({ port: WEB_PORT, dbPath, mode: runtimeEnv.mode }, 'Alfred WEB_ONLY dashboard started')
+const server = startWebServer(webPort)
+logger.info({ port: webPort, dbPath, mode: runtimeEnv.mode }, 'Alfred WEB_ONLY dashboard started')
 
 function shutdown(signal: string): void {
   logger.info({ signal }, 'Stopping Alfred WEB_ONLY dashboard')
