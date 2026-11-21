@@ -9,8 +9,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 ALFRED_BUILD_CMD="${ALFRED_BUILD_CMD:-npm run build:alfred}"
-# Child build/test processes (tsc, vitest) must NOT inherit alfred-ops's 128 MB NODE_OPTIONS cap.
+# Child build/test processes (tsc, vitest) must NOT inherit alfred-ops's 128 MB NODE_OPTIONS cap,
+# and must use /tmp paths when systemd ProtectHome=true blocks /home/alfred.
 export NODE_OPTIONS="${ALFRED_CHILD_NODE_OPTIONS:---max-old-space-size=512}"
+export npm_config_cache="${npm_config_cache:-/tmp/alfred-npm-cache}"
+export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-/dev/null}"
 PROD_SERVICE="${ALFRED_PROD_SERVICE:-alfred-prod}"
 TEST_SERVICE="${ALFRED_TEST_SERVICE:-alfred-test}"
 OPS_SERVICE="${ALFRED_OPS_SERVICE:-alfred-ops}"
@@ -93,6 +96,13 @@ ensure_node_modules() {
   local reference_dir="$2"
   local ref_lock="$reference_dir/package-lock.json"
   local tgt_lock="$target_dir/package-lock.json"
+
+  if [[ -L "$target_dir/node_modules" ]]; then
+    if [[ "$(sha256_file "$ref_lock")" == "$(sha256_file "$tgt_lock")" ]]; then
+      return 0
+    fi
+    rm -f "$target_dir/node_modules"
+  fi
 
   if [[ -d "$target_dir/node_modules" && ! -L "$target_dir/node_modules" ]]; then
     local lock_marker="$target_dir/node_modules/.alfred-lock.sha256"
