@@ -37,7 +37,7 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
     const s = statSync(filePath)
     // Both versioned asset tokens are part of the index ETag: a cached
     // index.html must be invalidated whenever the rewritten ?v= URLs change.
-    const etag = `"${s.mtimeMs}-${s.size}-${assetVersion(webDir, 'app.js')}-${assetVersion(webDir, 'style.css')}"`
+    const etag = `"${s.mtimeMs}-${s.size}-${assetVersion(webDir, 'app.js')}-${assetVersion(webDir, 'vps.js')}-${assetVersion(webDir, 'style.css')}"`
     const ifNoneMatch = req.headers['if-none-match']
     if (ifNoneMatch === etag) {
       res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' })
@@ -48,6 +48,10 @@ function serveIndexHtml(ctx: RouteContext, webDir: string): void {
       .replace(
         /(<script\s+src=")\/app\.js(")/,
         `$1/app.js?v=${assetVersion(webDir, 'app.js')}$2`,
+      )
+      .replace(
+        /(<script\s+src=")\/vps\.js(")/,
+        `$1/vps.js?v=${assetVersion(webDir, 'vps.js')}$2`,
       )
       // style.css gets the same ?v= cache-busting as app.js so both can be
       // served with a long max-age (see tryHandleStatic below).
@@ -105,6 +109,7 @@ export async function tryHandleStatic(ctx: RouteContext, webDir: string): Promis
   // a new URL. index.html itself stays no-cache.
   if (path === '/style.css') { serveFile(req, res, join(webDir, 'style.css'), { cacheSeconds: 86400 }); return true }
   if (path === '/app.js') { serveFile(req, res, join(webDir, 'app.js'), { cacheSeconds: 86400 }); return true }
+  if (path === '/vps.js') { serveFile(req, res, join(webDir, 'vps.js'), { cacheSeconds: 86400 }); return true }
   if (path === '/manifest.json') {
     // Brand the manifest (name/short_name -> BRAND_NAME, byte-preserving for the
     // shipped default via buildManifest) and, when a main-agent avatar is stored,
