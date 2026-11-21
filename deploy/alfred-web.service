@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=alfred
 Group=alfred
-WorkingDirectory=/opt/alfred-ops
+WorkingDirectory=/opt/alfred-prod
 EnvironmentFile=/opt/alfred-prod/.env
 Environment=NODE_ENV=production
 Environment=WEB_ONLY=true
@@ -17,7 +17,7 @@ Environment=ALFRED_WEB_DB_PATH=/opt/alfred-prod/store/alfred-prod.db
 Environment=ALFRED_PROD_ENV_FILE=/opt/alfred-prod/.env
 Environment=ALFRED_OPS_DIR=/opt/alfred-ops
 Environment=NODE_OPTIONS=--max-old-space-size=256
-ExecStart=/usr/bin/node /opt/alfred-ops/dist/web-only.js
+ExecStart=/usr/bin/node /opt/alfred-prod/dist/web-only.js
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
