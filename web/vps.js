@@ -407,4 +407,163 @@
   if (location.hash === '#vps' || !document.getElementById('vpsPage')?.hidden) {
     window.loadVpsPage()
   }
+
+  // === Simulated Discord Test Sandbox ===
+  let simActiveAgentId = null
+  let simAgentsCache = []
+  let simWired = false
+
+  function renderSimMessages(messages) {
+    const box = document.getElementById('simMessagesBox')
+    if (!box) return
+    if (!messages || messages.length === 0) {
+      box.innerHTML = '<div style="opacity:.6;font-size:13px">Üres szimulált csatorna. Írj egy üzenetet lent!</div>'
+      return
+    }
+    box.innerHTML = messages
+      .map(function (m) {
+        const isIn = m.direction === 'in'
+        return (
+          '<div style="padding:8px 10px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border);background:' +
+          (isIn ? 'var(--bg)' : 'var(--surface)') + '">' +
+          '<div style="font-size:11px;opacity:.7;margin-bottom:4px">' +
+          '<b>' + esc(isIn ? (m.sender_name || 'Tester') : m.agent_id) + '</b>' +
+          ' · ' + esc((m.ts || '').slice(0, 19).replace('T', ' ')) +
+          '</div>' +
+          '<div style="white-space:pre-wrap;font-size:13px;word-break:break-word">' + esc(m.text) + '</div>' +
+          '</div>'
+        )
+      })
+      .join('')
+    box.scrollTop = box.scrollHeight
+  }
+
+  async function refreshSimMessages() {
+    if (!simActiveAgentId) return
+    try {
+      const data = await apiJson('/api/test-sim/messages?agentId=' + encodeURIComponent(simActiveAgentId) + '&limit=50')
+      renderSimMessages(data.messages || [])
+    } catch { /* ignore */ }
+  }
+
+  function renderSimChannelHeader() {
+    const hdr = document.getElementById('simChannelHeader')
+    const ag = simAgentsCache.find(function (a) { return a.id === simActiveAgentId })
+    if (!hdr || !ag) return
+    hdr.innerHTML =
+      '<div><strong>' + esc(ag.channelName) + '</strong> <span style="font-size:12px;opacity:.75">(' + esc(ag.id) + ')</span></div>' +
+      '<div style="font-size:12px;opacity:.85">' +
+      'Munkakör: <b>' + esc(ag.role || '—') + '</b> · ' +
+      'Modell: <code>' + esc(ag.provider + ' / ' + ag.model) + '</code> · ' +
+      'Költés: $' + Number(ag.spendUsd || 0).toFixed(4) + ' / $' + Number(ag.dailyBudgetUsd || 0).toFixed(2) +
+      '</div>'
+  }
+
+  async function refreshTestSim() {
+    const offlineEl = document.getElementById('simOfflineBanner')
+    const mainEl = document.getElementById('simMainGrid')
+    const listEl = document.getElementById('simChannelsList')
+    const budgetEl = document.getElementById('simBudgetBox')
+    if (!listEl) return
+    try {
+      const data = await apiJson('/api/test-sim/status')
+      if (offlineEl) offlineEl.hidden = true
+      if (mainEl) mainEl.style.display = 'grid'
+      simAgentsCache = data.agents || []
+      if (!simActiveAgentId && simAgentsCache.length > 0) {
+        simActiveAgentId = simAgentsCache[0].id
+      }
+      listEl.innerHTML = simAgentsCache
+        .map(function (a) {
+          const active = a.id === simActiveAgentId
+          return (
+            '<button type="button" data-sim-ch="' + esc(a.id) + '" style="text-align:left;padding:8px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;background:' +
+            (active ? 'var(--accent, #2563eb)' : 'var(--bg)') + ';color:' + (active ? '#fff' : 'inherit') + '">' +
+            '<div style="font-weight:600;font-size:13px">' + esc(a.channelName) + '</div>' +
+            '<div style="font-size:11px;opacity:.8">' + esc(a.role || a.id) + ' · ' + esc(a.model) + '</div>' +
+            '</button>'
+          )
+        })
+        .join('')
+      listEl.querySelectorAll('[data-sim-ch]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          simActiveAgentId = btn.getAttribute('data-sim-ch')
+          refreshTestSim()
+        })
+      })
+      if (budgetEl) {
+        budgetEl.innerHTML = '<b>Teszt napi keret:</b> $' + Number(data.globalSpendUsd || 0).toFixed(4) + ' / $' + Number(data.globalBudgetUsd || 0).toFixed(2)
+      }
+      renderSimChannelHeader()
+      await refreshSimMessages()
+    } catch {
+      if (offlineEl) offlineEl.hidden = false
+      if (mainEl) mainEl.style.display = 'none'
+    }
+  }
+
+  async function sendSimMessage() {
+    const input = document.getElementById('simInput')
+    const btn = document.getElementById('simSendBtn')
+    const status = document.getElementById('simSendStatus')
+    if (!input || !btn || !simActiveAgentId) return
+    const text = input.value.trim()
+    if (!text) return
+    btn.disabled = true
+    if (status) status.textContent = '🧪 [TEST] végrehajtás folyamatban...'
+    try {
+      const res = await apiJson('/api/test-sim/send', {
+        method: 'POST',
+        body: JSON.stringify({ agentId: simActiveAgentId, content: text }),
+      })
+      input.value = ''
+      if (status) status.textContent = 'Kész (' + (res.status || 'ok') + ')'
+      await refreshSimMessages()
+      await refreshTestSim()
+    } catch (err) {
+      if (status) status.textContent = 'Hiba: ' + err.message
+    } finally {
+      btn.disabled = false
+    }
+  }
+
+  function wireSimEvents() {
+    if (simWired) return
+    simWired = true
+    document.getElementById('simReloadBtn')?.addEventListener('click', refreshTestSim)
+    document.getElementById('simSendBtn')?.addEventListener('click', sendSimMessage)
+    document.getElementById('simInput')?.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        sendSimMessage()
+      }
+    })
+    document.getElementById('simSpinupBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('simSpinupBtn')
+      const out = document.getElementById('simSpinupOut')
+      if (!btn || !out) return
+      btn.disabled = true
+      out.hidden = false
+      out.textContent = 'Indítás (reload-test)...'
+      try {
+        const res = await apiJson('/api/vps/ops', { method: 'POST', body: JSON.stringify({ action: 'reload-test' }) })
+        out.textContent = res.output || 'Elindítva.'
+        refreshTestSim()
+      } catch (err) {
+        out.textContent = 'Hiba: ' + err.message
+      } finally {
+        btn.disabled = false
+      }
+    })
+  }
+
+  window.loadTestSimPage = function () {
+    wireSimEvents()
+    refreshTestSim()
+  }
+
+  wireSimEvents()
+  if (location.hash === '#testsim' || !document.getElementById('testsimPage')?.hidden) {
+    window.loadTestSimPage()
+  }
 })()

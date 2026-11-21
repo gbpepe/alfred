@@ -4,6 +4,7 @@ import { initDatabase, getDb } from '../db.js'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import { AlfredDiscordGateway, bootAlfredCore, resolveAlfredRuntimeEnv } from './index.js'
+import { startTestSimulatorServer } from './test-simulator.js'
 
 function sanitizeStartupError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
@@ -24,11 +25,27 @@ async function main(): Promise<void> {
   initDatabase(runtimeEnv.dbPath)
   const db = getDb()
 
-  const cfg = bootAlfredCore({ env })
+  let cfg = bootAlfredCore({ env })
   if (!cfg) {
     logger.error('Alfred Core bootstrap failed; check ALFRED_AGENTS_CONFIG and SOUL.md paths')
     process.exit(1)
   }
+
+  const simPortRaw = (env['ALFRED_SIM_PORT'] ?? '').trim()
+  const simPort = simPortRaw ? Number(simPortRaw) : (runtimeEnv.mode === 'test' ? 3421 : 0)
+  const simServer = simPort > 0
+    ? startTestSimulatorServer({
+      db,
+      env,
+      port: simPort,
+      getAgentsConfig: () => cfg!,
+      reloadAgentsConfig: () => {
+        const next = bootAlfredCore({ env })
+        if (next) cfg = next
+        return cfg!
+      },
+    })
+    : null
 
   const gateway = new AlfredDiscordGateway({
     db,
@@ -44,6 +61,7 @@ async function main(): Promise<void> {
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'Stopping Alfred Discord Gateway')
     gateway.stop()
+    simServer?.close()
     process.exit(0)
   }
 

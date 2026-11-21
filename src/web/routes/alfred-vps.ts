@@ -567,5 +567,38 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     return true
   }
 
+  if (path.startsWith('/api/test-sim/')) {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Test simulator access requires an owner session.' }, 403)
+      return true
+    }
+    const simPort = Number(process.env['ALFRED_SIM_PORT'] || '3421') || 3421
+    const subPath = path.slice('/api/test-sim'.length) + url.search
+    const targetUrl = `http://127.0.0.1:${simPort}${subPath}`
+    try {
+      const bodyBuf = method === 'POST' || method === 'PUT' ? await readBody(req) : undefined
+      const upstream = await fetch(targetUrl, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        ...(bodyBuf && bodyBuf.length > 0 ? { body: new Uint8Array(bodyBuf) } : {}),
+        signal: AbortSignal.timeout(120_000),
+      })
+      const text = await upstream.text()
+      res.writeHead(upstream.status, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(text)
+    } catch {
+      json(
+        res,
+        {
+          ok: false,
+          offline: true,
+          error: 'A tesztkörnyezet (alfred-test) jelenleg nem fut. Indítsd el a Spinup Test gombbal!',
+        },
+        503,
+      )
+    }
+    return true
+  }
+
   return false
 }
