@@ -282,4 +282,9 @@
     refreshVpsLogs()
     refreshConversations()
   }
+
+  wireEvents()
+  if (location.hash === '#vps' || !document.getElementById('vpsPage')?.hidden) {
+    window.loadVpsPage()
+  }
 })()
