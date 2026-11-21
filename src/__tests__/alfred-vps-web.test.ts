@@ -215,4 +215,11 @@ describe('alfred role-based model routing', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('rejects unauthenticated POST /api/vps/tts', async () => {
+    const { ctx, getStatus } = mockReqRes('POST', '/api/vps/tts', { text: 'Szia' })
+    const handled = await tryHandleAlfredVps(ctx)
+    expect(handled).toBe(true)
+    expect(getStatus()).toBe(403)
+  })
 })

@@ -447,6 +447,8 @@
     ovRow.style.display = chk.checked ? 'flex' : 'none'
 
     if (budgetInp) budgetInp.value = String(ag.dailyBudgetUsd ?? 2)
+    const voiceSel = document.getElementById('agentCoreVoiceSel')
+    if (voiceSel) voiceSel.value = ag.voice || 'Kore'
     if (displayNameInp) displayNameInp.value = ag.displayName || ag.id
     if (personaBox) { personaBox.hidden = true; personaBox.style.display = 'none'; personaBox.innerHTML = '' }
     if (toolsList) {
@@ -698,6 +700,9 @@
       inputEl.value = ''
       if (statusEl) statusEl.textContent = res.model + ' · kész'
       await refreshConversations()
+      if (vpsChatTtsEnabled && res.replyText) {
+        speakAgentText(res.replyText, agentEl.value)
+      }
     } catch (err) {
       if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
     } finally {
@@ -916,6 +921,7 @@
         if (statusEl) statusEl.textContent = 'Mentés...'
         try {
           const dispNameVal = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
+          const voiceVal = document.getElementById('agentCoreVoiceSel')?.value || 'Kore'
           const res = await apiJson('/api/vps/agent-override', {
             method: 'POST',
             body: JSON.stringify({
@@ -925,6 +931,7 @@
               provider: useOverride ? provSel.value : null,
               model: useOverride ? (chosenModel || null) : null,
               dailyBudgetUsd: Number.isFinite(budgetVal) && budgetVal >= 0.05 ? budgetVal : null,
+              voice: voiceVal,
               restartServices: true,
             }),
           })
@@ -1699,6 +1706,109 @@
     window.loadVpsPage()
   }
 
+  // === Phase 4: Voice Communication (Browser STT + AI/Browser TTS) ===
+  let vpsChatTtsEnabled = false
+  let simTtsEnabled = false
+  let activeAudioEl = null
+  let activeRecognition = null
+
+  function speakBrowserFallback(text) {
+    if (!window.speechSynthesis) return
+    try {
+      window.speechSynthesis.cancel()
+      const clean = String(text || '').replace(/```[\s\S]*?```/g, ' kódblokk ').replace(/[`*_#>~]+/g, ' ').slice(0, 800)
+      const u = new SpeechSynthesisUtterance(clean)
+      u.lang = 'hu-HU'
+      u.rate = 1.02
+      window.speechSynthesis.speak(u)
+    } catch { /* ignore */ }
+  }
+
+  async function speakAgentText(text, agentId, voiceOverride) {
+    if (!text) return
+    if (activeAudioEl) {
+      try { activeAudioEl.pause() } catch { /* ignore */ }
+      activeAudioEl = null
+    }
+    try {
+      const res = await apiJson('/api/vps/tts', {
+        method: 'POST',
+        body: JSON.stringify({ text, agentId: agentId || undefined, voice: voiceOverride || undefined }),
+      })
+      if (res.audioDataUrl) {
+        activeAudioEl = new Audio(res.audioDataUrl)
+        await activeAudioEl.play()
+        return
+      }
+    } catch { /* fallback to browser TTS */ }
+    speakBrowserFallback(text)
+  }
+
+  function toggleVoiceDictation(inputEl, btnEl, statusEl) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) {
+      if (statusEl) statusEl.textContent = 'A böngésződ nem támogatja a beszédfelismerést (Chrome / Edge ajánlott).'
+      return
+    }
+    if (activeRecognition) {
+      try { activeRecognition.stop() } catch { /* ignore */ }
+      activeRecognition = null
+      if (btnEl) { btnEl.textContent = '🎤'; btnEl.style.background = ''; btnEl.style.color = '' }
+      return
+    }
+    const rec = new SR()
+    rec.lang = 'hu-HU'
+    rec.interimResults = true
+    rec.continuous = false
+    const baseText = inputEl ? inputEl.value.trim() : ''
+    activeRecognition = rec
+    if (btnEl) { btnEl.textContent = '⏹️'; btnEl.style.background = '#dc2626'; btnEl.style.color = '#fff' }
+    if (statusEl) statusEl.textContent = '🎤 Hallgatlak (beszélj magyarul)...'
+    rec.onresult = function (event) {
+      let transcript = ''
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript
+      }
+      if (inputEl) inputEl.value = (baseText ? baseText + ' ' : '') + transcript.trim()
+    }
+    rec.onerror = function (ev) {
+      if (statusEl) statusEl.textContent = 'Mikrofon hiba: ' + (ev.error || 'ismeretlen')
+    }
+    rec.onend = function () {
+      activeRecognition = null
+      if (btnEl) { btnEl.textContent = '🎤'; btnEl.style.background = ''; btnEl.style.color = '' }
+      if (statusEl && statusEl.textContent.indexOf('Hallgatlak') >= 0) {
+        statusEl.textContent = 'Diktálás kész — nyomj Entert a küldéshez.'
+      }
+      if (inputEl) inputEl.focus()
+    }
+    rec.start()
+  }
+
+  document.getElementById('vpsChatTtsToggle')?.addEventListener('click', function () {
+    vpsChatTtsEnabled = !vpsChatTtsEnabled
+    const btn = document.getElementById('vpsChatTtsToggle')
+    if (btn) btn.textContent = vpsChatTtsEnabled ? '🔊' : '🔇'
+  })
+  document.getElementById('vpsChatMicBtn')?.addEventListener('click', function () {
+    toggleVoiceDictation(
+      document.getElementById('vpsChatInput'),
+      document.getElementById('vpsChatMicBtn'),
+      document.getElementById('vpsChatStatus'),
+    )
+  })
+  document.getElementById('agentCoreVoiceTestBtn')?.addEventListener('click', async function () {
+    const btn = document.getElementById('agentCoreVoiceTestBtn')
+    const voice = document.getElementById('agentCoreVoiceSel')?.value || 'Kore'
+    const name = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || currentModalAgentId || 'Alfréd'
+    if (btn) btn.disabled = true
+    try {
+      await speakAgentText('Szia! ' + name + ' vagyok, készen állok a közös munkára!', currentModalAgentId, voice)
+    } finally {
+      if (btn) btn.disabled = false
+    }
+  })
+
   // === Simulated Discord Test Sandbox ===
   let simActiveAgentId = null
   let simAgentsCache = []
@@ -1811,6 +1921,9 @@
       if (status) status.textContent = 'Kész (' + (res.status || 'ok') + ')'
       await refreshSimMessages()
       await refreshTestSim()
+      if (simTtsEnabled && res.replyText) {
+        speakAgentText(res.replyText, simActiveAgentId)
+      }
     } catch (err) {
       if (status) status.textContent = 'Hiba: ' + err.message
     } finally {
@@ -1823,6 +1936,18 @@
     simWired = true
     document.getElementById('simReloadBtn')?.addEventListener('click', refreshTestSim)
     document.getElementById('simSendBtn')?.addEventListener('click', sendSimMessage)
+    document.getElementById('simTtsToggle')?.addEventListener('click', function () {
+      simTtsEnabled = !simTtsEnabled
+      const btn = document.getElementById('simTtsToggle')
+      if (btn) btn.textContent = simTtsEnabled ? '🔊 Felolvasás BE' : '🔇 Felolvasás KI'
+    })
+    document.getElementById('simMicBtn')?.addEventListener('click', function () {
+      toggleVoiceDictation(
+        document.getElementById('simInput'),
+        document.getElementById('simMicBtn'),
+        document.getElementById('simSendStatus'),
+      )
+    })
     document.getElementById('simInput')?.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()

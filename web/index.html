@@ -2347,6 +2347,7 @@
           <div style="font-size:12px;opacity:.75">Teljesen elszigetelt tesztkörnyezet (<code>alfred-test.db</code> + <code>workspaces-test</code> + <code>feat/self-sandbox</code>)</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn-secondary btn-compact" id="simTtsToggle" title="Automatikus felolvasás">🔇 Felolvasás KI</button>
           <button class="btn-secondary btn-compact" id="simReloadBtn">Frissítés</button>
         </div>
       </div>
@@ -2369,7 +2370,8 @@
           <div id="simChannelHeader" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--border)"></div>
           <div id="simMessagesBox" style="height:360px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
           <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" id="simInput" class="input" placeholder="Írj a szimulált Discord csatornába..." style="flex:1">
+            <button type="button" class="btn-secondary btn-compact" id="simMicBtn" title="Beszéd bevitel (magyar STT)" style="padding:6px 10px">🎤</button>
+            <input type="text" id="simInput" class="input" placeholder="Írj vagy diktálj a szimulált Discord csatornába..." style="flex:1">
             <button class="btn-primary btn-compact" id="simSendBtn">Küldés</button>
           </div>
           <div id="simSendStatus" style="font-size:12px;opacity:.75"></div>
@@ -2875,6 +2877,17 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
               <label for="agentCoreBudgetInp" style="font-size:13px;font-weight:600;margin:0">Napi költségkeret (USD):</label>
               <input type="number" id="agentCoreBudgetInp" class="input" min="0.05" max="100" step="0.25" style="width:100px;padding:4px 8px;font-size:12px">
+              <label for="agentCoreVoiceSel" style="font-size:13px;font-weight:600;margin:0 0 0 8px">Hangprofil (TTS):</label>
+              <select id="agentCoreVoiceSel" class="input" style="padding:4px 8px;font-size:12px">
+                <option value="Kore">Kore (női · Gemini)</option>
+                <option value="Aoede">Aoede (női lágy · Gemini)</option>
+                <option value="Puck">Puck (férfi élénk · Gemini)</option>
+                <option value="Charon">Charon (férfi mély · Gemini)</option>
+                <option value="nova">Nova (női · OpenAI)</option>
+                <option value="alloy">Alloy (semleges · OpenAI)</option>
+                <option value="browser">Böngésző hang (ingyenes)</option>
+              </select>
+              <button type="button" class="btn-secondary btn-compact" id="agentCoreVoiceTestBtn" style="font-size:11px;padding:4px 8px">🔊 Próba</button>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
               <span style="font-size:12px;font-weight:600;opacity:.8">Engedélyezett eszközök:</span>
@@ -3984,6 +3997,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <strong style="font-size:14px">💬 Alfred Chat</strong>
         <div style="display:flex;gap:6px;align-items:center">
+          <button type="button" id="vpsChatTtsToggle" title="Automatikus felolvasás ki/be" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;cursor:pointer">🔇</button>
           <select id="vpsConvEnv" class="input" style="padding:3px 6px;font-size:11px">
             <option value="prod">prod</option>
             <option value="ops">ops</option>
@@ -3995,7 +4009,8 @@
       </div>
       <div id="vpsChatHistory" style="height:260px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
       <div style="display:flex;gap:6px;align-items:center">
-        <input type="text" id="vpsChatInput" class="input" placeholder="Üzenet Alfrednek..." style="flex:1;font-size:13px">
+        <button type="button" class="btn-secondary btn-compact" id="vpsChatMicBtn" title="Beszéd bevitel (magyar STT)" style="padding:5px 8px">🎤</button>
+        <input type="text" id="vpsChatInput" class="input" placeholder="Üzenet vagy diktálás..." style="flex:1;font-size:13px">
         <button type="button" class="btn-primary btn-compact" id="vpsChatSend">Küldés</button>
       </div>
       <div id="vpsChatStatus" style="font-size:11px;opacity:.75"></div>

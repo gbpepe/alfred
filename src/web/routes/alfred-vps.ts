@@ -293,6 +293,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     sys.diskSummary = disk
 
     const rawAgentsOverride = new Set<string>()
+    const rawAgentVoice = new Map<string, string>()
     try {
       const cfgFile = process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json')
       if (existsSync(cfgFile)) {
@@ -300,6 +301,9 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         for (const entry of rawParsed.agents ?? []) {
           if (typeof entry.id === 'string' && (entry.provider !== undefined || entry.model !== undefined)) {
             rawAgentsOverride.add(entry.id)
+          }
+          if (typeof entry.id === 'string' && typeof entry.voice === 'string' && entry.voice.trim()) {
+            rawAgentVoice.set(entry.id, entry.voice.trim())
           }
         }
       }
@@ -322,6 +326,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         dailyBudgetUsd: a.dailyBudgetUsd,
         tools: a.tools,
         skills: a.skills ?? [],
+        voice: rawAgentVoice.get(a.id) ?? null,
       })),
     })
     return true
@@ -389,6 +394,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       provider?: string | null
       model?: string | null
       dailyBudgetUsd?: number | null
+      voice?: string | null
       restartServices?: boolean
     }>(req)
     const agentId = typeof body?.agentId === 'string' ? body.agentId.trim() : ''
@@ -397,6 +403,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       return true
     }
     const displayName = typeof body?.displayName === 'string' && body.displayName.trim() ? body.displayName.trim().slice(0, 60) : null
+    const voiceVal = typeof body?.voice === 'string' ? body.voice.trim().slice(0, 40) : undefined
     const roleId = body.role ? normalizeRoleId(body.role) : null
     if (body.role && !roleId) {
       json(res, { error: 'Unknown role. Allowed: tervezo, technikus, szakmunkas, segedmunkas' }, 400)
@@ -433,6 +440,10 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       if (model) entry.model = model
       else delete entry.model
       if (dailyBudgetUsd !== null) entry.dailyBudgetUsd = dailyBudgetUsd
+      if (voiceVal !== undefined) {
+        if (voiceVal && voiceVal !== 'browser') entry.voice = voiceVal
+        else delete entry.voice
+      }
       atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
     }
     if (!found) {
@@ -1437,7 +1448,129 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     return true
   }
 
+  if (path === '/api/vps/tts' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'TTS requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ text?: string; voice?: string; agentId?: string }>(req)
+    const cleanText = String(body?.text || '')
+      .replace(/```[\s\S]*?```/g, ' kódblokk ')
+      .replace(/[`*_#>~[\]]+/g, ' ')
+      .replace(/https?:\/\/\S+/g, ' link ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 1200)
+    if (!cleanText) {
+      json(res, { error: 'text is required' }, 400)
+      return true
+    }
+    let chosenVoice = (body?.voice || '').trim()
+    if (!chosenVoice && body?.agentId) {
+      try {
+        const cfgFile = process.env['ALFRED_AGENTS_CONFIG'] || join(process.cwd(), 'config', 'agents.json')
+        if (existsSync(cfgFile)) {
+          const parsed = JSON.parse(readFileSync(cfgFile, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+          const entry = (parsed.agents ?? []).find((a) => a.id === body.agentId)
+          if (entry && typeof entry.voice === 'string') chosenVoice = entry.voice.trim()
+        }
+      } catch { /* ignore */ }
+    }
+    if (chosenVoice === 'browser') {
+      json(res, { ok: true, fallback: 'browser' })
+      return true
+    }
+
+    const env = { ...readEnvFile(), ...process.env }
+    const geminiKey = (env['GEMINI_API_KEY'] || '').trim()
+    const openaiKey = (env['OPENAI_API_KEY'] || '').trim()
+    const isOpenAiVoice = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']).has(chosenVoice.toLowerCase())
+
+    if (geminiKey && !isOpenAiVoice) {
+      const voiceName = chosenVoice || 'Kore'
+      try {
+        const gRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(geminiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: cleanText }] }],
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+              },
+            }),
+            signal: AbortSignal.timeout(25_000),
+          },
+        )
+        if (gRes.ok) {
+          const data = (await gRes.json()) as {
+            candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> } }>
+          }
+          const inline = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData
+          if (inline?.data) {
+            const rawBuf = Buffer.from(inline.data, 'base64')
+            const mime = (inline.mimeType || '').toLowerCase()
+            const wavBuf = mime.includes('wav') ? rawBuf : wrapPcm16AsWav(rawBuf, 24000, 1)
+            json(res, {
+              ok: true,
+              provider: 'gemini',
+              voice: voiceName,
+              audioDataUrl: `data:audio/wav;base64,${wavBuf.toString('base64')}`,
+            })
+            return true
+          }
+        }
+      } catch { /* fall through to openai/browser */ }
+    }
+
+    if (openaiKey) {
+      const oVoice = isOpenAiVoice ? chosenVoice.toLowerCase() : 'nova'
+      try {
+        const oRes = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'tts-1', voice: oVoice, input: cleanText, response_format: 'mp3' }),
+          signal: AbortSignal.timeout(25_000),
+        })
+        if (oRes.ok) {
+          const buf = Buffer.from(await oRes.arrayBuffer())
+          json(res, {
+            ok: true,
+            provider: 'openai',
+            voice: oVoice,
+            audioDataUrl: `data:audio/mpeg;base64,${buf.toString('base64')}`,
+          })
+          return true
+        }
+      } catch { /* fall through to browser */ }
+    }
+
+    json(res, { ok: true, fallback: 'browser' })
+    return true
+  }
+
   return false
+}
+
+function wrapPcm16AsWav(pcm: Buffer, sampleRate: number, channels: number): Buffer {
+  const header = Buffer.alloc(44)
+  const byteRate = sampleRate * channels * 2
+  header.write('RIFF', 0)
+  header.writeUInt32LE(36 + pcm.length, 4)
+  header.write('WAVE', 8)
+  header.write('fmt ', 12)
+  header.writeUInt32LE(16, 16)
+  header.writeUInt16LE(1, 20)
+  header.writeUInt16LE(channels, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(byteRate, 28)
+  header.writeUInt16LE(channels * 2, 32)
+  header.writeUInt16LE(16, 34)
+  header.write('data', 36)
+  header.writeUInt32LE(pcm.length, 40)
+  return Buffer.concat([header, pcm])
 }
 
 const SAFE_SKILL_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i
