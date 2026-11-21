@@ -313,6 +313,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       roles: cfg ? Object.values(cfg.roles) : [],
       agents: (cfg?.agents ?? []).map((a) => ({
         id: a.id,
+        displayName: a.displayName,
         role: a.role ?? null,
         hasOverride: rawAgentsOverride.has(a.id),
         channelName: a.channelName,
@@ -1220,6 +1221,181 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     } catch (err) {
       json(res, { error: err instanceof Error ? err.message : String(err) }, 500)
     }
+    return true
+  }
+
+  if (path === '/api/vps/agents/suggest-persona' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Suggesting personas requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ agentId?: string; role?: string; hint?: string }>(req)
+    const env = { ...readEnvFile(), ...process.env }
+    const cfg = loadAlfredAgentsConfig({ env })
+    const baseAgent =
+      (body.agentId ? cfg?.agents.find((a) => a.id === body.agentId) : undefined) ?? cfg?.agents[0]
+    if (!baseAgent) {
+      json(res, { error: 'Nincs konfigurált Alfred Core ügynök a javaslathoz.' }, 400)
+      return true
+    }
+    const roleLabel = (body.role && cfg?.roles?.[normalizeRoleId(body.role) ?? 'tervezo']?.label) || body.role || baseAgent.role || 'AI asszisztens'
+    const personaAgent: AlfredAgentDefinition = {
+      ...baseAgent,
+      tools: [],
+      resolvedSystemPrompt:
+        'You are a creative branding & persona designer for Alfred AI agents. Output ONLY valid JSON (no markdown fences) with keys: "suggestions" (array of 4 objects: { "displayName": string, "tagline": string (short Hungarian subtitle max 40 chars), "emoji": single emoji, "color": hex color like "#2563eb" }) and "soulDraft" (concise Hungarian SOUL.md Markdown starting with "# <Name>", max 12 lines).',
+    }
+    try {
+      const outcome = await runHybridAgentTurn({
+        db: getDb(),
+        agent: personaAgent,
+        globalDailyBudgetUsd: cfg.global.dailyBudgetUsd,
+        userMessage: `Adj 4 kreatív név- és személyiség-javaslatot egy "${roleLabel}" munkakörű ügynöknek (${body.agentId || 'új ügynök'}).${body.hint ? ` Megjegyzés: ${body.hint}` : ''}`,
+        conversationHistory: [],
+        sessionId: `persona-gen:${Date.now()}`,
+        chatId: 'web-persona-gen',
+        env,
+        nowSec: Math.floor(Date.now() / 1000),
+      })
+      if (!outcome.ok) {
+        json(res, { error: outcome.discordMessage }, 429)
+        return true
+      }
+      const raw = outcome.replyText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+      const parsed = JSON.parse(raw) as {
+        suggestions?: Array<{ displayName?: string; tagline?: string; emoji?: string; color?: string }>
+        soulDraft?: string
+      }
+      json(res, {
+        ok: true,
+        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 5) : [],
+        soulDraft: typeof parsed.soulDraft === 'string' ? parsed.soulDraft : '',
+      })
+    } catch (err) {
+      json(res, { error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+    return true
+  }
+
+  if (path === '/api/vps/agents/personalize' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Personalizing agents requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ agentId?: string; displayName?: string; avatarDataUrl?: string }>(req)
+    const agentId = (body?.agentId || '').trim()
+    if (!agentId || !/^[a-zA-Z0-9_-]{1,64}$/.test(agentId)) {
+      json(res, { error: 'Valid agentId is required' }, 400)
+      return true
+    }
+    const displayName = typeof body?.displayName === 'string' ? body.displayName.trim().slice(0, 60) : ''
+    if (displayName) {
+      for (const cfgPath of resolveWritableAgentConfigPaths()) {
+        const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+        const entry = (parsed.agents ?? []).find((a) => a.id === agentId)
+        if (!entry) continue
+        entry.displayName = displayName
+        atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+      }
+    }
+    let avatarSaved = false
+    if (typeof body?.avatarDataUrl === 'string' && body.avatarDataUrl.startsWith('data:image/png;base64,')) {
+      const b64 = body.avatarDataUrl.slice('data:image/png;base64,'.length)
+      const buf = Buffer.from(b64, 'base64')
+      if (buf.length === 0 || buf.length > 1_500_000) {
+        json(res, { error: 'Avatar PNG size must be between 1 byte and 1.5 MB' }, 400)
+        return true
+      }
+      const dir = join(process.cwd(), 'agents', agentId)
+      mkdirSync(dir, { recursive: true })
+      for (const ext of ['.jpg', '.jpeg', '.webp']) {
+        const old = join(dir, `avatar${ext}`)
+        if (existsSync(old)) rmSync(old, { force: true })
+      }
+      atomicWriteFileSync(join(dir, 'avatar.png'), buf)
+      avatarSaved = true
+    }
+    json(res, {
+      ok: true,
+      agentId,
+      ...(displayName ? { displayName } : {}),
+      avatarSaved,
+      avatarUrl: avatarSaved ? `/api/agents/${encodeURIComponent(agentId)}/avatar?t=${Date.now()}` : undefined,
+    })
+    return true
+  }
+
+  if (path === '/api/vps/agents/generate-avatar' && method === 'POST') {
+    if (!mayActAsOwner(ctx.auth, req)) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Generating AI avatars requires an owner session.' }, 403)
+      return true
+    }
+    const body = await readJsonBody<{ agentId?: string; prompt?: string }>(req)
+    const agentId = (body?.agentId || '').trim()
+    if (!agentId || !/^[a-zA-Z0-9_-]{1,64}$/.test(agentId)) {
+      json(res, { error: 'Valid agentId is required' }, 400)
+      return true
+    }
+    const env = { ...readEnvFile(), ...process.env }
+    const openaiKey = (env['OPENAI_API_KEY'] || '').trim()
+    const geminiKey = (env['GEMINI_API_KEY'] || '').trim()
+    const desc = (body?.prompt || `Minimalist modern flat vector pictogram avatar icon for an AI assistant named ${agentId}, clean dark slate background, vibrant accent, no text`).slice(0, 400)
+
+    let pngBuf: Buffer | null = null
+    let lastErr = ''
+    if (geminiKey) {
+      try {
+        const resImg = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(geminiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ instances: [{ prompt: desc }], parameters: { sampleCount: 1, aspectRatio: '1:1' } }),
+            signal: AbortSignal.timeout(30_000),
+          },
+        )
+        if (resImg.ok) {
+          const data = (await resImg.json()) as { predictions?: Array<{ bytesBase64Encoded?: string }> }
+          const b64 = data.predictions?.[0]?.bytesBase64Encoded
+          if (b64) pngBuf = Buffer.from(b64, 'base64')
+        } else {
+          lastErr = `Gemini Imagen HTTP ${resImg.status}`
+        }
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+      }
+    }
+    if (!pngBuf && openaiKey) {
+      try {
+        const resImg = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'gpt-image-1', prompt: desc, size: '1024x1024', response_format: 'b64_json' }),
+          signal: AbortSignal.timeout(35_000),
+        })
+        if (resImg.ok) {
+          const data = (await resImg.json()) as { data?: Array<{ b64_json?: string }> }
+          const b64 = data.data?.[0]?.b64_json
+          if (b64) pngBuf = Buffer.from(b64, 'base64')
+        } else {
+          lastErr = `OpenAI Image HTTP ${resImg.status}`
+        }
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+      }
+    }
+    if (!pngBuf) {
+      json(res, { error: `AI avatar generálás nem elérhető (${lastErr || 'nincs GEMINI_API_KEY vagy OPENAI_API_KEY'}). Használd az azonnali Piktogram Stúdiót!` }, 400)
+      return true
+    }
+    const dir = join(process.cwd(), 'agents', agentId)
+    mkdirSync(dir, { recursive: true })
+    for (const ext of ['.jpg', '.jpeg', '.webp']) {
+      const old = join(dir, `avatar${ext}`)
+      if (existsSync(old)) rmSync(old, { force: true })
+    }
+    atomicWriteFileSync(join(dir, 'avatar.png'), pngBuf)
+    json(res, { ok: true, agentId, avatarUrl: `/api/agents/${encodeURIComponent(agentId)}/avatar?t=${Date.now()}` })
     return true
   }
 

@@ -372,6 +372,8 @@
     const roleSel = document.getElementById('agentCoreRoleSel')
     const provSel = document.getElementById('agentCoreProvSel')
     const budgetInp = document.getElementById('agentCoreBudgetInp')
+    const displayNameInp = document.getElementById('agentCoreDisplayNameInp')
+    const personaBox = document.getElementById('agentCorePersonaSuggestions')
     const toolsList = document.getElementById('agentCoreToolsList')
     const statusEl = document.getElementById('agentSettingsSaveStatus')
     const coreCh = document.getElementById('agentCoreChannelBox')
@@ -421,6 +423,8 @@
     ovRow.style.display = chk.checked ? 'flex' : 'none'
 
     if (budgetInp) budgetInp.value = String(ag.dailyBudgetUsd ?? 2)
+    if (displayNameInp) displayNameInp.value = ag.displayName || ag.id
+    if (personaBox) { personaBox.hidden = true; personaBox.innerHTML = '' }
     if (toolsList) {
       const tools = Array.isArray(ag.tools) ? ag.tools : []
       toolsList.innerHTML = tools.length
@@ -887,6 +891,10 @@
             }),
           })
           const fileSaves = []
+          const dispNameVal = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || ''
+          if (dispNameVal) {
+            fileSaves.push(apiJson('/api/vps/agents/personalize', { method: 'POST', body: JSON.stringify({ agentId: currentModalAgentId, displayName: dispNameVal }) }))
+          }
           if (coreFileDirty.claude) {
             const val = document.getElementById('editClaudeMd')?.value ?? ''
             fileSaves.push(apiJson('/api/agents/' + encodeURIComponent(currentModalAgentId) + '/claude-md', { method: 'PUT', body: JSON.stringify({ content: val }) }))
@@ -1362,6 +1370,151 @@
         showOptimizeResult(msgEl, beforeText, opt, function () { editor.value = beforeText })
       } catch (err) {
         if (msgEl) { msgEl.hidden = false; msgEl.textContent = 'Hiba: ' + err.message }
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    // Phase 3: Pictogram Studio, AI Avatar & AI Persona Suggestions
+    const pictoCanvas = document.getElementById('agentPictoCanvas')
+    const pictoIcon = document.getElementById('agentPictoIconSel')
+    const pictoC1 = document.getElementById('agentPictoColor1')
+    const pictoC2 = document.getElementById('agentPictoColor2')
+    const pictoStatus = document.getElementById('agentPictoStatus')
+
+    function drawPictogramCanvas() {
+      if (!pictoCanvas) return
+      const ctx = pictoCanvas.getContext('2d')
+      if (!ctx) return
+      const w = pictoCanvas.width
+      const h = pictoCanvas.height
+      const grad = ctx.createLinearGradient(0, 0, w, h)
+      grad.addColorStop(0, pictoC1 ? pictoC1.value : '#2563eb')
+      grad.addColorStop(1, pictoC2 ? pictoC2.value : '#7c3aed')
+      ctx.clearRect(0, 0, w, h)
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.font = Math.round(w * 0.48) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(pictoIcon ? pictoIcon.value : '🤖', w / 2, h / 2 + 4)
+    }
+
+    drawPictogramCanvas()
+    pictoIcon?.addEventListener('change', drawPictogramCanvas)
+    pictoC1?.addEventListener('input', drawPictogramCanvas)
+    pictoC2?.addEventListener('input', drawPictogramCanvas)
+
+    function refreshModalAvatarUrl(url) {
+      const avEl = document.getElementById('agentDetailAvatar')
+      if (avEl && url) {
+        avEl.innerHTML = '<img src="' + esc(url) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+      }
+    }
+
+    document.getElementById('agentPictoSaveBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId || !pictoCanvas) return
+      const btn = document.getElementById('agentPictoSaveBtn')
+      drawPictogramCanvas()
+      const dataUrl = pictoCanvas.toDataURL('image/png')
+      if (btn) btn.disabled = true
+      if (pictoStatus) pictoStatus.textContent = 'Mentés...'
+      try {
+        const res = await apiJson('/api/vps/agents/personalize', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, avatarDataUrl: dataUrl }),
+        })
+        if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
+        if (pictoStatus) pictoStatus.textContent = '✓ Piktogram avatar elmentve!'
+      } catch (err) {
+        if (pictoStatus) pictoStatus.textContent = 'Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    document.getElementById('agentAiAvatarGenBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId) return
+      const btn = document.getElementById('agentAiAvatarGenBtn')
+      const dispName = document.getElementById('agentCoreDisplayNameInp')?.value.trim() || currentModalAgentId
+      if (btn) btn.disabled = true
+      if (pictoStatus) pictoStatus.textContent = '✨ AI avatar generálása...'
+      try {
+        const res = await apiJson('/api/vps/agents/generate-avatar', {
+          method: 'POST',
+          body: JSON.stringify({
+            agentId: currentModalAgentId,
+            prompt: 'Clean minimalist modern flat avatar icon for an AI agent named ' + dispName + ', bold geometric motif, vibrant gradient background, no text',
+          }),
+        })
+        if (res.avatarUrl) refreshModalAvatarUrl(res.avatarUrl)
+        if (pictoStatus) pictoStatus.textContent = '✓ AI avatar elkészült és elmentve!'
+      } catch (err) {
+        if (pictoStatus) pictoStatus.textContent = err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    document.getElementById('agentCoreSuggestPersonaBtn')?.addEventListener('click', async function () {
+      if (!currentModalAgentId) return
+      const btn = document.getElementById('agentCoreSuggestPersonaBtn')
+      const box = document.getElementById('agentCorePersonaSuggestions')
+      const roleSel = document.getElementById('agentCoreRoleSel')
+      if (!box) return
+      if (btn) btn.disabled = true
+      box.hidden = false
+      box.style.display = 'flex'
+      box.innerHTML = '<div style="font-size:12px;opacity:.8">✨ Név- és személyiség-javaslatok generálása...</div>'
+      try {
+        const res = await apiJson('/api/vps/agents/suggest-persona', {
+          method: 'POST',
+          body: JSON.stringify({ agentId: currentModalAgentId, role: roleSel ? roleSel.value : undefined }),
+        })
+        const items = res.suggestions || []
+        const soulDraft = res.soulDraft || ''
+        const chips = items
+          .map(function (s, idx) {
+            return (
+              '<button type="button" class="btn-secondary btn-compact" data-persona-pick="' + idx + '" style="text-align:left;padding:5px 8px;font-size:12px">' +
+              esc((s.emoji || '🤖') + ' ' + (s.displayName || '')) +
+              (s.tagline ? ' <span style="opacity:.7">— ' + esc(s.tagline) + '</span>' : '') +
+              '</button>'
+            )
+          })
+          .join('')
+        box.innerHTML =
+          '<div style="font-size:11px;font-weight:600;opacity:.75">Kattints egy névre az alkalmazáshoz:</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' + (chips || '<span>Nincs javaslat</span>') + '</div>' +
+          (soulDraft ? '<div style="margin-top:4px"><button type="button" class="btn-secondary btn-compact" id="applyPersonaSoulBtn" style="font-size:11px">SOUL.md vázlat beillesztése</button></div>' : '')
+
+        box.querySelectorAll('[data-persona-pick]').forEach(function (pickBtn) {
+          pickBtn.addEventListener('click', function () {
+            const s = items[Number(pickBtn.getAttribute('data-persona-pick'))]
+            if (!s) return
+            const nameInp = document.getElementById('agentCoreDisplayNameInp')
+            if (nameInp && s.displayName) nameInp.value = s.displayName
+            if (s.emoji && pictoIcon) {
+              const hasOpt = Array.from(pictoIcon.options).some(function (o) { return o.value === s.emoji })
+              if (hasOpt) pictoIcon.value = s.emoji
+            }
+            if (s.color && /^#[0-9a-f]{6}$/i.test(s.color) && pictoC1) pictoC1.value = s.color
+            drawPictogramCanvas()
+          })
+        })
+        document.getElementById('applyPersonaSoulBtn')?.addEventListener('click', function () {
+          const soulArea = document.getElementById('editSoulMd')
+          if (soulArea && soulDraft) {
+            soulArea.value = soulDraft
+            coreFileDirty.soul = true
+            const det = soulArea.closest('details')
+            if (det) det.open = true
+          }
+        })
+      } catch (err) {
+        box.innerHTML = '<div style="font-size:12px;color:#dc2626">Hiba: ' + esc(err.message) + '</div>'
       } finally {
         if (btn) btn.disabled = false
       }

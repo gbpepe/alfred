@@ -2747,6 +2747,35 @@
             </div>
           </div>
           <div class="detail-avatar-gallery" id="detailAvatarGallery" hidden>
+            <div id="agentPictogramStudio" style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:12px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+                <strong style="font-size:12px">🎨 Piktogram & AI Avatar Stúdió</strong>
+                <button type="button" class="btn-secondary btn-compact" id="agentAiAvatarGenBtn" style="font-size:11px;padding:3px 8px">✨ AI Avatar generálása</button>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <canvas id="agentPictoCanvas" width="128" height="128" style="width:56px;height:56px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></canvas>
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:180px">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                    <select id="agentPictoIconSel" class="input" style="padding:3px 6px;font-size:13px">
+                      <option value="🏛️">🏛️ Tervező</option>
+                      <option value="💻">💻 Kódoló</option>
+                      <option value="🧪">🧪 QA / Teszt</option>
+                      <option value="🛠️">🛠️ Ops / Technikus</option>
+                      <option value="🧠">🧠 Stratéga</option>
+                      <option value="🚀">🚀 Fejlesztő</option>
+                      <option value="🛡️">🛡️ Biztonság</option>
+                      <option value="📊">📊 Elemző</option>
+                      <option value="⚡">⚡ Gyors</option>
+                      <option value="🤖">🤖 Asszisztens</option>
+                    </select>
+                    <input type="color" id="agentPictoColor1" value="#2563eb" title="Háttérszín 1" style="width:32px;height:28px;border:none;background:none;cursor:pointer">
+                    <input type="color" id="agentPictoColor2" value="#7c3aed" title="Háttérszín 2" style="width:32px;height:28px;border:none;background:none;cursor:pointer">
+                    <button type="button" class="btn-primary btn-compact" id="agentPictoSaveBtn" style="font-size:11px;padding:4px 10px">Piktogram mentése</button>
+                  </div>
+                  <div id="agentPictoStatus" style="font-size:11px;opacity:.8"></div>
+                </div>
+              </div>
+            </div>
             <label class="form-label-sm" data-i18n="agents.detail.select_avatar">Válassz új avatart</label>
             <div class="avatar-grid" id="detailAvatarGrid"></div>
             <div class="avatar-upload-divider"><span>vagy</span></div>
@@ -2812,6 +2841,12 @@
         <!-- Tab: Settings -->
         <div class="tab-panel" id="tabSettings" hidden>
           <div id="agentCoreOverrideBox" hidden style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input);margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <label for="agentCoreDisplayNameInp" style="font-size:13px;font-weight:600;margin:0">Megjelenített név:</label>
+              <input type="text" id="agentCoreDisplayNameInp" class="input" placeholder="pl. Architekt Alfréd" style="flex:1;min-width:150px;padding:4px 8px;font-size:12px">
+              <button type="button" class="btn-secondary btn-compact" id="agentCoreSuggestPersonaBtn" style="font-size:12px">✨ Név &amp; SOUL javaslat</button>
+            </div>
+            <div id="agentCorePersonaSuggestions" hidden style="display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
               <label for="agentCoreRoleSel" style="font-size:13px;font-weight:600;margin:0">Munkakör:</label>
               <select id="agentCoreRoleSel" class="input" style="padding:4px 8px;font-size:12px"></select>
