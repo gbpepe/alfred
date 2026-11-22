@@ -998,13 +998,19 @@
           if (c.authMethod === 'oauth') {
             authBadge = '<span title="' + esc(c.authDetail || 'OAuth') + '" style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#2563eb">OAuth előfizetés OK</span>'
           } else if (c.authMethod === 'api_key') {
-            authBadge = '<span title="' + esc(c.authDetail || 'API kulcs') + '" style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#7c3aed">API kulcs (.env)</span>'
+            authBadge = '<span title="' + esc(c.authDetail || 'API kulcs') + '" style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;color:#fff;background:#dc2626;box-shadow:0 0 0 2px rgba(220,38,38,0.28)">⚠ API kulcs (FIZETŐS!)</span>'
           } else {
             authBadge = '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#d97706">nincs belépve</span>'
           }
-          const authDetailLine = c.authDetail
+          const apiKeyWarnBox = c.authMethod === 'api_key'
+            ? '<div style="padding:6px 8px;border-radius:6px;background:rgba(220,38,38,0.12);border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:600;line-height:1.35">⚠ FIZETŐS API MÓD: tokenenként számláz (' + esc(c.authDetail || '.env') + ')! Lépj be OAuth előfizetéssel a „Belépés / Token” gombbal.</div>'
+            : ''
+          const authDetailLine = c.authDetail && c.authMethod !== 'api_key'
             ? '<div style="font-size:11px;opacity:.75">Auth forrás: <code>' + esc(c.authDetail) + '</code></div>'
             : ''
+          const cardBorderStyle = c.authMethod === 'api_key'
+            ? 'border:2px solid #dc2626;background:rgba(220,38,38,0.04)'
+            : 'border:1px solid var(--border);background:var(--bg)'
           const tokenPlaceholder =
             c.id === 'claude'
               ? 'sk-ant-oat01-... vagy ANTHROPIC_API_KEY vagy ~/.claude/.credentials.json'
@@ -1012,13 +1018,14 @@
                 ? 'OPENAI_API_KEY (sk-...) vagy ~/.codex/auth.json'
                 : 'GEMINI_API_KEY (AIza...) vagy ~/.gemini/oauth_creds.json'
           return (
-            '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
+            '<div style="padding:10px;' + cardBorderStyle + ';border-radius:8px;display:flex;flex-direction:column;gap:6px">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +
             '<strong>' + esc(c.provider) + '</strong>' +
             '<div style="display:flex;gap:4px;flex-wrap:wrap">' + instBadge + authBadge + '</div>' +
             '</div>' +
             '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word">' + esc(c.packageName) + '</div>' +
             '<div style="font-size:11px;opacity:.7;word-break:break-all">' + esc(c.resolvedPath || c.prefix || '') + '</div>' +
+            apiKeyWarnBox +
             authDetailLine +
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-action="install" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">' + (c.installed ? 'Frissítés' : 'Telepítés') + '</button>' +
