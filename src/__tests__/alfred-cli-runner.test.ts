@@ -892,6 +892,15 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
           authMethod: 'api_key',
           authDetail: 'GEMINI_API_KEY (.env)',
         },
+        {
+          provider: 'agy-cli',
+          binary: 'agy',
+          installed: true,
+          version: '0.9.0',
+          authConfigured: true,
+          authMethod: 'api_key',
+          authDetail: 'GEMINI_API_KEY (.env)',
+        },
       ])
     })
   })
@@ -1066,7 +1075,7 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
       expect(calls[0].env.DISCORD_BOT_TOKEN).toBeUndefined()
 
       const inventory = await getCliInventory({ env, processRunner: runner })
-      expect(inventory).toHaveLength(3)
+      expect(inventory).toHaveLength(4)
       const claudeItem = inventory.find((i) => i.id === 'claude')!
       expect(claudeItem.installed).toBe(true)
       expect(claudeItem.version).toBe('1.5.0 (Claude Code)')
@@ -1114,7 +1123,7 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
         const payload = validGet.getJson()
         expect(payload['ok']).toBe(true)
         expect(Array.isArray(payload['clis'])).toBe(true)
-        expect((payload['clis'] as Array<{ id: string }>).map((c) => c.id)).toEqual(['claude', 'codex', 'gemini'])
+        expect((payload['clis'] as Array<{ id: string }>).map((c) => c.id)).toEqual(['claude', 'codex', 'gemini', 'agy'])
 
         // 5) Invalid provider on POST /api/admin/clis/evil/install with valid token -> 400
         const badProv = makeMockHttpCtx('POST', '/api/admin/clis/evil-pkg/install', {

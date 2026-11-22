@@ -44,7 +44,7 @@ export function agentSpend(
   for (const r of rows) {
     const i = r.i ?? 0, o = r.o ?? 0, cw = r.cw ?? 0, cr = r.cr ?? 0
     tokens.input += i; tokens.output += o; tokens.cache_write += cw; tokens.cache_read += cr
-    if (r.model != null && /^(?:claude|codex|gemini)-cli(?::|$)/i.test(r.model.trim())) {
+    if (r.model != null && /^(?:claude|codex|gemini|agy)-cli(?::|$)/i.test(r.model.trim())) {
       continue
     }
     const p = r.model != null && Object.prototype.hasOwnProperty.call(prices, r.model) ? prices[r.model] : undefined

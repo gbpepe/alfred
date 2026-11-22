@@ -126,18 +126,28 @@ const PROVIDER_ENV_ALLOWLIST: Record<AlfredCliProviderName, readonly string[]> =
     'GOOGLE_APPLICATION_CREDENTIALS',
     'GEMINI_CLI_HOME',
   ],
+  'agy-cli': [
+    'AGY_ADC_AUTH',
+    'AGY_CONFIG_DIR',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+  ],
 }
 
 const PROVIDER_CONFIG_DIR_VAR: Record<AlfredCliProviderName, string> = {
   'claude-cli': 'CLAUDE_CONFIG_DIR',
   'codex-cli': 'CODEX_HOME',
   'gemini-cli': 'GEMINI_CLI_HOME',
+  'agy-cli': 'AGY_CONFIG_DIR',
 }
 
 const PROVIDER_BIN_ENV: Record<AlfredCliProviderName, { envKey: string; defaultBin: string }> = {
   'claude-cli': { envKey: 'ALFRED_CLAUDE_BIN', defaultBin: 'claude' },
   'codex-cli': { envKey: 'ALFRED_CODEX_BIN', defaultBin: 'codex' },
   'gemini-cli': { envKey: 'ALFRED_GEMINI_BIN', defaultBin: 'gemini' },
+  'agy-cli': { envKey: 'ALFRED_AGY_BIN', defaultBin: 'agy' },
 }
 
 const WRITE_TOOLS = new Set(['fs_write', 'bash', 'git'])
@@ -379,7 +389,7 @@ export function buildSanitizedCliEnv(
     } else if (provider === 'codex-cli') {
       delete out['OPENAI_API_KEY']
       delete out['CODEX_API_KEY']
-    } else if (provider === 'gemini-cli') {
+    } else if (provider === 'gemini-cli' || provider === 'agy-cli') {
       delete out['GEMINI_API_KEY']
       delete out['GOOGLE_API_KEY']
       delete out['GOOGLE_APPLICATION_CREDENTIALS']
@@ -516,6 +526,15 @@ export function buildCliCommandSpec(params: {
       args.push('-m', model)
     }
     args.push(combinedPrompt)
+    return { command, args, promptText: combinedPrompt }
+  }
+
+  if (provider === 'agy-cli') {
+    const args: string[] = ['-p', combinedPrompt, '--output-format', 'json', '--disable-slash-commands']
+    if (hasExplicitModel) {
+      args.push('--model', model)
+    }
+    args.push('--mode', hasWriteTools ? 'accept-edits' : 'plan')
     return { command, args, promptText: combinedPrompt }
   }
 
@@ -945,6 +964,55 @@ function parseGeminiCliOutput(
   }
 }
 
+function parseAgyCliOutput(
+  stdout: string,
+  configuredModel: string,
+  promptText: string,
+): CliRunResult {
+  const obj = extractJsonObject(stdout)
+  if (!obj) {
+    const plain = sanitizeCliText(stdout).trim()
+    return {
+      content: plain,
+      model: canonicalCliModel('agy-cli', undefined, configuredModel),
+      usage: withFallbackTokenEstimate(
+        { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, thinkingTokens: 0 },
+        promptText,
+        plain,
+      ),
+      rawOutput: stdout,
+    }
+  }
+
+  const content =
+    typeof obj.result === 'string'
+      ? obj.result
+      : typeof obj.response === 'string'
+        ? obj.response
+        : typeof obj.text === 'string'
+          ? obj.text
+          : typeof obj.content === 'string'
+            ? obj.content
+            : ''
+
+  const reportedModel = typeof obj.model === 'string' ? obj.model : undefined
+  const u = (obj.usage ?? {}) as Record<string, unknown>
+  const usage: ProviderUsageMetrics = {
+    inputTokens: Number(u.input_tokens ?? u.inputTokens ?? u.prompt_tokens ?? 0) || 0,
+    outputTokens: Number(u.output_tokens ?? u.outputTokens ?? u.completion_tokens ?? 0) || 0,
+    cacheReadTokens: Number(u.cache_read_input_tokens ?? u.cacheReadTokens ?? 0) || 0,
+    cacheCreationTokens: Number(u.cache_creation_input_tokens ?? u.cacheCreationTokens ?? 0) || 0,
+    thinkingTokens: Number(u.thinking_tokens ?? u.thinkingTokens ?? 0) || 0,
+  }
+
+  return {
+    content,
+    model: canonicalCliModel('agy-cli', reportedModel, configuredModel),
+    usage: withFallbackTokenEstimate(usage, promptText, content),
+    rawOutput: stdout,
+  }
+}
+
 export function parseCliOutput(
   provider: AlfredCliProviderName,
   stdout: string,
@@ -953,6 +1021,7 @@ export function parseCliOutput(
 ): CliRunResult {
   if (provider === 'claude-cli') return parseClaudeCliOutput(stdout, configuredModel, promptText)
   if (provider === 'codex-cli') return parseCodexCliOutput(stdout, configuredModel, promptText)
+  if (provider === 'agy-cli') return parseAgyCliOutput(stdout, configuredModel, promptText)
   return parseGeminiCliOutput(stdout, configuredModel, promptText)
 }
 
@@ -1381,6 +1450,25 @@ export function detectCliAuthStatus(
     }
     return { method: 'none' }
   }
+  if (provider === 'agy-cli') {
+    const agyDir = env['AGY_CONFIG_DIR']?.trim() || (home ? join(home, '.gemini', 'antigravity-cli') : '')
+    const agyCredFiles = ['credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json']
+    for (const f of agyCredFiles) {
+      if (agyDir && existsSync(join(agyDir, f))) {
+        return { method: 'oauth', detail: `~/.gemini/antigravity-cli/${f}` }
+      }
+    }
+    if ((env['AGY_ADC_AUTH'] || '').trim().toLowerCase() === 'true') {
+      return { method: 'oauth', detail: 'AGY_ADC_AUTH (GCP ADC)' }
+    }
+    if ((env['GEMINI_API_KEY'] || '').trim()) {
+      return { method: 'api_key', detail: 'GEMINI_API_KEY (.env)' }
+    }
+    if ((env['GOOGLE_API_KEY'] || '').trim()) {
+      return { method: 'api_key', detail: 'GOOGLE_API_KEY (.env)' }
+    }
+    return { method: 'none' }
+  }
   // gemini-cli
   const dir = env['GEMINI_CLI_HOME']?.trim() || (home ? join(home, '.gemini') : '')
   if (dir && existsSync(join(dir, 'oauth_creds.json'))) {
@@ -1421,7 +1509,7 @@ export async function checkCliProvidersHealth(opts?: {
   const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
   const runner = opts?.processRunner ?? spawnCliProcess
   const timeoutMs = opts?.timeoutMs ?? 5_000
-  const providers: AlfredCliProviderName[] = ['claude-cli', 'codex-cli', 'gemini-cli']
+  const providers: AlfredCliProviderName[] = ['claude-cli', 'codex-cli', 'gemini-cli', 'agy-cli']
 
   return Promise.all(
     providers.map(async (provider) => {

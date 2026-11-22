@@ -20,7 +20,7 @@ async function openStagingProvidersTab(page: Page): Promise<{ pageErrors: string
 
   await page.goto(buildTargetUrl('providers'), { waitUntil: 'domcontentloaded' })
   await expect(page.locator('#providersPage')).toBeVisible({ timeout: 20_000 })
-  await expect(page.locator('#vpsCliProvidersGrid [data-cli-auth-toggle]')).toHaveCount(3, { timeout: 20_000 })
+  await expect(page.locator('#vpsCliProvidersGrid [data-cli-auth-toggle]')).toHaveCount(4, { timeout: 20_000 })
   await expect(page.locator('#vpsModelCatalogGrid [data-api-test]')).toHaveCount(5, { timeout: 20_000 })
 
   return { pageErrors, failedCliApi }
@@ -44,7 +44,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await providersLink.click()
     await expect(page.locator('#providersPage')).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('#vpsPage')).toBeHidden()
-    await expect(page.locator('#vpsCliProvidersGrid [data-cli-test]')).toHaveCount(3, { timeout: 20_000 })
+    await expect(page.locator('#vpsCliProvidersGrid [data-cli-test]')).toHaveCount(4, { timeout: 20_000 })
     await expect(page.locator('#vpsModelCatalogGrid [data-api-test]')).toHaveCount(5, { timeout: 20_000 })
 
     await page.screenshot({ path: 'test-results/staging-providers-page.png', fullPage: true })
@@ -54,7 +54,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
   test('renders all 3 CLI cards with Test buttons, collapsed drawers, toggle behavior, and red paid API-key warning on #providers', async ({ page }) => {
     const { pageErrors, failedCliApi } = await openStagingProvidersTab(page)
 
-    for (const cliId of ['claude', 'codex', 'gemini']) {
+    for (const cliId of ['claude', 'codex', 'gemini', 'agy']) {
       const drawer = page.locator(`[data-cli-auth-drawer="${cliId}"]`)
       await expect(drawer).toBeHidden()
 
@@ -81,7 +81,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
   test('tests live connection on OAuth-authenticated CLIs and runs safe OAuth start/cancel only on unauthenticated CLIs', async ({ page }) => {
     const { pageErrors, failedCliApi } = await openStagingProvidersTab(page)
 
-    for (const cliId of ['claude', 'codex', 'gemini'] as const) {
+    for (const cliId of ['claude', 'codex', 'gemini', 'agy'] as const) {
       const card = page.locator('#vpsCliProvidersGrid > div').filter({
         has: page.locator(`[data-cli-auth-toggle="${cliId}"]`),
       })

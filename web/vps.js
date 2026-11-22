@@ -1086,7 +1086,9 @@
               ? 'sk-ant-oat01-... vagy ANTHROPIC_API_KEY vagy ~/.claude/.credentials.json'
               : c.id === 'codex'
                 ? 'OPENAI_API_KEY (sk-...) vagy ~/.codex/auth.json'
-                : 'GEMINI_API_KEY (AIza...) vagy ~/.gemini/oauth_creds.json'
+                : c.id === 'agy'
+                  ? 'GEMINI_API_KEY (AIza...) vagy ~/.gemini/antigravity-cli/credentials.json'
+                  : 'GEMINI_API_KEY (AIza...) vagy ~/.gemini/oauth_creds.json'
           return (
             '<div style="padding:10px;' + cardBorderStyle + ';border-radius:8px;display:flex;flex-direction:column;gap:6px">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +

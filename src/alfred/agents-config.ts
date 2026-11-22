@@ -5,7 +5,7 @@ import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import { resolveAlfredRuntimeEnv, type AlfredRuntimeMode } from './runtime-env.js'
 
-export type AlfredCliProviderName = 'claude-cli' | 'codex-cli' | 'gemini-cli'
+export type AlfredCliProviderName = 'claude-cli' | 'codex-cli' | 'gemini-cli' | 'agy-cli'
 
 export type AlfredProviderName =
   | 'deepseek'
@@ -19,6 +19,7 @@ export const CLI_PROVIDERS: ReadonlySet<AlfredCliProviderName> = new Set<AlfredC
   'claude-cli',
   'codex-cli',
   'gemini-cli',
+  'agy-cli',
 ])
 
 export function isCliProvider(provider: string): provider is AlfredCliProviderName {
@@ -34,6 +35,7 @@ export const ALLOWED_PROVIDERS: ReadonlySet<AlfredProviderName> = new Set<Alfred
   'claude-cli',
   'codex-cli',
   'gemini-cli',
+  'agy-cli',
 ])
 
 export interface AlfredFallbackConfig {

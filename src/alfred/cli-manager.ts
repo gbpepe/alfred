@@ -20,7 +20,7 @@ import {
   type CliSpawnResult,
 } from './cli-runner.js'
 
-export type ManagedCliId = 'claude' | 'codex' | 'gemini'
+export type ManagedCliId = 'claude' | 'codex' | 'gemini' | 'agy'
 
 export interface ManagedCliDefinition {
   id: ManagedCliId
@@ -29,6 +29,7 @@ export interface ManagedCliDefinition {
   binaryName: string
   configDirName: string
   configEnvVar: string
+  installerType: 'npm' | 'agy-script'
 }
 
 export const MANAGED_CLI_REGISTRY: Readonly<Record<ManagedCliId, ManagedCliDefinition>> = {
@@ -39,6 +40,7 @@ export const MANAGED_CLI_REGISTRY: Readonly<Record<ManagedCliId, ManagedCliDefin
     binaryName: 'claude',
     configDirName: '.claude',
     configEnvVar: 'CLAUDE_CONFIG_DIR',
+    installerType: 'npm',
   },
   codex: {
     id: 'codex',
@@ -47,6 +49,7 @@ export const MANAGED_CLI_REGISTRY: Readonly<Record<ManagedCliId, ManagedCliDefin
     binaryName: 'codex',
     configDirName: '.codex',
     configEnvVar: 'CODEX_HOME',
+    installerType: 'npm',
   },
   gemini: {
     id: 'gemini',
@@ -55,6 +58,16 @@ export const MANAGED_CLI_REGISTRY: Readonly<Record<ManagedCliId, ManagedCliDefin
     binaryName: 'gemini',
     configDirName: '.gemini',
     configEnvVar: 'GEMINI_CLI_HOME',
+    installerType: 'npm',
+  },
+  agy: {
+    id: 'agy',
+    provider: 'agy-cli',
+    packageName: 'antigravity-cli (agy)',
+    binaryName: 'agy',
+    configDirName: join('.gemini', 'antigravity-cli'),
+    configEnvVar: 'AGY_CONFIG_DIR',
+    installerType: 'agy-script',
   },
 }
 
@@ -131,8 +144,9 @@ export function normalizeManagedCliId(raw: string): ManagedCliId {
   if (clean === 'claude' || clean === 'claude-cli') return 'claude'
   if (clean === 'codex' || clean === 'codex-cli') return 'codex'
   if (clean === 'gemini' || clean === 'gemini-cli') return 'gemini'
+  if (clean === 'agy' || clean === 'agy-cli' || clean === 'antigravity' || clean === 'antigravity-cli') return 'agy'
   throw new CliManagerValidationError(
-    `CLI_INVALID_PROVIDER: Unsupported CLI "${raw}". Allowed: claude, codex, gemini`,
+    `CLI_INVALID_PROVIDER: Unsupported CLI "${raw}". Allowed: claude, codex, gemini, agy`,
   )
 }
 
@@ -289,11 +303,55 @@ export async function getCliInventory(opts?: {
     timeoutMs: opts?.timeoutMs ?? 5_000,
   })
 
-  return (['claude', 'codex', 'gemini'] as ManagedCliId[]).map((id) => {
+  return (['claude', 'codex', 'gemini', 'agy'] as ManagedCliId[]).map((id) => {
     const def = MANAGED_CLI_REGISTRY[id]
     const health = healthList.find((h) => h.provider === def.provider)
     return toInventoryItem(def, health, prefix, enrichedEnv)
   })
+}
+
+const AGY_INSTALL_SCRIPT_URL = 'https://antigravity.google/cli/install.sh'
+
+async function installAgyNativeBinary(
+  binDir: string,
+  envMap: Record<string, string | undefined>,
+  prefix: string,
+  timeoutMs: number,
+  processRunner?: CliProcessRunner,
+): Promise<CliSpawnResult> {
+  const existingBin = join(binDir, 'agy')
+  if (existsSync(existingBin)) {
+    rmSync(existingBin, { force: true })
+  }
+  const childEnv = buildSanitizedNpmEnv(envMap, prefix)
+  const tempRoot = mkdtempSync(join(tmpdir(), 'alfred-agy-install-'))
+  try {
+    const scriptPath = join(tempRoot, 'install-agy.sh')
+    if (!processRunner) {
+      const resp = await fetch(AGY_INSTALL_SCRIPT_URL, { signal: AbortSignal.timeout(30_000) })
+      if (!resp.ok) {
+        throw new Error(`Failed to download Antigravity CLI installer (HTTP ${resp.status})`)
+      }
+      const scriptText = await resp.text()
+      writeFileSync(scriptPath, scriptText, { mode: 0o700 })
+    }
+    const runner = processRunner ?? spawnCliProcess
+    return await runner({
+      command: 'bash',
+      args: [scriptPath, '--dir', binDir],
+      cwd: tempRoot,
+      env: childEnv,
+      timeoutMs,
+      killGraceMs: 5_000,
+      maxOutputBytes: 2 * 1024 * 1024,
+    })
+  } finally {
+    try {
+      rmSync(tempRoot, { recursive: true, force: true })
+    } catch {
+      /* best effort */
+    }
+  }
 }
 
 /**
@@ -311,23 +369,32 @@ export async function installOrUpdateCli(
   const def = getManagedCliDefinition(rawProvider)
   const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
   const prefix = resolveCliNpmPrefix(envMap)
+  const binDir = resolveCliBinDir(prefix)
   if (prefix) {
     if (!existsSync(prefix)) {
       mkdirSync(prefix, { recursive: true })
     }
-    const binDir = resolveCliBinDir(prefix)
     if (binDir && !existsSync(binDir)) {
       mkdirSync(binDir, { recursive: true })
     }
   }
 
-  const res = await runNpmSubprocess(
-    ['install', '-g', `${def.packageName}@latest`],
-    prefix,
-    envMap,
-    opts?.timeoutMs ?? 180_000,
-    opts?.processRunner,
-  )
+  const res =
+    def.installerType === 'agy-script'
+      ? await installAgyNativeBinary(
+          binDir || join(tmpdir(), 'alfred-agy-bin'),
+          envMap,
+          prefix,
+          opts?.timeoutMs ?? 180_000,
+          opts?.processRunner,
+        )
+      : await runNpmSubprocess(
+          ['install', '-g', `${def.packageName}@latest`],
+          prefix,
+          envMap,
+          opts?.timeoutMs ?? 180_000,
+          opts?.processRunner,
+        )
 
   const combinedOutput = sanitizeCliText([res.stdout, res.stderr].filter(Boolean).join('\n')).trim()
   if (res.spawnErrorCode || res.timedOut || res.exitCode !== 0) {
@@ -367,18 +434,28 @@ export async function removeCli(
   const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
   const prefix = resolveCliNpmPrefix(envMap)
 
-  const res = await runNpmSubprocess(
-    ['uninstall', '-g', def.packageName],
-    prefix,
-    envMap,
-    opts?.timeoutMs ?? 120_000,
-    opts?.processRunner,
-  )
-
-  const combinedOutput = sanitizeCliText([res.stdout, res.stderr].filter(Boolean).join('\n')).trim()
-  if (res.spawnErrorCode || res.timedOut || res.exitCode !== 0) {
-    logger.warn({ cli: def.id, exitCode: res.exitCode, timedOut: res.timedOut }, 'CLI remove failed')
-    throw new Error(`Failed to remove ${def.packageName}: ${combinedOutput || `exit ${res.exitCode}`}`)
+  let combinedOutput = ''
+  if (def.installerType === 'agy-script') {
+    const binPath = resolveCliBinPath(prefix, def.binaryName)
+    if (binPath && existsSync(binPath)) {
+      rmSync(binPath, { force: true })
+      combinedOutput = `Removed ${binPath}`
+    } else {
+      combinedOutput = 'Binary already absent'
+    }
+  } else {
+    const res = await runNpmSubprocess(
+      ['uninstall', '-g', def.packageName],
+      prefix,
+      envMap,
+      opts?.timeoutMs ?? 120_000,
+      opts?.processRunner,
+    )
+    combinedOutput = sanitizeCliText([res.stdout, res.stderr].filter(Boolean).join('\n')).trim()
+    if (res.spawnErrorCode || res.timedOut || res.exitCode !== 0) {
+      logger.warn({ cli: def.id, exitCode: res.exitCode, timedOut: res.timedOut }, 'CLI remove failed')
+      throw new Error(`Failed to remove ${def.packageName}: ${combinedOutput || `exit ${res.exitCode}`}`)
+    }
   }
 
   let purgedAuth = false
@@ -411,12 +488,14 @@ const PRIMARY_OAUTH_FILES: Readonly<Record<ManagedCliId, string>> = {
   claude: '.credentials.json',
   codex: 'auth.json',
   gemini: 'oauth_creds.json',
+  agy: 'credentials.json',
 }
 
 const ALL_OAUTH_FILES: Readonly<Record<ManagedCliId, readonly string[]>> = {
   claude: ['.credentials.json', 'credentials.json'],
   codex: ['auth.json', 'credentials.json'],
   gemini: ['oauth_creds.json', 'google_accounts.json'],
+  agy: ['credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json'],
 }
 
 export function resolveCliAuthDir(
@@ -725,6 +804,7 @@ const ALLOWED_OAUTH_HOST_PATTERNS: Readonly<Record<ManagedCliId, RegExp>> = {
   claude: /^(?:[a-z0-9-]+\.)*(?:claude\.ai|claude\.com|anthropic\.com)$/i,
   codex: /^(?:[a-z0-9-]+\.)*(?:openai\.com|chatgpt\.com)$/i,
   gemini: /^(?:[a-z0-9-]+\.)*(?:google\.com|googleapis\.com)$/i,
+  agy: /^(?:[a-z0-9-]+\.)*(?:google\.com|googleapis\.com|antigravity\.google)$/i,
 }
 
 const PYTHON_PTY_RELAY = [
@@ -1054,7 +1134,9 @@ export async function startCliLogin(
       ? ['setup-token']
       : def.id === 'codex'
         ? ['login', '--device-auth']
-        : []
+        : def.id === 'agy'
+          ? ['auth', 'login']
+          : []
 
   const session: ActiveCliLoginSession = {
     id: def.id,
@@ -1195,7 +1277,7 @@ export async function startCliLogin(
 
   child.on('close', (code) => {
     if (session.savingToken || session.phase === 'succeeded' || session.phase === 'cancelled') return
-    if (code === 0 && (def.id === 'codex' || def.id === 'gemini')) {
+    if (code === 0 && (def.id === 'codex' || def.id === 'gemini' || def.id === 'agy')) {
       session.phase = 'succeeded'
       session.message = `${def.provider} OAuth bejelentkezés sikeres!`
     } else if (def.id === 'claude') {
