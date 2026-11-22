@@ -880,6 +880,7 @@
   }
 
   const cliLoginPollers = {}
+  const cliLoginLastFingerprint = {}
 
   function stopCliLoginPoller(cliId) {
     if (cliLoginPollers[cliId]) {
@@ -892,10 +893,26 @@
     const box = document.querySelector('[data-cli-login-box="' + cliId + '"]')
     if (!box) return
     if (!session || session.phase === 'cancelled') {
+      delete cliLoginLastFingerprint[cliId]
       box.innerHTML = ''
       box.hidden = true
       return
     }
+    const fp = JSON.stringify({
+      active: Boolean(session.active),
+      phase: session.phase || '',
+      authUrl: session.authUrl || '',
+      deviceCode: session.deviceCode || '',
+      needsCodeInput: Boolean(session.needsCodeInput),
+      message: session.message || '',
+      error: session.error || '',
+      outputTail: session.outputTail || '',
+    })
+    if (cliLoginLastFingerprint[cliId] === fp && !box.hidden) {
+      return
+    }
+    const existingCodeVal = box.querySelector('[data-cli-login-code-inp="' + cliId + '"]')?.value || ''
+    cliLoginLastFingerprint[cliId] = fp
     box.hidden = false
     let html = '<div style="font-size:11px;margin-bottom:6px;font-weight:600">' + esc(session.message || session.phase) + '</div>'
     if (session.authUrl) {
@@ -930,6 +947,11 @@
       html += '<button type="button" class="btn-secondary btn-compact" data-cli-login-cancel="' + esc(cliId) + '" style="padding:3px 8px;font-size:11px">Mégse</button>'
     }
     box.innerHTML = html
+
+    const restoredInp = box.querySelector('[data-cli-login-code-inp="' + cliId + '"]')
+    if (restoredInp && existingCodeVal) {
+      restoredInp.value = existingCodeVal
+    }
 
     const sendBtn = box.querySelector('[data-cli-login-code-send="' + cliId + '"]')
     if (sendBtn) {
@@ -1041,7 +1063,7 @@
               : '') +
             '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
             '</div>' +
-            '<div data-cli-auth-drawer="' + esc(c.id) + '" hidden style="margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
+            '<div data-cli-auth-drawer="' + esc(c.id) + '" hidden style="margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:none;flex-direction:column;gap:8px">' +
             '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-oauth-start="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Böngészős OAuth indítása</button>' +
             (!c.installed ? '<span style="font-size:11px;opacity:.7">Előbb telepítsd a CLI-t.</span>' : '') +
@@ -1087,7 +1109,7 @@
           const cliId = btn.getAttribute('data-cli-auth-toggle')
           const drawer = grid.querySelector('[data-cli-auth-drawer="' + cliId + '"]')
           if (!drawer) return
-          const opening = drawer.hidden
+          const opening = drawer.hidden || drawer.style.display === 'none'
           drawer.hidden = !opening
           drawer.style.display = opening ? 'flex' : 'none'
         })
