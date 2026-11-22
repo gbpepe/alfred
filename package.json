@@ -24,6 +24,7 @@
     "typecheck:alfred": "tsc -p tsconfig.alfred.json --noEmit",
     "syntax-check": "node --check web/app.js web/sw.js",
     "smoke": "playwright test --config=playwright.config.ts",
+    "test:staging-ui": "playwright test --config=playwright.staging.config.ts",
     "skill": "tsx scripts/skill.ts",
     "browser-verify": "playwright test --config=playwright.browser.config.ts"
   },
