@@ -116,7 +116,7 @@
       "memoryNamespace": "alfred-ops",
       "dailyBudgetUsd": 2.0,
       "allowedUserIds": [],
-      "tools": ["bash", "fs_read", "memory", "cli_manage"],
+      "tools": ["bash", "fs_read", "memory", "cli_manage", "system_storage"],
       "protectedPaths": [
         ".env",
         ".env.example",

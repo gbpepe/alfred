@@ -33,7 +33,7 @@ import {
   installOrUpdateCli,
   logoutCli,
   removeCli,
-   resolveCliBinPath,
+  resolveCliBinPath,
   resolveCliNpmPrefix,
   saveCliCredentials,
   startCliLogin,
@@ -55,6 +55,8 @@ import {
   type ChatMessage,
 } from '../../alfred/model-router.js'
 import { resolveAlfredRuntimeEnv } from '../../alfred/runtime-env.js'
+import { runHousekeeping } from '../../alfred/housekeeper.js'
+import { collectSystemTelemetry } from '../../alfred/system-monitor.js'
 import { json, readBody } from '../http-helpers.js'
 import type { RouteContext } from './types.js'
 
@@ -377,11 +379,11 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       cliQueue: getCliQueueStats(),
       global: cfg
         ? {
-            dailyBudgetUsd: cfg.global.dailyBudgetUsd,
-            defaultProvider: cfg.global.defaultProvider,
-            defaultModel: cfg.global.defaultModel,
-            runtimeMode: cfg.global.runtimeMode,
-          }
+          dailyBudgetUsd: cfg.global.dailyBudgetUsd,
+          defaultProvider: cfg.global.defaultProvider,
+          defaultModel: cfg.global.defaultModel,
+          runtimeMode: cfg.global.runtimeMode,
+        }
         : null,
       costs: costs ?? {
         globalSpendUsd: 0,
@@ -402,6 +404,62 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         tools: a.tools,
       })),
     })
+    return true
+  }
+
+  if (path === '/api/admin/system' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    const specs = resolveVpsEnvSpecs()
+    const targetSpec = specs.find((s) => s.id === 'prod') ?? specs[0]
+    const projectRoot = targetSpec?.dir ?? process.cwd()
+    const system = await collectSystemTelemetry({ projectRoot, env })
+    json(res, { ok: true, system })
+    return true
+  }
+
+  if (path === '/api/admin/system/cleanup' && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const body = await readJsonBody<{ forceNpmCacheClean?: boolean }>(req).catch(() => ({
+        forceNpmCacheClean: false,
+      }))
+      const specs = resolveVpsEnvSpecs()
+      const targetSpec = specs.find((s) => s.id === 'prod') ?? specs[0]
+      const projectRoot = targetSpec?.dir ?? process.cwd()
+      const extraDbPaths = specs.map((s) => s.dbPath).filter(Boolean)
+      let activeDb: Database.Database | null = null
+      try {
+        activeDb = getDb()
+      } catch {
+        activeDb = null
+      }
+      const before = await collectSystemTelemetry({ projectRoot, env })
+      const cleanup = await runHousekeeping({
+        db: activeDb,
+        dbPath: targetSpec?.dbPath,
+        extraDbPaths,
+        projectRoot,
+        env,
+        diskUsedPct: before.health.maxDiskUsedPct,
+        diskWarnPct: before.thresholds.diskWarnPct,
+        forceNpmCacheClean: body.forceNpmCacheClean === true,
+      })
+      const system = await collectSystemTelemetry({ projectRoot, env })
+      json(res, { ok: true, cleanup, system })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, 500)
+    }
     return true
   }
 
@@ -765,11 +823,11 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       multiTests,
       global: cfg
         ? {
-            dailyBudgetUsd: cfg.global.dailyBudgetUsd,
-            defaultProvider: cfg.global.defaultProvider,
-            defaultModel: cfg.global.defaultModel,
-            workspacesRoot: cfg.global.workspacesRoot,
-          }
+          dailyBudgetUsd: cfg.global.dailyBudgetUsd,
+          defaultProvider: cfg.global.defaultProvider,
+          defaultModel: cfg.global.defaultModel,
+          workspacesRoot: cfg.global.workspacesRoot,
+        }
         : null,
       roles: cfg ? Object.values(cfg.roles) : [],
       agents: (cfg?.agents ?? []).map((a) => ({
@@ -1352,13 +1410,13 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
            ORDER BY created_at DESC, id DESC LIMIT ?`,
         )
         .all(agentId, ns, limit) as Array<{
-        direction: string
-        sender_name: string | null
-        text: string
-        ts: string | null
-        created_at: number | null
-        source: string | null
-      }>
+          direction: string
+          sender_name: string | null
+          text: string
+          ts: string | null
+          created_at: number | null
+          source: string | null
+        }>
       for (const m of msgs) {
         const epoch = Number(m.created_at || 0)
         const ts = m.ts || (epoch ? new Date(epoch * 1000).toISOString() : '')
@@ -1382,12 +1440,12 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
            ORDER BY created_at DESC, id DESC LIMIT ?`,
         )
         .all(agentId, ns, limit) as Array<{
-        tool_name: string
-        input_summary: string | null
-        status: string | null
-        duration_ms: number | null
-        created_at: number | null
-      }>
+          tool_name: string
+          input_summary: string | null
+          status: string | null
+          duration_ms: number | null
+          created_at: number | null
+        }>
       for (const t of tools) {
         const epoch = Number(t.created_at || 0)
         const isErr = t.status && t.status !== 'ok' && t.status !== 'success'
@@ -1410,12 +1468,12 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
            ORDER BY recorded_at DESC, id DESC LIMIT ?`,
         )
         .all(agentId, ns, Math.min(limit, 40)) as Array<{
-        model: string | null
-        input_tokens: number | null
-        output_tokens: number | null
-        cost_usd: number | null
-        recorded_at: number | null
-      }>
+          model: string | null
+          input_tokens: number | null
+          output_tokens: number | null
+          cost_usd: number | null
+          recorded_at: number | null
+        }>
       for (const u of usage) {
         const epoch = Number(u.recorded_at || 0)
         events.push({

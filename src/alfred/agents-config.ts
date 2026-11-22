@@ -102,7 +102,14 @@ const DEFAULT_ROLES: Record<AlfredRoleId, AlfredRoleDefinition> = {
   },
 }
 
-export type AllowedToolName = 'bash' | 'fs_read' | 'fs_write' | 'git' | 'memory' | 'cli_manage'
+export type AllowedToolName =
+  | 'bash'
+  | 'fs_read'
+  | 'fs_write'
+  | 'git'
+  | 'memory'
+  | 'cli_manage'
+  | 'system_storage'
 
 export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'bash',
@@ -111,6 +118,7 @@ export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedTool
   'git',
   'memory',
   'cli_manage',
+  'system_storage',
 ])
 
 const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
@@ -118,6 +126,7 @@ const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'fs_write',
   'git',
   'cli_manage',
+  'system_storage',
 ])
 
 export interface AlfredAgentDefinition {

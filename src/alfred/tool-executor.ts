@@ -5,6 +5,8 @@ import type Database from 'better-sqlite3'
 import type { AlfredAgentDefinition, AllowedToolName } from './agents-config.js'
 import { getCliInventory, installOrUpdateCli, removeCli } from './cli-manager.js'
 import type { CliProcessRunner } from './cli-runner.js'
+import { runHousekeeping } from './housekeeper.js'
+import { collectSystemTelemetry } from './system-monitor.js'
 
 export interface OpenAiToolSchema {
   type: 'function'
@@ -141,6 +143,24 @@ export const TOOL_SCHEMAS: Record<AllowedToolName, OpenAiToolSchema> = {
           purgeAuth: {
             type: 'boolean',
             description: 'Only for action="remove": also delete local auth/config directory (default: false).',
+          },
+        },
+        required: ['action'],
+      },
+    },
+  },
+  system_storage: {
+    type: 'function',
+    function: {
+      name: 'system_storage',
+      description: 'Query real-time RAM, Swap, Node RSS, SSD partition saturation, and directory storage breakdown, or trigger immediate SSD housekeeping and SQLite WAL checkpoint. Restricted to alfred-ops.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['status', 'cleanup'],
+            description: 'Storage operation: status (RAM/SSD telemetry & directory breakdown) or cleanup (immediate housekeeping + SQLite WAL checkpoint).',
           },
         },
         required: ['action'],
@@ -1056,12 +1076,23 @@ const BASH_MUTATING_HINT_RE =
                     }
                     throw new Error('cli_manage is asynchronous; invoke executeWhitelistedToolAsync()')
                   }
+
+                  case 'system_storage': {
+                    if (ctx.agent.id !== 'alfred-ops') {
+                      throw new ToolNotAllowedError(
+                        ctx.agent.id,
+                        toolName,
+                        allowedTools.filter((t) => t !== 'system_storage'),
+                      )
+                    }
+                    throw new Error('system_storage is asynchronous; invoke executeWhitelistedToolAsync()')
+                  }
                 }
               }
 
 /**
- * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`).
- * Strictly enforces that `cli_manage` can only be executed by `alfred-ops`.
+ * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`, `system_storage`).
+ * Strictly enforces that `cli_manage` and `system_storage` can only be executed by `alfred-ops`.
  */
 export async function executeWhitelistedToolAsync(
   ctx: ExecuteToolContext,
@@ -1103,6 +1134,44 @@ export async function executeWhitelistedToolAsync(
       return JSON.stringify(result, null, 2)
     }
     throw new Error(`cli_manage: unsupported action "${action}". Allowed: status, install, update, remove`)
+  }
+
+  if (toolName === 'system_storage') {
+    if (ctx.agent.id !== 'alfred-ops') {
+      throw new ToolNotAllowedError(
+        ctx.agent.id,
+        toolName,
+        allowedTools.filter((t) => t !== 'system_storage'),
+      )
+    }
+
+    const action = typeof rawArgs.action === 'string' ? rawArgs.action.trim().toLowerCase() : 'status'
+    if (action === 'status') {
+      const system = await collectSystemTelemetry({
+        projectRoot: ctx.agent.workspaceAbsPath,
+        env: opts?.env,
+      })
+      return JSON.stringify({ ok: true, system }, null, 2)
+    }
+    if (action === 'cleanup') {
+      const before = await collectSystemTelemetry({
+        projectRoot: ctx.agent.workspaceAbsPath,
+        env: opts?.env,
+      })
+      const cleanup = await runHousekeeping({
+        db: ctx.db,
+        projectRoot: ctx.agent.workspaceAbsPath,
+        env: opts?.env,
+        diskUsedPct: before.health.maxDiskUsedPct,
+        diskWarnPct: before.thresholds.diskWarnPct,
+      })
+      const system = await collectSystemTelemetry({
+        projectRoot: ctx.agent.workspaceAbsPath,
+        env: opts?.env,
+      })
+      return JSON.stringify({ ok: true, cleanup, system }, null, 2)
+    }
+    throw new Error(`system_storage: unsupported action "${action}". Allowed: status, cleanup`)
   }
 
   return executeWhitelistedTool(ctx, toolName, rawArgs)

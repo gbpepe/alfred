@@ -1,5 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type Database from 'better-sqlite3'
 import { initDatabase, getDb } from '../db.js'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
@@ -7,10 +9,133 @@ import {
   AlfredDiscordGateway,
   bootAlfredCore,
   checkCliProvidersHealth,
+  checkpointSqliteWal,
+  collectSystemTelemetry,
+  createAlfredDiscordSender,
+  formatSystemAlertDiscordMessage,
   isCliProvider,
+  prefixTestReply,
   resolveAlfredRuntimeEnv,
+  runHousekeeping,
+  SystemAlertTracker,
+  type AlfredAgentsConfig,
+  type AlfredRuntimeEnv,
+  type DiscordSendFn,
+  type HousekeepingResult,
+  type SystemTelemetrySnapshot,
 } from './index.js'
 import { startTestSimulatorServer } from './test-simulator.js'
+
+export interface ResourceHeartbeatTickOptions {
+  db?: Database.Database | null
+  dbPath?: string
+  env?: Record<string, string | undefined>
+  runtimeEnv?: AlfredRuntimeEnv
+  agentsConfig?: AlfredAgentsConfig | null
+  alertTracker: SystemAlertTracker
+  sendToDiscord?: DiscordSendFn
+  projectRoot?: string
+  nowMs?: number
+  runRoutineWalCheckpoint?: boolean
+  collectTelemetryFn?: typeof collectSystemTelemetry
+  runHousekeepingFn?: typeof runHousekeeping
+}
+
+export interface ResourceHeartbeatTickResult {
+  telemetry: SystemTelemetrySnapshot
+  cleanupResult: HousekeepingResult | null
+  alertSent: boolean
+  opsChannelId: string | null
+  alertMessage: string | null
+}
+
+function resolveOpsDiscordChannelId(
+  agentsConfig: AlfredAgentsConfig | null | undefined,
+  env: Record<string, string | undefined>,
+): string | null {
+  const opsAgent = agentsConfig?.agents.find((a) => a.id === 'alfred-ops')
+  const fromAgent = opsAgent?.discordChannelId?.trim() ?? ''
+  if (fromAgent && !fromAgent.startsWith('${')) {
+    return fromAgent
+  }
+  const fromEnv = (env['DISCORD_CHANNEL_ALFRED_OPS'] ?? '').trim()
+  if (fromEnv && !fromEnv.startsWith('${')) {
+    return fromEnv
+  }
+  return null
+}
+
+/**
+ * Executes a single resource-monitoring & housekeeping heartbeat cycle:
+ * 1. Measures RAM, Swap, Node RSS, and SSD partition/directory usage.
+ * 2. If SSD usage reaches `ALFRED_DISK_WARN_PCT` (`warn` or `crit`), automatically runs full Housekeeping
+ *    (SQLite WAL checkpoint + expired batch/log/tmp cleanup + `npm cache clean --force`) and re-measures telemetry.
+ *    Otherwise optionally performs a lightweight SQLite WAL checkpoint (`runRoutineWalCheckpoint`).
+ * 3. If RAM or SSD still exceeds configured thresholds and the alert cooldown allows, sends a structured
+ *    alert to `#alfred-ops`.
+ */
+export async function runResourceHeartbeatTick(
+  opts: ResourceHeartbeatTickOptions,
+): Promise<ResourceHeartbeatTickResult> {
+  const env = opts.env ?? process.env
+  const collectFn = opts.collectTelemetryFn ?? collectSystemTelemetry
+  const housekeepingFn = opts.runHousekeepingFn ?? runHousekeeping
+
+  let telemetry = await collectFn({
+    projectRoot: opts.projectRoot,
+    env,
+  })
+  let cleanupResult: HousekeepingResult | null = null
+
+  if (telemetry.health.diskLevel !== 'ok') {
+    cleanupResult = await housekeepingFn({
+      db: opts.db,
+      dbPath: opts.dbPath,
+      projectRoot: opts.projectRoot,
+      env,
+      nowMs: opts.nowMs,
+      diskUsedPct: telemetry.health.maxDiskUsedPct,
+      diskWarnPct: telemetry.thresholds.diskWarnPct,
+    })
+    telemetry = await collectFn({
+      projectRoot: opts.projectRoot,
+      env,
+    })
+  } else if (opts.runRoutineWalCheckpoint && opts.db) {
+    checkpointSqliteWal(opts.db, opts.dbPath)
+  }
+
+  const nowMs = opts.nowMs ?? Date.now()
+  const shouldAlert = opts.alertTracker.shouldEmitAlert(
+    telemetry.health.overallLevel,
+    telemetry.thresholds.cooldownMs,
+    nowMs,
+  )
+
+  const opsChannelId = resolveOpsDiscordChannelId(opts.agentsConfig, env)
+  let alertSent = false
+  let alertMessage: string | null = null
+
+  if (shouldAlert) {
+    const rawMsg = formatSystemAlertDiscordMessage(telemetry, cleanupResult)
+    alertMessage = opts.runtimeEnv ? prefixTestReply(rawMsg, opts.runtimeEnv) : rawMsg
+    if (opsChannelId && opts.sendToDiscord) {
+      await opts.sendToDiscord(opsChannelId, alertMessage)
+      opts.alertTracker.recordAlertSent(telemetry.health.overallLevel, nowMs)
+      alertSent = true
+    } else {
+      opts.alertTracker.recordAlertSent(telemetry.health.overallLevel, nowMs)
+    }
+  }
+
+  return {
+    telemetry,
+    cleanupResult,
+    alertSent,
+    opsChannelId,
+    alertMessage,
+  }
+}
 
 function sanitizeStartupError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
@@ -92,6 +217,10 @@ async function main(): Promise<void> {
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'Stopping Alfred Discord Gateway')
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer)
+      heartbeatTimer = null
+    }
     gateway?.stop()
     simServer?.close()
     process.exit(0)
@@ -99,6 +228,50 @@ async function main(): Promise<void> {
 
   process.on('SIGINT', () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
+
+  const alertTracker = new SystemAlertTracker()
+  const rawInterval = (env['ALFRED_MONITOR_INTERVAL_MS'] ?? '').trim()
+  const parsedInterval = rawInterval ? Number(rawInterval) : NaN
+  const monitorIntervalMs =
+    Number.isFinite(parsedInterval) && parsedInterval >= 10_000 ? Math.round(parsedInterval) : 300_000
+  const canSendDiscordAlerts = !simOnly && Boolean((env['DISCORD_BOT_TOKEN'] ?? '').trim())
+  const discordSender = canSendDiscordAlerts ? createAlfredDiscordSender(env) : undefined
+  let heartbeatTickCounter = 0
+
+  const executeHeartbeat = async () => {
+    heartbeatTickCounter += 1
+    try {
+      const res = await runResourceHeartbeatTick({
+        db,
+        dbPath: runtimeEnv.dbPath,
+        env,
+        runtimeEnv,
+        agentsConfig: cfg,
+        alertTracker,
+        sendToDiscord: discordSender,
+        runRoutineWalCheckpoint: heartbeatTickCounter % 6 === 1,
+      })
+      if (res.telemetry.health.overallLevel !== 'ok') {
+        logger.warn(
+          {
+            level: res.telemetry.health.overallLevel,
+            reasons: res.telemetry.health.reasons,
+            alertSent: res.alertSent,
+            reclaimedBytes: res.cleanupResult?.totalReclaimedBytes ?? 0,
+          },
+          'System resource threshold exceeded during heartbeat check',
+        )
+      }
+    } catch (err) {
+      logger.warn({ err: sanitizeStartupError(err) }, 'Resource heartbeat check failed')
+    }
+  }
+
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = setInterval(() => {
+    void executeHeartbeat()
+  }, monitorIntervalMs)
+  heartbeatTimer.unref?.()
+  void executeHeartbeat()
 
   if (!gateway) {
     logger.info(
@@ -129,7 +302,14 @@ async function main(): Promise<void> {
   )
 }
 
-main().catch((err) => {
-  logger.error({ error: sanitizeStartupError(err) }, 'Alfred runner failed to start')
-  process.exit(1)
-})
+const isDirectRun =
+  typeof process.argv[1] === 'string' &&
+  fileURLToPath(import.meta.url).replace(/\\/g, '/').toLowerCase() ===
+    process.argv[1].replace(/\\/g, '/').toLowerCase()
+
+if (isDirectRun) {
+  main().catch((err) => {
+    logger.error({ error: sanitizeStartupError(err) }, 'Alfred runner failed to start')
+    process.exit(1)
+  })
+}

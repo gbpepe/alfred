@@ -20,6 +20,8 @@ export * from './discord-adapter.js'
 export * from './discord-gateway.js'
 export * from './runtime-env.js'
 export * from './vertex-auth.js'
+export * from './system-monitor.js'
+export * from './housekeeper.js'
 
 interface DiscordAccessFile {
   dmPolicy?: 'pairing' | 'allowlist' | 'disabled'

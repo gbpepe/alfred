@@ -185,8 +185,8 @@ else
   chown -R "$ALFRED_USER:$ALFRED_USER" "$ALFRED_HOME/.local" "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.config"
   chmod 700 "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini"
 
-  mkdir -p "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude" \
-    "$OPS_DIR/store" "$OPS_DIR/.claude" "$WORKTREES_DIR"
+  mkdir -p "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude" "$PROD_DIR/logs" "$PROD_DIR/batch" \
+    "$OPS_DIR/store" "$OPS_DIR/.claude" "$OPS_DIR/logs" "$WORKTREES_DIR"
   chown -R "$ALFRED_USER:$ALFRED_USER" "$PROD_DIR" "$OPS_DIR" "$WORKTREES_DIR"
 
   mkdir -p "$ETC_ALFRED_DIR"
@@ -232,6 +232,11 @@ if [[ -d "$PROD_DIR/deploy" ]]; then
       cp "$PROD_DIR/deploy/alfred-ops.sudoers.example" /etc/sudoers.d/alfred-ops
       chmod 0440 /etc/sudoers.d/alfred-ops
       visudo -cf /etc/sudoers.d/alfred-ops
+    fi
+
+    if [[ -f "$PROD_DIR/deploy/alfred-logrotate.conf" ]]; then
+      cp "$PROD_DIR/deploy/alfred-logrotate.conf" /etc/logrotate.d/alfred
+      chmod 0644 /etc/logrotate.d/alfred
     fi
   fi
 else

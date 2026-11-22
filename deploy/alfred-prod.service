@@ -12,7 +12,7 @@ EnvironmentFile=/opt/alfred-prod/.env
 Environment=NODE_ENV=production
 Environment=ALFRED_ENV=production
 Environment=ALFRED_DB_PATH=store/alfred-prod.db
-Environment=NODE_OPTIONS=--max-old-space-size=384
+Environment=NODE_OPTIONS=--max-old-space-size=1536
 Environment=PATH=/home/alfred/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=NPM_CONFIG_PREFIX=/home/alfred/.local
 ExecStart=/usr/bin/node /opt/alfred-prod/dist/alfred/run.js
@@ -20,11 +20,10 @@ Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=15s
 
-# Sized for 2 GB RAM VPS alongside alfred-ops (256M) and optional headless CLI child processes
-MemoryHigh=768M
-MemoryMax=1280M
-MemorySwapMax=1G
-CPUQuota=75%
+# Tuned for expanded VPS capacity (4+ GB RAM) alongside alfred-ops and concurrent headless CLI child processes
+MemoryHigh=3G
+MemoryMax=4G
+MemorySwapMax=2G
 
 NoNewPrivileges=true
 PrivateTmp=true

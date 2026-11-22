@@ -80,8 +80,167 @@
 
       renderRolesGrid(data.roles || [], data.agents || [])
       renderMultiTests(data.multiTests || [])
+      refreshVpsSystemStorage()
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
+    }
+  }
+
+  function formatBytesUi(bytes) {
+    const n = Number(bytes || 0)
+    if (!Number.isFinite(n) || n <= 0) return '0 B'
+    const units = ['B', 'KB', 'MB', 'GB', 'TB']
+    let val = n
+    let idx = 0
+    while (val >= 1024 && idx < units.length - 1) {
+      val /= 1024
+      idx += 1
+    }
+    return (val >= 10 || idx === 0 ? val.toFixed(idx === 0 ? 0 : 1) : val.toFixed(2)) + ' ' + units[idx]
+  }
+
+  function renderVpsSystemStorage(system) {
+    const badgeEl = document.getElementById('vpsStorageHealthBadge')
+    const barsEl = document.getElementById('vpsStorageBars')
+    const dirsEl = document.getElementById('vpsStorageDirs')
+    if (!barsEl || !dirsEl || !system) return
+
+    const health = system.health || { overallLevel: 'ok' }
+    const thresholds = system.thresholds || { memWarnPct: 85, diskWarnPct: 80, diskCritPct: 90 }
+    if (badgeEl) {
+      if (health.overallLevel === 'crit') {
+        badgeEl.textContent = 'KRITIKUS'
+        badgeEl.style.background = '#dc2626'
+      } else if (health.overallLevel === 'warn') {
+        badgeEl.textContent = 'FIGYELMEZTETÉS'
+        badgeEl.style.background = '#d97706'
+      } else {
+        badgeEl.textContent = 'OK'
+        badgeEl.style.background = '#16a34a'
+      }
+    }
+
+    function renderBarCard(title, usedPct, subtitle, warnPct, critPct) {
+      const pct = Math.max(0, Math.min(100, Number(usedPct || 0)))
+      const color =
+        critPct && pct >= critPct ? '#dc2626' : pct >= (warnPct || 85) ? '#d97706' : '#16a34a'
+      return (
+        '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;gap:6px">' +
+        '<strong>' + esc(title) + '</strong>' +
+        '<span style="font-weight:700;color:' + color + '">' + esc(pct.toFixed(1)) + '%</span>' +
+        '</div>' +
+        '<div style="height:8px;border-radius:999px;background:rgba(128,128,128,0.2);overflow:hidden">' +
+        '<div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:999px;transition:width .25s ease"></div>' +
+        '</div>' +
+        '<div style="font-size:11px;opacity:.8">' + esc(subtitle) + '</div>' +
+        '</div>'
+      )
+    }
+
+    const m = system.memory || {}
+    const cards = []
+    cards.push(
+      renderBarCard(
+        'RAM & Node RSS',
+        m.usedPct || 0,
+        (m.usedMb || 0) + ' / ' + (m.totalMb || 0) + ' MB (szabad: ' + (m.availMb || 0) + ' MB · Node RSS: ' + (m.processRssMb || 0) + ' MB)',
+        thresholds.memWarnPct,
+        95,
+      ),
+    )
+
+    if ((m.swapTotalMb || 0) > 0) {
+      cards.push(
+        renderBarCard(
+          'Swap memória',
+          m.swapUsedPct || 0,
+          (m.swapUsedMb || 0) + ' / ' + (m.swapTotalMb || 0) + ' MB (szabad: ' + (m.swapFreeMb || 0) + ' MB)',
+          80,
+          95,
+        ),
+      )
+    }
+
+    ;(system.partitions || []).forEach(function (p) {
+      cards.push(
+        renderBarCard(
+          'SSD (' + (p.mountpoint || '/') + ')',
+          p.usedPct || 0,
+          formatBytesUi(p.usedBytes) + ' / ' + formatBytesUi(p.sizeBytes) + ' (szabad: ' + formatBytesUi(p.availBytes) + ')',
+          thresholds.diskWarnPct,
+          thresholds.diskCritPct,
+        ),
+      )
+    })
+
+    barsEl.innerHTML = cards.join('')
+
+    const dirs = system.directories || []
+    dirsEl.innerHTML = dirs
+      .map(function (d) {
+        const walExtra =
+          d.key === 'store' && d.walBytes != null
+            ? ' <span style="opacity:.75">(DB: ' + esc(formatBytesUi(d.dbBytes || 0)) + ' · WAL: ' + esc(formatBytesUi(d.walBytes || 0)) + ')</span>'
+            : ''
+        return (
+          '<span style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">' +
+          '<code>' + esc(d.label) + '</code>: <b>' + esc(formatBytesUi(d.bytes)) + '</b>' +
+          walExtra +
+          '</span>'
+        )
+      })
+      .join('')
+  }
+
+  async function refreshVpsSystemStorage() {
+    const barsEl = document.getElementById('vpsStorageBars')
+    if (!barsEl) return
+    try {
+      const data = await apiJson('/api/admin/system')
+      if (data && data.system) {
+        renderVpsSystemStorage(data.system)
+      }
+    } catch (err) {
+      barsEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Telemetria hiba: ' + esc(err.message) + '</div>'
+    }
+  }
+
+  async function runVpsSystemCleanup() {
+    const btn = document.getElementById('vpsRunCleanupBtn')
+    const statusEl = document.getElementById('vpsStorageCleanupStatus')
+    if (btn) btn.disabled = true
+    if (statusEl) {
+      statusEl.hidden = false
+      statusEl.textContent = 'Housekeeping & SQLite WAL checkpoint futtatása...'
+    }
+    try {
+      const data = await apiJson('/api/admin/system/cleanup', {
+        method: 'POST',
+        body: '{}',
+      })
+      if (data.system) {
+        renderVpsSystemStorage(data.system)
+      }
+      const c = data.cleanup || {}
+      const walBytes = c.walCheckpoint ? c.walCheckpoint.walReclaimedBytes || 0 : 0
+      if (statusEl) {
+        statusEl.textContent =
+          '✓ Takarítás kész: felszabadítva ' +
+          formatBytesUi(c.totalReclaimedBytes || 0) +
+          ' (' +
+          (c.deletedFilesCount || 0) +
+          ' régi fájl törölve · SQLite WAL: ' +
+          formatBytesUi(walBytes) +
+          (c.npmCacheCleaned ? ' · npm cache ürítve' : '') +
+          ').'
+      }
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = '✕ Takarítási hiba: ' + err.message
+      }
+    } finally {
+      if (btn) btn.disabled = false
     }
   }
 
@@ -1186,38 +1345,38 @@
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-action="install" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">' + (c.installed ? 'Frissítés' : 'Telepítés') + '</button>' +
             '<button type="button" class="btn-secondary btn-compact" data-cli-test="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Teszt</button>' +
-            ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy')
-              ? '<button type="button" class="btn-secondary btn-compact" data-cli-quota-btn="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kvóta</button>'
-              : '') +
-            '<button type="button" class="btn-secondary btn-compact" data-cli-auth-toggle="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Belépés / Token</button>' +
-            (c.authMethod === 'oauth'
-              ? '<button type="button" class="btn-secondary btn-compact" data-cli-logout="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kilépés</button>'
-              : '') +
-            '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
-            '</div>' +
-            ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy')
-              ? '<div data-cli-quota-box="' + esc(c.id) + '" hidden style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'
-              : '') +
-            '<div data-cli-test-result="' + esc(c.id) + '" hidden style="font-size:11px;padding:5px 7px;border-radius:6px;line-height:1.35;word-break:break-word"></div>' +
-            '<div data-cli-auth-drawer="' + esc(c.id) + '" hidden style="margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:none;flex-direction:column;gap:8px">' +
-            '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-            '<button type="button" class="btn-primary btn-compact" data-cli-oauth-start="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Böngészős OAuth indítása</button>' +
-            (!c.installed ? '<span style="font-size:11px;opacity:.7">Előbb telepítsd a CLI-t.</span>' : '') +
-            '</div>' +
-            '<div data-cli-login-box="' + esc(c.id) + '" hidden style="padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)"></div>' +
-            '<details data-cli-manual-details="' + esc(c.id) + '" style="border-top:1px solid var(--border);padding-top:6px">' +
-            '<summary style="font-size:11px;opacity:.8;cursor:pointer;user-select:none">Haladó: kézi API kulcs / OAuth JSON mentése</summary>' +
-            '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">' +
-            '<textarea class="input" rows="2" data-cli-auth-input="' + esc(c.id) + '" placeholder="' + esc(tokenPlaceholder) + '" style="font-size:11px;font-family:monospace;padding:5px 6px"></textarea>' +
-            '<div style="display:flex;gap:6px;align-items:center">' +
-            '<button type="button" class="btn-secondary btn-compact" data-cli-auth-save="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Mentés</button>' +
-            '<span data-cli-auth-msg="' + esc(c.id) + '" style="font-size:11px;opacity:.8"></span>' +
-            '</div>' +
-            '</div>' +
-            '</details>' +
-            '</div>' +
-            '</div>'
-          )
+              ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy')
+                ? '<button type="button" class="btn-secondary btn-compact" data-cli-quota-btn="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kvóta</button>'
+                : '') +
+              '<button type="button" class="btn-secondary btn-compact" data-cli-auth-toggle="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Belépés / Token</button>' +
+              (c.authMethod === 'oauth'
+                ? '<button type="button" class="btn-secondary btn-compact" data-cli-logout="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kilépés</button>'
+                : '') +
+              '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
+              '</div>' +
+                ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy')
+                  ? '<div data-cli-quota-box="' + esc(c.id) + '" hidden style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'
+                  : '') +
+                '<div data-cli-test-result="' + esc(c.id) + '" hidden style="font-size:11px;padding:5px 7px;border-radius:6px;line-height:1.35;word-break:break-word"></div>' +
+                '<div data-cli-auth-drawer="' + esc(c.id) + '" hidden style="margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:none;flex-direction:column;gap:8px">' +
+                '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+                '<button type="button" class="btn-primary btn-compact" data-cli-oauth-start="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Böngészős OAuth indítása</button>' +
+                (!c.installed ? '<span style="font-size:11px;opacity:.7">Előbb telepítsd a CLI-t.</span>' : '') +
+                '</div>' +
+                '<div data-cli-login-box="' + esc(c.id) + '" hidden style="padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)"></div>' +
+                '<details data-cli-manual-details="' + esc(c.id) + '" style="border-top:1px solid var(--border);padding-top:6px">' +
+                '<summary style="font-size:11px;opacity:.8;cursor:pointer;user-select:none">Haladó: kézi API kulcs / OAuth JSON mentése</summary>' +
+                '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">' +
+                '<textarea class="input" rows="2" data-cli-auth-input="' + esc(c.id) + '" placeholder="' + esc(tokenPlaceholder) + '" style="font-size:11px;font-family:monospace;padding:5px 6px"></textarea>' +
+                '<div style="display:flex;gap:6px;align-items:center">' +
+                '<button type="button" class="btn-secondary btn-compact" data-cli-auth-save="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Mentés</button>' +
+                '<span data-cli-auth-msg="' + esc(c.id) + '" style="font-size:11px;opacity:.8"></span>' +
+                '</div>' +
+                '</div>' +
+                '</details>' +
+                '</div>' +
+                '</div>'
+              )
         })
         .join('')
 
@@ -1231,12 +1390,12 @@
 
       // Auto-load live quota strip for OAuth-authenticated claude / codex / agy cards
       clis.forEach(function (c) {
-        if ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy') && c.authMethod === 'oauth') {
-          const box = grid.querySelector('[data-cli-quota-box="' + c.id + '"]')
-          const btn = grid.querySelector('[data-cli-quota-btn="' + c.id + '"]')
-          if (box) refreshCliQuota(c.id, box, btn)
-        }
-      })
+          if ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy') && c.authMethod === 'oauth') {
+            const box = grid.querySelector('[data-cli-quota-box="' + c.id + '"]')
+            const btn = grid.querySelector('[data-cli-quota-btn="' + c.id + '"]')
+            if (box) refreshCliQuota(c.id, box, btn)
+          }
+        })
 
       grid.querySelectorAll('[data-cli-test]').forEach(function (btn) {
         btn.addEventListener('click', async function () {
@@ -1406,6 +1565,7 @@
       refreshVpsStatus()
       refreshVpsLogs()
     })
+    document.getElementById('vpsRunCleanupBtn')?.addEventListener('click', runVpsSystemCleanup)
     document.getElementById('vpsLogUnit')?.addEventListener('change', refreshVpsLogs)
     document.getElementById('vpsConvEnv')?.addEventListener('change', refreshConversations)
     document.getElementById('vpsChatSend')?.addEventListener('click', sendVpsChat)
