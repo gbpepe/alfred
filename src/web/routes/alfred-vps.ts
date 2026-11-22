@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import Database from 'better-sqlite3'
 import { getDb } from '../../db.js'
 import { readEnvFile } from '../../env.js'
+import { parseEnvContent } from '../../env-parse.js'
 import { logger } from '../../logger.js'
 import {
   ALLOWED_PROVIDERS,
@@ -80,9 +81,18 @@ async function listMultiBranchTests(includeAccessToken = false): Promise<Array<{
       const worktreeDir = join(worktreeBase, d.name)
       const portsPath = join(worktreeDir, '.env.ports')
       if (!existsSync(portsPath)) return null
-      const vars = readEnvFile([portsPath])
+      let vars: Record<string, string> = {}
+      try {
+        vars = parseEnvContent(readFileSync(portsPath, 'utf-8'))
+      } catch {
+        vars = {}
+      }
       const slug = vars['ALFRED_TEST_SLUG'] || d.name.replace(/^alfred-test-/, '')
-      const branch = vars['ALFRED_TEST_BRANCH'] || slug
+      let branch = vars['ALFRED_TEST_BRANCH'] || ''
+      if (!branch) {
+        const gitInfo = await getGitSummary(worktreeDir)
+        branch = gitInfo?.branch || slug
+      }
       const host = vars['ALFRED_TEST_HOST'] || `${slug}-test-alfred.princicol.co.uk`
       let accessUrl = `https://${host}/#vps`
       if (includeAccessToken) {
