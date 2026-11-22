@@ -2222,10 +2222,10 @@
   }
 
   wireEvents()
-  if (location.hash === '#vps' || !document.getElementById('vpsPage')?.hidden) {
+  if (document.getElementById('vpsPage') && !document.getElementById('vpsPage').hidden) {
     window.loadVpsPage()
   }
-  if (location.hash === '#providers' || !document.getElementById('providersPage')?.hidden) {
+  if (document.getElementById('providersPage') && !document.getElementById('providersPage').hidden) {
     window.loadProvidersPage()
   }
 
