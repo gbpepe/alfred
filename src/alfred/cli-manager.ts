@@ -678,6 +678,7 @@ export interface CliLoginStatusSnapshot {
   needsCodeInput: boolean
   message?: string
   error?: string
+  outputTail?: string
   startedAt: number
 }
 
@@ -690,10 +691,17 @@ interface ActiveCliLoginSession {
   needsCodeInput: boolean
   message?: string
   error?: string
+  outputTail?: string
   startedAt: number
   child: ChildProcess | null
   timer: NodeJS.Timeout | null
+  watchTimer: NodeJS.Timeout | null
   tempRoot: string | null
+  browserUrlFile: string | null
+  oauthWatchFile: string | null
+  oauthBaselineMtimeMs: number
+  autoEnterCount: number
+  lastAutoEnterAt: number
   rawBuffer: string
   envFilePath?: string
   updateProcessEnv?: boolean
@@ -797,6 +805,19 @@ function extractClaudeOAuthToken(raw: string): string | null {
   return m?.[1] ?? null
 }
 
+function buildSanitizedOutputTail(raw: string): string | undefined {
+  const clean = sanitizeCliText(stripAnsi(raw))
+    .replace(/sk-ant-oat01-[A-Za-z0-9_-]+/g, 'sk-ant-oat01-[REDACTED]')
+    .replace(/ya29\.[A-Za-z0-9._-]+/g, '[REDACTED_TOKEN]')
+    .replace(/\r/g, '\n')
+  const lines = clean
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !/^[╭╮╰╯│─━┌┐└┘├┤┬┴┼▀▄█░▒▓\s]+$/.test(l))
+  if (lines.length === 0) return undefined
+  return lines.slice(-6).join('\n').slice(0, 600)
+}
+
 function toLoginSnapshot(s: ActiveCliLoginSession): CliLoginStatusSnapshot {
   const active = s.phase === 'starting' || s.phase === 'waiting_auth' || s.phase === 'submitting'
   return {
@@ -809,6 +830,7 @@ function toLoginSnapshot(s: ActiveCliLoginSession): CliLoginStatusSnapshot {
     needsCodeInput: s.needsCodeInput,
     ...(s.message ? { message: s.message } : {}),
     ...(s.error ? { error: s.error } : {}),
+    ...(s.outputTail ? { outputTail: s.outputTail } : {}),
     startedAt: s.startedAt,
   }
 }
@@ -817,6 +839,10 @@ function cleanupLoginSessionResources(session: ActiveCliLoginSession): void {
   if (session.timer) {
     clearTimeout(session.timer)
     session.timer = null
+  }
+  if (session.watchTimer) {
+    clearInterval(session.watchTimer)
+    session.watchTimer = null
   }
   if (session.child) {
     try {
@@ -839,7 +865,42 @@ function cleanupLoginSessionResources(session: ActiveCliLoginSession): void {
     }
     session.tempRoot = null
   }
+  session.browserUrlFile = null
   session.rawBuffer = ''
+}
+
+function ensureGeminiOAuthSettings(authDir: string): void {
+  if (!authDir) return
+  try {
+    if (!existsSync(authDir)) {
+      mkdirSync(authDir, { recursive: true, mode: 0o700 })
+    }
+    const settingsPath = join(authDir, 'settings.json')
+    let existing: Record<string, unknown> = {}
+    if (existsSync(settingsPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(settingsPath, 'utf-8')) as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          existing = parsed as Record<string, unknown>
+        }
+      } catch {
+        existing = {}
+      }
+    }
+    const sec = (existing['security'] && typeof existing['security'] === 'object' && !Array.isArray(existing['security'])
+      ? { ...(existing['security'] as Record<string, unknown>) }
+      : {}) as Record<string, unknown>
+    const auth = (sec['auth'] && typeof sec['auth'] === 'object' && !Array.isArray(sec['auth'])
+      ? { ...(sec['auth'] as Record<string, unknown>) }
+      : {}) as Record<string, unknown>
+    auth['selectedType'] = 'oauth-personal'
+    sec['auth'] = auth
+    existing['security'] = sec
+    existing['selectedAuthType'] = 'oauth-personal'
+    atomicWriteFileSync(settingsPath, JSON.stringify(existing, null, 2) + '\n', { mode: 0o600 })
+  } catch {
+    /* best effort */
+  }
 }
 
 function buildLoginChildEnv(
@@ -847,6 +908,7 @@ function buildLoginChildEnv(
   envMap: Record<string, string | undefined>,
   prefix: string,
   tempRoot: string,
+  browserUrlFile: string,
 ): Record<string, string> {
   const enriched = withCliPrefixPath(envMap, prefix)
   const out: Record<string, string> = {}
@@ -884,7 +946,12 @@ function buildLoginChildEnv(
 
   if (process.platform !== 'win32') {
     const noBrowserScript = join(tempRoot, 'no-browser.sh')
-    writeFileSync(noBrowserScript, '#!/bin/sh\nexit 0\n', { mode: 0o700 })
+    const escapedOut = browserUrlFile.replace(/'/g, "'\\''")
+    writeFileSync(
+      noBrowserScript,
+      `#!/bin/sh\nprintf '%s\\n' "$1" >> '${escapedOut}'\nprintf '\\n%s\\n' "$1"\nexit 0\n`,
+      { mode: 0o700 },
+    )
     out['BROWSER'] = noBrowserScript
   }
 
@@ -899,6 +966,40 @@ function buildLoginChildEnv(
   }
 
   return out
+}
+
+function checkLoginSideChannels(session: ActiveCliLoginSession): void {
+  if (session.phase === 'succeeded' || session.phase === 'cancelled' || session.phase === 'failed') return
+
+  if (!session.authUrl && session.browserUrlFile && existsSync(session.browserUrlFile)) {
+    try {
+      const content = readFileSync(session.browserUrlFile, 'utf-8')
+      const url = extractCliLoginUrl(session.id, content)
+      if (url) {
+        session.authUrl = url
+        session.phase = 'waiting_auth'
+        session.message =
+          session.id === 'codex'
+            ? 'Nyisd meg a linket a böngészőben és írd be a lent látható kódot.'
+            : 'Nyisd meg a linket a böngészőben, majd másold vissza ide a kapott kódot.'
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if ((session.id === 'gemini' || session.id === 'codex') && session.oauthWatchFile && existsSync(session.oauthWatchFile)) {
+    try {
+      const st = statSync(session.oauthWatchFile)
+      if (st.size > 2 && st.mtimeMs > session.oauthBaselineMtimeMs) {
+        session.phase = 'succeeded'
+        session.message = `${session.provider} OAuth előfizetés sikeresen mentve!`
+        cleanupLoginSessionResources(session)
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /**
@@ -921,9 +1022,28 @@ export async function startCliLogin(
   const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
   const prefix = resolveCliNpmPrefix(envMap)
   const binPath = resolveCliBinPath(prefix, def.binaryName) ?? resolveCliBinary(def.provider, envMap)
+  const authDir = resolveCliAuthDir(def, envMap)
+
+  if (def.id === 'gemini' && authDir) {
+    ensureGeminiOAuthSettings(authDir)
+  }
 
   const tempRoot = mkdtempSync(join(tmpdir(), `alfred-cli-login-${def.id}-`))
-  const childEnv = buildLoginChildEnv(def, envMap, prefix, tempRoot)
+  const browserUrlFile = join(tempRoot, 'browser-url.txt')
+  const childEnv = buildLoginChildEnv(def, envMap, prefix, tempRoot, browserUrlFile)
+
+  const oauthWatchFile =
+    (def.id === 'gemini' || def.id === 'codex') && authDir
+      ? join(authDir, PRIMARY_OAUTH_FILES[def.id])
+      : null
+  let oauthBaselineMtimeMs = 0
+  if (oauthWatchFile && existsSync(oauthWatchFile)) {
+    try {
+      oauthBaselineMtimeMs = statSync(oauthWatchFile).mtimeMs
+    } catch {
+      oauthBaselineMtimeMs = 0
+    }
+  }
 
   const cliArgs =
     def.id === 'claude'
@@ -941,7 +1061,13 @@ export async function startCliLogin(
     startedAt: Date.now(),
     child: null,
     timer: null,
+    watchTimer: null,
     tempRoot,
+    browserUrlFile,
+    oauthWatchFile,
+    oauthBaselineMtimeMs,
+    autoEnterCount: 0,
+    lastAutoEnterAt: 0,
     rawBuffer: '',
     envFilePath: opts?.envFilePath,
     updateProcessEnv: opts?.updateProcessEnv,
@@ -968,12 +1094,17 @@ export async function startCliLogin(
     }
   }, CLI_LOGIN_TIMEOUT_MS)
 
+  session.watchTimer = setInterval(() => {
+    checkLoginSideChannels(session)
+  }, 800)
+
   const handleChunk = (chunk: Buffer | string) => {
     if (session.phase === 'succeeded' || session.phase === 'cancelled' || session.phase === 'failed') return
     session.rawBuffer += chunk.toString('utf-8')
     if (session.rawBuffer.length > 64_000) {
       session.rawBuffer = session.rawBuffer.slice(-32_000)
     }
+    session.outputTail = buildSanitizedOutputTail(session.rawBuffer)
 
     if (!session.authUrl) {
       const url = extractCliLoginUrl(def.id, session.rawBuffer)
@@ -984,6 +1115,25 @@ export async function startCliLogin(
           def.id === 'codex'
             ? 'Nyisd meg a linket a böngészőben és írd be a lent látható kódot.'
             : 'Nyisd meg a linket a böngészőben, majd másold vissza ide a kapott kódot.'
+      } else if (def.id === 'gemini' && session.autoEnterCount < 4) {
+        const tailLower = (session.outputTail ?? '').toLowerCase()
+        const looksLikePrompt =
+          tailLower.includes('login with google') ||
+          tailLower.includes('get started') ||
+          tailLower.includes('choose a theme') ||
+          tailLower.includes('trust') ||
+          tailLower.includes('press enter') ||
+          tailLower.includes('use enter to select')
+        const now = Date.now()
+        if (looksLikePrompt && now - session.lastAutoEnterAt >= 1200) {
+          session.autoEnterCount += 1
+          session.lastAutoEnterAt = now
+          try {
+            session.child?.stdin?.write('\r')
+          } catch {
+            /* ignore */
+          }
+        }
       }
     }
 
@@ -1021,6 +1171,8 @@ export async function startCliLogin(
           })
       }
     }
+
+    checkLoginSideChannels(session)
   }
 
   child.stdout?.on('data', handleChunk)
@@ -1074,6 +1226,7 @@ export function getCliLoginStatus(rawProvider: string): CliLoginStatusSnapshot {
       startedAt: 0,
     }
   }
+  checkLoginSideChannels(session)
   return toLoginSnapshot(session)
 }
 

@@ -436,10 +436,10 @@
     if (coreCh) { coreCh.hidden = true; coreCh.style.display = 'none' }
     if (coreSkills) { coreSkills.hidden = true; coreSkills.style.display = 'none' }
     if (legacySkills) legacySkills.hidden = false
-    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
-      const b = document.getElementById(id)
-      if (b) b.hidden = false
-    })
+      ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
+        const b = document.getElementById(id)
+        if (b) b.hidden = false
+      })
   }
 
   window.syncAgentCoreOverride = async function (agentName) {
@@ -483,10 +483,10 @@
     if (legacyWrap) legacyWrap.hidden = true
     if (saveBar) { saveBar.hidden = false; saveBar.style.display = 'flex' }
     if (statusEl) statusEl.textContent = ''
-    ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
-      const b = document.getElementById(id)
-      if (b) b.hidden = true
-    })
+      ;['saveClaudeMdBtn', 'saveSoulMdBtn', 'saveMcpJsonBtn', 'agentClaudeMdDetails', 'agentMcpJsonDetails'].forEach(function (id) {
+        const b = document.getElementById(id)
+        if (b) b.hidden = true
+      })
 
     roleSel.innerHTML = vpsRolesCache
       .map(function (r) {
@@ -919,6 +919,12 @@
     }
     if (session.error) {
       html += '<div style="font-size:11px;color:#dc2626;margin-bottom:6px">' + esc(session.error) + '</div>'
+    }
+    if (session.outputTail) {
+      html +=
+        '<pre style="margin:0 0 6px 0;padding:6px;border-radius:4px;background:var(--surface);border:1px solid var(--border);font-size:10px;line-height:1.35;max-height:110px;overflow:auto;white-space:pre-wrap;word-break:break-word;opacity:.85">' +
+        esc(session.outputTail) +
+        '</pre>'
     }
     if (session.active) {
       html += '<button type="button" class="btn-secondary btn-compact" data-cli-login-cancel="' + esc(cliId) + '" style="padding:3px 8px;font-size:11px">Mégse</button>'
