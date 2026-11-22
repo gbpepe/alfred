@@ -1181,14 +1181,16 @@
             (!c.installed ? '<span style="font-size:11px;opacity:.7">Előbb telepítsd a CLI-t.</span>' : '') +
             '</div>' +
             '<div data-cli-login-box="' + esc(c.id) + '" hidden style="padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)"></div>' +
-            '<div style="border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:4px">' +
-            '<div style="font-size:11px;opacity:.8">Kézi token vagy OAuth JSON mentése (SSH nélkül):</div>' +
+            '<details data-cli-manual-details="' + esc(c.id) + '" style="border-top:1px solid var(--border);padding-top:6px">' +
+            '<summary style="font-size:11px;opacity:.8;cursor:pointer;user-select:none">Haladó: kézi API kulcs / OAuth JSON mentése</summary>' +
+            '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">' +
             '<textarea class="input" rows="2" data-cli-auth-input="' + esc(c.id) + '" placeholder="' + esc(tokenPlaceholder) + '" style="font-size:11px;font-family:monospace;padding:5px 6px"></textarea>' +
             '<div style="display:flex;gap:6px;align-items:center">' +
             '<button type="button" class="btn-secondary btn-compact" data-cli-auth-save="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Mentés</button>' +
             '<span data-cli-auth-msg="' + esc(c.id) + '" style="font-size:11px;opacity:.8"></span>' +
             '</div>' +
             '</div>' +
+            '</details>' +
             '</div>' +
             '</div>'
           )

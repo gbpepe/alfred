@@ -205,6 +205,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     const drawer = page.locator('[data-cli-auth-drawer="gemini"]')
     await expect(drawer).toBeVisible()
 
+    await drawer.locator('[data-cli-manual-details="gemini"] summary').click()
     await drawer.locator('[data-cli-auth-input="gemini"]').fill('{invalid-json')
     await drawer.locator('[data-cli-auth-save="gemini"]').click()
 

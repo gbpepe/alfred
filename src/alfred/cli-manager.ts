@@ -644,6 +644,11 @@ export async function saveCliCredentials(
     if (!isSingleLineEnvValue(rawToken)) {
       throw new CliManagerValidationError('A token nem tartalmazhat sortörést vagy vezérlőkaraktert.')
     }
+    if (/^(?:https?:\/\/|localhost:|127\.0\.0\.1:)/i.test(rawToken) || /[?&]code=/.test(rawToken)) {
+      throw new CliManagerValidationError(
+        'Ez egy OAuth callback URL — ne ide, hanem a fenti „Böngészős OAuth indítása” után megjelenő „Kód beküldése” mezőbe illeszd be!',
+      )
+    }
     let envKey: string
     if (def.id === 'claude') {
       envKey = rawToken.startsWith('sk-ant-oat') ? 'CLAUDE_CODE_OAUTH_TOKEN' : 'ANTHROPIC_API_KEY'
