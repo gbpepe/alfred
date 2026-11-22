@@ -31,7 +31,7 @@ CPUQuota=50%
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/opt/alfred-ops/store -/opt/alfred-ops/.claude -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/etc/alfred
+ReadWritePaths=/opt/alfred-ops/store -/opt/alfred-ops/.claude -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/home/alfred/.cli-profiles -/etc/alfred
 SyslogIdentifier=alfred-ops
 
 [Install]

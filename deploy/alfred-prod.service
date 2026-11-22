@@ -29,7 +29,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/opt/alfred-prod/store -/opt/alfred-prod/workspaces -/opt/alfred-prod/.claude -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/etc/alfred
+ReadWritePaths=/opt/alfred-prod/store -/opt/alfred-prod/workspaces -/opt/alfred-prod/.claude -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/home/alfred/.cli-profiles -/etc/alfred
 SyslogIdentifier=alfred-prod
 
 [Install]

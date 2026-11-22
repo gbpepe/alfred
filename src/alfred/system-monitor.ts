@@ -3,6 +3,17 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import {
+  findTopRss,
+  parsePressureSomeAvg10,
+  readMachineState,
+} from '../web/machine-state.js'
+
+export interface ProcRssEntry {
+  pid: number
+  residentPages: number
+  comm?: string | null
+}
 
 const execFileAsync = promisify(execFile)
 
@@ -13,6 +24,12 @@ export interface SystemThresholds {
   diskWarnPct: number
   diskCritPct: number
   cooldownMs: number
+}
+
+export interface TopRssProcessInfo {
+  pid: number
+  comm: string | null
+  rssMb: number
 }
 
 export interface MemoryTelemetry {
@@ -36,6 +53,9 @@ export interface MemoryTelemetry {
   processHeapUsedMb: number
   processHeapTotalBytes: number
   processHeapTotalMb: number
+  psiMemSome10: number | null
+  psiCpuSome10: number | null
+  topRss: TopRssProcessInfo | null
 }
 
 export interface DiskPartitionTelemetry {
@@ -159,6 +179,9 @@ function toPct(used: number, total: number): number {
 export interface ReadMemoryTelemetryOptions {
   procMeminfoText?: string
   procMeminfoPath?: string
+  pressureMemText?: string
+  pressureCpuText?: string
+  procRssEntries?: ProcRssEntry[]
   processMemoryUsageFn?: () => NodeJS.MemoryUsage
 }
 
@@ -186,6 +209,46 @@ export function readMemoryTelemetry(opts: ReadMemoryTelemetryOptions = {}): Memo
 
   const memUsage = (opts.processMemoryUsageFn ?? process.memoryUsage)()
 
+  let psiMemSome10: number | null = null
+  let psiCpuSome10: number | null = null
+  let topRss: TopRssProcessInfo | null = null
+
+  if (
+    opts.pressureMemText !== undefined ||
+    opts.pressureCpuText !== undefined ||
+    opts.procRssEntries !== undefined
+  ) {
+    if (opts.pressureMemText !== undefined) {
+      psiMemSome10 = parsePressureSomeAvg10(opts.pressureMemText)
+    }
+    if (opts.pressureCpuText !== undefined) {
+      psiCpuSome10 = parsePressureSomeAvg10(opts.pressureCpuText)
+    }
+    if (opts.procRssEntries !== undefined) {
+      const top = findTopRss(opts.procRssEntries)
+      if (top) {
+        const matched = opts.procRssEntries.find((e) => e.pid === top.pid)
+        const rssMb = Math.round((top.residentPages * 4096) / (1024 * 1024))
+        topRss = { pid: top.pid, comm: matched?.comm ?? null, rssMb }
+      }
+    }
+  } else {
+    try {
+      const ms = readMachineState(null)
+      psiMemSome10 = ms.psiMemSome10
+      psiCpuSome10 = ms.psiCpuSome10
+      if (ms.topRssPid !== null && ms.topRssRssMB !== null) {
+        topRss = {
+          pid: ms.topRssPid,
+          comm: ms.topRssComm,
+          rssMb: ms.topRssRssMB,
+        }
+      }
+    } catch {
+      // Non-Linux fallback
+    }
+  }
+
   return {
     totalBytes,
     usedBytes,
@@ -207,6 +270,9 @@ export function readMemoryTelemetry(opts: ReadMemoryTelemetryOptions = {}): Memo
     processHeapUsedMb: toMb(memUsage.heapUsed),
     processHeapTotalBytes: memUsage.heapTotal,
     processHeapTotalMb: toMb(memUsage.heapTotal),
+    psiMemSome10,
+    psiCpuSome10,
+    topRss,
   }
 }
 
@@ -568,6 +634,17 @@ export function formatSystemAlertDiscordMessage(
     '',
     `**Memória:** RAM ${m.usedMb}/${m.totalMb} MB (${m.usedPct.toFixed(1)}%, szabad: ${m.availMb} MB) · Swap ${m.swapUsedMb}/${m.swapTotalMb} MB (${m.swapUsedPct.toFixed(1)}%) · Node RSS: ${m.processRssMb} MB`,
   ]
+  if (m.topRss) {
+    lines.push(
+      `**Top memória-fogyasztó folyamat:** \`${m.topRss.comm || 'ismeretlen'}\` (PID ${m.topRss.pid} — ${m.topRss.rssMb} MB RSS)`,
+    )
+  }
+  if (m.psiMemSome10 !== null || m.psiCpuSome10 !== null) {
+    const psiParts: string[] = []
+    if (m.psiMemSome10 !== null) psiParts.push(`RAM PSI avg10: ${m.psiMemSome10.toFixed(2)}%`)
+    if (m.psiCpuSome10 !== null) psiParts.push(`CPU PSI avg10: ${m.psiCpuSome10.toFixed(2)}%`)
+    lines.push(`**Linux Pressure (PSI):** ${psiParts.join(' · ')}`)
+  }
 
   if (snapshot.partitions.length > 0) {
     const partText = snapshot.partitions

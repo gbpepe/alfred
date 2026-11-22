@@ -3,8 +3,19 @@ import { existsSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import Database from 'better-sqlite3'
+import {
+  checkpointAndCompact,
+  pruneAgentMessages,
+  pruneConversationLog,
+  pruneOtelSpans,
+  pruneToolCallLogRetention,
+} from '../db.js'
+import { runLogRotationSweep } from '../web/log-rotation.js'
 
 const execFileAsync = promisify(execFile)
+
+const VACUUM_MIN_FREE_PAGES = 1000
+const VACUUM_FREE_RATIO = 0.2
 
 export interface WalCheckpointResult {
   busy: number
@@ -13,12 +24,16 @@ export interface WalCheckpointResult {
   walBytesBefore: number
   walBytesAfter: number
   walReclaimedBytes: number
+  vacuumed: boolean
+  freePagesBefore: number
+  prunedDbRows: number
 }
 
 export interface HousekeepingResult {
   executedAt: string
   retentionDays: number
   walCheckpoint: WalCheckpointResult
+  rotatedAppLogs: string[]
   deletedBatchFiles: string[]
   deletedLogFiles: string[]
   deletedTempFiles: string[]
@@ -81,6 +96,22 @@ export function checkpointSqliteWal(
   let totalCheckpointedFrames = 0
   let totalWalBefore = 0
   let totalWalAfter = 0
+  let anyVacuumed = false
+  let maxFreePagesBefore = 0
+  let prunedDbRows = 0
+
+  // Invoke Marveen's table retention prunes + checkpointAndCompact() on the global db handle when initialized
+  try {
+    prunedDbRows += pruneConversationLog()
+    prunedDbRows += pruneOtelSpans()
+    prunedDbRows += pruneAgentMessages()
+    prunedDbRows += pruneToolCallLogRetention()
+    const globalCompact = checkpointAndCompact()
+    if (globalCompact.vacuumed) anyVacuumed = true
+    maxFreePagesBefore = Math.max(maxFreePagesBefore, globalCompact.freePagesBefore)
+  } catch {
+    // Global db in src/db.ts may not be initialized or may lack optional Marveen tables in minimal unit tests
+  }
 
   const checkpointSingleHandle = (handle: Database.Database, dbPathHint?: string) => {
     const resolvedDb = resolveDatabaseFilePath(handle, dbPathHint)
@@ -95,10 +126,25 @@ export function checkpointSqliteWal(
         checkpointed?: number
       }>
       const first = rows?.[0]
+      const busy = Number(first?.busy ?? 0)
       if (first) {
-        totalBusy += Number(first.busy ?? 0)
+        totalBusy += busy
         totalLogFrames += Number(first.log ?? 0)
         totalCheckpointedFrames += Number(first.checkpointed ?? 0)
+      }
+
+      const freelistPages = Number(handle.pragma('freelist_count', { simple: true }) ?? 0)
+      const pageCount = Number(handle.pragma('page_count', { simple: true }) ?? 0)
+      maxFreePagesBefore = Math.max(maxFreePagesBefore, freelistPages)
+      if (
+        busy === 0 &&
+        pageCount > 0 &&
+        freelistPages >= VACUUM_MIN_FREE_PAGES &&
+        freelistPages / pageCount >= VACUUM_FREE_RATIO
+      ) {
+        handle.exec('VACUUM')
+        handle.pragma('wal_checkpoint(TRUNCATE)')
+        anyVacuumed = true
       }
     } catch {
       // ignore if database is in-memory or busy
@@ -142,6 +188,9 @@ export function checkpointSqliteWal(
     walBytesBefore: totalWalBefore,
     walBytesAfter: totalWalAfter,
     walReclaimedBytes: Math.max(0, totalWalBefore - totalWalAfter),
+    vacuumed: anyVacuumed,
+    freePagesBefore: maxFreePagesBefore,
+    prunedDbRows,
   }
 }
 
@@ -311,6 +360,13 @@ export async function runHousekeeping(
   const walCheckpoint = checkpointSqliteWal(opts.db, opts.dbPath, opts.extraDbPaths)
   const batchMeta = inspectBatchJobsTable(opts.db)
 
+  const rotatedAppLogs: string[] = []
+  try {
+    rotatedAppLogs.push(...runLogRotationSweep(join(projectRoot, 'store')))
+  } catch {
+    // ignore log rotation sweep error
+  }
+
   const deletedBatchFiles: string[] = []
   const deletedLogFiles: string[] = []
   const deletedTempFiles: string[] = []
@@ -456,6 +512,7 @@ export async function runHousekeeping(
     executedAt: new Date(nowMs).toISOString(),
     retentionDays,
     walCheckpoint,
+    rotatedAppLogs,
     deletedBatchFiles,
     deletedLogFiles,
     deletedTempFiles,

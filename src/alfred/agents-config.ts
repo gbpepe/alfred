@@ -163,6 +163,8 @@ export interface AlfredAgentDefinition {
   soulFile?: string
   /** Optional list of global skill IDs (loaded from skills/<id>/SKILL.md) */
   skills?: string[]
+  /** Optional list of allowed MCP server names from .mcp.json (if omitted, inherits AGENT_INHERITED_MCP_SERVERS) */
+  mcpServers?: string[]
   /** Fallback or supplementary system prompt */
   systemPrompt?: string
   /** Resolved stable system prompt (SOUL.md content + systemPrompt + attached skills, if any) */
@@ -640,6 +642,9 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
       const skills = Array.isArray(a.skills)
         ? a.skills.filter((s): s is string => typeof s === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(s.trim())).map((s) => s.trim())
         : undefined
+      const mcpServers = Array.isArray(a.mcpServers)
+        ? a.mcpServers.filter((s): s is string => typeof s === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(s.trim())).map((s) => s.trim())
+        : undefined
       const resolvedSystemPrompt = loadAgentSystemPrompt(projectRoot, soulFile, systemPrompt, skills)
 
       agents.push({
@@ -665,6 +670,7 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
         ...(fallback !== undefined ? { fallback } : {}),
         soulFile,
         ...(skills && skills.length > 0 ? { skills } : {}),
+        ...(mcpServers !== undefined ? { mcpServers } : {}),
         systemPrompt,
         resolvedSystemPrompt,
       })

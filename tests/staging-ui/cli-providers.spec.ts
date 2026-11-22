@@ -52,6 +52,16 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await expect(page.locator('#vpsPage')).toBeHidden()
     await expect(page.locator('#vpsCliProvidersGrid [data-cli-test]')).toHaveCount(4, { timeout: 20_000 })
     await expect(page.locator('#vpsModelCatalogGrid [data-api-test]')).toHaveCount(5, { timeout: 20_000 })
+    await expect(page.locator('#vpsSkillsCatalogCard')).toBeVisible()
+    await expect(page.locator('#vpsMcpServersCard')).toBeVisible()
+    await expect(page.locator('#vpsSkillsSyncBtn')).toBeVisible()
+    await expect(page.locator('#vpsMcpSyncProfilesBtn')).toBeVisible()
+
+    // Trigger 4-CLI skill & profile sync on #providers and verify clean feedback
+    await page.locator('#vpsSkillsSyncBtn').click()
+    await expect(page.locator('#vpsSkillsCatalogStatus')).toContainText('✓ Szinkron kész', { timeout: 20_000 })
+    await page.locator('#vpsMcpSyncProfilesBtn').click()
+    await expect(page.locator('#vpsMcpServersStatus')).toContainText('✓ 4-CLI Profil Szinkron kész', { timeout: 20_000 })
 
     await page.screenshot({ path: 'test-results/staging-providers-page.png', fullPage: true })
 

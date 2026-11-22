@@ -139,12 +139,18 @@
     }
 
     const m = system.memory || {}
+    const topRssExtra =
+      m.topRss && m.topRss.pid
+        ? ' · Top RSS: ' + (m.topRss.comm || 'proc') + ' (PID ' + m.topRss.pid + ', ' + m.topRss.rssMb + ' MB)'
+        : ''
+    const psiExtra =
+      m.psiMemSome10 != null ? ' · PSI avg10: ' + Number(m.psiMemSome10).toFixed(2) + '%' : ''
     const cards = []
     cards.push(
       renderBarCard(
         'RAM & Node RSS',
         m.usedPct || 0,
-        (m.usedMb || 0) + ' / ' + (m.totalMb || 0) + ' MB (szabad: ' + (m.availMb || 0) + ' MB · Node RSS: ' + (m.processRssMb || 0) + ' MB)',
+        (m.usedMb || 0) + ' / ' + (m.totalMb || 0) + ' MB (szabad: ' + (m.availMb || 0) + ' MB · Node RSS: ' + (m.processRssMb || 0) + ' MB' + topRssExtra + psiExtra + ')',
         thresholds.memWarnPct,
         95,
       ),
@@ -224,6 +230,8 @@
       }
       const c = data.cleanup || {}
       const walBytes = c.walCheckpoint ? c.walCheckpoint.walReclaimedBytes || 0 : 0
+      const vacuumed = c.walCheckpoint && c.walCheckpoint.vacuumed
+      const rotatedCount = Array.isArray(c.rotatedAppLogs) ? c.rotatedAppLogs.length : 0
       if (statusEl) {
         statusEl.textContent =
           '✓ Takarítás kész: felszabadítva ' +
@@ -232,6 +240,8 @@
           (c.deletedFilesCount || 0) +
           ' régi fájl törölve · SQLite WAL: ' +
           formatBytesUi(walBytes) +
+          (vacuumed ? ' · VACUUM kész' : '') +
+          (rotatedCount > 0 ? ' · ' + rotatedCount + ' log rotálva (.gz)' : '') +
           (c.npmCacheCleaned ? ' · npm cache ürítve' : '') +
           ').'
       }
@@ -740,6 +750,14 @@
           '</label>'
         )
       }).join('')
+    }
+    const profilePathEl = document.getElementById('agentCoreCliProfilePath')
+    if (profilePathEl) {
+      profilePathEl.textContent = ag.cliProfileDir || ('~/.cli-profiles/' + ag.provider.replace(/-cli$/, '') + '/' + ag.id)
+    }
+    const mcpListEl = document.getElementById('agentCoreMcpList')
+    if (mcpListEl) {
+      renderAgentModalMcpCheckboxes(ag, mcpListEl)
     }
     const sysPromptInp = document.getElementById('agentCoreSystemPromptInp')
     const wsInp = document.getElementById('agentCoreWorkspaceInp')
@@ -1551,6 +1569,205 @@
     }
   }
 
+  let sharedMcpServersCache = []
+  let sharedMcpCatalogCache = []
+
+  async function renderAgentModalMcpCheckboxes(ag, containerEl) {
+    if (!containerEl) return
+    if (sharedMcpServersCache.length === 0) {
+      try {
+        const mcpData = await apiJson('/api/admin/mcp')
+        sharedMcpServersCache = mcpData.servers || []
+      } catch {
+        sharedMcpServersCache = []
+      }
+    }
+    if (sharedMcpServersCache.length === 0) {
+      containerEl.innerHTML = '<span style="font-size:11px;opacity:.65">Nincs még közös MCP szerver az API &amp; CLI (#providers) lapon.</span>'
+      return
+    }
+    const explicitList = Array.isArray(ag.mcpServers) ? ag.mcpServers : null
+    containerEl.innerHTML = sharedMcpServersCache
+      .map(function (srv) {
+        const isChecked = explicitList ? explicitList.indexOf(srv.name) >= 0 : true
+        return (
+          '<label style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;user-select:none;margin:0">' +
+          '<input type="checkbox" data-core-mcp-chk="' + esc(srv.name) + '"' + (isChecked ? ' checked' : '') + ' style="margin:0">' +
+          '<span>' + esc(srv.name) + '</span>' +
+          '</label>'
+        )
+      })
+      .join('')
+  }
+
+  async function refreshProvidersSkillsCatalog() {
+    const grid = document.getElementById('vpsSkillsCatalogGrid')
+    const statusEl = document.getElementById('vpsSkillsCatalogStatus')
+    if (!grid) return
+    try {
+      const data = await apiJson('/api/vps/skills')
+      const skills = data.skills || []
+      if (skills.length === 0) {
+        grid.innerHTML = '<div style="font-size:12px;opacity:.7;padding:8px">Még nincs közös SKILL.md a könyvtárban. Kattints az „+ Új Skill” gombra!</div>'
+        return
+      }
+      grid.innerHTML = skills
+        .map(function (s) {
+          let scanBadge
+          if (s.scanStatus === 'flagged') {
+            scanBadge = '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#dc2626">⚠ Blokkolt minta</span>'
+          } else if (s.scanStatus === 'warning') {
+            scanBadge = '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#d97706">⚠ Figyelmeztetés</span>'
+          } else {
+            scanBadge = '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#16a34a">✓ Szkenner: Tiszta</span>'
+          }
+          const assignedText = Array.isArray(s.assignedAgents) && s.assignedAgents.length > 0
+            ? s.assignedAgents.join(', ')
+            : 'nincs hozzárendelve'
+          const findingsHtml = Array.isArray(s.findings) && s.findings.length > 0
+            ? '<div style="font-size:11px;color:#d97706">Találatok: ' + esc(s.findings.map(function (f) { return f.pattern }).join(', ')) + '</div>'
+            : ''
+          return (
+            '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px" data-shared-skill-card="' + esc(s.id) + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +
+            '<strong>' + esc(s.id) + '</strong>' +
+            scanBadge +
+            '</div>' +
+            '<div style="font-size:12px;opacity:.85;flex:1">' + esc(s.description || '—') + '</div>' +
+            findingsHtml +
+            '<div style="font-size:11px;opacity:.75"><b>Ügynökök:</b> ' + esc(assignedText) + '</div>' +
+            '<div style="font-size:11px;opacity:.7">4-CLI célok: <code>.claude/skills</code> · <code>.gemini/skills</code> · <code>.agents/skills</code> · <code>.codex/skills</code></div>' +
+            '<div style="display:flex;gap:6px;margin-top:2px">' +
+            '<button type="button" class="btn-secondary btn-compact" data-prov-skill-edit="' + esc(s.id) + '" style="padding:3px 8px;font-size:11px">Szerkesztés</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-prov-skill-del="' + esc(s.id) + '" style="padding:3px 8px;font-size:11px;color:#dc2626">Törlés</button>' +
+            '</div>' +
+            '</div>'
+          )
+        })
+        .join('')
+
+      grid.querySelectorAll('[data-prov-skill-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const id = btn.getAttribute('data-prov-skill-edit')
+          const sk = skills.find(function (x) { return x.id === id })
+          if (!sk) return
+          const drawer = document.getElementById('vpsSkillsNewDrawer')
+          if (drawer) {
+            drawer.hidden = false
+            drawer.style.display = 'flex'
+          }
+          const idInp = document.getElementById('vpsSkillIdInp')
+          const descInp = document.getElementById('vpsSkillDescInp')
+          const contInp = document.getElementById('vpsSkillContentInp')
+          if (idInp) idInp.value = sk.id
+          if (descInp) descInp.value = sk.description || ''
+          if (contInp) contInp.value = sk.content || ''
+        })
+      })
+
+      grid.querySelectorAll('[data-prov-skill-del]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const id = btn.getAttribute('data-prov-skill-del')
+          if (!id || !confirm('Biztosan törlöd a "' + id + '" közös skillt?')) return
+          btn.disabled = true
+          try {
+            await apiJson('/api/vps/skills?id=' + encodeURIComponent(id), { method: 'DELETE' })
+            if (statusEl) statusEl.textContent = '✓ Törölve és 4-CLI profilok szinkronizálva: ' + id
+            await refreshProvidersSkillsCatalog()
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+            btn.disabled = false
+          }
+        })
+      })
+    } catch (err) {
+      if (statusEl) statusEl.textContent = 'Skill könyvtár betöltési hiba: ' + err.message
+    }
+  }
+
+  async function refreshProvidersMcpServers() {
+    const grid = document.getElementById('vpsMcpServersGrid')
+    const statusEl = document.getElementById('vpsMcpServersStatus')
+    const catSelect = document.getElementById('vpsMcpCatalogSelect')
+    const rootBadge = document.getElementById('vpsMcpProfilesRootBadge')
+    if (!grid) return
+    try {
+      const data = await apiJson('/api/admin/mcp')
+      sharedMcpServersCache = data.servers || []
+      sharedMcpCatalogCache = data.catalog || []
+      if (rootBadge && data.profilesRoot) {
+        rootBadge.textContent = 'Profilok: ' + data.profilesRoot
+      }
+      if (catSelect && sharedMcpCatalogCache.length > 0 && catSelect.options.length <= 1) {
+        sharedMcpCatalogCache.forEach(function (item) {
+          const opt = document.createElement('option')
+          opt.value = item.id || item.name
+          opt.textContent = (item.name || item.id) + (item.description ? ' — ' + item.description.slice(0, 45) : '')
+          catSelect.appendChild(opt)
+        })
+      }
+      if (sharedMcpServersCache.length === 0) {
+        grid.innerHTML =
+          '<div style="font-size:12px;opacity:.75;padding:8px">Még nincs konfigurált közös MCP szerver. Válassz sablont a katalógusból vagy kattints a „+ Egyedi MCP” gombra!</div>'
+        return
+      }
+      grid.innerHTML = sharedMcpServersCache
+        .map(function (srv) {
+          const cmdLine = srv.url
+            ? srv.url
+            : [srv.command || '', (srv.args || []).join(' ')].filter(Boolean).join(' ')
+          const envBadges = (srv.envEntries || [])
+            .map(function (e) {
+              return (
+                '<span style="padding:1px 6px;border-radius:999px;font-size:10px;background:' +
+                (e.isVaulted ? 'rgba(37,99,235,0.15);color:#2563eb;border:1px solid rgba(37,99,235,0.4)' : 'var(--surface);border:1px solid var(--border)') +
+                '">' +
+                esc(e.key) +
+                (e.isVaulted ? ' 🔒 Vault' : '') +
+                '</span>'
+              )
+            })
+            .join(' ')
+          const assignedText = Array.isArray(srv.assignedAgents) && srv.assignedAgents.length > 0
+            ? srv.assignedAgents.join(', ')
+            : 'minden ügynök'
+          return (
+            '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px" data-mcp-card="' + esc(srv.name) + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +
+            '<strong>' + esc(srv.name) + '</strong>' +
+            '<span style="padding:1px 6px;border-radius:999px;font-size:10px;color:#fff;background:#2563eb">Claude/AGY/Gemini JSON + Codex TOML</span>' +
+            '</div>' +
+            '<div style="font-size:11px;font-family:monospace;opacity:.85;word-break:break-all">' + esc(cmdLine) + '</div>' +
+            (envBadges ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' + envBadges + '</div>' : '') +
+            '<div style="font-size:11px;opacity:.75"><b>Ügynökök:</b> ' + esc(assignedText) + '</div>' +
+            '<div style="display:flex;gap:6px;margin-top:2px">' +
+            '<button type="button" class="btn-secondary btn-compact" data-mcp-del="' + esc(srv.name) + '" style="padding:3px 8px;font-size:11px;color:#dc2626">Eltávolítás</button>' +
+            '</div>' +
+            '</div>'
+          )
+        })
+        .join('')
+
+      grid.querySelectorAll('[data-mcp-del]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const name = btn.getAttribute('data-mcp-del')
+          if (!name || !confirm('Biztosan eltávolítod a "' + name + '" MCP szervert mind a 4 CLI profilból?')) return
+          btn.disabled = true
+          try {
+            await apiJson('/api/admin/mcp/' + encodeURIComponent(name), { method: 'DELETE' })
+            if (statusEl) statusEl.textContent = '✓ Eltávolítva és 4-CLI profilok frissítve: ' + name
+            await refreshProvidersMcpServers()
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
+            btn.disabled = false
+          }
+        })
+      })
+    } catch (err) {
+      if (statusEl) statusEl.textContent = 'MCP lista betöltési hiba: ' + err.message
+    }
+  }
+
   let wired = false
   function wireEvents() {
     if (wired) return
@@ -1560,6 +1777,185 @@
     document.getElementById('providersRefreshAllBtn')?.addEventListener('click', function () {
       ensureModelCatalog(true)
       refreshCliProviders()
+      refreshProvidersSkillsCatalog()
+      refreshProvidersMcpServers()
+    })
+
+    // Shared Skills Library controls on #providersPage
+    document.getElementById('vpsSkillsNewBtn')?.addEventListener('click', function () {
+      const drawer = document.getElementById('vpsSkillsNewDrawer')
+      if (!drawer) return
+      const opening = drawer.hidden || drawer.style.display === 'none'
+      drawer.hidden = !opening
+      drawer.style.display = opening ? 'flex' : 'none'
+    })
+    document.getElementById('vpsSkillCancelBtn')?.addEventListener('click', function () {
+      const drawer = document.getElementById('vpsSkillsNewDrawer')
+      if (drawer) {
+        drawer.hidden = true
+        drawer.style.display = 'none'
+      }
+    })
+    document.getElementById('vpsSkillSaveBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('vpsSkillSaveBtn')
+      const msgEl = document.getElementById('vpsSkillEditorMsg')
+      const statusEl = document.getElementById('vpsSkillsCatalogStatus')
+      const id = document.getElementById('vpsSkillIdInp')?.value.trim() || ''
+      const description = document.getElementById('vpsSkillDescInp')?.value.trim() || ''
+      const content = document.getElementById('vpsSkillContentInp')?.value.trim() || ''
+      if (!id || !content) {
+        if (msgEl) msgEl.textContent = 'A skill ID és a SKILL.md tartalom megadása kötelező!'
+        return
+      }
+      if (btn) btn.disabled = true
+      if (msgEl) msgEl.textContent = 'Biztonsági szkennelés és mentés...'
+      try {
+        const res = await apiJson('/api/vps/skills/save', {
+          method: 'POST',
+          body: JSON.stringify({ id, description, content }),
+        })
+        if (msgEl) msgEl.textContent = ''
+        const drawer = document.getElementById('vpsSkillsNewDrawer')
+        if (drawer) {
+          drawer.hidden = true
+          drawer.style.display = 'none'
+        }
+        if (statusEl) {
+          statusEl.textContent =
+            '✓ Skill mentve és szinkronizálva mind a 4 CLI mappájába: ' +
+            res.id +
+            ' (szkenner: ' +
+            (res.scan ? res.scan.status : 'clean') +
+            ')'
+        }
+        await refreshProvidersSkillsCatalog()
+      } catch (err) {
+        if (msgEl) msgEl.textContent = '✕ ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+    document.getElementById('vpsSkillsSyncBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('vpsSkillsSyncBtn')
+      const statusEl = document.getElementById('vpsSkillsCatalogStatus')
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = '4-CLI skill-mappák és per-agent profilok szinkronizálása...'
+      try {
+        const res = await apiJson('/api/vps/skills/sync', { method: 'POST', body: '{}' })
+        const count = res.sync && Array.isArray(res.sync.agentProfiles) ? res.sync.agentProfiles.length : 0
+        if (statusEl) {
+          statusEl.textContent = '✓ Szinkron kész (' + count + ' izolált agent CLI profil frissítve).'
+        }
+        await refreshProvidersSkillsCatalog()
+      } catch (err) {
+        if (statusEl) statusEl.textContent = '✕ Szinkron hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+
+    // Shared MCP & Vault controls on #providersPage
+    document.getElementById('vpsMcpAddToggleBtn')?.addEventListener('click', function () {
+      const drawer = document.getElementById('vpsMcpAddDrawer')
+      if (!drawer) return
+      const opening = drawer.hidden || drawer.style.display === 'none'
+      drawer.hidden = !opening
+      drawer.style.display = opening ? 'flex' : 'none'
+    })
+    document.getElementById('vpsMcpCancelBtn')?.addEventListener('click', function () {
+      const drawer = document.getElementById('vpsMcpAddDrawer')
+      if (drawer) {
+        drawer.hidden = true
+        drawer.style.display = 'none'
+      }
+    })
+    document.getElementById('vpsMcpCatalogSelect')?.addEventListener('change', function (e) {
+      const sel = e.target
+      const chosenId = sel.value
+      if (!chosenId) return
+      const item = sharedMcpCatalogCache.find(function (c) { return (c.id || c.name) === chosenId })
+      if (!item) return
+      const drawer = document.getElementById('vpsMcpAddDrawer')
+      if (drawer) {
+        drawer.hidden = false
+        drawer.style.display = 'flex'
+      }
+      const nameInp = document.getElementById('vpsMcpNameInp')
+      const cmdInp = document.getElementById('vpsMcpCmdInp')
+      const argsInp = document.getElementById('vpsMcpArgsInp')
+      const envKeyInp = document.getElementById('vpsMcpEnvKeyInp')
+      if (nameInp) nameInp.value = item.id || item.name || ''
+      if (cmdInp) cmdInp.value = item.command || 'npx'
+      if (argsInp) argsInp.value = Array.isArray(item.args) ? item.args.join(' ') : ''
+      if (envKeyInp) {
+        const firstEnv = Array.isArray(item.env) && item.env[0] ? (item.env[0].key || item.env[0].name || '') : ''
+        envKeyInp.value = firstEnv
+      }
+      sel.value = ''
+    })
+    document.getElementById('vpsMcpSaveBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('vpsMcpSaveBtn')
+      const msgEl = document.getElementById('vpsMcpDrawerMsg')
+      const statusEl = document.getElementById('vpsMcpServersStatus')
+      const name = document.getElementById('vpsMcpNameInp')?.value.trim() || ''
+      const command = document.getElementById('vpsMcpCmdInp')?.value.trim() || ''
+      const args = document.getElementById('vpsMcpArgsInp')?.value.trim() || ''
+      const envKey = document.getElementById('vpsMcpEnvKeyInp')?.value.trim() || ''
+      const envVal = document.getElementById('vpsMcpEnvValInp')?.value.trim() || ''
+      if (!name || !command) {
+        if (msgEl) msgEl.textContent = 'Az MCP név és a parancs megadása kötelező!'
+        return
+      }
+      const envObj = {}
+      if (envKey && envVal) envObj[envKey] = envVal
+      if (btn) btn.disabled = true
+      if (msgEl) msgEl.textContent = 'Mentés Vaultba és 4-CLI profilok szinkronizálása...'
+      try {
+        const res = await apiJson('/api/admin/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ name, command, args, env: envObj }),
+        })
+        if (msgEl) msgEl.textContent = ''
+        const envValInp = document.getElementById('vpsMcpEnvValInp')
+        if (envValInp) envValInp.value = ''
+        const drawer = document.getElementById('vpsMcpAddDrawer')
+        if (drawer) {
+          drawer.hidden = true
+          drawer.style.display = 'none'
+        }
+        if (statusEl) {
+          statusEl.textContent =
+            '✓ MCP szerver mentve (' +
+            res.name +
+            ') és szinkronizálva (' +
+            (res.syncedProfiles || 0) +
+            ' CLI profil: Claude/AGY/Gemini JSON + Codex config.toml).'
+        }
+        await refreshProvidersMcpServers()
+      } catch (err) {
+        if (msgEl) msgEl.textContent = '✕ ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
+    })
+    document.getElementById('vpsMcpSyncProfilesBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('vpsMcpSyncProfilesBtn')
+      const statusEl = document.getElementById('vpsMcpServersStatus')
+      if (btn) btn.disabled = true
+      if (statusEl) statusEl.textContent = 'OAuth + SKILL.md + MCP konfigurációk szinkronizálása mind a 4 CLI profilba...'
+      try {
+        const res = await apiJson('/api/admin/cli-profiles/sync', { method: 'POST', body: '{}' })
+        const count = res.sync && Array.isArray(res.sync.agentProfiles) ? res.sync.agentProfiles.length : 0
+        if (statusEl) {
+          statusEl.textContent =
+            '✓ 4-CLI Profil Szinkron kész (' + count + ' per-agent profil frissítve: OAuth + SKILL.md + MCP).'
+        }
+        await refreshProvidersMcpServers()
+      } catch (err) {
+        if (statusEl) statusEl.textContent = '✕ Hiba: ' + err.message
+      } finally {
+        if (btn) btn.disabled = false
+      }
     })
     document.getElementById('vpsRefreshBtn')?.addEventListener('click', function () {
       refreshVpsStatus()
@@ -1686,6 +2082,12 @@
           const selectedTools = Array.from(document.querySelectorAll('[data-core-tool-chk]:checked'))
             .map(function (el) { return el.getAttribute('data-core-tool-chk') })
             .filter(Boolean)
+          const mcpCheckboxes = document.querySelectorAll('[data-core-mcp-chk]')
+          const selectedMcpServers = mcpCheckboxes.length > 0
+            ? Array.from(document.querySelectorAll('[data-core-mcp-chk]:checked'))
+                .map(function (el) { return el.getAttribute('data-core-mcp-chk') })
+                .filter(Boolean)
+            : undefined
           const sysPromptVal = document.getElementById('agentCoreSystemPromptInp')?.value ?? ''
           const wsVal = document.getElementById('agentCoreWorkspaceInp')?.value.trim() || null
           const memNsVal = document.getElementById('agentCoreMemNsInp')?.value.trim() || null
@@ -1710,6 +2112,7 @@
               dailyBudgetUsd: Number.isFinite(budgetVal) && budgetVal >= 0.05 ? budgetVal : null,
               voice: voiceVal,
               tools: selectedTools,
+              ...(selectedMcpServers !== undefined ? { mcpServers: selectedMcpServers } : {}),
               systemPrompt: sysPromptVal,
               workspace: wsVal,
               memoryNamespace: memNsVal,
@@ -2490,6 +2893,8 @@
     wireEvents()
     ensureModelCatalog(false)
     refreshCliProviders()
+    refreshProvidersSkillsCatalog()
+    refreshProvidersMcpServers()
   }
 
   wireEvents()

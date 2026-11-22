@@ -2390,6 +2390,67 @@
         <div id="vpsModelCatalogGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px"></div>
         <div id="vpsModelCatalogStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
       </div>
+
+      <div id="vpsSkillsCatalogCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <strong>Közös Skill Könyvtár &amp; Biztonsági Szkenner</strong>
+            <span style="font-size:12px;opacity:.7;margin-left:8px">Közös SKILL.md fájlok szinkronizálása mind a 4 CLI-hez (.claude, .gemini, .agents, .codex + per-agent profilok)</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn-secondary btn-compact" id="vpsSkillsNewBtn">+ Új Skill</button>
+            <button type="button" class="btn-primary btn-compact" id="vpsSkillsSyncBtn">Szinkronizálás (4 CLI)</button>
+          </div>
+        </div>
+        <div id="vpsSkillsNewDrawer" hidden style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);margin-bottom:10px;display:none;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="text" id="vpsSkillIdInp" class="input" placeholder="skill-id (pl. pr-security-audit)" style="width:200px;padding:5px 8px;font-size:12px">
+            <input type="text" id="vpsSkillDescInp" class="input" placeholder="Rövid leírás" style="flex:1;min-width:200px;padding:5px 8px;font-size:12px">
+          </div>
+          <textarea id="vpsSkillContentInp" class="code-textarea" rows="6" placeholder="# Skill instrukciók..."></textarea>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="btn-primary btn-compact" id="vpsSkillSaveBtn">Szkennelés &amp; Mentés</button>
+            <button type="button" class="btn-secondary btn-compact" id="vpsSkillCancelBtn">Bezárás</button>
+            <span id="vpsSkillEditorMsg" style="font-size:12px;opacity:.85"></span>
+          </div>
+        </div>
+        <div id="vpsSkillsCatalogGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px"></div>
+        <div id="vpsSkillsCatalogStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
+      </div>
+
+      <div id="vpsMcpServersCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <strong>Közös MCP Szerverek &amp; Vault (4-CLI Szinkron)</strong>
+            <span id="vpsMcpProfilesRootBadge" style="font-size:11px;font-family:monospace;opacity:.75;margin-left:8px"></span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <select id="vpsMcpCatalogSelect" class="input" style="padding:4px 8px;font-size:12px;max-width:220px">
+              <option value="">+ Sablon a katalógusból...</option>
+            </select>
+            <button type="button" class="btn-secondary btn-compact" id="vpsMcpAddToggleBtn">+ Egyedi MCP</button>
+            <button type="button" class="btn-primary btn-compact" id="vpsMcpSyncProfilesBtn">4-CLI Profil Szinkron</button>
+          </div>
+        </div>
+        <div id="vpsMcpAddDrawer" hidden style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);margin-bottom:10px;display:none;flex-direction:column;gap:8px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+            <input type="text" id="vpsMcpNameInp" class="input" placeholder="MCP név (pl. github, postgres)" style="padding:5px 8px;font-size:12px">
+            <input type="text" id="vpsMcpCmdInp" class="input" placeholder="Parancs (pl. npx)" style="padding:5px 8px;font-size:12px">
+            <input type="text" id="vpsMcpArgsInp" class="input" placeholder="Argumentumok (pl. -y @modelcontextprotocol/server-github)" style="padding:5px 8px;font-size:12px">
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+            <input type="text" id="vpsMcpEnvKeyInp" class="input" placeholder="Titkos ENV kulcs (pl. GITHUB_PERSONAL_ACCESS_TOKEN)" style="padding:5px 8px;font-size:12px">
+            <input type="password" id="vpsMcpEnvValInp" class="input" placeholder="Érték (automatikusan a titkosított Vaultba kerül)" autocomplete="off" style="padding:5px 8px;font-size:12px">
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="btn-primary btn-compact" id="vpsMcpSaveBtn">Mentés Vaultba &amp; 4-CLI Szinkron</button>
+            <button type="button" class="btn-secondary btn-compact" id="vpsMcpCancelBtn">Bezárás</button>
+            <span id="vpsMcpDrawerMsg" style="font-size:12px;opacity:.85"></span>
+          </div>
+        </div>
+        <div id="vpsMcpServersGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px"></div>
+        <div id="vpsMcpServersStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
+      </div>
     </section>
 
     <section class="page" id="testsimPage" hidden>
@@ -2949,6 +3010,14 @@
               <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:6px;border-top:1px solid var(--border)">
                 <span style="font-size:12px;font-weight:600;opacity:.8">Engedélyezett eszközök:</span>
                 <div id="agentCoreToolsList" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:6px;border-top:1px solid var(--border)">
+                <span style="font-size:12px;font-weight:600;opacity:.8">Engedélyezett MCP szerverek:</span>
+                <div id="agentCoreMcpList" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:6px;border-top:1px solid var(--border);font-size:11px;opacity:.8">
+                <strong>Izolált CLI profil:</strong>
+                <code id="agentCoreCliProfilePath">—</code>
               </div>
             </div>
             <details id="agentCoreAdvancedDetails" style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input)">

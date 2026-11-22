@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import type { AlfredAgentDefinition, AlfredCliProviderName } from './agents-config.js'
+import { ensureAgentCliProfile } from './cli-profile-manager.js'
 import type { ChatMessage, ProviderUsageMetrics } from './model-router.js'
 import { mapWhitelistToClaudePermissions, matchProtectedPath, ProtectedPathError } from './tool-executor.js'
 
@@ -1350,7 +1351,20 @@ export async function runCliAgent(opts: RunCliAgentOptions): Promise<CliRunResul
   return queue.runExclusive(
     async () => {
       mkdirSync(opts.agent.workspaceAbsPath, { recursive: true })
-      const sanitizedEnv = buildSanitizedCliEnv(provider, envMap, opts.agent.cliConfigDir)
+      let effectiveCliConfigDir = opts.agent.cliConfigDir
+      if (!effectiveCliConfigDir) {
+        try {
+          const profileSync = ensureAgentCliProfile({
+            agent: opts.agent,
+            cliOrProvider: provider,
+            env: envMap as NodeJS.ProcessEnv,
+          })
+          effectiveCliConfigDir = profileSync.profileDir
+        } catch {
+          // Fallback to host default if profile dir cannot be created in a restricted test
+        }
+      }
+      const sanitizedEnv = buildSanitizedCliEnv(provider, envMap, effectiveCliConfigDir)
       const cmdSpec = buildCliCommandSpec({
         agent: opts.agent,
         userMessage: opts.userMessage,

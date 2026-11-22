@@ -167,7 +167,7 @@ fi
 
 # 3. System user & directory structure (created BEFORE user-level CLI installs)
 if [[ "$DRY_RUN" == "1" ]]; then
-  log_info "[DRY-RUN] Ensure user '$ALFRED_USER' exists and prepare $PROD_DIR, $OPS_DIR, $WORKTREES_DIR, $ETC_ALFRED_DIR, and home dirs (~/.local, ~/.local/bin, ~/.claude, ~/.codex, ~/.gemini, ~/.config)"
+  log_info "[DRY-RUN] Ensure user '$ALFRED_USER' exists and prepare $PROD_DIR, $OPS_DIR, $WORKTREES_DIR, $ETC_ALFRED_DIR, and home dirs (~/.local, ~/.local/bin, ~/.claude, ~/.codex, ~/.gemini, ~/.config, ~/.cli-profiles)"
   ALFRED_HOME="/home/$ALFRED_USER"
 else
   if ! id "$ALFRED_USER" >/dev/null 2>&1; then
@@ -181,9 +181,9 @@ else
   if [[ -z "$ALFRED_HOME" ]]; then
     ALFRED_HOME="/home/$ALFRED_USER"
   fi
-  mkdir -p "$ALFRED_HOME/.local/bin" "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.config"
-  chown -R "$ALFRED_USER:$ALFRED_USER" "$ALFRED_HOME/.local" "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.config"
-  chmod 700 "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini"
+  mkdir -p "$ALFRED_HOME/.local/bin" "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.config" "$ALFRED_HOME/.cli-profiles"
+  chown -R "$ALFRED_USER:$ALFRED_USER" "$ALFRED_HOME/.local" "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.config" "$ALFRED_HOME/.cli-profiles"
+  chmod 700 "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.cli-profiles"
 
   mkdir -p "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude" "$PROD_DIR/logs" "$PROD_DIR/batch" \
     "$OPS_DIR/store" "$OPS_DIR/.claude" "$OPS_DIR/logs" "$WORKTREES_DIR"

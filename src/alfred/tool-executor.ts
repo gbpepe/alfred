@@ -513,301 +513,301 @@ export interface GitPolicyOptions {
 /**
  * Resolves the active git branch in `cwd`, or `null` when `cwd` is not a git repo or HEAD is detached/unborn.
  */
-  export function getCurrentGitBranch(cwd: string): string | null {
-    try {
-      const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
-        cwd,
-        encoding: 'utf-8',
-        timeout: 5_000,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }).trim()
-      return out || null
-    } catch {
-      return null
+export function getCurrentGitBranch(cwd: string): string | null {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Validates git arguments to enforce workspace isolation, forbid destructive operations
+ * (`push --force`, `reset --hard`), protect `main`/`master` (and `feat/alfred-core` for self-dev),
+ * require `feat/self-*` / `fix/self-*` branches for self-dev mutations, and protect `protectedPaths`
+ * against `checkout --` / `restore` / `apply`.
+ */
+export function validateGitArgs(args: readonly string[], opts: GitPolicyOptions = {}): void {
+  if (!Array.isArray(args) || args.length === 0) {
+    throw new Error('git tool requires a non-empty "args" array')
+  }
+  const normalized = args.map((a) => String(a).trim())
+
+  for (const arg of normalized) {
+    if (arg === '-C' || /^-C.+/.test(arg) || arg.startsWith('--git-dir') || arg.startsWith('--work-tree')) {
+      throw new WorkspaceBoundaryError(`GIT_POLICY_VIOLATION: Flag "${arg}" is forbidden in isolated workspace`)
     }
   }
 
-  /**
-   * Validates git arguments to enforce workspace isolation, forbid destructive operations
-   * (`push --force`, `reset --hard`), protect `main`/`master` (and `feat/alfred-core` for self-dev),
-   * require `feat/self-*` / `fix/self-*` branches for self-dev mutations, and protect `protectedPaths`
-   * against `checkout --` / `restore` / `apply`.
-   */
-  export function validateGitArgs(args: readonly string[], opts: GitPolicyOptions = {}): void {
-    if (!Array.isArray(args) || args.length === 0) {
-      throw new Error('git tool requires a non-empty "args" array')
+  let subcmd = ''
+  let subcmdIndex = -1
+  for (let i = 0; i < normalized.length; i++) {
+    const tok = normalized[i]
+    if (!tok) continue
+    if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(tok)) {
+      i += 1
+      continue
     }
-    const normalized = args.map((a) => String(a).trim())
+    if (tok.startsWith('-')) continue
+    subcmd = tok.toLowerCase()
+    subcmdIndex = i
+    break
+  }
 
-    for (const arg of normalized) {
-        if (arg === '-C' || /^-C.+/.test(arg) || arg.startsWith('--git-dir') || arg.startsWith('--work-tree')) {
-          throw new WorkspaceBoundaryError(`GIT_POLICY_VIOLATION: Flag "${arg}" is forbidden in isolated workspace`)
+  if (!subcmd) {
+    throw new Error('git tool requires a valid git subcommand')
+  }
+
+  const subcmdArgs = normalized.slice(subcmdIndex + 1)
+  const protectedBranches = opts.protectedBranches ?? []
+  const agentId = opts.agentId ?? 'git'
+
+  if (subcmd === 'reset') {
+    if (subcmdArgs.some((tok) => tok === '--hard' || tok.startsWith('--hard='))) {
+      throw new Error('GIT_POLICY_VIOLATION: "git reset --hard" is strictly forbidden')
+    }
+  }
+
+  if (subcmd === 'apply' && opts.protectedPaths && opts.protectedPaths.length > 0) {
+    throw new ProtectedPathError(
+      agentId,
+      subcmdArgs.join(' ') || 'apply',
+      opts.protectedPaths[0],
+      'git',
+      '"git apply" cannot be used when protectedPaths are configured',
+    )
+  }
+
+  if (subcmd === 'checkout' || subcmd === 'switch') {
+    const dashDashIdx = subcmdArgs.indexOf('--')
+    const branchSection = dashDashIdx >= 0 ? subcmdArgs.slice(0, dashDashIdx) : subcmdArgs
+    const pathSection = dashDashIdx >= 0 ? subcmdArgs.slice(dashDashIdx + 1) : []
+
+    if (opts.protectedPaths && opts.workspaceAbsPath) {
+      const checkPaths = pathSection.length > 0 ? pathSection : branchSection.filter((t) => !t.startsWith('-'))
+      for (const p of checkPaths) {
+        const abs = resolve(opts.workspaceAbsPath, p)
+        const matched = matchProtectedPath(opts.workspaceAbsPath, abs, opts.protectedPaths)
+        if (matched) {
+          throw new ProtectedPathError(agentId, p, matched, 'git')
         }
       }
+    }
 
-      let subcmd = ''
-      let subcmdIndex = -1
-      for (let i = 0; i < normalized.length; i++) {
-        const tok = normalized[i]
-        if (!tok) continue
-        if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(tok)) {
-          i += 1
-          continue
-        }
-        if (tok.startsWith('-')) continue
-        subcmd = tok.toLowerCase()
-        subcmdIndex = i
-        break
+    let createdBranch: string | null = null
+    let expectingCreatedBranch = false
+    const otherPositionals: string[] = []
+
+    for (let i = 0; i < branchSection.length; i++) {
+      const tok = branchSection[i]
+      if (!tok) continue
+      if (expectingCreatedBranch) {
+        createdBranch = tok
+        expectingCreatedBranch = false
+        continue
       }
-
-      if (!subcmd) {
-        throw new Error('git tool requires a valid git subcommand')
+      if (tok === '-b' || tok === '-B' || tok === '-c' || tok === '-C' || tok === '--create' || tok === '--force-create') {
+        expectingCreatedBranch = true
+        continue
       }
-
-      const subcmdArgs = normalized.slice(subcmdIndex + 1)
-      const protectedBranches = opts.protectedBranches ?? []
-      const agentId = opts.agentId ?? 'git'
-
-      if (subcmd === 'reset') {
-        if (subcmdArgs.some((tok) => tok === '--hard' || tok.startsWith('--hard='))) {
-          throw new Error('GIT_POLICY_VIOLATION: "git reset --hard" is strictly forbidden')
-        }
+      if (/^-[bBcC].+/.test(tok)) {
+        createdBranch = tok.slice(2)
+        continue
       }
+      if (tok.startsWith('--create=') || tok.startsWith('--force-create=')) {
+        createdBranch = tok.split('=')[1] ?? ''
+        continue
+      }
+      if (tok.startsWith('-')) continue
+      otherPositionals.push(tok)
+    }
 
-      if (subcmd === 'apply' && opts.protectedPaths && opts.protectedPaths.length > 0) {
-        throw new ProtectedPathError(
-          agentId,
-          subcmdArgs.join(' ') || 'apply',
-          opts.protectedPaths[0],
-          'git',
-          '"git apply" cannot be used when protectedPaths are configured',
+    if (expectingCreatedBranch) {
+      throw new Error('GIT_POLICY_VIOLATION: Branch creation flag requires a branch name')
+    }
+
+    if (createdBranch !== null) {
+      if (isProtectedBranchName(createdBranch, protectedBranches)) {
+        throw new Error(`GIT_POLICY_VIOLATION: Creating protected branch "${createdBranch}" is forbidden`)
+      }
+      if (opts.requireSelfDevBranch && !isValidSelfDevBranch(createdBranch)) {
+        throw new Error(
+          `GIT_POLICY_VIOLATION: Self-dev branch "${createdBranch}" must match "feat/self-*" or "fix/self-*"`,
         )
       }
+    } else {
+      for (const tok of otherPositionals) {
+        if (isProtectedBranchName(tok, protectedBranches)) {
+          throw new Error(`GIT_POLICY_VIOLATION: Switching to "${tok}" branch is strictly forbidden`)
+        }
+      }
+    }
+  }
 
-      if (subcmd === 'checkout' || subcmd === 'switch') {
-          const dashDashIdx = subcmdArgs.indexOf('--')
-          const branchSection = dashDashIdx >= 0 ? subcmdArgs.slice(0, dashDashIdx) : subcmdArgs
-          const pathSection = dashDashIdx >= 0 ? subcmdArgs.slice(dashDashIdx + 1) : []
+  if (subcmd === 'restore' && opts.protectedPaths && opts.workspaceAbsPath) {
+    for (const tok of subcmdArgs) {
+      if (!tok || tok === '--' || tok.startsWith('-')) continue
+      const abs = resolve(opts.workspaceAbsPath, tok)
+      const matched = matchProtectedPath(opts.workspaceAbsPath, abs, opts.protectedPaths)
+      if (matched) {
+        throw new ProtectedPathError(agentId, tok, matched, 'git')
+      }
+    }
+  }
 
-          if (opts.protectedPaths && opts.workspaceAbsPath) {
-            const checkPaths = pathSection.length > 0 ? pathSection : branchSection.filter((t) => !t.startsWith('-'))
-            for (const p of checkPaths) {
-              const abs = resolve(opts.workspaceAbsPath, p)
-              const matched = matchProtectedPath(opts.workspaceAbsPath, abs, opts.protectedPaths)
-              if (matched) {
-                throw new ProtectedPathError(agentId, p, matched, 'git')
-              }
-            }
-          }
+  if (subcmd === 'branch') {
+    const hasMutatingFlag = subcmdArgs.some(
+      (tok) => tok === '-f' || tok === '--force' || tok === '-D' || tok === '-d' || tok === '--delete' || tok === '-m' || tok === '-M',
+    )
+    if (hasMutatingFlag) {
+      for (const tok of subcmdArgs) {
+        if (tok.startsWith('-')) continue
+        if (isProtectedBranchName(tok, protectedBranches)) {
+          throw new Error(`GIT_POLICY_VIOLATION: Modifying or deleting protected branch "${tok}" is forbidden`)
+        }
+      }
+    }
+  }
 
-          let createdBranch: string | null = null
-          let expectingCreatedBranch = false
-          const otherPositionals: string[] = []
+  if (subcmd === 'update-ref') {
+    for (const tok of subcmdArgs) {
+      if (tok.startsWith('-')) continue
+      if (isProtectedBranchName(tok, protectedBranches)) {
+        throw new Error(`GIT_POLICY_VIOLATION: Updating protected ref "${tok}" is forbidden`)
+      }
+    }
+  }
 
-          for (let i = 0; i < branchSection.length; i++) {
-            const tok = branchSection[i]
-            if (!tok) continue
-            if (expectingCreatedBranch) {
-              createdBranch = tok
-              expectingCreatedBranch = false
-              continue
-            }
-            if (tok === '-b' || tok === '-B' || tok === '-c' || tok === '-C' || tok === '--create' || tok === '--force-create') {
-              expectingCreatedBranch = true
-              continue
-            }
-            if (/^-[bBcC].+/.test(tok)) {
-              createdBranch = tok.slice(2)
-              continue
-            }
-            if (tok.startsWith('--create=') || tok.startsWith('--force-create=')) {
-              createdBranch = tok.split('=')[1] ?? ''
-              continue
-            }
-            if (tok.startsWith('-')) continue
-              otherPositionals.push(tok)
-            }
+  if (subcmd === 'commit' || subcmd === 'merge' || subcmd === 'rebase' || subcmd === 'cherry-pick' || subcmd === 'revert') {
+    const cur = opts.currentBranch
+    if (cur && isProtectedBranchName(cur, protectedBranches)) {
+      throw new Error(`GIT_POLICY_VIOLATION: Direct "${subcmd}" on protected branch "${cur}" is strictly forbidden`)
+    }
+    if (opts.requireSelfDevBranch) {
+      if (!cur || cur === 'HEAD' || !isValidSelfDevBranch(cur)) {
+        throw new Error(
+          `GIT_POLICY_VIOLATION: "${subcmd}" requires an active "feat/self-*" or "fix/self-*" branch (current: "${cur ?? 'unknown'}")`,
+        )
+      }
+    }
+  }
 
-            if (expectingCreatedBranch) {
-              throw new Error('GIT_POLICY_VIOLATION: Branch creation flag requires a branch name')
-            }
+  if (subcmd === 'push') {
+    const positionals: string[] = []
+    for (const tok of subcmdArgs) {
+      if (
+        tok === '--force' ||
+        tok === '-f' ||
+        /^-[a-zA-Z]*f[a-zA-Z]*$/.test(tok) ||
+        tok.startsWith('--force-with-lease') ||
+        tok === '--force-if-includes' ||
+        tok === '--all' ||
+        tok === '--mirror'
+      ) {
+        throw new Error(`GIT_POLICY_VIOLATION: Force or wildcard push ("${tok}") is forbidden`)
+      }
+      if (tok.startsWith('+')) {
+        throw new Error(`GIT_POLICY_VIOLATION: Force push via "+" refspec ("${tok}") is forbidden`)
+      }
+      if (tok.startsWith('-')) continue
+      positionals.push(tok)
+    }
 
-            if (createdBranch !== null) {
-              if (isProtectedBranchName(createdBranch, protectedBranches)) {
-                throw new Error(`GIT_POLICY_VIOLATION: Creating protected branch "${createdBranch}" is forbidden`)
-              }
-              if (opts.requireSelfDevBranch && !isValidSelfDevBranch(createdBranch)) {
-                throw new Error(
-                  `GIT_POLICY_VIOLATION: Self-dev branch "${createdBranch}" must match "feat/self-*" or "fix/self-*"`,
-                )
-              }
-            } else {
-              for (const tok of otherPositionals) {
-                if (isProtectedBranchName(tok, protectedBranches)) {
-                  throw new Error(`GIT_POLICY_VIOLATION: Switching to "${tok}" branch is strictly forbidden`)
-                }
-              }
-            }
-          }
+    const refspecs =
+      positionals.length >= 2
+        ? positionals.slice(1)
+        : (positionals.length === 1 && (positionals[0].includes(':') || isProtectedBranchName(positionals[0], protectedBranches)))
+          ? positionals
+          : []
 
-          if (subcmd === 'restore' && opts.protectedPaths && opts.workspaceAbsPath) {
-            for (const tok of subcmdArgs) {
-              if (!tok || tok === '--' || tok.startsWith('-')) continue
-              const abs = resolve(opts.workspaceAbsPath, tok)
-              const matched = matchProtectedPath(opts.workspaceAbsPath, abs, opts.protectedPaths)
-              if (matched) {
-                throw new ProtectedPathError(agentId, tok, matched, 'git')
-              }
-            }
-          }
+    if (refspecs.length > 0) {
+      for (const refspec of refspecs) {
+        const parts = refspec.split(':')
+        const rawTarget = parts.length > 1 ? parts[parts.length - 1] : parts[0]
+        if (parts.length > 1 && rawTarget === '') {
+          throw new Error(`GIT_POLICY_VIOLATION: Deleting remote branch via "${refspec}" is forbidden`)
+        }
+        const resolved = rawTarget === 'HEAD' && opts.currentBranch ? opts.currentBranch : rawTarget
+        const normTarget = normalizeBranchRef(resolved)
+        if (isProtectedBranchName(normTarget, protectedBranches)) {
+          throw new Error(`GIT_POLICY_VIOLATION: Pushing to "${normTarget}" is strictly forbidden`)
+        }
+        if (opts.requireSelfDevBranch && !isValidSelfDevBranch(normTarget)) {
+          throw new Error(
+            `GIT_POLICY_VIOLATION: Self-dev push target "${normTarget}" must match "feat/self-*" or "fix/self-*"`,
+          )
+        }
+      }
+    } else if (opts.requireSelfDevBranch) {
+      const cur = opts.currentBranch
+      if (!cur || cur === 'HEAD' || isProtectedBranchName(cur, protectedBranches) || !isValidSelfDevBranch(cur)) {
+        throw new Error(
+          `GIT_POLICY_VIOLATION: Pushing from protected or non-self-dev branch "${cur ?? 'unknown'}" is forbidden`,
+        )
+      }
+    }
+  }
+}
 
-          if (subcmd === 'branch') {
-            const hasMutatingFlag = subcmdArgs.some(
-              (tok) => tok === '-f' || tok === '--force' || tok === '-D' || tok === '-d' || tok === '--delete' || tok === '-m' || tok === '-M',
-            )
-            if (hasMutatingFlag) {
-              for (const tok of subcmdArgs) {
-                if (tok.startsWith('-')) continue
-                if (isProtectedBranchName(tok, protectedBranches)) {
-                  throw new Error(`GIT_POLICY_VIOLATION: Modifying or deleting protected branch "${tok}" is forbidden`)
-                }
-              }
-            }
-          }
+const FORBIDDEN_BASH_PATTERNS: readonly RegExp[] = [
+  /\bsudo\b/i,
+  /\bgit\s+(?:checkout|switch)\s+(?:-[a-zA-Z]+\s+)*(?:main|master)\b/i,
+  /\bgit\s+push\b[^\n;&|]*\b(?:main|master)\b/i,
+  /\bgit\b[^\n;&|]*\bpush\b[^\n;&|]*(?:--force(?:-with-lease)?|--force-if-includes|\s-[a-zA-Z]*f[a-zA-Z]*\b)/i,
+  /\bgit\b[^\n;&|]*\breset\b[^\n;&|]*--hard\b/i,
+  /\brm\s+-[a-zA-Z]*r[a-zA-Z]*f?\s+\/(?:\s|$)/i,
+]
 
-          if (subcmd === 'update-ref') {
-            for (const tok of subcmdArgs) {
-              if (tok.startsWith('-')) continue
-              if (isProtectedBranchName(tok, protectedBranches)) {
-                throw new Error(`GIT_POLICY_VIOLATION: Updating protected ref "${tok}" is forbidden`)
-              }
-            }
-          }
+const FORBIDDEN_WHITELIST_BASH_CHARS_RE = /[;&|`$<>()\r\n\0'"\\*?[\]{}~#!%^]/
 
-          if (subcmd === 'commit' || subcmd === 'merge' || subcmd === 'rebase' || subcmd === 'cherry-pick' || subcmd === 'revert') {
-            const cur = opts.currentBranch
-            if (cur && isProtectedBranchName(cur, protectedBranches)) {
-              throw new Error(`GIT_POLICY_VIOLATION: Direct "${subcmd}" on protected branch "${cur}" is strictly forbidden`)
-            }
-            if (opts.requireSelfDevBranch) {
-              if (!cur || cur === 'HEAD' || !isValidSelfDevBranch(cur)) {
-                throw new Error(
-                  `GIT_POLICY_VIOLATION: "${subcmd}" requires an active "feat/self-*" or "fix/self-*" branch (current: "${cur ?? 'unknown'}")`,
-                )
-              }
-            }
-          }
+/**
+ * Validates a command strictly against an agent's `allowedBashCommands` template list,
+ * rejecting any shell metacharacters, chaining, quotes, or invalid `<self-branch>` arguments.
+ * Returns the parsed `argv` array for shell-less `execFileSync` execution.
+ */
+export function validateWhitelistedBashCommand(
+  command: string,
+  allowedTemplates: readonly string[],
+  agentId: string,
+): string[] {
+  const trimmed = command.trim()
+  if (!trimmed) {
+    throw new Error('BASH_WHITELIST_VIOLATION: Command must be non-empty')
+  }
+  if (FORBIDDEN_WHITELIST_BASH_CHARS_RE.test(trimmed)) {
+    throw new Error(`BASH_WHITELIST_VIOLATION: Shell metacharacters or chaining are forbidden in "${trimmed}"`)
+  }
+  if (allowedTemplates.length === 0) {
+    throw new Error(`BASH_WHITELIST_VIOLATION: Agent "${agentId}" has an empty allowedBashCommands whitelist`)
+  }
 
-          if (subcmd === 'push') {
-                const positionals: string[] = []
-                for (const tok of subcmdArgs) {
-                  if (
-                    tok === '--force' ||
-                    tok === '-f' ||
-                    /^-[a-zA-Z]*f[a-zA-Z]*$/.test(tok) ||
-                    tok.startsWith('--force-with-lease') ||
-                    tok === '--force-if-includes' ||
-                    tok === '--all' ||
-                    tok === '--mirror'
-                  ) {
-                    throw new Error(`GIT_POLICY_VIOLATION: Force or wildcard push ("${tok}") is forbidden`)
-                  }
-                    if (tok.startsWith('+')) {
-                      throw new Error(`GIT_POLICY_VIOLATION: Force push via "+" refspec ("${tok}") is forbidden`)
-                    }
-                    if (tok.startsWith('-')) continue
-                    positionals.push(tok)
-                  }
+  const argv = trimmed.split(/\s+/)
+  for (const template of allowedTemplates) {
+    const tmplTokens = template.trim().split(/\s+/)
+    if (tmplTokens.length !== argv.length) continue
+    let matched = true
+    for (let i = 0; i < tmplTokens.length; i++) {
+      if (tmplTokens[i] === '<self-branch>') {
+        if (!isValidSelfDevBranch(argv[i])) {
+          matched = false
+          break
+        }
+      } else if (argv[i] !== tmplTokens[i]) {
+        matched = false
+        break
+      }
+    }
+    if (matched) return argv
+  }
 
-                  const refspecs =
-                    positionals.length >= 2
-                      ? positionals.slice(1)
-                      : (positionals.length === 1 && (positionals[0].includes(':') || isProtectedBranchName(positionals[0], protectedBranches)))
-                        ? positionals
-                        : []
-
-                  if (refspecs.length > 0) {
-                    for (const refspec of refspecs) {
-                      const parts = refspec.split(':')
-                      const rawTarget = parts.length > 1 ? parts[parts.length - 1] : parts[0]
-                      if (parts.length > 1 && rawTarget === '') {
-                        throw new Error(`GIT_POLICY_VIOLATION: Deleting remote branch via "${refspec}" is forbidden`)
-                      }
-                      const resolved = rawTarget === 'HEAD' && opts.currentBranch ? opts.currentBranch : rawTarget
-                      const normTarget = normalizeBranchRef(resolved)
-                      if (isProtectedBranchName(normTarget, protectedBranches)) {
-                        throw new Error(`GIT_POLICY_VIOLATION: Pushing to "${normTarget}" is strictly forbidden`)
-                      }
-                      if (opts.requireSelfDevBranch && !isValidSelfDevBranch(normTarget)) {
-                        throw new Error(
-                          `GIT_POLICY_VIOLATION: Self-dev push target "${normTarget}" must match "feat/self-*" or "fix/self-*"`,
-                        )
-                      }
-                    }
-                  } else if (opts.requireSelfDevBranch) {
-                    const cur = opts.currentBranch
-                    if (!cur || cur === 'HEAD' || isProtectedBranchName(cur, protectedBranches) || !isValidSelfDevBranch(cur)) {
-                      throw new Error(
-                        `GIT_POLICY_VIOLATION: Pushing from protected or non-self-dev branch "${cur ?? 'unknown'}" is forbidden`,
-                      )
-                    }
-                  }
-                }
-              }
-
-              const FORBIDDEN_BASH_PATTERNS: readonly RegExp[] = [
-                /\bsudo\b/i,
-                /\bgit\s+(?:checkout|switch)\s+(?:-[a-zA-Z]+\s+)*(?:main|master)\b/i,
-                /\bgit\s+push\b[^\n;&|]*\b(?:main|master)\b/i,
-                /\bgit\b[^\n;&|]*\bpush\b[^\n;&|]*(?:--force(?:-with-lease)?|--force-if-includes|\s-[a-zA-Z]*f[a-zA-Z]*\b)/i,
-                /\bgit\b[^\n;&|]*\breset\b[^\n;&|]*--hard\b/i,
-                /\brm\s+-[a-zA-Z]*r[a-zA-Z]*f?\s+\/(?:\s|$)/i,
-              ]
-
-              const FORBIDDEN_WHITELIST_BASH_CHARS_RE = /[;&|`$<>()\r\n\0'"\\*?[\]{}~#!%^]/
-
-              /**
-               * Validates a command strictly against an agent's `allowedBashCommands` template list,
-               * rejecting any shell metacharacters, chaining, quotes, or invalid `<self-branch>` arguments.
-               * Returns the parsed `argv` array for shell-less `execFileSync` execution.
-               */
-              export function validateWhitelistedBashCommand(
-                command: string,
-                allowedTemplates: readonly string[],
-                agentId: string,
-              ): string[] {
-                const trimmed = command.trim()
-                if (!trimmed) {
-                  throw new Error('BASH_WHITELIST_VIOLATION: Command must be non-empty')
-                }
-                if (FORBIDDEN_WHITELIST_BASH_CHARS_RE.test(trimmed)) {
-                  throw new Error(`BASH_WHITELIST_VIOLATION: Shell metacharacters or chaining are forbidden in "${trimmed}"`)
-                }
-                if (allowedTemplates.length === 0) {
-                  throw new Error(`BASH_WHITELIST_VIOLATION: Agent "${agentId}" has an empty allowedBashCommands whitelist`)
-                }
-
-                const argv = trimmed.split(/\s+/)
-                for (const template of allowedTemplates) {
-                  const tmplTokens = template.trim().split(/\s+/)
-                  if (tmplTokens.length !== argv.length) continue
-                  let matched = true
-                  for (let i = 0; i < tmplTokens.length; i++) {
-                    if (tmplTokens[i] === '<self-branch>') {
-                      if (!isValidSelfDevBranch(argv[i])) {
-                        matched = false
-                        break
-                      }
-                    } else if (argv[i] !== tmplTokens[i]) {
-                      matched = false
-                      break
-                    }
-                  }
-                  if (matched) return argv
-                }
-
-                throw new Error(`BASH_WHITELIST_VIOLATION: Command "${trimmed}" is not in allowedBashCommands for "${agentId}"`)
-              }
+  throw new Error(`BASH_WHITELIST_VIOLATION: Command "${trimmed}" is not in allowedBashCommands for "${agentId}"`)
+}
 
 export function resolveBashExecutable(bin: string): string {
   if (process.platform === 'win32' && bin === 'bash') {
@@ -846,150 +846,150 @@ function buildBashExecEnv(executablePath: string): NodeJS.ProcessEnv | undefined
   return undefined
 }
 
-              function escapeRegExp(literal: string): string {
-                return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-              }
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
 const BASH_MUTATING_HINT_RE =
   /(?:(?<![12])>>?|(?<![12])>\||2>(?!&1\b)|&>(?!&[12]\b)|\b(?:rm|del|erase|mv|move|cp|copy|tee|touch|truncate|dd|chmod|chown|ln|install|patch|Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item|Rename-Item|Clear-Content|New-Item|sc|ac|ri|mi|cpi)\b|\bsed\s+[^\n;|&]*-i\b|\bperl\s+[^\n;|&]*-i\b|\b(?:node|tsx|python|python3|ruby|pwsh|powershell|sh|bash)\s+[^\n;|&]*-[ec]\b|\bgit\s+(?:checkout\s+--|restore|apply|clean)\b)/i
 
-              /**
-               * Validates a general `bash` command against forbidden patterns, `protectedPaths` mutations,
-               * `.env` / `store/` reads, and self-dev Git branch rules.
-               */
-              export function validateBashCommand(
-                command: string,
-                agent: Pick<AlfredAgentDefinition, 'id' | 'workspace' | 'workspaceAbsPath' | 'protectedPaths'>,
-                currentBranch?: string | null,
-              ): void {
-                for (const pat of FORBIDDEN_BASH_PATTERNS) {
-                  if (pat.test(command)) {
-                    throw new Error(`BASH_POLICY_VIOLATION: Command rejected by security filter: ${command}`)
-                  }
-                }
+/**
+ * Validates a general `bash` command against forbidden patterns, `protectedPaths` mutations,
+ * `.env` / `store/` reads, and self-dev Git branch rules.
+ */
+export function validateBashCommand(
+  command: string,
+  agent: Pick<AlfredAgentDefinition, 'id' | 'workspace' | 'workspaceAbsPath' | 'protectedPaths'>,
+  currentBranch?: string | null,
+): void {
+  for (const pat of FORBIDDEN_BASH_PATTERNS) {
+    if (pat.test(command)) {
+      throw new Error(`BASH_POLICY_VIOLATION: Command rejected by security filter: ${command}`)
+    }
+  }
 
-                const normCmd = command.replace(/\\/g, '/')
-                const wsPosix = normalizeCaseForPlatform(safeRealpath(agent.workspaceAbsPath).replace(/\\/g, '/').replace(/\/+$/, ''))
-                const protectsStore =
-                  agent.workspace.trim() === '.' ||
-                  Boolean(agent.protectedPaths?.some((r) => normalizePosixRel(r).toLowerCase() === 'store'))
+  const normCmd = command.replace(/\\/g, '/')
+  const wsPosix = normalizeCaseForPlatform(safeRealpath(agent.workspaceAbsPath).replace(/\\/g, '/').replace(/\/+$/, ''))
+  const protectsStore =
+    agent.workspace.trim() === '.' ||
+    Boolean(agent.protectedPaths?.some((r) => normalizePosixRel(r).toLowerCase() === 'store'))
 
-                const envReadRe = /(?:^|[\s"'`=;(|&<>:/])\.env(?:\.(?!example\b)[a-z0-9._-]+|~)?(?=$|[\s"'`;)|&<>])/i
-                if (envReadRe.test(normCmd)) {
-                  throw new ProtectedPathError(agent.id, '.env', '.env', 'bash', 'reading or modifying .env via bash is forbidden')
-                }
+  const envReadRe = /(?:^|[\s"'`=;(|&<>:/])\.env(?:\.(?!example\b)[a-z0-9._-]+|~)?(?=$|[\s"'`;)|&<>])/i
+  if (envReadRe.test(normCmd)) {
+    throw new ProtectedPathError(agent.id, '.env', '.env', 'bash', 'reading or modifying .env via bash is forbidden')
+  }
 
-                if (protectsStore) {
-                  const storePrefix = wsPosix ? `(?:${escapeRegExp(wsPosix)}/|\\.?\\.?/)?` : '(?:\\.?\\.?/)?'
-                  const storeRe = new RegExp(`(?:^|[\\s"'\`=;(|&<>])${storePrefix}store(?:/|$|[\\s"'\`;)|&<>])`, 'i')
-                  if (storeRe.test(normCmd)) {
-                    throw new ProtectedPathError(agent.id, 'store/', 'store/', 'bash', 'accessing store/ via bash is forbidden')
-                  }
-                }
+  if (protectsStore) {
+    const storePrefix = wsPosix ? `(?:${escapeRegExp(wsPosix)}/|\\.?\\.?/)?` : '(?:\\.?\\.?/)?'
+    const storeRe = new RegExp(`(?:^|[\\s"'\`=;(|&<>])${storePrefix}store(?:/|$|[\\s"'\`;)|&<>])`, 'i')
+    if (storeRe.test(normCmd)) {
+      throw new ProtectedPathError(agent.id, 'store/', 'store/', 'bash', 'accessing store/ via bash is forbidden')
+    }
+  }
 
-                if (agent.protectedPaths && agent.protectedPaths.length > 0 && BASH_MUTATING_HINT_RE.test(normCmd)) {
-                  for (const rule of agent.protectedPaths) {
-                    const clean = normalizePosixRel(rule)
-                    if (!clean) continue
-                    const isDir = rule.trim().endsWith('/')
-                    const escapedRule = escapeRegExp(clean)
-                    const wsOpt = wsPosix ? `(?:${escapeRegExp(wsPosix)}/|\\.?\\.?/)?` : '(?:\\.?\\.?/)?'
-                    const tail = isDir ? '(?:/|$|[\\s"\'`;)|&<>])' : '(?=$|[\\s"\'`;)|&<>])'
-                    const ruleRe = new RegExp(`(?:^|[\\s"'\`=;(|&<>])${wsOpt}${escapedRule}${tail}`, 'i')
-                    if (ruleRe.test(normCmd)) {
-                      throw new ProtectedPathError(agent.id, clean, rule, 'bash', 'modifying protected path via bash is forbidden')
-                    }
-                  }
-                }
+  if (agent.protectedPaths && agent.protectedPaths.length > 0 && BASH_MUTATING_HINT_RE.test(normCmd)) {
+    for (const rule of agent.protectedPaths) {
+      const clean = normalizePosixRel(rule)
+      if (!clean) continue
+      const isDir = rule.trim().endsWith('/')
+      const escapedRule = escapeRegExp(clean)
+      const wsOpt = wsPosix ? `(?:${escapeRegExp(wsPosix)}/|\\.?\\.?/)?` : '(?:\\.?\\.?/)?'
+      const tail = isDir ? '(?:/|$|[\\s"\'`;)|&<>])' : '(?=$|[\\s"\'`;)|&<>])'
+      const ruleRe = new RegExp(`(?:^|[\\s"'\`=;(|&<>])${wsOpt}${escapedRule}${tail}`, 'i')
+      if (ruleRe.test(normCmd)) {
+        throw new ProtectedPathError(agent.id, clean, rule, 'bash', 'modifying protected path via bash is forbidden')
+      }
+    }
+  }
 
-                if (isSelfDevAgent(agent)) {
-                  if (/\bgit\b[^\n;&|]*\bpush\b[^\n;&|]*\bfeat\/alfred-core\b/i.test(normCmd)) {
-                    throw new Error('GIT_POLICY_VIOLATION: Pushing to "feat/alfred-core" via bash is forbidden')
-                  }
-                  if (/\bgit\b[^\n;&|]*\b(?:checkout|switch)\b(?![^\n;&|]*\s-(?:[bBcC]|-create|-force-create)\b)[^\n;&|]*\bfeat\/alfred-core\b/i.test(normCmd)) {
-                    throw new Error('GIT_POLICY_VIOLATION: Switching to "feat/alfred-core" via bash is forbidden')
-                  }
-                  if (/\bgit\b[^\n;&|]*\b(?:commit|push|merge|rebase|cherry-pick|revert)\b/i.test(normCmd)) {
-                    if (currentBranch && !isValidSelfDevBranch(currentBranch)) {
-                      throw new Error(
-                        `GIT_POLICY_VIOLATION: Git mutation via bash requires a "feat/self-*" or "fix/self-*" branch (current: "${currentBranch}")`,
-                      )
-                    }
-                  }
-                }
-              }
+  if (isSelfDevAgent(agent)) {
+    if (/\bgit\b[^\n;&|]*\bpush\b[^\n;&|]*\bfeat\/alfred-core\b/i.test(normCmd)) {
+      throw new Error('GIT_POLICY_VIOLATION: Pushing to "feat/alfred-core" via bash is forbidden')
+    }
+    if (/\bgit\b[^\n;&|]*\b(?:checkout|switch)\b(?![^\n;&|]*\s-(?:[bBcC]|-create|-force-create)\b)[^\n;&|]*\bfeat\/alfred-core\b/i.test(normCmd)) {
+      throw new Error('GIT_POLICY_VIOLATION: Switching to "feat/alfred-core" via bash is forbidden')
+    }
+    if (/\bgit\b[^\n;&|]*\b(?:commit|push|merge|rebase|cherry-pick|revert)\b/i.test(normCmd)) {
+      if (currentBranch && !isValidSelfDevBranch(currentBranch)) {
+        throw new Error(
+          `GIT_POLICY_VIOLATION: Git mutation via bash requires a "feat/self-*" or "fix/self-*" branch (current: "${currentBranch}")`,
+        )
+      }
+    }
+  }
+}
 
-              export interface ExecuteToolContext {
-                agent: AlfredAgentDefinition
-                db: Database.Database
-                chatId?: string
-              }
+export interface ExecuteToolContext {
+  agent: AlfredAgentDefinition
+  db: Database.Database
+  chatId?: string
+}
 
-              /**
-               * Layer 2 of Tool Whitelist enforcement:
-               * Verifies at runtime that `toolName` is in `agent.tools`, then executes the tool
-               * strictly confined to `agent.workspaceAbsPath` and `agent.memoryNamespace`.
-               */
-              export function executeWhitelistedTool(
-                ctx: ExecuteToolContext,
-                toolName: string,
-                rawArgs: Record<string, unknown>,
-              ): string {
-                const allowedTools = ctx.agent.tools
-                if (!allowedTools.includes(toolName as AllowedToolName)) {
-                  throw new ToolNotAllowedError(ctx.agent.id, toolName, allowedTools)
-                }
+/**
+ * Layer 2 of Tool Whitelist enforcement:
+ * Verifies at runtime that `toolName` is in `agent.tools`, then executes the tool
+ * strictly confined to `agent.workspaceAbsPath` and `agent.memoryNamespace`.
+ */
+export function executeWhitelistedTool(
+  ctx: ExecuteToolContext,
+  toolName: string,
+  rawArgs: Record<string, unknown>,
+): string {
+  const allowedTools = ctx.agent.tools
+  if (!allowedTools.includes(toolName as AllowedToolName)) {
+    throw new ToolNotAllowedError(ctx.agent.id, toolName, allowedTools)
+  }
 
-                switch (toolName as AllowedToolName) {
-                  case 'fs_read': {
-                    const reqPath = typeof rawArgs.path === 'string' ? rawArgs.path : '.'
-                    const target = resolvePathInWorkspace(ctx.agent.workspaceAbsPath, reqPath)
-                    assertReadAllowed(ctx.agent, target, reqPath)
-                    if (!existsSync(target)) {
-                      return `Error: File or directory not found: ${reqPath}`
-                    }
-                    const st = statSync(target)
-                    if (st.isDirectory()) {
-                      const entries = readdirSync(target, { withFileTypes: true })
-                        .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
-                        .sort()
-                      return entries.join('\n') || '(empty directory)'
-                    }
-                    return readFileSync(target, 'utf-8').slice(0, 64_000)
-                  }
+  switch (toolName as AllowedToolName) {
+    case 'fs_read': {
+      const reqPath = typeof rawArgs.path === 'string' ? rawArgs.path : '.'
+      const target = resolvePathInWorkspace(ctx.agent.workspaceAbsPath, reqPath)
+      assertReadAllowed(ctx.agent, target, reqPath)
+      if (!existsSync(target)) {
+        return `Error: File or directory not found: ${reqPath}`
+      }
+      const st = statSync(target)
+      if (st.isDirectory()) {
+        const entries = readdirSync(target, { withFileTypes: true })
+          .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
+          .sort()
+        return entries.join('\n') || '(empty directory)'
+      }
+      return readFileSync(target, 'utf-8').slice(0, 64_000)
+    }
 
-                  case 'fs_write': {
-                    const reqPath = typeof rawArgs.path === 'string' ? rawArgs.path.trim() : ''
-                    if (!reqPath) throw new Error('fs_write requires a non-empty "path"')
-                    const content = typeof rawArgs.content === 'string' ? rawArgs.content : ''
-                    const target = resolvePathInWorkspace(ctx.agent.workspaceAbsPath, reqPath)
-                    assertWriteAllowed(ctx.agent, target, reqPath)
-                    mkdirSync(dirname(target), { recursive: true })
-                    writeFileSync(target, content, 'utf-8')
-                    return `OK: Wrote ${Buffer.byteLength(content, 'utf-8')} bytes to ${reqPath}`
-                  }
+    case 'fs_write': {
+      const reqPath = typeof rawArgs.path === 'string' ? rawArgs.path.trim() : ''
+      if (!reqPath) throw new Error('fs_write requires a non-empty "path"')
+      const content = typeof rawArgs.content === 'string' ? rawArgs.content : ''
+      const target = resolvePathInWorkspace(ctx.agent.workspaceAbsPath, reqPath)
+      assertWriteAllowed(ctx.agent, target, reqPath)
+      mkdirSync(dirname(target), { recursive: true })
+      writeFileSync(target, content, 'utf-8')
+      return `OK: Wrote ${Buffer.byteLength(content, 'utf-8')} bytes to ${reqPath}`
+    }
 
-                  case 'git': {
-                    const args = Array.isArray(rawArgs.args) ? rawArgs.args.map(String) : []
-                    const selfDev = isSelfDevAgent(ctx.agent)
-                    const currentBranch = getCurrentGitBranch(ctx.agent.workspaceAbsPath)
-                    validateGitArgs(args, {
-                      agentId: ctx.agent.id,
-                      currentBranch,
-                      protectedBranches: selfDev ? ['feat/alfred-core'] : [],
-                      requireSelfDevBranch: selfDev,
-                      protectedPaths: ctx.agent.protectedPaths,
-                      workspaceAbsPath: ctx.agent.workspaceAbsPath,
-                    })
-                    mkdirSync(ctx.agent.workspaceAbsPath, { recursive: true })
-                    const out = execFileSync('git', args, {
-                      cwd: ctx.agent.workspaceAbsPath,
-                      encoding: 'utf-8',
-                      timeout: 15_000,
-                      stdio: ['ignore', 'pipe', 'pipe'],
-                    })
-                    return out.trim() || '(git command exited 0 with no output)'
-                  }
+    case 'git': {
+      const args = Array.isArray(rawArgs.args) ? rawArgs.args.map(String) : []
+      const selfDev = isSelfDevAgent(ctx.agent)
+      const currentBranch = getCurrentGitBranch(ctx.agent.workspaceAbsPath)
+      validateGitArgs(args, {
+        agentId: ctx.agent.id,
+        currentBranch,
+        protectedBranches: selfDev ? ['feat/alfred-core'] : [],
+        requireSelfDevBranch: selfDev,
+        protectedPaths: ctx.agent.protectedPaths,
+        workspaceAbsPath: ctx.agent.workspaceAbsPath,
+      })
+      mkdirSync(ctx.agent.workspaceAbsPath, { recursive: true })
+      const out = execFileSync('git', args, {
+        cwd: ctx.agent.workspaceAbsPath,
+        encoding: 'utf-8',
+        timeout: 15_000,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      return out.trim() || '(git command exited 0 with no output)'
+    }
 
     case 'bash': {
       const command = typeof rawArgs.command === 'string' ? rawArgs.command.trim() : ''
@@ -1024,73 +1024,75 @@ const BASH_MUTATING_HINT_RE =
     }
 
     case 'memory': {
-                    const action = typeof rawArgs.action === 'string' ? rawArgs.action : 'read'
-                    const namespace = ctx.agent.memoryNamespace
-                    const chatId = ctx.chatId ?? ctx.agent.discordChannelId ?? namespace
-                    const nowSec = Math.floor(Date.now() / 1000)
+      const action = typeof rawArgs.action === 'string' ? rawArgs.action : 'read'
+      const namespace = ctx.agent.memoryNamespace
+      const chatId = ctx.chatId ?? ctx.agent.discordChannelId ?? namespace
+      const nowSec = Math.floor(Date.now() / 1000)
 
-                    if (action === 'save') {
-                      const content = typeof rawArgs.content === 'string' ? rawArgs.content.trim() : ''
-                      if (!content) throw new Error('memory save requires non-empty "content"')
-                      const rawCat = typeof rawArgs.category === 'string' ? rawArgs.category : 'warm'
-                      const category = rawCat === 'hot' || rawCat === 'cold' ? rawCat : 'warm'
-                      const res = ctx.db.prepare(`
+      if (action === 'save') {
+        const content = typeof rawArgs.content === 'string' ? rawArgs.content.trim() : ''
+        if (!content) throw new Error('memory save requires non-empty "content"')
+        const rawCat = typeof rawArgs.category === 'string' ? rawArgs.category : 'warm'
+        const category = rawCat === 'hot' || rawCat === 'cold' ? rawCat : 'warm'
+        const res = ctx.db.prepare(`
           INSERT INTO memories (chat_id, content, sector, salience, created_at, accessed_at, agent_id, category)
           VALUES (?, ?, 'semantic', 1.0, ?, ?, ?, ?)
         `).run(chatId, content, nowSec, nowSec, namespace, category)
-                      return `OK: Memory saved in namespace "${namespace}" (id=${String(res.lastInsertRowid)})`
-                    }
+        return `OK: Memory saved in namespace "${namespace}" (id=${String(res.lastInsertRowid)})`
+      }
 
-                    if (action === 'search') {
-                      const query = typeof rawArgs.content === 'string' ? rawArgs.content.trim() : ''
-                      const rows = ctx.db.prepare(`
+      if (action === 'search') {
+        const query = typeof rawArgs.content === 'string' ? rawArgs.content.trim() : ''
+        const rows = ctx.db.prepare(`
           SELECT id, content, category, created_at
           FROM memories
           WHERE agent_id = ? AND retracted_at IS NULL AND content LIKE ?
           ORDER BY created_at DESC
           LIMIT 10
         `).all(namespace, `%${query}%`) as Array<{ id: number; content: string; category: string }>
-                      if (rows.length === 0) return '(no matching memories in namespace)'
-                      return rows.map((r) => `[#${r.id} ${r.category}] ${r.content}`).join('\n')
-                    }
+        if (rows.length === 0) return '(no matching memories in namespace)'
+        return rows.map((r) => `[#${r.id} ${r.category}] ${r.content}`).join('\n')
+      }
 
-                    // action === 'read'
-                    const rows = ctx.db.prepare(`
+      // action === 'read'
+      const rows = ctx.db.prepare(`
         SELECT id, content, category, created_at
         FROM memories
         WHERE agent_id = ? AND retracted_at IS NULL
         ORDER BY created_at DESC
         LIMIT 10
       `).all(namespace) as Array<{ id: number; content: string; category: string }>
-                    if (rows.length === 0) return '(no memories stored in namespace)'
-                    return rows.map((r) => `[#${r.id} ${r.category}] ${r.content}`).join('\n')
-                  }
+      if (rows.length === 0) return '(no memories stored in namespace)'
+      return rows.map((r) => `[#${r.id} ${r.category}] ${r.content}`).join('\n')
+    }
 
-                  case 'cli_manage': {
-                    if (ctx.agent.id !== 'alfred-ops') {
-                      throw new ToolNotAllowedError(
-                        ctx.agent.id,
-                        toolName,
-                        allowedTools.filter((t) => t !== 'cli_manage'),
-                      )
-                    }
-                    throw new Error('cli_manage is asynchronous; invoke executeWhitelistedToolAsync()')
-                  }
+    case 'cli_manage': {
+      if (ctx.agent.id !== 'alfred-ops') {
+        throw new ToolNotAllowedError(
+          ctx.agent.id,
+          toolName,
+          allowedTools.filter((t) => t !== 'cli_manage'),
+        )
+      }
+      throw new Error('cli_manage is asynchronous; invoke executeWhitelistedToolAsync()')
+    }
 
-                  case 'system_storage': {
-                    if (ctx.agent.id !== 'alfred-ops') {
-                      throw new ToolNotAllowedError(
-                        ctx.agent.id,
-                        toolName,
-                        allowedTools.filter((t) => t !== 'system_storage'),
-                      )
-                    }
-                    throw new Error('system_storage is asynchronous; invoke executeWhitelistedToolAsync()')
-                  }
-                }
-              }
+    case 'system_storage': {
+      if (ctx.agent.id !== 'alfred-ops') {
+        throw new ToolNotAllowedError(
+          ctx.agent.id,
+          toolName,
+          allowedTools.filter((t) => t !== 'system_storage'),
+        )
+      }
+      throw new Error('system_storage is asynchronous; invoke executeWhitelistedToolAsync()')
+    }
+  }
+}
 
 /**
+ * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`).
+ * Strictly enforces that `cli_manage` can only be executed by `alfred-ops`.
  * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`, `system_storage`).
  * Strictly enforces that `cli_manage` and `system_storage` can only be executed by `alfred-ops`.
  */

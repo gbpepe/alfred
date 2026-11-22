@@ -12,13 +12,26 @@ import { logger } from '../../logger.js'
 import {
   ALLOWED_PROVIDERS,
   CANONICAL_TOOLS,
+  isCliProvider,
   loadAlfredAgentsConfig,
   normalizeRoleId,
   type AllowedToolName,
   type AlfredAgentDefinition,
   type AlfredProviderName,
 } from '../../alfred/agents-config.js'
+import {
+  ensureAgentCliProfile,
+  readSharedMcpServers,
+  resolveAgentCliProfileDir,
+  resolveCliProfilesRoot,
+  scanSkillMarkdownContent,
+  syncAllCliProfilesAndDirectories,
+  vaultMcpServerSecrets,
+  writeSharedMcpServers,
+  type McpServerRecord,
+} from '../../alfred/cli-profile-manager.js'
 import { atomicWriteFileSync } from '../atomic-write.js'
+import { listSecrets } from '../vault.js'
 import { mayActAsOwner, OWNER_SESSION_REQUIRED } from './auth.js'
 import {
   evaluateCircuitBreaker,
@@ -841,6 +854,12 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         dailyBudgetUsd: a.dailyBudgetUsd,
         tools: a.tools,
         skills: a.skills ?? [],
+        mcpServers: a.mcpServers ?? [],
+        cliProfileDir: resolveAgentCliProfileDir(
+          isCliProvider(a.provider) ? a.provider : 'claude',
+          a.id,
+          env as NodeJS.ProcessEnv,
+        ),
         voice: rawAgentVoice.get(a.id) ?? null,
         systemPrompt: a.systemPrompt ?? '',
         workspace: a.workspace,
@@ -965,6 +984,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       dailyBudgetUsd?: number | null
       voice?: string | null
       tools?: string[] | null
+      mcpServers?: string[] | null
       systemPrompt?: string | null
       workspace?: string | null
       memoryNamespace?: string | null
@@ -1079,6 +1099,14 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       if (toolsVal !== undefined) {
         entry.tools = toolsVal
       }
+      if (Array.isArray(body?.mcpServers)) {
+        const cleanMcp = body.mcpServers
+          .map((s) => String(s).trim())
+          .filter((s) => /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(s))
+        entry.mcpServers = cleanMcp
+      } else if (body?.mcpServers === null) {
+        delete entry.mcpServers
+      }
       if (systemPromptVal !== undefined) {
         if (systemPromptVal) entry.systemPrompt = systemPromptVal
         else delete entry.systemPrompt
@@ -1123,6 +1151,11 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
 
     const env = { ...readEnvFile(), ...process.env }
     const updatedCfg = loadAlfredAgentsConfig({ env })
+    try {
+      syncAllCliProfilesAndDirectories({ agents: updatedCfg.agents, env: env as NodeJS.ProcessEnv })
+    } catch {
+      // ignore profile sync error
+    }
     json(res, {
       ok: true,
       restarted,
@@ -1131,6 +1164,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         role: a.role ?? null,
         provider: a.provider,
         model: a.model,
+        mcpServers: a.mcpServers ?? [],
       })),
     })
     return true
@@ -1630,7 +1664,17 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       for (const r of rows) usageMap.set(r.skill_name, Number(r.cnt || 0))
     } catch { /* optional table */ }
 
-    const skills: Array<{ id: string; description: string; content: string; enabled: boolean; usageCount: number }> = []
+    const skills: Array<{
+      id: string
+      description: string
+      content: string
+      enabled: boolean
+      usageCount: number
+      scanStatus: 'clean' | 'warning' | 'flagged'
+      blocked: boolean
+      findings: Array<{ category: string; pattern: string; match?: string }>
+      assignedAgents: string[]
+    }> = []
     if (existsSync(skillsDir)) {
       const dirs = readdirSync(skillsDir, { withFileTypes: true }).filter((d) => d.isDirectory())
       for (const d of dirs) {
@@ -1639,12 +1683,20 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         if (!existsSync(mdPath)) continue
         try {
           const raw = readFileSync(mdPath, 'utf-8')
+          const scan = scanSkillMarkdownContent(raw)
+          const assignedAgents = (cfg?.agents ?? [])
+            .filter((a) => (a.skills ?? []).includes(d.name))
+            .map((a) => a.id)
           skills.push({
             id: d.name,
             description: extractSkillDescription(raw),
             content: raw,
             enabled: assignedSet.has(d.name),
             usageCount: usageMap.get(d.name) ?? 0,
+            scanStatus: scan.status,
+            blocked: scan.blocked,
+            findings: scan.findings,
+            assignedAgents,
           })
         } catch { /* ignore */ }
       }
@@ -1688,6 +1740,13 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { error: `Unknown agent: ${agentId}` }, 404)
       return true
     }
+    try {
+      const env = { ...readEnvFile(), ...process.env }
+      const updatedCfg = loadAlfredAgentsConfig({ env })
+      syncAllCliProfilesAndDirectories({ agents: updatedCfg.agents, env: env as NodeJS.ProcessEnv })
+    } catch {
+      // ignore profile sync error
+    }
     json(res, { ok: true, agentId, skills: cleanSkills })
     return true
   }
@@ -1697,7 +1756,13 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       json(res, { ...OWNER_SESSION_REQUIRED, error: 'Saving skills requires an owner session.' }, 403)
       return true
     }
-    const body = await readJsonBody<{ id?: string; description?: string; content?: string; agentId?: string }>(req)
+    const body = await readJsonBody<{
+      id?: string
+      description?: string
+      content?: string
+      agentId?: string
+      force?: boolean
+    }>(req)
     const rawId = (body?.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
     if (!rawId || !SAFE_SKILL_ID_RE.test(rawId)) {
       json(res, { error: 'Érvényes skill ID megadása kötelező (a-z, 0-9, -, _).' }, 400)
@@ -1714,6 +1779,20 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     } else if (!content.endsWith('\n')) {
       content += '\n'
     }
+
+    const scan = scanSkillMarkdownContent(content)
+    if (scan.blocked && body?.force !== true) {
+      json(
+        res,
+        {
+          error: `Biztonsági szkenner megállította a mentést (${scan.findings.map((f) => f.pattern).join(', ')}).`,
+          scan,
+        },
+        400,
+      )
+      return true
+    }
+
     const dir = join(resolveSkillsRootDir(), rawId)
     mkdirSync(dir, { recursive: true })
     atomicWriteFileSync(join(dir, 'SKILL.md'), content)
@@ -1731,7 +1810,34 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         }
       }
     }
-    json(res, { ok: true, id: rawId })
+    try {
+      const env = { ...readEnvFile(), ...process.env }
+      const updatedCfg = loadAlfredAgentsConfig({ env })
+      syncAllCliProfilesAndDirectories({ agents: updatedCfg.agents, env: env as NodeJS.ProcessEnv })
+    } catch {
+      // ignore profile sync error
+    }
+    json(res, { ok: true, id: rawId, scan })
+    return true
+  }
+
+  if (path === '/api/vps/skills/sync' && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false })
+      const sync = syncAllCliProfilesAndDirectories({
+        agents: cfg.agents,
+        env: env as NodeJS.ProcessEnv,
+      })
+      json(res, { ok: true, sync })
+    } catch (err) {
+      json(res, { ok: false, error: err instanceof Error ? err.message : String(err) }, 500)
+    }
     return true
   }
 
@@ -1762,7 +1868,237 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       }
       if (changed) atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
     }
+    try {
+      const env = { ...readEnvFile(), ...process.env }
+      const updatedCfg = loadAlfredAgentsConfig({ env })
+      syncAllCliProfilesAndDirectories({ agents: updatedCfg.agents, env: env as NodeJS.ProcessEnv })
+    } catch {
+      // ignore profile sync error
+    }
     json(res, { ok: true, deleted: id })
+    return true
+  }
+
+  if (path === '/api/admin/cli-profiles/sync' && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false })
+      const sync = syncAllCliProfilesAndDirectories({
+        agents: cfg.agents,
+        env: env as NodeJS.ProcessEnv,
+      })
+      json(res, { ok: true, sync })
+    } catch (err) {
+      json(res, { ok: false, error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+    return true
+  }
+
+  if (path === '/api/admin/mcp' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    const rawServers = readSharedMcpServers(process.cwd(), env as NodeJS.ProcessEnv)
+    const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false })
+    const servers = Object.entries(rawServers).map(([name, srv]) => {
+      const envObj = srv.env ?? {}
+      const envEntries = Object.entries(envObj).map(([k, v]) => ({
+        key: k,
+        isVaulted: typeof v === 'string' && v.startsWith('vault:'),
+        vaultRef: typeof v === 'string' && v.startsWith('vault:') ? v : null,
+      }))
+      const assignedAgents = (cfg?.agents ?? [])
+        .filter((a) => !a.mcpServers || a.mcpServers.includes(name))
+        .map((a) => a.id)
+      return {
+        name,
+        type: srv.type ?? (srv.url ? 'http' : 'stdio'),
+        command: srv.command ?? null,
+        args: srv.args ?? [],
+        url: srv.url ?? null,
+        envEntries,
+        assignedAgents,
+      }
+    })
+
+    let catalog: unknown[] = []
+    try {
+      const catPath = join(process.cwd(), 'mcp-catalog.json')
+      if (existsSync(catPath)) {
+        const parsedCat = JSON.parse(readFileSync(catPath, 'utf-8')) as unknown
+        if (Array.isArray(parsedCat)) catalog = parsedCat
+        else if (parsedCat && typeof parsedCat === 'object' && Array.isArray((parsedCat as { servers?: unknown[] }).servers)) {
+          catalog = (parsedCat as { servers: unknown[] }).servers
+        }
+      }
+    } catch {
+      catalog = []
+    }
+
+    let vaultSecrets: Array<{ id: string; label: string; updatedAt: string }> = []
+    try {
+      vaultSecrets = listSecrets()
+        .filter((s) => s.id.startsWith('mcp_') || s.label.startsWith('MCP:'))
+        .map((s) => ({
+          id: s.id,
+          label: s.label,
+          updatedAt: s.updatedAt,
+        }))
+    } catch {
+      vaultSecrets = []
+    }
+
+    json(res, {
+      ok: true,
+      profilesRoot: resolveCliProfilesRoot(env as NodeJS.ProcessEnv),
+      servers,
+      catalog,
+      vaultSecrets,
+      agents: (cfg?.agents ?? []).map((a) => ({
+        id: a.id,
+        displayName: a.displayName,
+        provider: a.provider,
+        mcpServers: a.mcpServers ?? null,
+        profileDir: resolveAgentCliProfileDir(
+          isCliProvider(a.provider) ? a.provider : 'claude',
+          a.id,
+          env as NodeJS.ProcessEnv,
+        ),
+      })),
+    })
+    return true
+  }
+
+  if (path === '/api/admin/mcp' && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const body = await readJsonBody<{
+        name?: string
+        type?: 'stdio' | 'http' | 'sse'
+        command?: string
+        args?: string[] | string
+        url?: string
+        env?: Record<string, string>
+        agents?: string[]
+      }>(req)
+      const rawName = (body?.name || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
+      if (!rawName || !SAFE_SKILL_ID_RE.test(rawName)) {
+        json(res, { ok: false, error: 'Érvényes MCP szerver név kötelező (a-z, 0-9, -, _).' }, 400)
+        return true
+      }
+      const command = typeof body?.command === 'string' ? body.command.trim() : ''
+      const urlVal = typeof body?.url === 'string' ? body.url.trim() : ''
+      if (!command && !urlVal) {
+        json(res, { ok: false, error: 'Meg kell adni a parancsot (command) vagy az URL-t (url).' }, 400)
+        return true
+      }
+      const argsList: string[] = Array.isArray(body?.args)
+        ? body.args.map((a) => String(a).trim()).filter(Boolean)
+        : typeof body?.args === 'string' && body.args.trim()
+          ? body.args.trim().split(/\s+/)
+          : []
+
+      const { storedEnv, vaultedKeys } = vaultMcpServerSecrets(rawName, body?.env)
+      const allServers = readSharedMcpServers(process.cwd(), env as NodeJS.ProcessEnv)
+      const prevEnv = allServers[rawName]?.env ?? {}
+      const mergedEnv = { ...prevEnv, ...storedEnv }
+
+      const record: McpServerRecord = {
+        ...(body?.type ? { type: body.type } : {}),
+        ...(command ? { command } : {}),
+        ...(argsList.length > 0 ? { args: argsList } : {}),
+        ...(urlVal ? { url: urlVal } : {}),
+        ...(Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
+      }
+      allServers[rawName] = record
+      writeSharedMcpServers(allServers, process.cwd(), env as NodeJS.ProcessEnv)
+
+      if (Array.isArray(body?.agents)) {
+        const selectedSet = new Set(body.agents.map((a) => String(a).trim()))
+        const allServerNames = Object.keys(allServers)
+        for (const cfgPath of resolveWritableAgentConfigPaths()) {
+          const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+          for (const entry of parsed.agents ?? []) {
+            const agId = typeof entry.id === 'string' ? entry.id : ''
+            if (!agId) continue
+            const currentList = Array.isArray(entry.mcpServers)
+              ? entry.mcpServers.map(String)
+              : allServerNames.filter((n) => n !== rawName)
+            const nextSet = new Set(currentList)
+            if (selectedSet.has(agId)) nextSet.add(rawName)
+            else nextSet.delete(rawName)
+            entry.mcpServers = Array.from(nextSet)
+          }
+          atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+        }
+      }
+
+      const updatedCfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false })
+      const sync = syncAllCliProfilesAndDirectories({
+        agents: updatedCfg.agents,
+        env: env as NodeJS.ProcessEnv,
+      })
+
+      json(res, {
+        ok: true,
+        name: rawName,
+        vaultedKeys,
+        syncedProfiles: sync.agentProfiles.length,
+      })
+    } catch (err) {
+      json(res, { ok: false, error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+    return true
+  }
+
+  const mcpDeleteMatch = /^\/api\/admin\/mcp\/([^/]+)$/.exec(path)
+  if ((mcpDeleteMatch || path === '/api/admin/mcp') && method === 'DELETE') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    const name = (mcpDeleteMatch ? decodeURIComponent(mcpDeleteMatch[1]) : url.searchParams.get('name') || '').trim()
+    if (!name || !SAFE_SKILL_ID_RE.test(name)) {
+      json(res, { ok: false, error: 'Invalid MCP server name' }, 400)
+      return true
+    }
+    const allServers = readSharedMcpServers(process.cwd(), env as NodeJS.ProcessEnv)
+    delete allServers[name]
+    writeSharedMcpServers(allServers, process.cwd(), env as NodeJS.ProcessEnv)
+
+    for (const cfgPath of resolveWritableAgentConfigPaths()) {
+      const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
+      let changed = false
+      for (const entry of parsed.agents ?? []) {
+        if (Array.isArray(entry.mcpServers) && entry.mcpServers.includes(name)) {
+          entry.mcpServers = entry.mcpServers.filter((s) => s !== name)
+          changed = true
+        }
+      }
+      if (changed) atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+    }
+
+    const updatedCfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false })
+    syncAllCliProfilesAndDirectories({
+      agents: updatedCfg.agents,
+      env: env as NodeJS.ProcessEnv,
+    })
+    json(res, { ok: true, deleted: name })
     return true
   }
 
