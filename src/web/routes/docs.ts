@@ -18,6 +18,14 @@ function titleOf(content: string, fallback: string): string {
   return m ? m[1].trim() : fallback
 }
 
+function pinRank(name: string): number {
+  if (/^0[0-9]-/.test(name)) {
+    return Number(name.slice(0, 2))
+  }
+  if (name === 'README.md') return 10
+  return 100
+}
+
 export async function tryHandleDocs(ctx: RouteContext): Promise<boolean> {
   const { res, path, method } = ctx
 
@@ -34,24 +42,26 @@ export async function tryHandleDocs(ctx: RouteContext): Promise<boolean> {
       .map(name => {
         let title = name
         let created: string | null = null
+        let searchText = ''
         let ms = 0
         try {
           const file = join(DOCS_DIR, name)
-          title = titleOf(readFileSync(file, 'utf-8'), name)
+          const raw = readFileSync(file, 'utf-8')
+          title = titleOf(raw, name)
+          searchText = raw.replace(/\s+/g, ' ').trim().slice(0, 12_000)
           const s = statSync(file)
-          // birthtime is the file's creation time; on filesystems that don't track
-          // it (returns 0) fall back to the last-modified time.
           ms = s.birthtimeMs && s.birthtimeMs > 0 ? s.birthtimeMs : s.mtimeMs
           created = new Date(ms).toISOString().slice(0, 10)
         } catch {
           /* keep filename as title, created stays null */
         }
-        return { name, title, created, ms }
+        const rank = pinRank(name)
+        return { name, title, created, pinned: rank < 100, searchText, rank, ms }
       })
-      // Newest first: sort by the file's creation/modification time descending,
-      // tie-break by name. The `ms` field is internal -- strip it before sending.
-      .sort((a, b) => (b.ms - a.ms) || a.name.localeCompare(b.name))
-      .map(({ name, title, created }) => ({ name, title, created }))
+      // Pinned tutorial/handbook chapters (00-..05-, README.md) come first in numerical order,
+      // followed by remaining docs newest-first.
+      .sort((a, b) => (a.rank - b.rank) || (b.ms - a.ms) || a.name.localeCompare(b.name))
+      .map(({ name, title, created, pinned, searchText }) => ({ name, title, created, pinned, searchText }))
     json(res, docs)
     return true
   }

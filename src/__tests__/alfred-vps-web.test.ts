@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { loadAlfredAgentsConfig, normalizeRoleId } from '../alfred/agents-config.js'
 import { tryHandleAlfredVps } from '../web/routes/alfred-vps.js'
+import { tryHandleDocs } from '../web/routes/docs.js'
 import type { RouteContext } from '../web/routes/types.js'
 
 function mockReqRes(method: string, path: string, body?: unknown): {
@@ -228,5 +229,35 @@ describe('alfred role-based model routing', () => {
     const handled = await tryHandleAlfredVps(ctx)
     expect(handled).toBe(true)
     expect(getStatus()).toBe(403)
+  })
+
+  it('serves pinned Hungarian handbook & tutorial chapters first via GET /api/docs and GET /api/docs/:name', async () => {
+    const listReq = mockReqRes('GET', '/api/docs')
+    expect(await tryHandleDocs(listReq.ctx)).toBe(true)
+    expect(listReq.getStatus()).toBe(200)
+    const docs = listReq.getJson() as unknown as Array<{
+      name: string
+      title: string
+      pinned: boolean
+      searchText: string
+    }>
+    expect(Array.isArray(docs)).toBe(true)
+    expect(docs.length).toBeGreaterThanOrEqual(6)
+    expect(docs[0].name).toBe('00-alfred-kezikonyv-es-tutorialok.md')
+    expect(docs[0].pinned).toBe(true)
+    expect(docs[0].searchText).toContain('agy-cli')
+    expect(docs[1].name).toBe('01-attekintes-es-gyorsinditas.md')
+    expect(docs[2].name).toBe('02-cli-szolgaltatok-es-oauth-belepes.md')
+    expect(docs[3].name).toBe('03-per-agent-profilok-skill-es-mcp-vault.md')
+    expect(docs[4].name).toBe('04-vps-eroforras-figyeles-es-housekeeping.md')
+    expect(docs[5].name).toBe('05-hibaelharitas-es-uzemeltetesi-parancsok.md')
+
+    const detailReq = mockReqRes('GET', '/api/docs/00-alfred-kezikonyv-es-tutorialok.md')
+    expect(await tryHandleDocs(detailReq.ctx)).toBe(true)
+    expect(detailReq.getStatus()).toBe(200)
+    const detail = detailReq.getJson() as { name: string; title: string; content: string }
+    expect(detail.name).toBe('00-alfred-kezikonyv-es-tutorialok.md')
+    expect(detail.content).toContain('Per-Agent CLI Profil-izoláció')
+    expect(detail.content).toContain('wal_checkpoint(TRUNCATE)')
   })
 })

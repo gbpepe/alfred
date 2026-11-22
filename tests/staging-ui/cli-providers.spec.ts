@@ -242,4 +242,36 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await expect(msgEl).toContainText('Hiba:', { timeout: 10_000 })
     expect(pageErrors).toEqual([])
   })
+
+  test('renders comprehensive Hungarian handbook & tutorials on #docs with quick chapter tabs, TOC, search filter, and copyable code blocks', async ({ page }) => {
+    const pageErrors: string[] = []
+    page.on('pageerror', (err) => pageErrors.push(err.message))
+
+    await page.goto(buildTargetUrl('docs'), { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#docsPage')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('#docsQuickTabs [data-docs-quick]')).toHaveCount(6, { timeout: 15_000 })
+    await expect(page.locator('#docsContent')).toContainText('Alfred Kézikönyv & Lépésről-lépésre Tutorialok', {
+      timeout: 20_000,
+    })
+    await expect(page.locator('#docsTocBar [data-docs-toc]').first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('#docsContent [data-docs-copy-btn]').first()).toBeVisible()
+
+    // Switch chapter via quick tab (Chapter 3: Per-Agent Profiles, SKILL.md & MCP + Vault)
+    await page.locator('[data-docs-quick="03-per-agent-profilok-skill-es-mcp-vault.md"]').click()
+    await expect(page.locator('#docsContent')).toContainText('/home/alfred/.cli-profiles/<cliId>/<agentId>', {
+      timeout: 15_000,
+    })
+
+    // Filter sidebar via search input
+    const searchInput = page.locator('#docsSearchInput')
+    await searchInput.fill('wal_checkpoint')
+    await expect(page.locator('#docsSearchCount')).toContainText('találat')
+    await expect(
+      page.locator('#docsList .docs-list-item[data-doc="04-vps-eroforras-figyeles-es-housekeeping.md"]'),
+    ).toBeVisible()
+    await page.locator('#docsSearchClearBtn').click()
+    await expect(searchInput).toHaveValue('')
+
+    expect(pageErrors).toEqual([])
+  })
 })

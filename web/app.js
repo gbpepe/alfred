@@ -22615,7 +22615,102 @@ function renderMarkdown(md) {
   return out.join('\n')
 }
 
+let _docsCache = []
+let _docsCurrentName = ''
+let _docsSearchWired = false
+
+function syncDocsQuickTabActive(name) {
+  const tabsWrap = document.getElementById('docsQuickTabs')
+  if (!tabsWrap) return
+  tabsWrap.querySelectorAll('[data-docs-quick]').forEach(btn => {
+    const isMatch = btn.getAttribute('data-docs-quick') === name
+    btn.className = isMatch ? 'btn-primary btn-compact' : 'btn-secondary btn-compact'
+  })
+}
+
+function renderDocsSidebarList(queryStr) {
+  const listEl = document.getElementById('docsList')
+  const countEl = document.getElementById('docsSearchCount')
+  const clearBtn = document.getElementById('docsSearchClearBtn')
+  if (!listEl) return
+  const q = String(queryStr || '').trim().toLowerCase()
+  if (clearBtn) clearBtn.hidden = !q
+
+  const filtered = !q
+    ? _docsCache
+    : _docsCache.filter(d =>
+        String(d.title || '').toLowerCase().includes(q) ||
+        String(d.name || '').toLowerCase().includes(q) ||
+        String(d.searchText || '').toLowerCase().includes(q)
+      )
+
+  if (countEl) {
+    countEl.textContent = q ? (filtered.length + ' / ' + _docsCache.length + ' találat') : ''
+  }
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<p class="muted">Nincs találat erre: "' + escapeHtml(queryStr) + '"</p>'
+    return
+  }
+
+  const pinnedDocs = filtered.filter(d => d.pinned)
+  const otherDocs = filtered.filter(d => !d.pinned)
+
+  const renderItem = (d) =>
+    '<a href="#" class="docs-list-item' + (d.name === _docsCurrentName ? ' active' : '') + '" data-doc="' + escapeAttr(d.name) + '">' +
+      '<span class="docs-list-title">' + escapeHtml(d.title || d.name) + '</span>' +
+      (d.created ? '<span class="docs-list-date">' + escapeHtml(d.created) + '</span>' : '') +
+    '</a>'
+
+  let html = ''
+  if (pinnedDocs.length > 0) {
+    html += '<div class="docs-list-group-label" style="font-size:11px;font-weight:700;opacity:.75;padding:6px 10px 4px">📘 KÉZIKÖNYV & TUTORIALOK</div>'
+    html += pinnedDocs.map(renderItem).join('')
+  }
+  if (otherDocs.length > 0) {
+    html += '<div class="docs-list-group-label" style="font-size:11px;font-weight:700;opacity:.75;padding:10px 10px 4px">TOVÁBBI MODULOK</div>'
+    html += otherDocs.map(renderItem).join('')
+  }
+  listEl.innerHTML = html
+
+  listEl.querySelectorAll('.docs-list-item').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault()
+      openDoc(a.dataset.doc)
+    })
+  })
+}
+
+function wireDocsNavigation() {
+  if (_docsSearchWired) return
+  _docsSearchWired = true
+  const searchInp = document.getElementById('docsSearchInput')
+  const clearBtn = document.getElementById('docsSearchClearBtn')
+  const tabsWrap = document.getElementById('docsQuickTabs')
+
+  if (searchInp) {
+    searchInp.addEventListener('input', () => {
+      renderDocsSidebarList(searchInp.value)
+    })
+  }
+  if (clearBtn && searchInp) {
+    clearBtn.addEventListener('click', () => {
+      searchInp.value = ''
+      renderDocsSidebarList('')
+    })
+  }
+  if (tabsWrap) {
+    tabsWrap.querySelectorAll('[data-docs-quick]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetDoc = btn.getAttribute('data-docs-quick')
+        if (targetDoc) openDoc(targetDoc)
+      })
+    })
+  }
+}
+
 async function loadDocs() {
+  wireDocsNavigation()
   const listEl = document.getElementById('docsList')
   const contentEl = document.getElementById('docsContent')
   if (!listEl) return
@@ -22629,46 +22724,110 @@ async function loadDocs() {
     listEl.innerHTML = '<p class="muted">' + t('docs.list_load_error') + ': ' + escapeHtml(String(e.message || e)) + '</p>'
     return
   }
+  _docsCache = docs
   if (!docs.length) {
     listEl.innerHTML = '<p class="muted">' + t('docs.empty_list') + '</p>'
     if (contentEl) contentEl.innerHTML = '<p class="muted">' + t('docs.empty_content') + '</p>'
     return
   }
-  listEl.innerHTML = docs.map(d =>
-    '<a href="#" class="docs-list-item" data-doc="' + escapeAttr(d.name) + '">' +
-      '<span class="docs-list-title">' + escapeHtml(d.title || d.name) + '</span>' +
-      (d.created ? '<span class="docs-list-date">' + escapeHtml(d.created) + '</span>' : '') +
-    '</a>'
-  ).join('')
-  listEl.querySelectorAll('.docs-list-item').forEach(a => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault()
-      listEl.querySelectorAll('.docs-list-item').forEach(x => x.classList.remove('active'))
-      a.classList.add('active')
-      openDoc(a.dataset.doc)
-    })
-  })
-  const first = listEl.querySelector('.docs-list-item')
-  if (first) { first.classList.add('active'); openDoc(first.dataset.doc) }
+  const searchVal = document.getElementById('docsSearchInput')?.value || ''
+  const initialDoc = docs[0].name
+  _docsCurrentName = initialDoc
+  renderDocsSidebarList(searchVal)
+  openDoc(initialDoc)
 }
 
 async function openDoc(name) {
   const contentEl = document.getElementById('docsContent')
+  const listEl = document.getElementById('docsList')
   if (!contentEl) return
+  _docsCurrentName = name
+  syncDocsQuickTabActive(name)
+  if (listEl) {
+    listEl.querySelectorAll('.docs-list-item').forEach(x => {
+      x.classList.toggle('active', x.dataset.doc === name)
+    })
+  }
   contentEl.innerHTML = '<p class="muted">' + t('docs.loading') + '</p>'
   try {
     const res = await fetch('/api/docs/' + encodeURIComponent(name))
     if (!res.ok) throw new Error('HTTP ' + res.status)
     const doc = await res.json()
     const content = doc.content || ''
-    // Toolbar with a raw-.md download, then the rendered markdown.
+    // Toolbar with in-page TOC container + raw-.md download, then the rendered markdown.
     contentEl.innerHTML =
-      '<div class="docs-content-toolbar">' +
+      '<div class="docs-content-toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
+        '<div id="docsTocBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>' +
         '<button class="btn-secondary btn-compact" id="docsDownloadBtn">' + t('docs.download_btn') + '</button>' +
       '</div>' +
       '<div class="docs-rendered markdown-body md-rendered">' + renderMarkdown(content) + '</div>'
     const dl = document.getElementById('docsDownloadBtn')
     if (dl) dl.addEventListener('click', () => downloadMarkdown(name, content))
+
+    // 1. Build in-page Table of Contents (TOC) from h2 headings
+    const renderedEl = contentEl.querySelector('.docs-rendered')
+    const tocBar = document.getElementById('docsTocBar')
+    if (renderedEl && tocBar) {
+      const headings = Array.from(renderedEl.querySelectorAll('h2'))
+      if (headings.length > 1) {
+        tocBar.innerHTML =
+          '<span style="font-size:11px;font-weight:700;opacity:.7">Fejezetek:</span>' +
+          headings.map((hEl, idx) => {
+            const secId = 'docs-sec-' + idx
+            hEl.id = secId
+            return (
+              '<button type="button" class="btn-secondary btn-compact" data-docs-toc="' + secId + '" style="padding:3px 8px;font-size:11px">' +
+              escapeHtml((hEl.textContent || '').trim()) +
+              '</button>'
+            )
+          }).join('')
+        tocBar.querySelectorAll('[data-docs-toc]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const target = document.getElementById(btn.getAttribute('data-docs-toc'))
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          })
+        })
+      }
+    }
+
+    // 2. Add Copy button to every <pre> code block
+    if (renderedEl) {
+      renderedEl.querySelectorAll('pre').forEach(preEl => {
+        preEl.style.position = 'relative'
+        const copyBtn = document.createElement('button')
+        copyBtn.type = 'button'
+        copyBtn.className = 'btn-secondary btn-compact'
+        copyBtn.setAttribute('data-docs-copy-btn', '1')
+        copyBtn.style.cssText = 'position:absolute;top:8px;right:8px;padding:2px 8px;font-size:11px;opacity:.9'
+        copyBtn.textContent = 'Másolás'
+        copyBtn.addEventListener('click', async () => {
+          const codeEl = preEl.querySelector('code')
+          const rawCode = (codeEl ? codeEl.textContent : preEl.textContent) || ''
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(rawCode.trim())
+            }
+            copyBtn.textContent = '✓ Másolva!'
+            setTimeout(() => { copyBtn.textContent = 'Másolás' }, 1800)
+          } catch {
+            copyBtn.textContent = 'Másolás'
+          }
+        })
+        preEl.appendChild(copyBtn)
+      })
+
+      // 3. Intercept internal .md links so they open directly inside #docs
+      renderedEl.querySelectorAll('a[href]').forEach(aEl => {
+        const href = aEl.getAttribute('href') || ''
+        if (/^[A-Za-z0-9._-]+\.md$/.test(href)) {
+          aEl.removeAttribute('target')
+          aEl.addEventListener('click', (e) => {
+            e.preventDefault()
+            openDoc(href)
+          })
+        }
+      })
+    }
   } catch (e) {
     contentEl.innerHTML = '<p class="muted">' + t('docs.open_error') + ': ' + escapeHtml(String(e.message || e)) + '</p>'
   }

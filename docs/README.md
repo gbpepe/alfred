@@ -1,12 +1,25 @@
 # Alfred — Funkció-dokumentáció
 
-Alfred egy önfejlesztő, proaktív AI-asszisztens rendszer Claude Code alapokon. Nem chatbot: ügynök-flotta, amely magától észreveszi a tennivalót, emlékszik, tanul, és a háttérben dolgozik.
+Alfred egy önfejlesztő, proaktív Multi-Agent AI rendszer és egységes VPS Dashboard. Nem chatbot: ügynök-flotta, amely `$0`-s előfizetéses CLI-ket (`claude-cli`, `agy-cli`, `codex-cli`, `gemini-cli`) és valós idejű Modell API-kat kombinál per-agent profil-izolációval, közös `SKILL.md` biztonsági szkennerrel, Vaulttal védett MCP szerverekkel és automatikus VPS erőforrás-takarítóval.
 
-Minden lap két szemszögből mutatja be a funkciót:
+## 📘 Kiemelt Kézikönyv & Lépésről-lépésre Tutorialok
+
+| Fejezet | Tartalom |
+| :--- | :--- |
+| **[📘 Komplett Alfred Kézikönyv & Tutorialok](00-alfred-kezikonyv-es-tutorialok.md)** | **Minden egyben:** Architektúra, 4-CLI OAuth belépés, Per-Agent profilok, `SKILL.md` szkenner, MCP + Vault, VPS Memória/SSD & Housekeeping, Hibaelhárítás |
+| **[1. Áttekintés & Gyorsindítás](01-attekintes-es-gyorsinditas.md)** | `alfred-prod` / `alfred-ops` / `alfred-web` felépítés, 4 munkakör (Tervező, Szakértő, Technikus, Segítő), hibrid CostOps (`$0` CLI vs. API) |
+| **[2. CLI Szolgáltatók & Böngészős OAuth Belépés](02-cli-szolgaltatok-es-oauth-belepes.md)** | `claude-cli`, `agy-cli` (egyéni Google AI Pro/Ultra), `codex-cli` és Enterprise `gemini-cli` telepítése, SSH-mentes OAuth belépés, `Teszt` és 0-tokenes `Kvóta` sávok |
+| **[3. Per-Agent Profilok, SKILL.md & MCP + Vault](03-per-agent-profilok-skill-es-mcp-vault.md)** | `/home/alfred/.cli-profiles/<cliId>/<agentId>` izoláció, OAuth-öröklés, prompt-injection szkenner, MCP katalógus, Vault és Claude/AGY/Gemini JSON + Codex TOML szinkron |
+| **[4. VPS Erőforrás-figyelés & Housekeeping](04-vps-eroforras-figyeles-es-housekeeping.md)** | `#vps` Memória & SSD kártya (Top RSS, Linux PSI), `wal_checkpoint(TRUNCATE)`, feltételes `VACUUM`, `.gz` logrotáció, 30 napos artifact takarítás és `system_storage` eszköz |
+| **[5. Hibaelhárítás & Üzemeltetési Parancsok](05-hibaelharitas-es-uzemeltetesi-parancsok.md)** | Gyakori hibák (`AUTH_REQUIRED`, blokkolt `SKILL.md`, `ProtectHome=read-only` / `ReadWritePaths`) és `systemctl` / `journalctl` parancsok |
+
+---
+
+Minden további funkció-lap két szemszögből mutatja be a rendszert:
 - **🎯 Mit tud / miért érdekes** — közérthető bemutatás, kuriózumok, használati példák
 - **🛠 Hogyan működik** — technikai felépítés, hogyan bővíthető
 
-## Funkciók
+## További Rendszermodulok
 
 | Funkció | Leírás |
 |---------|--------|

@@ -1279,9 +1279,24 @@
 
     <!-- === Docs Page === -->
     <div class="page" id="docsPage" hidden>
-      <div class="page-header">
-        <h1 data-i18n="docs.page_title">Dokumentáció</h1>
-        <p class="subtitle" data-i18n="docs.page_subtitle">A projekt docs/ mappája, olvasható formában</p>
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <div>
+          <h1 data-i18n="docs.page_title" style="margin:0">Dokumentáció &amp; Tutorialok</h1>
+          <p class="subtitle" data-i18n="docs.page_subtitle" style="margin:4px 0 0">Teljes körű magyar nyelvű Alfred kézikönyv, lépésről-lépésre útmutatók és másolható parancsok</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="search" id="docsSearchInput" class="input" placeholder="🔎 Keresés a dokumentációban (pl. OAuth, agy-cli, Vault, VACUUM)..." style="min-width:280px;padding:6px 10px;font-size:12px">
+          <button type="button" class="btn-secondary btn-compact" id="docsSearchClearBtn" hidden style="font-size:12px">Törlés</button>
+          <span id="docsSearchCount" style="font-size:12px;opacity:.75"></span>
+        </div>
+      </div>
+      <div id="docsQuickTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+        <button type="button" class="btn-primary btn-compact" data-docs-quick="00-alfred-kezikonyv-es-tutorialok.md" style="font-size:12px">📘 Komplett Kézikönyv</button>
+        <button type="button" class="btn-secondary btn-compact" data-docs-quick="01-attekintes-es-gyorsinditas.md" style="font-size:12px">1. Áttekintés &amp; Gyorsindítás</button>
+        <button type="button" class="btn-secondary btn-compact" data-docs-quick="02-cli-szolgaltatok-es-oauth-belepes.md" style="font-size:12px">2. CLI &amp; Böngészős OAuth</button>
+        <button type="button" class="btn-secondary btn-compact" data-docs-quick="03-per-agent-profilok-skill-es-mcp-vault.md" style="font-size:12px">3. Profilok, SKILL.md &amp; MCP + Vault</button>
+        <button type="button" class="btn-secondary btn-compact" data-docs-quick="04-vps-eroforras-figyeles-es-housekeeping.md" style="font-size:12px">4. VPS Memória/SSD &amp; Housekeeping</button>
+        <button type="button" class="btn-secondary btn-compact" data-docs-quick="05-hibaelharitas-es-uzemeltetesi-parancsok.md" style="font-size:12px">5. Hibaelhárítás &amp; Parancsok</button>
       </div>
       <div class="docs-layout">
         <aside class="docs-list" id="docsList">
