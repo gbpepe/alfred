@@ -66,12 +66,16 @@ export interface RunCliAgentOptions {
 
 export type RunCliAgentFn = (opts: RunCliAgentOptions) => Promise<CliRunResult>
 
+export type CliAuthMethod = 'oauth' | 'api_key' | 'none'
+
 export interface CliProviderHealthStatus {
   provider: AlfredCliProviderName
   binary: string
   installed: boolean
   version?: string
   authConfigured: boolean
+  authMethod: CliAuthMethod
+  authDetail?: string
 }
 
 const DEFAULT_CLI_TIMEOUT_MS = 300_000
@@ -1315,25 +1319,61 @@ export async function runCliAgent(opts: RunCliAgentOptions): Promise<CliRunResul
   )
 }
 
-function hasCliAuthConfigured(
+export function detectCliAuthStatus(
   provider: AlfredCliProviderName,
   env: Record<string, string | undefined>,
-): boolean {
+): { method: CliAuthMethod; detail?: string } {
   const home = env['HOME'] || env['USERPROFILE'] || ''
   if (provider === 'claude-cli') {
-    if ((env['CLAUDE_CODE_OAUTH_TOKEN'] || env['ANTHROPIC_API_KEY'] || '').trim()) return true
+    if ((env['CLAUDE_CODE_OAUTH_TOKEN'] || '').trim()) {
+      return { method: 'oauth', detail: 'CLAUDE_CODE_OAUTH_TOKEN (.env)' }
+    }
     const dir = env['CLAUDE_CONFIG_DIR']?.trim() || (home ? join(home, '.claude') : '')
-    return Boolean(dir && (existsSync(join(dir, '.credentials.json')) || existsSync(join(dir, 'credentials.json'))))
+    if (dir && existsSync(join(dir, '.credentials.json'))) {
+      return { method: 'oauth', detail: '~/.claude/.credentials.json' }
+    }
+    if (dir && existsSync(join(dir, 'credentials.json'))) {
+      return { method: 'oauth', detail: '~/.claude/credentials.json' }
+    }
+    if ((env['ANTHROPIC_API_KEY'] || '').trim()) {
+      return { method: 'api_key', detail: 'ANTHROPIC_API_KEY (.env)' }
+    }
+    return { method: 'none' }
   }
   if (provider === 'codex-cli') {
-    if ((env['OPENAI_API_KEY'] || env['CODEX_API_KEY'] || '').trim()) return true
     const dir = env['CODEX_HOME']?.trim() || (home ? join(home, '.codex') : '')
-    return Boolean(dir && (existsSync(join(dir, 'auth.json')) || existsSync(join(dir, 'credentials.json'))))
+    if (dir && existsSync(join(dir, 'auth.json'))) {
+      return { method: 'oauth', detail: '~/.codex/auth.json' }
+    }
+    if (dir && existsSync(join(dir, 'credentials.json'))) {
+      return { method: 'oauth', detail: '~/.codex/credentials.json' }
+    }
+    if ((env['CODEX_API_KEY'] || '').trim()) {
+      return { method: 'api_key', detail: 'CODEX_API_KEY (.env)' }
+    }
+    if ((env['OPENAI_API_KEY'] || '').trim()) {
+      return { method: 'api_key', detail: 'OPENAI_API_KEY (.env)' }
+    }
+    return { method: 'none' }
   }
   // gemini-cli
-  if ((env['GEMINI_API_KEY'] || env['GOOGLE_API_KEY'] || env['GOOGLE_APPLICATION_CREDENTIALS'] || '').trim()) return true
   const dir = env['GEMINI_CLI_HOME']?.trim() || (home ? join(home, '.gemini') : '')
-  return Boolean(dir && (existsSync(join(dir, 'oauth_creds.json')) || existsSync(join(dir, 'google_accounts.json'))))
+  if (dir && existsSync(join(dir, 'oauth_creds.json'))) {
+    return { method: 'oauth', detail: '~/.gemini/oauth_creds.json' }
+  }
+  if (dir && existsSync(join(dir, 'google_accounts.json'))) {
+    return { method: 'oauth', detail: '~/.gemini/google_accounts.json' }
+  }
+  if ((env['GEMINI_API_KEY'] || '').trim()) {
+    return { method: 'api_key', detail: 'GEMINI_API_KEY (.env)' }
+  }
+  if ((env['GOOGLE_API_KEY'] || '').trim()) {
+    return { method: 'api_key', detail: 'GOOGLE_API_KEY (.env)' }
+  }
+  if ((env['GOOGLE_APPLICATION_CREDENTIALS'] || '').trim()) {
+    return { method: 'api_key', detail: 'GOOGLE_APPLICATION_CREDENTIALS (.env)' }
+  }
+  return { method: 'none' }
 }
 
 /**
@@ -1376,12 +1416,15 @@ export async function checkCliProvidersHealth(opts?: {
         installed = false
       }
 
+      const auth = detectCliAuthStatus(provider, envMap)
       return {
         provider,
         binary,
         installed,
         ...(version ? { version } : {}),
-        authConfigured: hasCliAuthConfigured(provider, envMap),
+        authConfigured: auth.method !== 'none',
+        authMethod: auth.method,
+        ...(auth.detail ? { authDetail: auth.detail } : {}),
       }
     }),
   )

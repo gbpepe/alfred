@@ -24,10 +24,16 @@ import {
   resolveEffectiveTokenPrices,
 } from '../../alfred/circuit-breaker.js'
 import {
+  cancelCliLogin,
   CliManagerValidationError,
   getCliInventory,
+  getCliLoginStatus,
   installOrUpdateCli,
+  logoutCli,
   removeCli,
+  saveCliCredentials,
+  startCliLogin,
+  submitCliLoginCode,
 } from '../../alfred/cli-manager.js'
 import { getCliQueueStats } from '../../alfred/cli-runner.js'
 import { runHybridAgentTurn, type ChatMessage } from '../../alfred/model-router.js'
@@ -420,6 +426,123 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       })
       const clis = await getCliInventory({ env })
       json(res, { ok: true, result, clis })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliAuthMatch = /^\/api\/admin\/clis\/([^/]+)\/auth$/.exec(path)
+  if (cliAuthMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const body = await readJsonBody<{ token?: string; authJson?: string }>(req)
+      const result = await saveCliCredentials(decodeURIComponent(cliAuthMatch[1]), {
+        token: body?.token,
+        authJson: body?.authJson,
+      })
+      const freshEnv = { ...readEnvFile(), ...process.env }
+      const clis = await getCliInventory({ env: freshEnv })
+      json(res, { ok: true, result, clis })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliLogoutMatch = /^\/api\/admin\/clis\/([^/]+)\/logout$/.exec(path)
+  if (cliLogoutMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const result = await logoutCli(decodeURIComponent(cliLogoutMatch[1]))
+      const freshEnv = { ...readEnvFile(), ...process.env }
+      const clis = await getCliInventory({ env: freshEnv })
+      json(res, { ok: true, result, clis })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliLoginStartMatch = /^\/api\/admin\/clis\/([^/]+)\/login\/start$/.exec(path)
+  if (cliLoginStartMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const session = await startCliLogin(decodeURIComponent(cliLoginStartMatch[1]), { env })
+      json(res, { ok: true, session })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliLoginStatusMatch = /^\/api\/admin\/clis\/([^/]+)\/login\/status$/.exec(path)
+  if (cliLoginStatusMatch && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const session = getCliLoginStatus(decodeURIComponent(cliLoginStatusMatch[1]))
+      json(res, { ok: true, session })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliLoginCodeMatch = /^\/api\/admin\/clis\/([^/]+)\/login\/code$/.exec(path)
+  if (cliLoginCodeMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const body = await readJsonBody<{ code?: string }>(req)
+      const session = submitCliLoginCode(decodeURIComponent(cliLoginCodeMatch[1]), body?.code ?? '')
+      json(res, { ok: true, session })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliLoginCancelMatch = /^\/api\/admin\/clis\/([^/]+)\/login\/cancel$/.exec(path)
+  if (cliLoginCancelMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const session = cancelCliLogin(decodeURIComponent(cliLoginCancelMatch[1]))
+      json(res, { ok: true, session })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)

@@ -15,13 +15,17 @@ import {
   CliExecutionError,
   CliExecutionQueue,
   CliManagerValidationError,
+  detectCliAuthStatus,
   evaluateCircuitBreaker,
   executeWhitelistedToolAsync,
+  extractCliLoginUrl,
+  extractCodexDeviceCode,
   getCliInventory,
   getCliQueueStats,
   handleAlfredDiscordMessage,
   installOrUpdateCli,
   loadAlfredAgentsConfig,
+  logoutCli,
   normalizeManagedCliId,
   ProtectedPathError,
   removeCli,
@@ -30,6 +34,7 @@ import {
   runCliAgent,
   runHybridAgentTurn,
   sanitizeCliText,
+  saveCliCredentials,
   spawnCliProcess,
   ToolNotAllowedError,
   type AlfredAgentDefinition,
@@ -867,12 +872,15 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
           installed: true,
           version: '1.2.3 (Claude Code)',
           authConfigured: true,
+          authMethod: 'oauth',
+          authDetail: 'CLAUDE_CODE_OAUTH_TOKEN (.env)',
         },
         {
           provider: 'codex-cli',
           binary: 'codex',
           installed: false,
           authConfigured: false,
+          authMethod: 'none',
         },
         {
           provider: 'gemini-cli',
@@ -880,6 +888,8 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
           installed: true,
           version: '0.9.0',
           authConfigured: true,
+          authMethod: 'api_key',
+          authDetail: 'GEMINI_API_KEY (.env)',
         },
       ])
     })
@@ -1186,6 +1196,130 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
       expect(parsed.ok).toBe(true)
       expect(parsed.id).toBe('codex')
       expect(parsed.packageName).toBe('@openai/codex')
+    })
+
+    it('distinguishes oauth vs api_key vs none, saves credentials (JSON & token), logs out cleanly, and parses OAuth login URLs/codes', async () => {
+      const fakeHome = join(tempDir, 'auth-home')
+      const fakeEnvFile = join(tempDir, 'auth-test.env')
+      mkdirSync(fakeHome, { recursive: true })
+
+      // 1) Gemini with only GEMINI_API_KEY -> api_key (NOT oauth)
+      expect(detectCliAuthStatus('gemini-cli', { HOME: fakeHome, GEMINI_API_KEY: 'AIzaTestKey123' })).toEqual({
+        method: 'api_key',
+        detail: 'GEMINI_API_KEY (.env)',
+      })
+      // 2) No auth at all -> none
+      expect(detectCliAuthStatus('codex-cli', { HOME: fakeHome })).toEqual({ method: 'none' })
+      expect(detectCliAuthStatus('claude-cli', { HOME: fakeHome })).toEqual({ method: 'none' })
+
+      const noopRunner: CliProcessRunner = async () => ({
+        stdout: '1.0.0\n',
+        stderr: '',
+        exitCode: 0,
+        signal: null,
+        timedOut: false,
+      })
+
+      // 3) Save OAuth JSON for gemini -> writes ~/.gemini/oauth_creds.json and switches authMethod to 'oauth'
+      const savedJson = await saveCliCredentials(
+        'gemini',
+        { authJson: JSON.stringify({ access_token: 'ya29.test', refresh_token: '1//test' }) },
+        { env: { HOME: fakeHome, GEMINI_API_KEY: 'AIzaTestKey123' }, envFilePath: fakeEnvFile, updateProcessEnv: false, processRunner: noopRunner },
+      )
+      expect(savedJson.ok).toBe(true)
+      expect(savedJson.savedKind).toBe('oauth_json')
+      expect(savedJson.target).toBe('oauth_creds.json')
+      expect(existsSync(join(fakeHome, '.gemini', 'oauth_creds.json'))).toBe(true)
+      expect(savedJson.status?.authMethod).toBe('oauth')
+      expect(savedJson.status?.authDetail).toBe('~/.gemini/oauth_creds.json')
+
+      // 4) Logout gemini -> removes oauth_creds.json, falls back to api_key from GEMINI_API_KEY
+      const loggedOutGemini = await logoutCli('gemini', {
+        env: { HOME: fakeHome, GEMINI_API_KEY: 'AIzaTestKey123' },
+        envFilePath: fakeEnvFile,
+        updateProcessEnv: false,
+        processRunner: noopRunner,
+      })
+      expect(loggedOutGemini.removedFiles).toEqual(['oauth_creds.json'])
+      expect(existsSync(join(fakeHome, '.gemini', 'oauth_creds.json'))).toBe(false)
+      expect(loggedOutGemini.status?.authMethod).toBe('api_key')
+
+      // 5) Save Claude OAuth setup token -> writes CLAUDE_CODE_OAUTH_TOKEN to .env and reports 'oauth'
+      const savedClaudeTok = await saveCliCredentials(
+        'claude',
+        { token: 'sk-ant-oat01-abcdefghijklmnopqrstuvwxyz0123456789ABCDEF' },
+        { env: { HOME: fakeHome }, envFilePath: fakeEnvFile, updateProcessEnv: false, processRunner: noopRunner },
+      )
+      expect(savedClaudeTok.savedKind).toBe('env_token')
+      expect(savedClaudeTok.target).toBe('CLAUDE_CODE_OAUTH_TOKEN')
+      expect(savedClaudeTok.status?.authMethod).toBe('oauth')
+      expect(readFileSync(fakeEnvFile, 'utf-8')).toContain('CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-')
+
+      // 6) Logout Claude -> removes CLAUDE_CODE_OAUTH_TOKEN from .env
+      const loggedOutClaude = await logoutCli('claude', {
+        env: { HOME: fakeHome, CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat01-abcdefghijklmnopqrstuvwxyz0123456789ABCDEF' },
+        envFilePath: fakeEnvFile,
+        updateProcessEnv: false,
+        processRunner: noopRunner,
+      })
+      expect(loggedOutClaude.clearedEnvKeys).toEqual(['CLAUDE_CODE_OAUTH_TOKEN'])
+      expect(readFileSync(fakeEnvFile, 'utf-8')).not.toContain('CLAUDE_CODE_OAUTH_TOKEN=')
+      expect(loggedOutClaude.status?.authMethod).toBe('none')
+
+      // 7) Invalid JSON rejected
+      await expect(
+        saveCliCredentials('codex', { authJson: 'not-json' }, { env: { HOME: fakeHome }, envFilePath: fakeEnvFile, updateProcessEnv: false }),
+      ).rejects.toBeInstanceOf(CliManagerValidationError)
+
+      // 8) OAuth URL & Codex device code extraction
+      expect(extractCliLoginUrl('claude', 'Open https://claude.ai/oauth/authorize?client_id=123 to login')).toBe(
+        'https://claude.ai/oauth/authorize?client_id=123',
+      )
+      expect(extractCliLoginUrl('gemini', 'Visit https://accounts.google.com/o/oauth2/v2/auth?scope=openid now')).toBe(
+        'https://accounts.google.com/o/oauth2/v2/auth?scope=openid',
+      )
+      expect(extractCliLoginUrl('codex', 'Go to https://auth.openai.com/codex/device and enter code ABCD-1234')).toBe(
+        'https://auth.openai.com/codex/device',
+      )
+      expect(extractCodexDeviceCode('Enter one-time code: ABCD-1234')).toBe('ABCD-1234')
+      // Untrusted host must be rejected
+      expect(extractCliLoginUrl('claude', 'Open https://evil.example.com/oauth/authorize?x=1')).toBeNull()
+    })
+
+    it('protects /api/admin/clis/:provider/auth, /logout, and /login/status with DASHBOARD_TOKEN gate', async () => {
+      const prevDashToken = process.env['DASHBOARD_TOKEN']
+      process.env['DASHBOARD_TOKEN'] = 'test-admin-auth-secret-999'
+      try {
+        // Unauthenticated -> 401
+        const unauthAuth = makeMockHttpCtx('POST', '/api/admin/clis/gemini/auth', {}, { token: 'x' })
+        expect(await tryHandleAlfredVps(unauthAuth.ctx)).toBe(true)
+        expect(unauthAuth.getStatus()).toBe(401)
+
+        const unauthStatus = makeMockHttpCtx('GET', '/api/admin/clis/gemini/login/status')
+        expect(await tryHandleAlfredVps(unauthStatus.ctx)).toBe(true)
+        expect(unauthStatus.getStatus()).toBe(401)
+
+        // Authenticated GET /login/status -> 200
+        const okStatus = makeMockHttpCtx('GET', '/api/admin/clis/gemini/login/status', {
+          authorization: 'Bearer test-admin-auth-secret-999',
+        })
+        expect(await tryHandleAlfredVps(okStatus.ctx)).toBe(true)
+        expect(okStatus.getStatus()).toBe(200)
+        expect(okStatus.getJson()['ok']).toBe(true)
+
+        // Authenticated POST /auth with invalid JSON -> 400
+        const badJson = makeMockHttpCtx(
+          'POST',
+          '/api/admin/clis/gemini/auth',
+          { authorization: 'Bearer test-admin-auth-secret-999' },
+          { authJson: '{bad' },
+        )
+        expect(await tryHandleAlfredVps(badJson.ctx)).toBe(true)
+        expect(badJson.getStatus()).toBe(400)
+      } finally {
+        if (prevDashToken === undefined) delete process.env['DASHBOARD_TOKEN']
+        else process.env['DASHBOARD_TOKEN'] = prevDashToken
+      }
     })
   })
 })

@@ -879,6 +879,109 @@
     }
   }
 
+  const cliLoginPollers = {}
+
+  function stopCliLoginPoller(cliId) {
+    if (cliLoginPollers[cliId]) {
+      clearInterval(cliLoginPollers[cliId])
+      delete cliLoginPollers[cliId]
+    }
+  }
+
+  function renderCliLoginState(cliId, session) {
+    const box = document.querySelector('[data-cli-login-box="' + cliId + '"]')
+    if (!box) return
+    if (!session || session.phase === 'cancelled') {
+      box.innerHTML = ''
+      box.hidden = true
+      return
+    }
+    box.hidden = false
+    let html = '<div style="font-size:11px;margin-bottom:6px;font-weight:600">' + esc(session.message || session.phase) + '</div>'
+    if (session.authUrl) {
+      html +=
+        '<div style="margin-bottom:6px">' +
+        '<a href="' + esc(session.authUrl) + '" target="_blank" rel="noopener noreferrer" class="btn-primary btn-compact" style="display:inline-block;padding:4px 10px;font-size:11px;text-decoration:none">OAuth oldal megnyitása ↗</a>' +
+        '</div>'
+    }
+    if (session.deviceCode) {
+      html +=
+        '<div style="margin-bottom:6px;padding:6px 8px;border:1px dashed var(--border);border-radius:6px;background:var(--surface);font-family:monospace;font-size:13px;font-weight:700;letter-spacing:1px">' +
+        'Eszközkód: ' + esc(session.deviceCode) +
+        '</div>'
+    }
+    if (session.active && session.needsCodeInput && session.authUrl) {
+      html +=
+        '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">' +
+        '<input type="text" class="input" data-cli-login-code-inp="' + esc(cliId) + '" placeholder="Illeszd be a böngészőből kapott kódot..." style="flex:1;min-width:140px;padding:4px 6px;font-size:11px">' +
+        '<button type="button" class="btn-primary btn-compact" data-cli-login-code-send="' + esc(cliId) + '" style="padding:4px 8px;font-size:11px">Kód beküldése</button>' +
+        '</div>'
+    }
+    if (session.error) {
+      html += '<div style="font-size:11px;color:#dc2626;margin-bottom:6px">' + esc(session.error) + '</div>'
+    }
+    if (session.active) {
+      html += '<button type="button" class="btn-secondary btn-compact" data-cli-login-cancel="' + esc(cliId) + '" style="padding:3px 8px;font-size:11px">Mégse</button>'
+    }
+    box.innerHTML = html
+
+    const sendBtn = box.querySelector('[data-cli-login-code-send="' + cliId + '"]')
+    if (sendBtn) {
+      sendBtn.addEventListener('click', async function () {
+        const inp = box.querySelector('[data-cli-login-code-inp="' + cliId + '"]')
+        const code = inp ? inp.value.trim() : ''
+        if (!code) return
+        sendBtn.disabled = true
+        try {
+          const res = await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/login/code', {
+            method: 'POST',
+            body: JSON.stringify({ code: code }),
+          })
+          renderCliLoginState(cliId, res.session)
+        } catch (err) {
+          const statusEl = document.getElementById('vpsCliProvidersStatus')
+          if (statusEl) statusEl.textContent = 'Kód beküldési hiba (' + cliId + '): ' + err.message
+          sendBtn.disabled = false
+        }
+      })
+    }
+
+    const cancelBtn = box.querySelector('[data-cli-login-cancel="' + cliId + '"]')
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', async function () {
+        stopCliLoginPoller(cliId)
+        try {
+          await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/login/cancel', {
+            method: 'POST',
+            body: '{}',
+          })
+        } catch { /* ignore */ }
+        renderCliLoginState(cliId, null)
+      })
+    }
+  }
+
+  function startCliLoginPoller(cliId) {
+    stopCliLoginPoller(cliId)
+    cliLoginPollers[cliId] = setInterval(async function () {
+      try {
+        const data = await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/login/status')
+        const session = data.session
+        renderCliLoginState(cliId, session)
+        if (!session || !session.active) {
+          stopCliLoginPoller(cliId)
+          if (session && session.phase === 'succeeded') {
+            const statusEl = document.getElementById('vpsCliProvidersStatus')
+            if (statusEl) statusEl.textContent = session.message || (cliId + ' OAuth belépés sikeres!')
+            await refreshCliProviders()
+          }
+        }
+      } catch {
+        stopCliLoginPoller(cliId)
+      }
+    }, 1500)
+  }
+
   async function refreshCliProviders() {
     const grid = document.getElementById('vpsCliProvidersGrid')
     const statusEl = document.getElementById('vpsCliProvidersStatus')
@@ -891,9 +994,23 @@
           const instBadge = c.installed
             ? '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#16a34a">' + esc(c.version || 'telepítve') + '</span>'
             : '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#6b7280">nincs telepítve</span>'
-          const authBadge = c.authConfigured
-            ? '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#2563eb">belépve / auth OK</span>'
-            : '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#d97706">nincs belépve</span>'
+          let authBadge
+          if (c.authMethod === 'oauth') {
+            authBadge = '<span title="' + esc(c.authDetail || 'OAuth') + '" style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#2563eb">OAuth előfizetés OK</span>'
+          } else if (c.authMethod === 'api_key') {
+            authBadge = '<span title="' + esc(c.authDetail || 'API kulcs') + '" style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#7c3aed">API kulcs (.env)</span>'
+          } else {
+            authBadge = '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#d97706">nincs belépve</span>'
+          }
+          const authDetailLine = c.authDetail
+            ? '<div style="font-size:11px;opacity:.75">Auth forrás: <code>' + esc(c.authDetail) + '</code></div>'
+            : ''
+          const tokenPlaceholder =
+            c.id === 'claude'
+              ? 'sk-ant-oat01-... vagy ANTHROPIC_API_KEY vagy ~/.claude/.credentials.json'
+              : c.id === 'codex'
+                ? 'OPENAI_API_KEY (sk-...) vagy ~/.codex/auth.json'
+                : 'GEMINI_API_KEY (AIza...) vagy ~/.gemini/oauth_creds.json'
           return (
             '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +
@@ -902,9 +1019,29 @@
             '</div>' +
             '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word">' + esc(c.packageName) + '</div>' +
             '<div style="font-size:11px;opacity:.7;word-break:break-all">' + esc(c.resolvedPath || c.prefix || '') + '</div>' +
+            authDetailLine +
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-action="install" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">' + (c.installed ? 'Frissítés' : 'Telepítés') + '</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-cli-auth-toggle="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Belépés / Token</button>' +
+            (c.authMethod === 'oauth'
+              ? '<button type="button" class="btn-secondary btn-compact" data-cli-logout="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kilépés</button>'
+              : '') +
             '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
+            '</div>' +
+            '<div data-cli-auth-drawer="' + esc(c.id) + '" hidden style="margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
+            '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+            '<button type="button" class="btn-primary btn-compact" data-cli-oauth-start="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Böngészős OAuth indítása</button>' +
+            (!c.installed ? '<span style="font-size:11px;opacity:.7">Előbb telepítsd a CLI-t.</span>' : '') +
+            '</div>' +
+            '<div data-cli-login-box="' + esc(c.id) + '" hidden style="padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)"></div>' +
+            '<div style="border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:4px">' +
+            '<div style="font-size:11px;opacity:.8">Kézi token vagy OAuth JSON mentése (SSH nélkül):</div>' +
+            '<textarea class="input" rows="2" data-cli-auth-input="' + esc(c.id) + '" placeholder="' + esc(tokenPlaceholder) + '" style="font-size:11px;font-family:monospace;padding:5px 6px"></textarea>' +
+            '<div style="display:flex;gap:6px;align-items:center">' +
+            '<button type="button" class="btn-secondary btn-compact" data-cli-auth-save="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Mentés</button>' +
+            '<span data-cli-auth-msg="' + esc(c.id) + '" style="font-size:11px;opacity:.8"></span>' +
+            '</div>' +
+            '</div>' +
             '</div>' +
             '</div>'
           )
@@ -927,6 +1064,88 @@
             await refreshCliProviders()
           } catch (err) {
             if (statusEl) statusEl.textContent = 'Hiba (' + cliId + '): ' + err.message
+            btn.disabled = false
+          }
+        })
+      })
+
+      grid.querySelectorAll('[data-cli-auth-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const cliId = btn.getAttribute('data-cli-auth-toggle')
+          const drawer = grid.querySelector('[data-cli-auth-drawer="' + cliId + '"]')
+          if (!drawer) return
+          const opening = drawer.hidden
+          drawer.hidden = !opening
+          drawer.style.display = opening ? 'flex' : 'none'
+        })
+      })
+
+      grid.querySelectorAll('[data-cli-oauth-start]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const cliId = btn.getAttribute('data-cli-oauth-start')
+          if (!cliId) return
+          btn.disabled = true
+          if (statusEl) statusEl.textContent = cliId + ' böngészős OAuth indítása...'
+          try {
+            const data = await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/login/start', {
+              method: 'POST',
+              body: '{}',
+            })
+            renderCliLoginState(cliId, data.session)
+            if (data.session && data.session.active) {
+              startCliLoginPoller(cliId)
+            }
+            if (statusEl) statusEl.textContent = ''
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'OAuth indítási hiba (' + cliId + '): ' + err.message
+          } finally {
+            btn.disabled = false
+          }
+        })
+      })
+
+      grid.querySelectorAll('[data-cli-auth-save]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const cliId = btn.getAttribute('data-cli-auth-save')
+          const inp = grid.querySelector('[data-cli-auth-input="' + cliId + '"]')
+          const msgEl = grid.querySelector('[data-cli-auth-msg="' + cliId + '"]')
+          const raw = inp ? inp.value.trim() : ''
+          if (!cliId || !raw) {
+            if (msgEl) msgEl.textContent = 'Adj meg tokent vagy JSON-t.'
+            return
+          }
+          btn.disabled = true
+          if (msgEl) msgEl.textContent = 'Mentés...'
+          try {
+            const payload = raw.startsWith('{') ? { authJson: raw } : { token: raw }
+            const res = await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/auth', {
+              method: 'POST',
+              body: JSON.stringify(payload),
+            })
+            if (inp) inp.value = ''
+            if (statusEl) statusEl.textContent = cliId + ' hitelesítés mentve (' + (res.result && res.result.target ? res.result.target : 'OK') + ').'
+            await refreshCliProviders()
+          } catch (err) {
+            if (msgEl) msgEl.textContent = 'Hiba: ' + err.message
+            btn.disabled = false
+          }
+        })
+      })
+
+      grid.querySelectorAll('[data-cli-logout]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const cliId = btn.getAttribute('data-cli-logout')
+          if (!cliId || !confirm('Biztosan törlöd a ' + cliId + ' OAuth belépését?')) return
+          btn.disabled = true
+          try {
+            await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/logout', {
+              method: 'POST',
+              body: '{}',
+            })
+            if (statusEl) statusEl.textContent = cliId + ' OAuth belépés törölve.'
+            await refreshCliProviders()
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Kilépési hiba (' + cliId + '): ' + err.message
             btn.disabled = false
           }
         })
