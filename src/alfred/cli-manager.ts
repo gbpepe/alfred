@@ -702,6 +702,7 @@ interface ActiveCliLoginSession {
   oauthBaselineMtimeMs: number
   autoEnterCount: number
   lastAutoEnterAt: number
+  savingToken: boolean
   rawBuffer: string
   envFilePath?: string
   updateProcessEnv?: boolean
@@ -1068,6 +1069,7 @@ export async function startCliLogin(
     oauthBaselineMtimeMs,
     autoEnterCount: 0,
     lastAutoEnterAt: 0,
+    savingToken: false,
     rawBuffer: '',
     envFilePath: opts?.envFilePath,
     updateProcessEnv: opts?.updateProcessEnv,
@@ -1147,10 +1149,12 @@ export async function startCliLogin(
       }
     }
 
-    if (def.id === 'claude') {
+    if (def.id === 'claude' && !session.savingToken) {
       const token = extractClaudeOAuthToken(session.rawBuffer)
       if (token) {
+        session.savingToken = true
         session.rawBuffer = ''
+        session.message = 'Claude OAuth token elkapva, mentés...'
         void saveCliCredentials(
           'claude',
           { token },
@@ -1161,6 +1165,7 @@ export async function startCliLogin(
         )
           .then(() => {
             session.phase = 'succeeded'
+            session.error = undefined
             session.message = 'Claude OAuth előfizetés sikeresen mentve!'
             cleanupLoginSessionResources(session)
           })
@@ -1179,14 +1184,14 @@ export async function startCliLogin(
   child.stderr?.on('data', handleChunk)
 
   child.on('error', (err) => {
-    if (session.phase === 'succeeded' || session.phase === 'cancelled') return
+    if (session.savingToken || session.phase === 'succeeded' || session.phase === 'cancelled') return
     session.phase = 'failed'
     session.error = `Nem sikerült elindítani a CLI-t: ${err.message}`
     cleanupLoginSessionResources(session)
   })
 
-  child.on('exit', (code) => {
-    if (session.phase === 'succeeded' || session.phase === 'cancelled') return
+  child.on('close', (code) => {
+    if (session.savingToken || session.phase === 'succeeded' || session.phase === 'cancelled') return
     if (code === 0 && (def.id === 'codex' || def.id === 'gemini')) {
       session.phase = 'succeeded'
       session.message = `${def.provider} OAuth bejelentkezés sikeres!`
