@@ -55,10 +55,11 @@ function validateOpsBranch(branch: string): boolean {
   return true
 }
 
-async function listMultiBranchTests(): Promise<Array<{
+async function listMultiBranchTests(includeAccessToken = false): Promise<Array<{
   slug: string
   branch: string
   host: string
+  accessUrl: string
   webPort: number
   simPort: number
   active: string
@@ -70,19 +71,32 @@ async function listMultiBranchTests(): Promise<Array<{
     .filter((d) => d.isDirectory() && d.name.startsWith('alfred-test-'))
   const results = await Promise.all(
     entries.map(async (d) => {
-      const portsPath = join(worktreeBase, d.name, '.env.ports')
+      const worktreeDir = join(worktreeBase, d.name)
+      const portsPath = join(worktreeDir, '.env.ports')
       if (!existsSync(portsPath)) return null
       const vars = readEnvFile([portsPath])
       const slug = vars['ALFRED_TEST_SLUG'] || d.name.replace(/^alfred-test-/, '')
       const branch = vars['ALFRED_TEST_BRANCH'] || slug
       const host = vars['ALFRED_TEST_HOST'] || `${slug}-test-alfred.princicol.co.uk`
+      let accessUrl = `https://${host}/#vps`
+      if (includeAccessToken) {
+        const tokPath = join(worktreeDir, 'store', '.dashboard-token')
+        if (existsSync(tokPath)) {
+          try {
+            const tok = readFileSync(tokPath, 'utf-8').trim()
+            if (tok) {
+              accessUrl = `https://${host}/?token=${encodeURIComponent(tok)}#vps`
+            }
+          } catch { /* ignore unreadable token file */ }
+        }
+      }
       const webPort = Number(vars['WEB_PORT'] || 0)
       const simPort = Number(vars['ALFRED_SIM_PORT'] || 0)
       const [active, webActive] = await Promise.all([
         getUnitStatus(`alfred-test@${slug}`),
         getUnitStatus(`alfred-test-web@${slug}`),
       ])
-      return { slug, branch, host, webPort, simPort, active, webActive }
+      return { slug, branch, host, accessUrl, webPort, simPort, active, webActive }
     }),
   )
   return results.filter((r): r is NonNullable<typeof r> => r !== null)
@@ -417,6 +431,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     const specs = resolveVpsEnvSpecs()
     const env = { ...readEnvFile(), ...process.env }
     const cfg = loadAlfredAgentsConfig({ env })
+    const includeTestTokens = mayActAsOwner(ctx.auth, req) || (ctx.auth?.kind === 'token' && !ctx.auth.tokenAgent)
     const [services, disk, multiTests] = await Promise.all([
       Promise.all(
         specs.map(async (s) => {
@@ -434,7 +449,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         }),
       ),
       getDiskSummary(),
-      listMultiBranchTests(),
+      listMultiBranchTests(includeTestTokens),
     ])
     const sys = getSystemMetrics()
     sys.diskSummary = disk

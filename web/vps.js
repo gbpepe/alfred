@@ -99,7 +99,7 @@
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px">' +
           '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
           '<strong>' + esc(t.branch) + '</strong>' +
-          '<a href="https://' + esc(t.host) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">' + esc(t.host) + ' ↗</a>' +
+          '<a href="' + esc(t.accessUrl || ('https://' + t.host)) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">' + esc(t.host) + ' ↗</a>' +
           '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:' + badgeColor(t.active) + '">core: ' + esc(t.active) + '</span>' +
           '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:' + badgeColor(t.webActive) + '">web: ' + esc(t.webActive) + '</span>' +
           '</div>' +
