@@ -148,6 +148,10 @@ const WRITE_TOOLS = new Set(['fs_write', 'bash', 'git'])
 export function sanitizeCliText(raw: string): string {
   if (!raw) return ''
   return raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;?<>=]*[A-Za-z]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
     .replace(/sk-ant-[A-Za-z0-9_-]+/g, 'sk-ant-[REDACTED]')
     .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-[REDACTED]')
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
@@ -364,6 +368,27 @@ export function buildSanitizedCliEnv(
 
   if (cliConfigDir && cliConfigDir.trim()) {
     out[PROVIDER_CONFIG_DIR_VAR[provider]] = cliConfigDir.trim()
+  }
+
+  // If OAuth subscription auth is active, strip paid API keys from the CLI subprocess
+  // so the CLI always uses the subscription quota instead of pay-per-token billing.
+  const auth = detectCliAuthStatus(provider, { ...sourceEnv, ...out })
+  if (auth.method === 'oauth') {
+    if (provider === 'claude-cli') {
+      delete out['ANTHROPIC_API_KEY']
+    } else if (provider === 'codex-cli') {
+      delete out['OPENAI_API_KEY']
+      delete out['CODEX_API_KEY']
+    } else if (provider === 'gemini-cli') {
+      delete out['GEMINI_API_KEY']
+      delete out['GOOGLE_API_KEY']
+      delete out['GOOGLE_APPLICATION_CREDENTIALS']
+    }
+  }
+
+  // Gemini CLI 0.70+ requires GEMINI_CLI_TRUST_WORKSPACE=true in headless non-interactive mode.
+  if (provider === 'gemini-cli') {
+    out['GEMINI_CLI_TRUST_WORKSPACE'] = 'true'
   }
 
   return out

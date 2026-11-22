@@ -78,10 +78,26 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     expect(failedCliApi).toEqual([])
   })
 
-  test('runs browser OAuth start & clean cancel on every installed CLI without JS or API errors', async ({ page }) => {
+  test('tests live connection on OAuth-authenticated CLIs and runs safe OAuth start/cancel only on unauthenticated CLIs', async ({ page }) => {
     const { pageErrors, failedCliApi } = await openStagingProvidersTab(page)
 
     for (const cliId of ['claude', 'codex', 'gemini'] as const) {
+      const card = page.locator('#vpsCliProvidersGrid > div').filter({
+        has: page.locator(`[data-cli-auth-toggle="${cliId}"]`),
+      })
+      const isOAuthLoggedIn = (await card.getByText('OAuth előfizetés OK').count()) > 0
+
+      if (isOAuthLoggedIn) {
+        // NEVER trigger OAuth login on an already-authenticated CLI (could clobber live session).
+        // Instead, verify the live "Teszt" button succeeds cleanly!
+        const testBtn = card.locator(`[data-cli-test="${cliId}"]`)
+        await testBtn.click()
+        const resultEl = card.locator(`[data-cli-test-result="${cliId}"]`)
+        await expect(resultEl).toBeVisible({ timeout: 45_000 })
+        await expect(resultEl).toContainText('✓ Kapcsolat OK', { timeout: 45_000 })
+        continue
+      }
+
       const toggleBtn = page.locator(`[data-cli-auth-toggle="${cliId}"]`)
       await toggleBtn.click()
 
