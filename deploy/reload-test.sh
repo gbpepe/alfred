@@ -53,6 +53,9 @@ fi
 
 if git -C "$TEST_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
   git -C "$TEST_DIR" pull --ff-only
+elif git -C "$TEST_DIR" remote get-url origin >/dev/null 2>&1 && git -C "$TEST_DIR" fetch origin "$CURRENT_BRANCH" --quiet 2>/dev/null; then
+  log_info "Fetched latest $CURRENT_BRANCH from origin; fast-forwarding $TEST_DIR"
+  git -C "$TEST_DIR" merge --ff-only FETCH_HEAD
 else
   log_info "No upstream tracking branch configured; syncing from $SOURCE_REPO/$CURRENT_BRANCH"
   LOCAL_SHA="$(git -C "$SOURCE_REPO" rev-parse --verify "$CURRENT_BRANCH")"
@@ -76,6 +79,12 @@ verify_instance_alive "test" "$TEST_SERVICE" "$TEST_PID_FILE" 5 "0"
 if [[ "$DEPLOY_MODE" == "systemd" ]]; then
   if [[ -n "$TEST_SLUG" || -f /etc/systemd/system/alfred-test-web.service ]]; then
     run_systemctl restart "$TEST_WEB_SERVICE" || true
+  fi
+fi
+if [[ -n "$TEST_SLUG" && -f "$TEST_DIR/.env.ports" ]]; then
+  WEB_PORT_VAL="$(awk -F= '/^WEB_PORT=/{print $2}' "$TEST_DIR/.env.ports")"
+  if [[ -n "$WEB_PORT_VAL" ]]; then
+    node "$SCRIPT_DIR/cf-test-route.mjs" up "$CURRENT_BRANCH" "$WEB_PORT_VAL" || true
   fi
 fi
 log_info "Staging environment reloaded cleanly on branch '$CURRENT_BRANCH'"

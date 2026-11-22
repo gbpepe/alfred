@@ -24,6 +24,19 @@ done
 validate_self_branch "$BRANCH"
 configure_test_target "$BRANCH" "$MULTI"
 
+if [[ "$DRY_RUN" != "1" ]] && git -C "$SOURCE_REPO" remote get-url origin >/dev/null 2>&1; then
+  if git -C "$SOURCE_REPO" fetch origin "$BRANCH" --quiet 2>/dev/null; then
+    if ! git -C "$SOURCE_REPO" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+      git -C "$SOURCE_REPO" branch "$BRANCH" FETCH_HEAD
+    elif [[ ! -e "$TEST_DIR" ]]; then
+      CURRENT_SRC_BRANCH="$(git -C "$SOURCE_REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+      if [[ "$CURRENT_SRC_BRANCH" != "$BRANCH" ]]; then
+        git -C "$SOURCE_REPO" branch -f "$BRANCH" FETCH_HEAD || true
+      fi
+    fi
+  fi
+fi
+
 if ! git -C "$SOURCE_REPO" rev-parse --verify --quiet "${BRANCH}^{commit}" >/dev/null; then
   log_err "Branch '$BRANCH' does not exist in $SOURCE_REPO"
   exit 1

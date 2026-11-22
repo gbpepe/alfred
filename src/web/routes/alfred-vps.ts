@@ -835,11 +835,12 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       return true
     }
     const args = branch && action !== 'check-health' ? [scriptPath, branch] : [scriptPath]
+    const opsTimeoutMs = action === 'spinup-test' || action === 'reload-test' ? 300_000 : 120_000
     try {
       const { stdout, stderr } = await execFileAsync('bash', args, {
         cwd: opsDir,
-        timeout: 120_000,
-        maxBuffer: 1024 * 1024,
+        timeout: opsTimeoutMs,
+        maxBuffer: 4 * 1024 * 1024,
       })
       json(res, {
         ok: true,
@@ -847,13 +848,14 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         output: sanitizeOutput([stdout, stderr].filter(Boolean).join('\n')),
       })
     } catch (err) {
-      const e = err as { stdout?: string; stderr?: string; message?: string }
+      const e = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean; signal?: string }
+      const diag = [e.killed ? '[killed/timeout]' : '', e.signal ? `[signal=${e.signal}]` : ''].filter(Boolean).join(' ')
       json(
         res,
         {
           ok: false,
           action,
-          output: sanitizeOutput([e.stdout, e.stderr, e.message].filter(Boolean).join('\n')),
+          output: sanitizeOutput([diag, e.stdout, e.stderr, e.message].filter(Boolean).join('\n')),
         },
         500,
       )
