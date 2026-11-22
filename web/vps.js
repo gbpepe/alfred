@@ -930,7 +930,7 @@
     if (session.active && session.needsCodeInput && session.authUrl) {
       html +=
         '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">' +
-        '<input type="text" class="input" data-cli-login-code-inp="' + esc(cliId) + '" placeholder="Illeszd be a böngészőből kapott kódot..." style="flex:1;min-width:140px;padding:4px 6px;font-size:11px">' +
+        '<input type="text" class="input" data-cli-login-code-inp="' + esc(cliId) + '" placeholder="Illeszd be a kódot VAGY a teljes localhost callback URL-t..." style="flex:1;min-width:160px;padding:4px 6px;font-size:11px">' +
         '<button type="button" class="btn-primary btn-compact" data-cli-login-code-send="' + esc(cliId) + '" style="padding:4px 8px;font-size:11px">Kód beküldése</button>' +
         '</div>'
     }

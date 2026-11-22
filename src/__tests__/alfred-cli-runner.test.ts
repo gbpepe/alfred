@@ -27,6 +27,7 @@ import {
   loadAlfredAgentsConfig,
   logoutCli,
   normalizeManagedCliId,
+  parseSubmittedLoginInput,
   ProtectedPathError,
   removeCli,
   resetDefaultCliQueue,
@@ -1284,6 +1285,23 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
       expect(extractCodexDeviceCode('Enter one-time code: ABCD-1234')).toBe('ABCD-1234')
       // Untrusted host must be rejected
       expect(extractCliLoginUrl('claude', 'Open https://evil.example.com/oauth/authorize?x=1')).toBeNull()
+
+      // 9) Submitted localhost callback URL parsing (Claude code#state + local relay)
+      const parsedCb = parseSubmittedLoginInput(
+        'claude',
+        'localhost:44471/callback?code=QfBOcAk1&state=IN8tWgwb',
+      )
+      expect(parsedCb).toEqual({
+        localCallbackUrl: 'http://127.0.0.1:44471/callback?code=QfBOcAk1&state=IN8tWgwb',
+        ptyCode: 'QfBOcAk1#IN8tWgwb',
+      })
+      expect(parseSubmittedLoginInput('claude', 'raw-code#state123')).toEqual({
+        ptyCode: 'raw-code#state123',
+      })
+      // Non-localhost URL must NOT produce a localCallbackUrl (no SSRF)
+      expect(parseSubmittedLoginInput('claude', 'https://evil.example.com/callback?code=1')).toEqual({
+        ptyCode: 'https://evil.example.com/callback?code=1',
+      })
     })
 
     it('protects /api/admin/clis/:provider/auth, /logout, and /login/status with DASHBOARD_TOKEN gate', async () => {

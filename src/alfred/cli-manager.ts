@@ -1230,19 +1230,100 @@ export function getCliLoginStatus(rawProvider: string): CliLoginStatusSnapshot {
   return toLoginSnapshot(session)
 }
 
+export function parseSubmittedLoginInput(
+  id: ManagedCliId,
+  rawInput: string,
+): { ptyCode: string; localCallbackUrl?: string } {
+  const trimmed = String(rawInput ?? '').trim()
+  if (!trimmed || /[\r\n\0\x1b]/.test(trimmed) || trimmed.length > 4096) {
+    throw new CliManagerValidationError('Érvénytelen bejelentkezési kód vagy callback URL.')
+  }
+
+  // Support pasting the full http://localhost:<port>/callback?code=...&state=... URL directly
+  const looksLikeLocalUrl = /^(?:https?:\/\/)?(?:localhost|127\.0\.0\.1):\d+\//i.test(trimmed)
+  if (looksLikeLocalUrl) {
+    const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
+    let parsed: URL
+    try {
+      parsed = new URL(withProto)
+    } catch {
+      throw new CliManagerValidationError('Érvénytelen localhost callback URL.')
+    }
+    const portNum = Number(parsed.port)
+    if (
+      parsed.protocol !== 'http:' ||
+      (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') ||
+      !Number.isInteger(portNum) ||
+      portNum < 1024 ||
+      portNum > 65535
+    ) {
+      throw new CliManagerValidationError('Csak helyi (localhost/127.0.0.1) callback URL fogadható el.')
+    }
+    const localCallbackUrl = `http://127.0.0.1:${portNum}${parsed.pathname}${parsed.search}`
+    const codeParam = parsed.searchParams.get('code')?.trim() ?? ''
+    const stateParam = parsed.searchParams.get('state')?.trim() ?? ''
+    const ptyCode =
+      id === 'claude' && codeParam && stateParam
+        ? `${codeParam}#${stateParam}`
+        : codeParam || trimmed
+    return { ptyCode, localCallbackUrl }
+  }
+
+  return { ptyCode: trimmed }
+}
+
 export function submitCliLoginCode(rawProvider: string, rawCode: string): CliLoginStatusSnapshot {
   const def = getManagedCliDefinition(rawProvider)
   const session = activeCliLoginSessions.get(def.id)
-  if (!session || !session.child || (session.phase !== 'waiting_auth' && session.phase !== 'starting')) {
+  if (!session || !session.child || (session.phase !== 'waiting_auth' && session.phase !== 'starting' && session.phase !== 'submitting')) {
     throw new CliManagerValidationError('Nincs aktív, kódra váró bejelentkezési folyamat.')
   }
-  const code = String(rawCode ?? '').trim()
-  if (!code || /[\r\n\0\x1b]/.test(code) || code.length > 2048) {
-    throw new CliManagerValidationError('Érvénytelen bejelentkezési kód.')
-  }
+  const { ptyCode, localCallbackUrl } = parseSubmittedLoginInput(def.id, rawCode)
   session.phase = 'submitting'
-  session.message = 'Kód feldolgozása és token ellenőrzése...'
-  session.child.stdin?.write(`${code}\n`)
+  session.message = localCallbackUrl
+    ? 'Callback továbbítása a helyi CLI szervernek és token ellenőrzése...'
+    : 'Kód feldolgozása és token ellenőrzése...'
+
+  const sendToPty = () => {
+    if (!session.child || session.phase !== 'submitting') return
+    try {
+      session.child.stdin?.write(ptyCode)
+      // Ink / raw PTY prompts (Claude CLI 2.1+) treat an Enter arriving in the same burst as pasted text;
+      // send CR (\r) after 500ms so the prompt actually submits.
+      setTimeout(() => {
+        if (session.child && session.phase === 'submitting') {
+          try {
+            session.child.stdin?.write('\r')
+          } catch {
+            /* ignore */
+          }
+        }
+      }, 500)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (localCallbackUrl) {
+    // Relay the localhost callback directly inside the VPS to the CLI's local listener;
+    // if the listener is not open (or fails), fall back to pasting code#state into the PTY.
+    void fetch(localCallbackUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(8_000),
+    })
+      .then((resp) => {
+        if (!resp.ok && resp.status >= 400) {
+          sendToPty()
+        }
+      })
+      .catch(() => {
+        sendToPty()
+      })
+  } else {
+    sendToPty()
+  }
+
   return toLoginSnapshot(session)
 }
 
