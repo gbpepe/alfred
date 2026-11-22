@@ -173,7 +173,7 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
       })
       const roSpec = buildCliCommandSpec({ agent: roAgent, userMessage: 'Olvass!', env: {} })
       expect(roSpec.command).toBe('codex')
-      expect(roSpec.args.slice(0, 4)).toEqual(['exec', '--json', '--sandbox', 'read-only'])
+      expect(roSpec.args.slice(0, 5)).toEqual(['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only'])
       expect(roSpec.args).not.toContain('-m')
 
       const rwAgent = makeCliAgent({
@@ -204,7 +204,15 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
         },
       })
 
-      expect(capturedArgs.slice(0, 6)).toEqual(['exec', '--json', '--sandbox', 'workspace-write', '-m', 'o4-mini'])
+      expect(capturedArgs.slice(0, 7)).toEqual([
+        'exec',
+        '--json',
+        '--skip-git-repo-check',
+        '--sandbox',
+        'workspace-write',
+        '-m',
+        'o4-mini',
+      ])
       expect(res.content).toBe('Végső Codex válasz')
       expect(res.model).toBe('codex-cli:o4-mini')
       expect(res.usage).toEqual({

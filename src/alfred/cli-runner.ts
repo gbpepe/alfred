@@ -521,7 +521,13 @@ export function buildCliCommandSpec(params: {
   }
 
   if (provider === 'codex-cli') {
-    const args: string[] = ['exec', '--json', '--sandbox', hasWriteTools ? 'workspace-write' : 'read-only']
+    const args: string[] = [
+      'exec',
+      '--json',
+      '--skip-git-repo-check',
+      '--sandbox',
+      hasWriteTools ? 'workspace-write' : 'read-only',
+    ]
     if (hasExplicitModel) {
       args.push('-m', model)
     }
