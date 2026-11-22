@@ -1209,6 +1209,11 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
         method: 'api_key',
         detail: 'GEMINI_API_KEY (.env)',
       })
+      // 1b) Gemini with google_accounts.json where active is null must NOT count as oauth
+      mkdirSync(join(fakeHome, '.gemini'), { recursive: true })
+      writeFileSync(join(fakeHome, '.gemini', 'google_accounts.json'), JSON.stringify({ active: null, old: ['a@b.com'] }), 'utf-8')
+      expect(detectCliAuthStatus('gemini-cli', { HOME: fakeHome })).toEqual({ method: 'none' })
+      rmSync(join(fakeHome, '.gemini', 'google_accounts.json'), { force: true })
       // 2) No auth at all -> none
       expect(detectCliAuthStatus('codex-cli', { HOME: fakeHome })).toEqual({ method: 'none' })
       expect(detectCliAuthStatus('claude-cli', { HOME: fakeHome })).toEqual({ method: 'none' })

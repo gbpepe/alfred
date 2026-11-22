@@ -577,7 +577,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     }
     try {
       const result = await testCliConnection(decodeURIComponent(cliTestMatch[1]), { env })
-      json(res, result, result.ok ? 200 : 502)
+      json(res, result, 200)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
@@ -681,7 +681,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
           error: sanitizeOutput(err instanceof Error ? err.message : String(err)).slice(0, 300),
           latencyMs: Date.now() - startedAt,
         },
-        502,
+        200,
       )
     }
     return true

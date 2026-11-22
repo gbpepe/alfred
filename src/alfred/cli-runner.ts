@@ -1361,8 +1361,16 @@ export function detectCliAuthStatus(
   if (dir && existsSync(join(dir, 'oauth_creds.json'))) {
     return { method: 'oauth', detail: '~/.gemini/oauth_creds.json' }
   }
-  if (dir && existsSync(join(dir, 'google_accounts.json'))) {
-    return { method: 'oauth', detail: '~/.gemini/google_accounts.json' }
+  const googleAccountsPath = dir ? join(dir, 'google_accounts.json') : ''
+  if (googleAccountsPath && existsSync(googleAccountsPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(googleAccountsPath, 'utf-8')) as { active?: unknown }
+      if (typeof parsed?.active === 'string' && parsed.active.trim().length > 0) {
+        return { method: 'oauth', detail: `~/.gemini/google_accounts.json (${parsed.active.trim()})` }
+      }
+    } catch {
+      /* ignore malformed google_accounts.json */
+    }
   }
   if ((env['GEMINI_API_KEY'] || '').trim()) {
     return { method: 'api_key', detail: 'GEMINI_API_KEY (.env)' }
