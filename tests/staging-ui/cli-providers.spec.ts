@@ -74,6 +74,13 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
       await expect(page.getByText('FIZETŐS API MÓD:').first()).toBeVisible()
     }
 
+    // Verify Enterprise-only notice on gemini-cli card pointing individual users to agy-cli
+    const geminiCard = page.locator('#vpsCliProvidersGrid > div').filter({
+      has: page.locator('[data-cli-auth-toggle="gemini"]'),
+    })
+    await expect(geminiCard).toContainText('Enterprise')
+    await expect(geminiCard).toContainText('agy-cli')
+
     // Verify live quota button + auto-loaded quota strip on Claude card when OAuth is active
     await expect(page.locator('[data-cli-quota-btn="claude"]')).toBeVisible()
     await expect(page.locator('[data-cli-quota-btn="codex"]')).toBeVisible()
@@ -151,6 +158,13 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
       await toggleBtn.click()
       await expect(drawer).toBeHidden()
     }
+
+    // Verify Enterprise-only notice on gemini-cli card pointing individual users to agy-cli
+    const geminiCard = page.locator('#vpsCliProvidersGrid > div').filter({
+      has: page.locator('[data-cli-auth-toggle="gemini"]'),
+    })
+    await expect(geminiCard).toContainText('Enterprise')
+    await expect(geminiCard).toContainText('agy-cli')
 
     // Verify live quota button + auto-loaded quota strip on Claude card when OAuth is active
     await expect(page.locator('[data-cli-quota-btn="claude"]')).toBeVisible()

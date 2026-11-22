@@ -1128,6 +1128,12 @@
           const apiKeyWarnBox = c.authMethod === 'api_key'
             ? '<div style="padding:6px 8px;border-radius:6px;background:rgba(220,38,38,0.12);border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:600;line-height:1.35">⚠ FIZETŐS API MÓD: tokenenként számláz (' + esc(c.authDetail || '.env') + ')! Lépj be OAuth előfizetéssel a „Belépés / Token” gombbal.</div>'
             : ''
+          const cliNoteBox =
+            c.id === 'gemini'
+              ? '<div style="padding:5px 7px;border-radius:6px;background:rgba(217,119,6,0.10);border:1px solid rgba(217,119,6,0.45);font-size:11px;line-height:1.35">ℹ OAuth módban csak <b>Enterprise / céges</b> Google Code Assist előfizetéssel működik. Egyéni (Individual) Google előfizetéshez használd az <b>agy-cli</b>-t!</div>'
+              : c.id === 'agy'
+                ? '<div style="padding:5px 7px;border-radius:6px;background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.35);font-size:11px;line-height:1.35">ℹ Egyéni (Individual) Google AI előfizetéshez ajánlott (Antigravity CLI).</div>'
+                : ''
           const authDetailLine = c.authDetail && c.authMethod !== 'api_key'
             ? '<div style="font-size:11px;opacity:.75">Auth forrás: <code>' + esc(c.authDetail) + '</code></div>'
             : ''
@@ -1150,6 +1156,7 @@
             '</div>' +
             '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word">' + esc(c.packageName) + '</div>' +
             '<div style="font-size:11px;opacity:.7;word-break:break-all">' + esc(c.resolvedPath || c.prefix || '') + '</div>' +
+            cliNoteBox +
             apiKeyWarnBox +
             authDetailLine +
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
