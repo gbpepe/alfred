@@ -22615,9 +22615,9 @@ function renderMarkdown(md) {
   return out.join('\n')
 }
 
-let _docsCache = []
-let _docsCurrentName = ''
-let _docsSearchWired = false
+var _docsCache = []
+var _docsCurrentName = ''
+var _docsSearchWired = false
 
 function syncDocsQuickTabActive(name) {
   const tabsWrap = document.getElementById('docsQuickTabs')
