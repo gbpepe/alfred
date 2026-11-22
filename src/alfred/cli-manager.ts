@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
@@ -183,6 +184,12 @@ function buildSanitizedNpmEnv(env: Record<string, string | undefined>, prefix: s
     out['NPM_CONFIG_PREFIX'] = prefix
     out['npm_config_prefix'] = prefix
   }
+  const npmCacheDir = (enriched['npm_config_cache'] ?? enriched['NPM_CONFIG_CACHE'] ?? '').trim() || join(tmpdir(), 'alfred-npm-cache')
+  const npmLogsDir = (enriched['npm_config_logs_dir'] ?? enriched['NPM_CONFIG_LOGS_DIR'] ?? '').trim() || join(tmpdir(), 'alfred-npm-logs')
+  out['NPM_CONFIG_CACHE'] = npmCacheDir
+  out['npm_config_cache'] = npmCacheDir
+  out['NPM_CONFIG_LOGS_DIR'] = npmLogsDir
+  out['npm_config_logs_dir'] = npmLogsDir
   return out
 }
 
