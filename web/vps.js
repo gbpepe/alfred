@@ -1186,7 +1186,7 @@
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-action="install" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">' + (c.installed ? 'Frissítés' : 'Telepítés') + '</button>' +
             '<button type="button" class="btn-secondary btn-compact" data-cli-test="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Teszt</button>' +
-            ((c.id === 'claude' || c.id === 'codex')
+            ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy')
               ? '<button type="button" class="btn-secondary btn-compact" data-cli-quota-btn="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kvóta</button>'
               : '') +
             '<button type="button" class="btn-secondary btn-compact" data-cli-auth-toggle="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Belépés / Token</button>' +
@@ -1195,7 +1195,7 @@
               : '') +
             '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
             '</div>' +
-            ((c.id === 'claude' || c.id === 'codex')
+            ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy')
               ? '<div data-cli-quota-box="' + esc(c.id) + '" hidden style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'
               : '') +
             '<div data-cli-test-result="' + esc(c.id) + '" hidden style="font-size:11px;padding:5px 7px;border-radius:6px;line-height:1.35;word-break:break-word"></div>' +
@@ -1229,9 +1229,9 @@
         })
       })
 
-      // Auto-load live quota strip for OAuth-authenticated claude / codex cards
+      // Auto-load live quota strip for OAuth-authenticated claude / codex / agy cards
       clis.forEach(function (c) {
-        if ((c.id === 'claude' || c.id === 'codex') && c.authMethod === 'oauth') {
+        if ((c.id === 'claude' || c.id === 'codex' || c.id === 'agy') && c.authMethod === 'oauth') {
           const box = grid.querySelector('[data-cli-quota-box="' + c.id + '"]')
           const btn = grid.querySelector('[data-cli-quota-btn="' + c.id + '"]')
           if (box) refreshCliQuota(c.id, box, btn)

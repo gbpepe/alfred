@@ -1673,7 +1673,7 @@ export async function getCliQuota(
   const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
   const checkedAt = new Date().toISOString()
 
-  if (def.id === 'gemini' || def.id === 'agy') {
+  if (def.id === 'gemini') {
     return {
       ok: true,
       id: def.id,
@@ -1682,6 +1682,83 @@ export async function getCliQuota(
       windows: [],
       message: 'Ehhez a CLI-hez jelenleg nincs előfizetéses kvóta-lekérdező végpont.',
       checkedAt,
+    }
+  }
+
+  if (def.id === 'agy') {
+    const prefix = resolveCliNpmPrefix(envMap)
+    const agyBin = resolveCliBinPath(prefix, 'agy') ?? resolveCliBinary('agy-cli', envMap)
+    const childEnv = buildSanitizedNpmEnv(envMap, prefix)
+    try {
+      const res = await spawnCliProcess({
+        command: agyBin,
+        args: ['-p', '/usage'],
+        cwd: process.cwd(),
+        env: childEnv,
+        timeoutMs: 12_000,
+        killGraceMs: 2_000,
+        maxOutputBytes: 64_000,
+      })
+      if (res.spawnErrorCode || res.timedOut || res.exitCode !== 0) {
+        return {
+          ok: false,
+          id: def.id,
+          provider: def.provider,
+          supported: true,
+          windows: [],
+          error: sanitizeCliText((res.stderr || res.stdout || '').trim() || `exit ${res.exitCode}`).slice(0, 220),
+          checkedAt,
+        }
+      }
+      const windows: CliQuotaWindow[] = []
+      const lines = (res.stdout || '').split(/\r?\n/)
+      for (const line of lines) {
+        const parts = line.split('\t').map((s) => s.trim())
+        if (parts.length < 3) continue
+        const [group, rawWin, rawRemPct, rawReset] = parts
+        const pctMatch = /^(\d+(?:\.\d+)?)%$/.exec(rawRemPct ?? '')
+        if (!pctMatch) continue
+        const remaining = clampPct(Number(pctMatch[1]))
+        const used = clampPct(100 - remaining)
+        const shortWin = (rawWin || '')
+          .replace(/\bRemaining\b/gi, '')
+          .replace(/\bFive Hour Limit\b/gi, '5 órás')
+          .replace(/\bWeekly Limit\b/gi, '7 napos')
+          .replace(/\s+/g, ' ')
+          .trim()
+        const label =
+          group && !shortWin.toLowerCase().startsWith(group.toLowerCase())
+            ? `${group} (${shortWin})`
+            : shortWin || group || 'Kvóta'
+        const resetsAt = toIsoReset(rawReset)
+        windows.push({
+          id: `${group}-${rawWin}`.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+          label,
+          usedPercent: used,
+          remainingPercent: remaining,
+          ...(resetsAt ? { resetsAt } : {}),
+        })
+      }
+      return {
+        ok: true,
+        id: def.id,
+        provider: def.provider,
+        supported: true,
+        source: 'agy_usage_cmd',
+        windows,
+        ...(windows.length === 0 ? { message: 'Nincs olvasható kvóta-sor az agy /usage kimenetében.' } : {}),
+        checkedAt,
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        id: def.id,
+        provider: def.provider,
+        supported: true,
+        windows: [],
+        error: sanitizeCliText(err instanceof Error ? err.message : String(err)).slice(0, 200),
+        checkedAt,
+      }
     }
   }
 
