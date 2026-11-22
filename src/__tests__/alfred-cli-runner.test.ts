@@ -1130,36 +1130,6 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
         expect(Array.isArray(ov['agents'])).toBe(true)
         const ovAgents = ov['agents'] as Array<{ id: string; provider: string; model: string; fallback: unknown }>
         expect(ovAgents.some((a) => a.id === 'alfred-ops')).toBe(true)
-
-        // 7) GET /admin -> serves standalone zero-dependency HTML Admin UI
-        const req = new EventEmitter() as http.IncomingMessage
-        req.method = 'GET'
-        req.url = '/admin'
-        req.headers = {}
-        queueMicrotask(() => req.emit('end'))
-        let adminStatus = 0
-        let adminHeaders: Record<string, string> = {}
-        let adminHtml = ''
-        const res = {
-          writeHead(code: number, headers?: Record<string, string>) {
-            adminStatus = code
-            if (headers) adminHeaders = headers
-            return this
-          },
-          end(chunk?: string | Buffer) {
-            if (chunk) adminHtml += chunk.toString()
-            return this
-          },
-        } as unknown as http.ServerResponse
-        const adminUrl = new URL('http://127.0.0.1:3420/admin')
-        expect(await tryHandleAlfredVps({ req, res, path: '/admin', method: 'GET', url: adminUrl })).toBe(true)
-        expect(adminStatus).toBe(200)
-        expect(adminHeaders['Content-Type']).toContain('text/html')
-        expect(adminHtml).toContain('sessionStorage')
-        expect(adminHtml).toContain('/api/admin/overview')
-        expect(adminHtml).toContain('/api/admin/clis')
-        expect(adminHtml).toContain('CLI Szolgáltatók')
-        expect(adminHtml).toContain('Ügynökök')
       } finally {
         if (prevDashToken === undefined) delete process.env['DASHBOARD_TOKEN']
         else process.env['DASHBOARD_TOKEN'] = prevDashToken

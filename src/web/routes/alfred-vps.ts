@@ -33,7 +33,6 @@ import { getCliQueueStats } from '../../alfred/cli-runner.js'
 import { runHybridAgentTurn, type ChatMessage } from '../../alfred/model-router.js'
 import { resolveAlfredRuntimeEnv } from '../../alfred/runtime-env.js'
 import { json, readBody } from '../http-helpers.js'
-import { renderAdminDashboardHtml } from './admin-ui.js'
 import type { RouteContext } from './types.js'
 
 const execFileAsync = promisify(execFile)
@@ -307,15 +306,6 @@ function authorizeAdminCliRequest(
 
 export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   const { req, res, path, method, url } = ctx
-
-  if ((path === '/admin' || path === '/admin/') && method === 'GET') {
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-cache',
-    })
-    res.end(renderAdminDashboardHtml())
-    return true
-  }
 
   if (path === '/api/admin/overview' && method === 'GET') {
     const env = { ...readEnvFile(), ...process.env }
