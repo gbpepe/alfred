@@ -1140,9 +1140,7 @@ export async function startCliLogin(
       ? ['setup-token']
       : def.id === 'codex'
         ? ['login', '--device-auth']
-        : def.id === 'agy'
-          ? ['auth', 'login']
-          : []
+        : []
 
   const session: ActiveCliLoginSession = {
     id: def.id,
@@ -1208,10 +1206,12 @@ export async function startCliLogin(
           def.id === 'codex'
             ? 'Nyisd meg a linket a böngészőben és írd be a lent látható kódot.'
             : 'Nyisd meg a linket a böngészőben, majd másold vissza ide a kapott kódot.'
-      } else if (def.id === 'gemini' && session.autoEnterCount < 4) {
+      } else if ((def.id === 'gemini' || def.id === 'agy') && session.autoEnterCount < 4) {
         const tailLower = (session.outputTail ?? '').toLowerCase()
         const looksLikePrompt =
           tailLower.includes('login with google') ||
+          tailLower.includes('google oauth') ||
+          tailLower.includes('select login method') ||
           tailLower.includes('get started') ||
           tailLower.includes('choose a theme') ||
           tailLower.includes('trust') ||
