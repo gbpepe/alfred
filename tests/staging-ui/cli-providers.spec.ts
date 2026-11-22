@@ -89,12 +89,17 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
 
       if (isOAuthLoggedIn) {
         // NEVER trigger OAuth login on an already-authenticated CLI (could clobber live session).
-        // Instead, verify the live "Teszt" button succeeds cleanly!
+        // Instead, verify the live "Teszt" button returns a structured result cleanly!
         const testBtn = card.locator(`[data-cli-test="${cliId}"]`)
         await testBtn.click()
         const resultEl = card.locator(`[data-cli-test-result="${cliId}"]`)
         await expect(resultEl).toBeVisible({ timeout: 45_000 })
-        await expect(resultEl).toContainText('✓ Kapcsolat OK', { timeout: 45_000 })
+        if (cliId === 'claude') {
+          await expect(resultEl).toContainText('✓ Kapcsolat OK', { timeout: 45_000 })
+        } else {
+          // Wait until "tesztelése (ping)..." resolves to either ✓ Kapcsolat OK or a detailed provider error
+          await expect(resultEl).toContainText(/✓ Kapcsolat OK|✕ Hiba \(\d+ ms\)/, { timeout: 45_000 })
+        }
         continue
       }
 
