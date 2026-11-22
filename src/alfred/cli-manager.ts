@@ -327,6 +327,11 @@ async function installAgyNativeBinary(
   const childEnv = buildSanitizedNpmEnv(envMap, prefix)
   const tempRoot = mkdtempSync(join(tmpdir(), 'alfred-agy-install-'))
   try {
+    // Under systemd ProtectHome=read-only, ~/.cache is read-only. Since we pass
+    // `--dir <binDir>` explicitly, pointing HOME and XDG_CACHE_HOME at tempRoot
+    // lets install.sh stage and verify the binary cleanly while installing to binDir.
+    childEnv['HOME'] = tempRoot
+    childEnv['XDG_CACHE_HOME'] = join(tempRoot, '.cache')
     const scriptPath = join(tempRoot, 'install-agy.sh')
     if (!processRunner) {
       const resp = await fetch(AGY_INSTALL_SCRIPT_URL, { signal: AbortSignal.timeout(30_000) })

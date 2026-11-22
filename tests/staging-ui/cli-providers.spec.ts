@@ -130,13 +130,28 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
 
       const startBtn = drawer.locator(`[data-cli-oauth-start="${cliId}"]`)
       if (await startBtn.isDisabled()) {
-        await toggleBtn.click()
-        continue
+        // If agy-cli is not yet installed on staging, actually click Telepítés and verify install succeeds!
+        if (cliId === 'agy') {
+          await toggleBtn.click()
+          const installBtn = card.locator('[data-cli-action="install"][data-cli-id="agy"]')
+          await installBtn.click()
+          await expect(card.locator('[data-cli-action="install"][data-cli-id="agy"]')).toHaveText('Frissítés', {
+            timeout: 120_000,
+          })
+          await expect(card.locator('[data-cli-test="agy"]')).toBeEnabled()
+          await page.locator('[data-cli-auth-toggle="agy"]').click()
+          await expect(page.locator('[data-cli-auth-drawer="agy"]')).toBeVisible()
+        } else {
+          await toggleBtn.click()
+          continue
+        }
       }
 
-      await startBtn.click()
+      const activeDrawer = page.locator(`[data-cli-auth-drawer="${cliId}"]`)
+      const activeStartBtn = activeDrawer.locator(`[data-cli-oauth-start="${cliId}"]`)
+      await activeStartBtn.click()
 
-      const loginBox = drawer.locator(`[data-cli-login-box="${cliId}"]`)
+      const loginBox = activeDrawer.locator(`[data-cli-login-box="${cliId}"]`)
       await expect(loginBox).toBeVisible({ timeout: 15_000 })
 
       const oauthLink = loginBox.locator('a', { hasText: 'OAuth oldal megnyitása' })
@@ -155,8 +170,8 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
       await cancelBtn.click()
       await expect(loginBox).toBeHidden({ timeout: 10_000 })
 
-      await toggleBtn.click()
-      await expect(drawer).toBeHidden()
+      await page.locator(`[data-cli-auth-toggle="${cliId}"]`).click()
+      await expect(activeDrawer).toBeHidden()
     }
 
     // Verify Enterprise-only notice on gemini-cli card pointing individual users to agy-cli
