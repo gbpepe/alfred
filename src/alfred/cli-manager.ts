@@ -295,9 +295,13 @@ export async function installOrUpdateCli(
   const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
   const prefix = resolveCliNpmPrefix(envMap)
   if (prefix) {
-    mkdirSync(prefix, { recursive: true })
+    if (!existsSync(prefix)) {
+      mkdirSync(prefix, { recursive: true })
+    }
     const binDir = resolveCliBinDir(prefix)
-    if (binDir) mkdirSync(binDir, { recursive: true })
+    if (binDir && !existsSync(binDir)) {
+      mkdirSync(binDir, { recursive: true })
+    }
   }
 
   const res = await runNpmSubprocess(
