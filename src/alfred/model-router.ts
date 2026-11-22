@@ -42,6 +42,8 @@ export interface ToolCallRequest {
     name: string
     arguments: string
   }
+  /** Gemini 3 / Vertex AI thought signature required when replaying functionCall parts in multi-turn tool loops */
+  thoughtSignature?: string
 }
 
 export interface ProviderUsageMetrics {
@@ -184,9 +186,18 @@ export async function callOpenAiCompatibleProvider(params: {
     params.defaultBaseUrl
   ).replace(/\/+$/, '')
 
+  const sanitizedMessages = params.messages.map((m) =>
+    m.tool_calls && m.tool_calls.length > 0
+      ? {
+          ...m,
+          tool_calls: m.tool_calls.map(({ thoughtSignature: _ts, ...tc }) => tc),
+        }
+      : m,
+  )
+
   const payload: Record<string, unknown> = {
     model: params.model,
-    messages: params.messages,
+    messages: sanitizedMessages,
   }
   if (params.tools.length > 0) {
     payload.tools = params.tools
@@ -320,6 +331,7 @@ export async function callVertexEuProvider(params: {
             name: tc.function.name,
             args: JSON.parse(tc.function.arguments || '{}'),
           },
+          ...(tc.thoughtSignature ? { thoughtSignature: tc.thoughtSignature } : {}),
         })),
       }
     }
@@ -372,6 +384,8 @@ export async function callVertexEuProvider(params: {
         parts?: Array<{
           text?: string
           thought?: boolean
+          thoughtSignature?: string
+          thought_signature?: string
           functionCall?: { name: string; args?: Record<string, unknown> }
         }>
       }
@@ -391,6 +405,7 @@ export async function callVertexEuProvider(params: {
   parts.forEach((p, idx) => {
     if (typeof p.text === 'string' && !p.thought) textParts.push(p.text)
     if (p.functionCall && p.functionCall.name) {
+      const sig = p.thoughtSignature ?? p.thought_signature
       toolCalls.push({
         id: `vertex_call_${idx + 1}`,
         type: 'function',
@@ -398,6 +413,7 @@ export async function callVertexEuProvider(params: {
           name: p.functionCall.name,
           arguments: JSON.stringify(p.functionCall.args ?? {}),
         },
+        ...(sig ? { thoughtSignature: sig } : {}),
       })
     }
   })

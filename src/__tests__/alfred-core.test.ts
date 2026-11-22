@@ -838,5 +838,90 @@ describe('Alfred Core (feat/alfred-core)', () => {
           '100000000000000002',
         ])
       })
+
+      it('preserves Gemini 3 thoughtSignature across Vertex AI EU multi-turn functionCall loops', async () => {
+        const db = getDb()
+        const ws = join(tempDir, 'ws-vertex-sig')
+        mkdirSync(ws, { recursive: true })
+        const sentPayloads: Array<Record<string, unknown>> = []
+
+        const mockFetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+          sentPayloads.push(body)
+          if (sentPayloads.length === 1) {
+            return new Response(
+              JSON.stringify({
+                candidates: [
+                  {
+                    content: {
+                      parts: [
+                        {
+                          functionCall: { name: 'memory', args: { action: 'read' } },
+                          thoughtSignature: 'sig-gemini3-test-xyz',
+                        },
+                      ],
+                    },
+                  },
+                ],
+                usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 20, thoughtsTokenCount: 10 },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            )
+          }
+          return new Response(
+            JSON.stringify({
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: 'Kész a Vertex válasz.' }],
+                  },
+                },
+              ],
+              usageMetadata: { promptTokenCount: 140, candidatesTokenCount: 15 },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        })
+
+        const outcome = await runHybridAgentTurn({
+          db,
+          agent: {
+            id: 'vertex-sig-agent',
+            displayName: 'Vertex Sig Agent',
+            channelName: '#vertex-sig',
+            discordChannelId: '777777777777777777',
+            provider: 'vertex-eu',
+            model: 'gemini-3.8-flash',
+            workspace: 'workspaces/vertex-sig',
+            workspaceAbsPath: ws,
+            memoryNamespace: 'vertex-sig-agent',
+            dailyBudgetUsd: 5,
+            allowedUserIds: ['111111111111111111'],
+            tools: ['memory'],
+            resolvedSystemPrompt: 'Teszt.',
+          },
+          globalDailyBudgetUsd: 10,
+          userMessage: 'Olvasd ki a memóriát!',
+          env: {
+            VERTEX_EU_ACCESS_TOKEN: 'ya29.test-token',
+            VERTEX_EU_PROJECT_ID: 'eu-test-proj',
+            VERTEX_EU_LOCATION: 'eu',
+          },
+          fetchImpl: mockFetch as unknown as typeof fetch,
+        })
+
+        expect(outcome.ok).toBe(true)
+        if (outcome.ok) {
+          expect(outcome.replyText).toBe('Kész a Vertex válasz.')
+        }
+        expect(sentPayloads).toHaveLength(2)
+        const secondContents = sentPayloads[1]['contents'] as Array<{
+          role: string
+          parts: Array<{ functionCall?: { name: string }; thoughtSignature?: string }>
+        }>
+        const modelTurn = secondContents.find((c) => c.role === 'model')
+        expect(modelTurn?.parts[0]?.functionCall?.name).toBe('memory')
+        expect(modelTurn?.parts[0]?.thoughtSignature).toBe('sig-gemini3-test-xyz')
+      })
     })
   })
