@@ -188,6 +188,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><circle cx="6" cy="6.5" r="1"/><circle cx="6" cy="17.5" r="1"/></svg>
             <span class="sb-label">VPS</span>
           </a>
+          <a href="#" class="sb-link" data-page="providers">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            <span class="sb-label">API &amp; CLI</span>
+          </a>
           <a href="#" class="sb-link" data-page="status">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span class="sb-label">Státusz</span>
@@ -2300,36 +2304,11 @@
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
         <h1 style="margin:0">VPS</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn-primary btn-compact" id="vpsOpenApiWizardBtn">Model API varázsló</button>
           <button class="btn-secondary btn-compact" id="vpsRefreshBtn">Frissítés</button>
         </div>
       </div>
       <div id="vpsSystemBar" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px">Betöltés...</div>
       <div id="vpsServicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px"></div>
-
-      <div id="vpsModelCatalogCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <div>
-            <strong>Modell Katalógus (API szinkron)</strong>
-            <span id="vpsModelCatalogSyncedAt" style="font-size:12px;opacity:.7;margin-left:8px"></span>
-          </div>
-          <button class="btn-primary btn-compact" id="vpsSyncModelsBtn">Modellek frissítése (API szinkron)</button>
-        </div>
-        <div id="vpsModelCatalogGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
-        <div id="vpsModelCatalogStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
-      </div>
-
-      <div id="vpsCliProvidersCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <div>
-            <strong>CLI Szolgáltatók</strong>
-            <span style="font-size:12px;opacity:.7;margin-left:8px">Előfizetéses headless CLI-k (sudo nélkül, user prefixbe)</span>
-          </div>
-          <button class="btn-secondary btn-compact" id="vpsRefreshClisBtn">Állapot frissítése</button>
-        </div>
-        <div id="vpsCliProvidersGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px"></div>
-        <div id="vpsCliProvidersStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
-      </div>
 
       <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -2359,6 +2338,43 @@
           </select>
         </div>
         <pre id="vpsLogOutput" style="white-space:pre-wrap;font-family:monospace;font-size:11px;height:320px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
+      </div>
+    </section>
+
+    <section class="page" id="providersPage" hidden>
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div>
+          <h1 style="margin:0">API &amp; CLI</h1>
+          <div style="font-size:12px;opacity:.75">Előfizetéses CLI szolgáltatók, Model API kulcsok és élő kapcsolat tesztek</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-primary btn-compact" id="vpsOpenApiWizardBtn">Model API varázsló</button>
+          <button class="btn-secondary btn-compact" id="providersRefreshAllBtn">Összes frissítése</button>
+        </div>
+      </div>
+
+      <div id="vpsCliProvidersCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <strong>CLI Szolgáltatók</strong>
+            <span style="font-size:12px;opacity:.7;margin-left:8px">Előfizetéses headless CLI-k (sudo nélkül, user prefixbe)</span>
+          </div>
+          <button class="btn-secondary btn-compact" id="vpsRefreshClisBtn">Állapot frissítése</button>
+        </div>
+        <div id="vpsCliProvidersGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px"></div>
+        <div id="vpsCliProvidersStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
+      </div>
+
+      <div id="vpsModelCatalogCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <strong>Model API Szolgáltatók &amp; Katalógus</strong>
+            <span id="vpsModelCatalogSyncedAt" style="font-size:12px;opacity:.7;margin-left:8px"></span>
+          </div>
+          <button class="btn-primary btn-compact" id="vpsSyncModelsBtn">Modellek frissítése (API szinkron)</button>
+        </div>
+        <div id="vpsModelCatalogGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px"></div>
+        <div id="vpsModelCatalogStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
       </div>
     </section>
 

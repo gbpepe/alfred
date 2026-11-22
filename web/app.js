@@ -611,6 +611,7 @@ function switchPage(pageId) {
   if (pageId === 'naplo') loadNaplo()
   if (pageId === 'federation') loadFederationPage()
   if (pageId === 'vps' && typeof window.loadVpsPage === 'function') window.loadVpsPage()
+  if (pageId === 'providers' && typeof window.loadProvidersPage === 'function') window.loadProvidersPage()
   if (pageId === 'testsim' && typeof window.loadTestSimPage === 'function') window.loadTestSimPage()
 }
 
@@ -655,7 +656,7 @@ const SIDEBAR_GROUPS = [
   { key: 'team',        labelKey: 'nav.group.team',        pages: ['agents', 'messages', 'tasks', 'bgTasks'] },
   { key: 'knowledge',   labelKey: 'nav.group.knowledge',   pages: ['memories', 'skills', 'research', 'ideas'] },
   { key: 'stats',       labelKey: 'nav.group.stats',       pages: ['costs', 'tokenUsage'] },
-  { key: 'system',      labelKey: 'nav.group.system',      pages: ['vps', 'status', 'naplo', 'updates', 'settings', 'vault'] },
+  { key: 'system',      labelKey: 'nav.group.system',      pages: ['vps', 'providers', 'status', 'naplo', 'updates', 'settings', 'vault'] },
   { key: 'connections', labelKey: 'nav.group.connections', pages: ['connectors', 'clitools', 'federation', 'migrate'] },
 ]
 const sidebarGroupEls = document.querySelectorAll('.sb-group[data-group]')

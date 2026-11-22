@@ -80,7 +80,6 @@
 
       renderRolesGrid(data.roles || [], data.agents || [])
       renderMultiTests(data.multiTests || [])
-      refreshCliProviders()
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
@@ -293,10 +292,53 @@
         '<div style="display:flex;gap:4px;margin-top:2px">' +
         '<input type="' + (meta.secret ? 'password' : 'text') + '" class="input" data-cat-key="' + esc(meta.key) + '" placeholder="' + esc(meta.placeholder) + '" autocomplete="off" style="flex:1;min-width:0;padding:4px 6px;font-size:11px">' +
         '<button type="button" class="btn-secondary btn-compact" data-cat-save="' + esc(p) + '" data-cat-env="' + esc(meta.key) + '" style="padding:4px 8px;font-size:11px">Mentés</button>' +
+        '<button type="button" class="btn-secondary btn-compact" data-api-test="' + esc(p) + '" style="padding:4px 8px;font-size:11px"' + (info.configured ? '' : ' disabled') + '>Teszt</button>' +
         '</div>' +
+        '<div data-api-test-result="' + esc(p) + '" hidden style="font-size:11px;padding:5px 7px;border-radius:6px;line-height:1.35;word-break:break-word"></div>' +
         '</div>'
       )
     }).join('')
+
+    grid.querySelectorAll('[data-api-test]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const prov = btn.getAttribute('data-api-test')
+        const outEl = grid.querySelector('[data-api-test-result="' + prov + '"]')
+        if (!prov || !outEl) return
+        btn.disabled = true
+        outEl.hidden = false
+        outEl.style.background = 'var(--surface)'
+        outEl.style.border = '1px solid var(--border)'
+        outEl.style.color = 'inherit'
+        outEl.textContent = 'Kapcsolat tesztelése...'
+        try {
+          const res = await fetch('/api/admin/providers/' + encodeURIComponent(prov) + '/test', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          })
+          const data = await res.json().catch(function () { return {} })
+          if (res.ok && data.ok) {
+            outEl.style.background = 'rgba(22,163,74,0.12)'
+            outEl.style.border = '1px solid #16a34a'
+            outEl.style.color = '#15803d'
+            outEl.textContent = '✓ OK (' + data.latencyMs + ' ms) · ' + (data.model || '') + ' · válasz: ' + (data.reply || 'OK')
+          } else {
+            outEl.style.background = 'rgba(220,38,38,0.12)'
+            outEl.style.border = '1px solid #dc2626'
+            outEl.style.color = '#dc2626'
+            outEl.textContent = '✕ Hiba' + (data.latencyMs ? ' (' + data.latencyMs + ' ms)' : '') + ': ' + (data.error || ('HTTP ' + res.status))
+          }
+        } catch (err) {
+          outEl.style.background = 'rgba(220,38,38,0.12)'
+          outEl.style.border = '1px solid #dc2626'
+          outEl.style.color = '#dc2626'
+          outEl.textContent = '✕ Hiba: ' + err.message
+        } finally {
+          btn.disabled = false
+        }
+      })
+    })
 
     grid.querySelectorAll('[data-cat-save]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
@@ -1057,12 +1099,14 @@
             authDetailLine +
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-action="install" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">' + (c.installed ? 'Frissítés' : 'Telepítés') + '</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-cli-test="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Teszt</button>' +
             '<button type="button" class="btn-secondary btn-compact" data-cli-auth-toggle="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Belépés / Token</button>' +
             (c.authMethod === 'oauth'
               ? '<button type="button" class="btn-secondary btn-compact" data-cli-logout="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kilépés</button>'
               : '') +
             '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
             '</div>' +
+            '<div data-cli-test-result="' + esc(c.id) + '" hidden style="font-size:11px;padding:5px 7px;border-radius:6px;line-height:1.35;word-break:break-word"></div>' +
             '<div data-cli-auth-drawer="' + esc(c.id) + '" hidden style="margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:none;flex-direction:column;gap:8px">' +
             '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-oauth-start="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Böngészős OAuth indítása</button>' +
@@ -1082,6 +1126,53 @@
           )
         })
         .join('')
+
+      grid.querySelectorAll('[data-cli-test]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const cliId = btn.getAttribute('data-cli-test')
+          const outEl = grid.querySelector('[data-cli-test-result="' + cliId + '"]')
+          if (!cliId || !outEl) return
+          btn.disabled = true
+          outEl.hidden = false
+          outEl.style.background = 'var(--surface)'
+          outEl.style.border = '1px solid var(--border)'
+          outEl.style.color = 'inherit'
+          outEl.textContent = 'CLI kapcsolat tesztelése (ping)...'
+          try {
+            const res = await fetch('/api/admin/clis/' + encodeURIComponent(cliId) + '/test', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: '{}',
+            })
+            const data = await res.json().catch(function () { return {} })
+            if (res.ok && data.ok) {
+              outEl.style.background = 'rgba(22,163,74,0.12)'
+              outEl.style.border = '1px solid #16a34a'
+              outEl.style.color = '#15803d'
+              outEl.textContent =
+                '✓ Kapcsolat OK (' + data.latencyMs + ' ms) · auth: ' + (data.authMethod || '?') +
+                (data.model ? ' · ' + data.model : '') +
+                ' · válasz: ' + (data.reply || 'OK')
+            } else {
+              outEl.style.background = 'rgba(220,38,38,0.12)'
+              outEl.style.border = '1px solid #dc2626'
+              outEl.style.color = '#dc2626'
+              outEl.textContent =
+                '✕ Hiba' + (data.latencyMs ? ' (' + data.latencyMs + ' ms)' : '') +
+                (data.errorKind ? ' [' + data.errorKind + ']' : '') + ': ' +
+                (data.error || ('HTTP ' + res.status))
+            }
+          } catch (err) {
+            outEl.style.background = 'rgba(220,38,38,0.12)'
+            outEl.style.border = '1px solid #dc2626'
+            outEl.style.color = '#dc2626'
+            outEl.textContent = '✕ Hiba: ' + err.message
+          } finally {
+            btn.disabled = false
+          }
+        })
+      })
 
       grid.querySelectorAll('[data-cli-action]').forEach(function (btn) {
         btn.addEventListener('click', async function () {
@@ -1196,6 +1287,10 @@
     wired = true
     document.getElementById('vpsOpenApiWizardBtn')?.addEventListener('click', openModelApiWizard)
     document.getElementById('vpsRefreshClisBtn')?.addEventListener('click', refreshCliProviders)
+    document.getElementById('providersRefreshAllBtn')?.addEventListener('click', function () {
+      ensureModelCatalog(true)
+      refreshCliProviders()
+    })
     document.getElementById('vpsRefreshBtn')?.addEventListener('click', function () {
       refreshVpsStatus()
       refreshVpsLogs()
@@ -2117,13 +2212,21 @@
   window.loadVpsPage = function () {
     wireEvents()
     refreshVpsStatus()
-    ensureModelCatalog(false)
     refreshVpsLogs()
+  }
+
+  window.loadProvidersPage = function () {
+    wireEvents()
+    ensureModelCatalog(false)
+    refreshCliProviders()
   }
 
   wireEvents()
   if (location.hash === '#vps' || !document.getElementById('vpsPage')?.hidden) {
     window.loadVpsPage()
+  }
+  if (location.hash === '#providers' || !document.getElementById('providersPage')?.hidden) {
+    window.loadProvidersPage()
   }
 
   // === Phase 4: Voice Communication (Browser STT + AI/Browser TTS) ===

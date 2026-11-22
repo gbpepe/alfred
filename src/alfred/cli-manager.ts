@@ -8,7 +8,10 @@ import { atomicWriteFileSync } from '../web/atomic-write.js'
 import type { AlfredCliProviderName } from './agents-config.js'
 import {
   checkCliProvidersHealth,
+  CliExecutionError,
+  detectCliAuthStatus,
   resolveCliBinary,
+  runCliAgent,
   sanitizeCliText,
   spawnCliProcess,
   type CliAuthMethod,
@@ -1342,4 +1345,102 @@ export function cancelCliLogin(rawProvider: string): CliLoginStatusSnapshot {
     return toLoginSnapshot(session)
   }
   return getCliLoginStatus(def.id)
+}
+
+export interface CliConnectionTestResult {
+  ok: boolean
+  id: ManagedCliId
+  provider: AlfredCliProviderName
+  authMethod: CliAuthMethod
+  authDetail?: string
+  model?: string
+  reply?: string
+  error?: string
+  errorKind?: string
+  latencyMs: number
+}
+
+/**
+ * Executes a fast, read-only connection probe against an installed CLI provider (`claude`, `codex`, `gemini`)
+ * inside a throwaway empty directory with zero write tools.
+ */
+export async function testCliConnection(
+  rawProvider: string,
+  opts?: {
+    env?: Record<string, string | undefined>
+    processRunner?: CliProcessRunner
+    timeoutMs?: number
+  },
+): Promise<CliConnectionTestResult> {
+  const def = getManagedCliDefinition(rawProvider)
+  const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
+  const prefix = resolveCliNpmPrefix(envMap)
+  const enrichedEnv = withCliPrefixPath(envMap, prefix)
+  const auth = detectCliAuthStatus(def.provider, enrichedEnv)
+  const startedAt = Date.now()
+
+  const tempWs = mkdtempSync(join(tmpdir(), `alfred-cli-ping-${def.id}-`))
+  try {
+    const result = await runCliAgent({
+      agent: {
+        id: `cli-ping-${def.id}`,
+        displayName: `CLI Ping (${def.id})`,
+        channelName: '#ping',
+        discordChannelId: '0',
+        provider: def.provider,
+        model: 'default',
+        workspace: tempWs,
+        workspaceAbsPath: tempWs,
+        memoryNamespace: `cli-ping-${def.id}`,
+        dailyBudgetUsd: 1,
+        allowedUserIds: [],
+        tools: ['fs_read'],
+        resolvedSystemPrompt: 'Respond briefly to connection checks.',
+        cliTimeoutMs: opts?.timeoutMs ?? 45_000,
+      },
+      userMessage: 'Reply with exactly: OK',
+      env: enrichedEnv,
+      processRunner: opts?.processRunner,
+    })
+
+    return {
+      ok: true,
+      id: def.id,
+      provider: def.provider,
+      authMethod: auth.method,
+      ...(auth.detail ? { authDetail: auth.detail } : {}),
+      model: result.model,
+      reply: sanitizeCliText(result.content).trim().slice(0, 200),
+      latencyMs: Date.now() - startedAt,
+    }
+  } catch (err) {
+    const latencyMs = Date.now() - startedAt
+    if (err instanceof CliExecutionError) {
+      return {
+        ok: false,
+        id: def.id,
+        provider: def.provider,
+        authMethod: auth.method,
+        ...(auth.detail ? { authDetail: auth.detail } : {}),
+        errorKind: err.kind,
+        error: sanitizeCliText(err.stderr || err.message).slice(0, 300),
+        latencyMs,
+      }
+    }
+    return {
+      ok: false,
+      id: def.id,
+      provider: def.provider,
+      authMethod: auth.method,
+      ...(auth.detail ? { authDetail: auth.detail } : {}),
+      error: sanitizeCliText(err instanceof Error ? err.message : String(err)).slice(0, 300),
+      latencyMs,
+    }
+  } finally {
+    try {
+      rmSync(tempWs, { recursive: true, force: true })
+    } catch {
+      /* best effort */
+    }
+  }
 }

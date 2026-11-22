@@ -35,9 +35,16 @@ import {
   saveCliCredentials,
   startCliLogin,
   submitCliLoginCode,
+  testCliConnection,
 } from '../../alfred/cli-manager.js'
 import { getCliQueueStats } from '../../alfred/cli-runner.js'
-import { runHybridAgentTurn, type ChatMessage } from '../../alfred/model-router.js'
+import {
+  callDeepSeekProvider,
+  callOpenAiCompatibleProvider,
+  callVertexEuProvider,
+  runHybridAgentTurn,
+  type ChatMessage,
+} from '../../alfred/model-router.js'
 import { resolveAlfredRuntimeEnv } from '../../alfred/runtime-env.js'
 import { json, readBody } from '../http-helpers.js'
 import type { RouteContext } from './types.js'
@@ -556,6 +563,126 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliTestMatch = /^\/api\/admin\/clis\/([^/]+)\/test$/.exec(path)
+  if (cliTestMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const result = await testCliConnection(decodeURIComponent(cliTestMatch[1]), { env })
+      json(res, result, result.ok ? 200 : 502)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const apiProviderTestMatch = /^\/api\/admin\/providers\/([^/]+)\/test$/.exec(path)
+  if (apiProviderTestMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    const provider = decodeURIComponent(apiProviderTestMatch[1]).trim().toLowerCase()
+    const allowedApiProviders = new Set(['deepseek', 'openai', 'xai', 'gemini', 'vertex-eu'])
+    if (!allowedApiProviders.has(provider)) {
+      json(res, { ok: false, error: `Unsupported API provider: ${provider}` }, 400)
+      return true
+    }
+
+    const startedAt = Date.now()
+    const pingMessages: ChatMessage[] = [{ role: 'user', content: 'Reply with exactly: OK' }]
+    const fetchWithTimeout: typeof fetch = (input, init) =>
+      fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) })
+
+    try {
+      let model = ''
+      let reply = ''
+      if (provider === 'deepseek') {
+        model = 'deepseek-chat'
+        const r = await callDeepSeekProvider({ model, messages: pingMessages, tools: [], env, fetchImpl: fetchWithTimeout })
+        reply = r.content
+      } else if (provider === 'openai') {
+        model = 'gpt-4.1-mini'
+        const r = await callOpenAiCompatibleProvider({
+          providerLabel: 'OpenAI',
+          defaultBaseUrl: 'https://api.openai.com/v1',
+          baseUrlEnvKey: 'OPENAI_BASE_URL',
+          apiKeyEnvKey: 'OPENAI_API_KEY',
+          model,
+          messages: pingMessages,
+          tools: [],
+          env,
+          fetchImpl: fetchWithTimeout,
+        })
+        reply = r.content
+      } else if (provider === 'xai') {
+        model = 'grok-3-mini'
+        const r = await callOpenAiCompatibleProvider({
+          providerLabel: 'xAI',
+          defaultBaseUrl: 'https://api.x.ai/v1',
+          baseUrlEnvKey: 'XAI_BASE_URL',
+          apiKeyEnvKey: 'XAI_API_KEY',
+          model,
+          messages: pingMessages,
+          tools: [],
+          env,
+          fetchImpl: fetchWithTimeout,
+        })
+        reply = r.content
+      } else if (provider === 'gemini') {
+        model = 'gemini-2.5-flash'
+        const key = (env['GEMINI_API_KEY'] || '').trim()
+        if (!key) throw new Error('GEMINI_API_KEY is missing from environment')
+        const gRes = await fetchWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: 'Reply with exactly: OK' }] }],
+              generationConfig: { maxOutputTokens: 16 },
+            }),
+          },
+        )
+        const gText = await gRes.text()
+        if (!gRes.ok) throw new Error(`Gemini HTTP ${gRes.status}: ${sanitizeOutput(gText).slice(0, 200)}`)
+        const parsed = JSON.parse(gText) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
+        reply = (parsed.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim()
+      } else {
+        model = 'gemini-2.5-flash'
+        const r = await callVertexEuProvider({ model, messages: pingMessages, tools: [], env, fetchImpl: fetchWithTimeout })
+        reply = r.content
+      }
+
+      json(res, {
+        ok: true,
+        provider,
+        model,
+        reply: sanitizeOutput(reply).trim().slice(0, 200),
+        latencyMs: Date.now() - startedAt,
+      })
+    } catch (err) {
+      json(
+        res,
+        {
+          ok: false,
+          provider,
+          error: sanitizeOutput(err instanceof Error ? err.message : String(err)).slice(0, 300),
+          latencyMs: Date.now() - startedAt,
+        },
+        502,
+      )
     }
     return true
   }

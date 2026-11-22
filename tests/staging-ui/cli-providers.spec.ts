@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 
-function buildTargetUrl(): string {
+function buildTargetUrl(hash: string): string {
   const token = (process.env.STAGING_TOKEN || '').trim()
-  return token ? `/?token=${encodeURIComponent(token)}#vps` : '/#vps'
+  return token ? `/?token=${encodeURIComponent(token)}#${hash}` : `/#${hash}`
 }
 
-async function openStagingVpsTab(page: Page): Promise<{ pageErrors: string[]; failedCliApi: string[] }> {
+async function openStagingProvidersTab(page: Page): Promise<{ pageErrors: string[]; failedCliApi: string[] }> {
   const pageErrors: string[] = []
   const failedCliApi: string[] = []
 
@@ -13,25 +13,52 @@ async function openStagingVpsTab(page: Page): Promise<{ pageErrors: string[]; fa
     pageErrors.push(err.message)
   })
   page.on('response', (res) => {
-    if (res.url().includes('/api/admin/clis') && res.status() >= 400) {
+    if ((res.url().includes('/api/admin/clis') || res.url().includes('/api/admin/providers')) && res.status() >= 400) {
       failedCliApi.push(`${res.status()} ${res.url()}`)
     }
   })
 
-  await page.goto(buildTargetUrl(), { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('#vpsCliProvidersGrid')).toBeVisible({ timeout: 20_000 })
+  await page.goto(buildTargetUrl('providers'), { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('#providersPage')).toBeVisible({ timeout: 20_000 })
   await expect(page.locator('#vpsCliProvidersGrid [data-cli-auth-toggle]')).toHaveCount(3, { timeout: 20_000 })
+  await expect(page.locator('#vpsModelCatalogGrid [data-api-test]')).toHaveCount(5, { timeout: 20_000 })
 
   return { pageErrors, failedCliApi }
 }
 
 test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () => {
-  test('renders all 3 CLI cards, collapsed drawers, toggle behavior, and red paid API-key warning', async ({ page }) => {
-    const { pageErrors, failedCliApi } = await openStagingVpsTab(page)
+  test('keeps #vps dedicated to server controls and separates API & CLI onto #providers', async ({ page }) => {
+    const pageErrors: string[] = []
+    page.on('pageerror', (err) => pageErrors.push(err.message))
+
+    await page.goto(buildTargetUrl('vps'), { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#vpsPage')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('#vpsSystemBar')).toBeVisible()
+    await expect(page.locator('#vpsServicesGrid')).toBeVisible()
+    await expect(page.locator('#providersPage')).toBeHidden()
+    await expect(page.locator('#vpsCliProvidersGrid')).toBeHidden()
+    await expect(page.locator('#vpsModelCatalogGrid')).toBeHidden()
+
+    // Sidebar link switches cleanly to API & CLI page
+    const providersLink = page.locator('.sb-link[data-page="providers"]')
+    await providersLink.click()
+    await expect(page.locator('#providersPage')).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('#vpsPage')).toBeHidden()
+    await expect(page.locator('#vpsCliProvidersGrid [data-cli-test]')).toHaveCount(3, { timeout: 20_000 })
+    await expect(page.locator('#vpsModelCatalogGrid [data-api-test]')).toHaveCount(5, { timeout: 20_000 })
+
+    await page.screenshot({ path: 'test-results/staging-providers-page.png', fullPage: true })
+    expect(pageErrors).toEqual([])
+  })
+
+  test('renders all 3 CLI cards with Test buttons, collapsed drawers, toggle behavior, and red paid API-key warning on #providers', async ({ page }) => {
+    const { pageErrors, failedCliApi } = await openStagingProvidersTab(page)
 
     for (const cliId of ['claude', 'codex', 'gemini']) {
       const drawer = page.locator(`[data-cli-auth-drawer="${cliId}"]`)
       await expect(drawer).toBeHidden()
+
+      await expect(page.locator(`[data-cli-test="${cliId}"]`)).toBeVisible()
 
       const toggleBtn = page.locator(`[data-cli-auth-toggle="${cliId}"]`)
       await expect(toggleBtn).toBeVisible()
@@ -47,13 +74,12 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
       await expect(page.getByText('FIZETŐS API MÓD:').first()).toBeVisible()
     }
 
-    await page.screenshot({ path: 'test-results/staging-cli-providers.png', fullPage: true })
     expect(pageErrors).toEqual([])
     expect(failedCliApi).toEqual([])
   })
 
   test('runs browser OAuth start & clean cancel on every installed CLI without JS or API errors', async ({ page }) => {
-    const { pageErrors, failedCliApi } = await openStagingVpsTab(page)
+    const { pageErrors, failedCliApi } = await openStagingProvidersTab(page)
 
     for (const cliId of ['claude', 'codex', 'gemini'] as const) {
       const toggleBtn = page.locator(`[data-cli-auth-toggle="${cliId}"]`)
@@ -64,7 +90,6 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
 
       const startBtn = drawer.locator(`[data-cli-oauth-start="${cliId}"]`)
       if (await startBtn.isDisabled()) {
-        // CLI not installed on this staging host — skip OAuth launch for this card
         await toggleBtn.click()
         continue
       }
@@ -99,7 +124,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
   })
 
   test('rejects invalid manual OAuth JSON with clear inline error', async ({ page }) => {
-    const { pageErrors } = await openStagingVpsTab(page)
+    const { pageErrors } = await openStagingProvidersTab(page)
 
     const toggleBtn = page.locator('[data-cli-auth-toggle="gemini"]')
     await toggleBtn.click()
