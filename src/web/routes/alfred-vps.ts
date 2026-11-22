@@ -29,6 +29,7 @@ import {
   CliManagerValidationError,
   getCliInventory,
   getCliLoginStatus,
+  getCliQuota,
   installOrUpdateCli,
   logoutCli,
   removeCli,
@@ -577,6 +578,24 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     }
     try {
       const result = await testCliConnection(decodeURIComponent(cliTestMatch[1]), { env })
+      json(res, result, 200)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliQuotaMatch = /^\/api\/admin\/clis\/([^/]+)\/quota$/.exec(path)
+  if (cliQuotaMatch && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const result = await getCliQuota(decodeURIComponent(cliQuotaMatch[1]), { env })
       json(res, result, 200)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

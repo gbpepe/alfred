@@ -74,6 +74,18 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
       await expect(page.getByText('FIZETŐS API MÓD:').first()).toBeVisible()
     }
 
+    // Verify live quota button + auto-loaded quota strip on Claude card when OAuth is active
+    await expect(page.locator('[data-cli-quota-btn="claude"]')).toBeVisible()
+    await expect(page.locator('[data-cli-quota-btn="codex"]')).toBeVisible()
+    const claudeCard = page.locator('#vpsCliProvidersGrid > div').filter({
+      has: page.locator('[data-cli-auth-toggle="claude"]'),
+    })
+    if ((await claudeCard.getByText('OAuth előfizetés OK').count()) > 0) {
+      const quotaBox = claudeCard.locator('[data-cli-quota-box="claude"]')
+      await expect(quotaBox).toBeVisible({ timeout: 15_000 })
+      await expect(quotaBox).toContainText(/szabad|ablak|Kvóta/, { timeout: 15_000 })
+    }
+
     expect(pageErrors).toEqual([])
     expect(failedCliApi).toEqual([])
   })
@@ -138,6 +150,18 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
 
       await toggleBtn.click()
       await expect(drawer).toBeHidden()
+    }
+
+    // Verify live quota button + auto-loaded quota strip on Claude card when OAuth is active
+    await expect(page.locator('[data-cli-quota-btn="claude"]')).toBeVisible()
+    await expect(page.locator('[data-cli-quota-btn="codex"]')).toBeVisible()
+    const claudeCard = page.locator('#vpsCliProvidersGrid > div').filter({
+      has: page.locator('[data-cli-auth-toggle="claude"]'),
+    })
+    if ((await claudeCard.getByText('OAuth előfizetés OK').count()) > 0) {
+      const quotaBox = claudeCard.locator('[data-cli-quota-box="claude"]')
+      await expect(quotaBox).toBeVisible({ timeout: 15_000 })
+      await expect(quotaBox).toContainText(/szabad|ablak|Kvóta/, { timeout: 15_000 })
     }
 
     expect(pageErrors).toEqual([])

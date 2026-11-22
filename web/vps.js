@@ -1052,6 +1052,59 @@
     }, 1500)
   }
 
+  function formatResetTime(iso) {
+    if (!iso) return ''
+    try {
+      const d = new Date(iso)
+      if (Number.isNaN(d.getTime())) return ''
+      return d.toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return ''
+    }
+  }
+
+  async function refreshCliQuota(cliId, boxEl, btnEl) {
+    if (!boxEl) return
+    if (btnEl) btnEl.disabled = true
+    boxEl.hidden = false
+    boxEl.innerHTML = '<div style="font-size:11px;opacity:.75">Kvóta lekérdezése...</div>'
+    try {
+      const data = await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/quota')
+      if (!data.ok) {
+        boxEl.innerHTML = '<div style="font-size:11px;color:#dc2626">Kvóta hiba: ' + esc(data.error || 'ismeretlen hiba') + '</div>'
+        return
+      }
+      const wins = Array.isArray(data.windows) ? data.windows : []
+      if (wins.length === 0) {
+        boxEl.innerHTML = '<div style="font-size:11px;opacity:.75">' + esc(data.message || 'Nincs elérhető kvóta-adat.') + '</div>'
+        return
+      }
+      boxEl.innerHTML = wins
+        .map(function (w) {
+          const used = Math.max(0, Math.min(100, Number(w.usedPercent || 0)))
+          const rem = Math.max(0, Math.min(100, Number(w.remainingPercent != null ? w.remainingPercent : (100 - used))))
+          const barColor = used >= 90 ? '#dc2626' : used >= 70 ? '#d97706' : '#16a34a'
+          const resetStr = formatResetTime(w.resetsAt)
+          return (
+            '<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:6px">' +
+            '<span><b>' + esc(w.label) + ':</b> ' + esc(rem.toFixed(0)) + '% szabad (' + esc(used.toFixed(0)) + '% használt)</span>' +
+            (resetStr ? '<span style="opacity:.7;font-size:10px">reset: ' + esc(resetStr) + '</span>' : '') +
+            '</div>' +
+            '<div style="height:6px;border-radius:999px;background:rgba(128,128,128,0.2);overflow:hidden">' +
+            '<div style="height:100%;width:' + used + '%;background:' + barColor + ';border-radius:999px;transition:width .25s ease"></div>' +
+            '</div>' +
+            '</div>'
+          )
+        })
+        .join('')
+    } catch (err) {
+      boxEl.innerHTML = '<div style="font-size:11px;color:#dc2626">Kvóta hiba: ' + esc(err.message) + '</div>'
+    } finally {
+      if (btnEl) btnEl.disabled = false
+    }
+  }
+
   async function refreshCliProviders() {
     const grid = document.getElementById('vpsCliProvidersGrid')
     const statusEl = document.getElementById('vpsCliProvidersStatus')
@@ -1102,12 +1155,18 @@
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
             '<button type="button" class="btn-primary btn-compact" data-cli-action="install" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">' + (c.installed ? 'Frissítés' : 'Telepítés') + '</button>' +
             '<button type="button" class="btn-secondary btn-compact" data-cli-test="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Teszt</button>' +
+            ((c.id === 'claude' || c.id === 'codex')
+              ? '<button type="button" class="btn-secondary btn-compact" data-cli-quota-btn="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kvóta</button>'
+              : '') +
             '<button type="button" class="btn-secondary btn-compact" data-cli-auth-toggle="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Belépés / Token</button>' +
             (c.authMethod === 'oauth'
               ? '<button type="button" class="btn-secondary btn-compact" data-cli-logout="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">Kilépés</button>'
               : '') +
             '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
             '</div>' +
+            ((c.id === 'claude' || c.id === 'codex')
+              ? '<div data-cli-quota-box="' + esc(c.id) + '" hidden style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"></div>'
+              : '') +
             '<div data-cli-test-result="' + esc(c.id) + '" hidden style="font-size:11px;padding:5px 7px;border-radius:6px;line-height:1.35;word-break:break-word"></div>' +
             '<div data-cli-auth-drawer="' + esc(c.id) + '" hidden style="margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:none;flex-direction:column;gap:8px">' +
             '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
@@ -1128,6 +1187,23 @@
           )
         })
         .join('')
+
+      grid.querySelectorAll('[data-cli-quota-btn]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const cliId = btn.getAttribute('data-cli-quota-btn')
+          const box = grid.querySelector('[data-cli-quota-box="' + cliId + '"]')
+          if (cliId && box) refreshCliQuota(cliId, box, btn)
+        })
+      })
+
+      // Auto-load live quota strip for OAuth-authenticated claude / codex cards
+      clis.forEach(function (c) {
+        if ((c.id === 'claude' || c.id === 'codex') && c.authMethod === 'oauth') {
+          const box = grid.querySelector('[data-cli-quota-box="' + c.id + '"]')
+          const btn = grid.querySelector('[data-cli-quota-btn="' + c.id + '"]')
+          if (box) refreshCliQuota(c.id, box, btn)
+        }
+      })
 
       grid.querySelectorAll('[data-cli-test]').forEach(function (btn) {
         btn.addEventListener('click', async function () {

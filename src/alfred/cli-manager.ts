@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
+import { probePlanUsage, usageFromProbe } from '../claude-plan-usage-probe.js'
 import { assertEnvEntry, ENV_FILE_MODE, isSingleLineEnvValue, readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import { atomicWriteFileSync } from '../web/atomic-write.js'
@@ -1523,6 +1524,326 @@ export async function testCliConnection(
       rmSync(tempWs, { recursive: true, force: true })
     } catch {
       /* best effort */
+    }
+  }
+}
+
+export interface CliQuotaWindow {
+  id: string
+  label: string
+  usedPercent: number
+  remainingPercent: number
+  resetsAt?: string
+}
+
+export interface CliQuotaResult {
+  ok: boolean
+  id: ManagedCliId
+  provider: AlfredCliProviderName
+  supported: boolean
+  source?: string
+  windows: CliQuotaWindow[]
+  message?: string
+  error?: string
+  checkedAt: string
+}
+
+function clampPct(val: number): number {
+  if (!Number.isFinite(val)) return 0
+  return Math.max(0, Math.min(100, Math.round(val * 10) / 10))
+}
+
+function toIsoReset(val: unknown): string | undefined {
+  if (typeof val === 'number' && Number.isFinite(val) && val > 0) {
+    const ms = val > 1e12 ? val : val * 1000
+    return new Date(ms).toISOString()
+  }
+  if (typeof val === 'string' && val.trim()) {
+    const parsed = Date.parse(val.trim())
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString()
+  }
+  return undefined
+}
+
+function findNewestCodexRolloutFile(sessionsDir: string): string | null {
+  if (!sessionsDir || !existsSync(sessionsDir)) return null
+  let newestPath: string | null = null
+  let newestMtime = -1
+
+  const walk = (dir: string, depth: number) => {
+    if (depth > 5) return
+    let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>
+    try {
+      entries = readdirSync(dir, { withFileTypes: true, encoding: 'utf8' })
+    } catch {
+      return
+    }
+    for (const ent of entries) {
+      const full = join(dir, ent.name)
+      if (ent.isDirectory()) {
+        walk(full, depth + 1)
+      } else if (ent.isFile() && ent.name.startsWith('rollout-') && ent.name.endsWith('.jsonl')) {
+        try {
+          const st = statSync(full)
+          if (st.mtimeMs > newestMtime) {
+            newestMtime = st.mtimeMs
+            newestPath = full
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  walk(sessionsDir, 0)
+  return newestPath
+}
+
+function readCodexRolloutQuota(codexDir: string): { windows: CliQuotaWindow[]; message?: string } {
+  const rolloutPath = findNewestCodexRolloutFile(join(codexDir, 'sessions'))
+  if (!rolloutPath) {
+    return {
+      windows: [],
+      message: 'Még nincs Codex munkamenet-adat (futtass egy Teszt hívást OAuth belépés után).',
+    }
+  }
+  const lines = readFileSync(rolloutPath, 'utf-8').split(/\r?\n/)
+  let lastRateLimits: Record<string, unknown> | null = null
+  for (const line of lines) {
+    if (!line.includes('"rate_limits"')) continue
+    try {
+      const obj = JSON.parse(line) as { payload?: { rate_limits?: Record<string, unknown> } }
+      if (obj?.payload?.rate_limits && typeof obj.payload.rate_limits === 'object') {
+        lastRateLimits = obj.payload.rate_limits
+      }
+    } catch {
+      /* ignore malformed line */
+    }
+  }
+  if (!lastRateLimits) {
+    return {
+      windows: [],
+      message: 'A legutóbbi Codex munkamenet még nem tartalmazott rate_limits adatot.',
+    }
+  }
+
+  const windows: CliQuotaWindow[] = []
+  const defs: Array<{ key: string; id: string; label: string }> = [
+    { key: 'primary', id: 'five_hour', label: '5 órás ablak' },
+    { key: 'secondary', id: 'seven_day', label: '7 napos ablak' },
+  ]
+  for (const d of defs) {
+    const w = lastRateLimits[d.key] as { used_percent?: unknown; resets_at?: unknown } | undefined
+    if (!w || typeof w.used_percent !== 'number') continue
+    const used = clampPct(w.used_percent)
+    const resetsAt = toIsoReset(w.resets_at)
+    windows.push({
+      id: d.id,
+      label: d.label,
+      usedPercent: used,
+      remainingPercent: clampPct(100 - used),
+      ...(resetsAt ? { resetsAt } : {}),
+    })
+  }
+  return { windows }
+}
+
+/**
+ * Fetches live subscription quota / rate-limit windows for `claude` and `codex` CLIs.
+ * Secrets are never logged or returned.
+ */
+export async function getCliQuota(
+  rawProvider: string,
+  opts?: {
+    env?: Record<string, string | undefined>
+  },
+): Promise<CliQuotaResult> {
+  const def = getManagedCliDefinition(rawProvider)
+  const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
+  const checkedAt = new Date().toISOString()
+
+  if (def.id === 'gemini' || def.id === 'agy') {
+    return {
+      ok: true,
+      id: def.id,
+      provider: def.provider,
+      supported: false,
+      windows: [],
+      message: 'Ehhez a CLI-hez jelenleg nincs előfizetéses kvóta-lekérdező végpont.',
+      checkedAt,
+    }
+  }
+
+  if (def.id === 'codex') {
+    const authDir = resolveCliAuthDir(def, envMap)
+    try {
+      const { windows, message } = readCodexRolloutQuota(authDir)
+      return {
+        ok: true,
+        id: def.id,
+        provider: def.provider,
+        supported: true,
+        source: 'codex_rollout',
+        windows,
+        ...(message ? { message } : {}),
+        checkedAt,
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        id: def.id,
+        provider: def.provider,
+        supported: true,
+        windows: [],
+        error: sanitizeCliText(err instanceof Error ? err.message : String(err)).slice(0, 200),
+        checkedAt,
+      }
+    }
+  }
+
+  // claude-cli
+  const authDir = resolveCliAuthDir(def, envMap)
+  let credFileToken = ''
+  if (authDir) {
+    for (const fname of ['.credentials.json', 'credentials.json']) {
+      const p = join(authDir, fname)
+      if (!existsSync(p)) continue
+      try {
+        const parsed = JSON.parse(readFileSync(p, 'utf-8')) as {
+          claudeAiOauth?: { accessToken?: string }
+          accessToken?: string
+        }
+        const tok = (parsed?.claudeAiOauth?.accessToken || parsed?.accessToken || '').trim()
+        if (tok) {
+          credFileToken = tok
+          break
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  const envOAuthToken = (envMap['CLAUDE_CODE_OAUTH_TOKEN'] || '').trim()
+  const token = credFileToken || envOAuthToken
+  if (!token) {
+    return {
+      ok: true,
+      id: def.id,
+      provider: def.provider,
+      supported: true,
+      windows: [],
+      message: 'Nincs aktív Claude OAuth token.',
+      checkedAt,
+    }
+  }
+
+  // 1) If we have a credentials-file session token, try the zero-token /api/oauth/usage endpoint first.
+  if (credFileToken) {
+    try {
+      const resp = await fetch('https://api.anthropic.com/api/oauth/usage', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${credFileToken}`,
+          'User-Agent': 'claude-code/2.1.0',
+        },
+        signal: AbortSignal.timeout(8_000),
+      })
+      if (resp.ok) {
+        const data = (await resp.json()) as Record<string, { utilization?: number; resets_at?: string } | null>
+        const windows: CliQuotaWindow[] = []
+        const defs = [
+          { key: 'five_hour', label: '5 órás ablak' },
+          { key: 'seven_day', label: '7 napos ablak' },
+        ]
+        for (const d of defs) {
+          const w = data?.[d.key]
+          if (!w || typeof w.utilization !== 'number') continue
+          const used = clampPct(w.utilization)
+          const resetsAt = toIsoReset(w.resets_at)
+          windows.push({
+            id: d.key,
+            label: d.label,
+            usedPercent: used,
+            remainingPercent: clampPct(100 - used),
+            ...(resetsAt ? { resetsAt } : {}),
+          })
+        }
+        if (windows.length > 0) {
+          return {
+            ok: true,
+            id: def.id,
+            provider: def.provider,
+            supported: true,
+            source: 'oauth_usage_api',
+            windows,
+            checkedAt,
+          }
+        }
+      }
+    } catch {
+      /* fall through to ratelimit_headers probe */
+    }
+  }
+
+  // 2) Unified rate-limit headers probe (works with CLAUDE_CODE_OAUTH_TOKEN setup-tokens too!)
+  try {
+    const probe = await probePlanUsage(token, { timeoutMs: 10_000 })
+    const usage = usageFromProbe(probe)
+    const windows: CliQuotaWindow[] = []
+    if (usage?.fiveHour) {
+      const used = clampPct(usage.fiveHour.usedPercent)
+      const resetsAt = toIsoReset(usage.fiveHour.resetsAt)
+      windows.push({
+        id: 'five_hour',
+        label: '5 órás ablak',
+        usedPercent: used,
+        remainingPercent: clampPct(100 - used),
+        ...(resetsAt ? { resetsAt } : {}),
+      })
+    }
+    if (usage?.sevenDay) {
+      const used = clampPct(usage.sevenDay.usedPercent)
+      const resetsAt = toIsoReset(usage.sevenDay.resetsAt)
+      windows.push({
+        id: 'seven_day',
+        label: '7 napos ablak',
+        usedPercent: used,
+        remainingPercent: clampPct(100 - used),
+        ...(resetsAt ? { resetsAt } : {}),
+      })
+    }
+    if (windows.length > 0) {
+      return {
+        ok: true,
+        id: def.id,
+        provider: def.provider,
+        supported: true,
+        source: 'ratelimit_headers',
+        windows,
+        checkedAt,
+      }
+    }
+    return {
+      ok: false,
+      id: def.id,
+      provider: def.provider,
+      supported: true,
+      windows: [],
+      error: probe.ok
+        ? 'Nem érkezett kvóta-header a válaszban.'
+        : `Kvóta lekérdezési hiba: ${probe.error} (HTTP ${probe.httpStatus ?? '-'})`,
+      checkedAt,
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      id: def.id,
+      provider: def.provider,
+      supported: true,
+      windows: [],
+      error: sanitizeCliText(err instanceof Error ? err.message : String(err)).slice(0, 200),
+      checkedAt,
     }
   }
 }
