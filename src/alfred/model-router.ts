@@ -1,7 +1,8 @@
 import type Database from 'better-sqlite3'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
-import type { AlfredAgentDefinition, AlfredProviderName } from './agents-config.js'
+import type { AlfredAgentDefinition, AlfredCliProviderName, AlfredProviderName } from './agents-config.js'
+import { isCliProvider } from './agents-config.js'
 import {
   assertBudgetAvailable,
   BudgetExceededError,
@@ -9,8 +10,19 @@ import {
   type CircuitBreakerEvaluation,
 } from './circuit-breaker.js'
 import {
-  executeWhitelistedTool,
+  classifyCliError,
+  CliExecutionError,
+  formatCliDiscordError,
+  runCliAgent,
+  sanitizeCliText,
+  type CliErrorKind,
+  type CliProcessRunner,
+  type RunCliAgentFn,
+} from './cli-runner.js'
+import {
+  executeWhitelistedToolAsync,
   getWhitelistedToolSchemas,
+  ProtectedPathError,
   type OpenAiToolSchema,
 } from './tool-executor.js'
 import { resolveVertexEuAuth } from './vertex-auth.js'
@@ -61,6 +73,9 @@ export interface HybridRouterOptions {
   maxToolIterations?: number
   env?: Record<string, string | undefined>
   fetchImpl?: typeof fetch
+  cliRunner?: RunCliAgentFn
+  cliProcessRunner?: CliProcessRunner
+  onCliQueued?: (position: number) => void
   nowSec?: number
 }
 
@@ -79,6 +94,14 @@ export type HybridRouterOutcome =
     code: 'BUDGET_EXCEEDED'
     discordMessage: string
     evaluation: CircuitBreakerEvaluation
+  }
+  | {
+    ok: false
+    code: 'CLI_EXECUTION_FAILED'
+    provider: AlfredCliProviderName
+    errorKind: CliErrorKind
+    error: string
+    discordMessage: string
   }
 
 const EU_VERTEX_REGION_RE = /^(eu|europe-[a-z0-9-]+)$/
@@ -413,6 +436,130 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
   const maxIterations = opts.maxToolIterations ?? opts.agent.maxToolIterations ?? 6
   const sessionId = opts.sessionId ?? `alfred-${opts.agent.id}-${Date.now()}`
 
+  if (isCliProvider(opts.agent.provider)) {
+    try {
+      assertBudgetAvailable({
+        db: opts.db,
+        agentId: opts.agent.id,
+        agentDailyLimitUsd: opts.agent.dailyBudgetUsd,
+        globalDailyLimitUsd: opts.globalDailyBudgetUsd,
+        nowSec: opts.nowSec,
+      })
+    } catch (err) {
+      if (err instanceof BudgetExceededError) {
+        logger.warn(
+          {
+            agentId: opts.agent.id,
+            reason: err.evaluation.reason,
+            agentSpendUsd: err.evaluation.agentSpendUsd,
+            globalSpendUsd: err.evaluation.globalSpendUsd,
+          },
+          'CostOps Circuit Breaker blocked CLI call (BUDGET_EXCEEDED)',
+        )
+        return {
+          ok: false,
+          code: 'BUDGET_EXCEEDED',
+          discordMessage: err.evaluation.discordMessage!,
+          evaluation: err.evaluation,
+        }
+      }
+      throw err
+    }
+
+    const cliRunner = opts.cliRunner ?? runCliAgent
+    try {
+      const cliRes = await cliRunner({
+        agent: opts.agent,
+        userMessage: opts.userMessage,
+        conversationHistory: opts.conversationHistory,
+        env: envMap,
+        processRunner: opts.cliProcessRunner,
+        onQueued: opts.onCliQueued,
+      })
+
+      recordModelTokenUsage({
+        db: opts.db,
+        agentId: opts.agent.id,
+        sessionId,
+        model: cliRes.model,
+        provider: opts.agent.provider,
+        inputTokens: cliRes.usage.inputTokens,
+        outputTokens: cliRes.usage.outputTokens,
+        cacheReadTokens: cliRes.usage.cacheReadTokens,
+        cacheCreationTokens: cliRes.usage.cacheCreationTokens,
+        thinkingTokens: cliRes.usage.thinkingTokens,
+        contentPreview: cliRes.content || opts.userMessage,
+        toolName: null,
+        timestampSec: opts.nowSec,
+      })
+
+      return {
+        ok: true,
+        replyText: cliRes.content,
+        provider: opts.agent.provider,
+        model: cliRes.model,
+        iterations: 1,
+        totalUsage: cliRes.usage,
+        toolCallsExecuted: [],
+      }
+    } catch (err) {
+      if (err instanceof ProtectedPathError) {
+        throw err
+      }
+
+      const errKind: CliErrorKind =
+        err instanceof CliExecutionError
+          ? err.kind
+          : classifyCliError(opts.agent.provider, 1, err instanceof Error ? err.message : String(err), false)
+      const rawErrMsg = err instanceof Error ? err.message : String(err)
+      const sanitizedErr = sanitizeCliText(rawErrMsg)
+      const discordMsg =
+        err instanceof CliExecutionError
+          ? err.discordMessage
+          : formatCliDiscordError(opts.agent.provider, errKind, sanitizedErr)
+
+      const fb = opts.agent.fallback
+      if (fb) {
+        logger.warn(
+          {
+            agentId: opts.agent.id,
+            failedProvider: opts.agent.provider,
+            errorKind: errKind,
+            fallbackProvider: fb.provider,
+            fallbackModel: fb.model,
+          },
+          'CLI provider failed; invoking explicit fallback provider',
+        )
+        const fbOutcome = await runHybridAgentTurn({
+          ...opts,
+          agent: {
+            ...opts.agent,
+            provider: fb.provider,
+            model: fb.model,
+            fallback: undefined,
+          },
+        })
+        if (fbOutcome.ok) {
+          const tag = `[Fallback: ${fb.provider}/${fb.model}]`
+          return {
+            ...fbOutcome,
+            replyText: fbOutcome.replyText ? `${fbOutcome.replyText}\n\n${tag}` : tag,
+          }
+        }
+        return fbOutcome
+      }
+
+      return {
+        ok: false,
+        code: 'CLI_EXECUTION_FAILED',
+        provider: opts.agent.provider,
+        errorKind: errKind,
+        error: sanitizedErr,
+        discordMessage: discordMsg,
+      }
+    }
+  }
+
   const messages = buildPromptCachedMessages(
     opts.agent,
     opts.conversationHistory ?? [],
@@ -548,10 +695,11 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
         parsedArgs = {}
       }
 
-      const output = executeWhitelistedTool(
+      const output = await executeWhitelistedToolAsync(
         { agent: opts.agent, db: opts.db, chatId: opts.chatId },
         tc.function.name,
         parsedArgs,
+        { env: envMap, processRunner: opts.cliProcessRunner },
       )
 
       toolCallsExecuted.push({

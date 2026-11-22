@@ -1,57 +1,54 @@
 #!/usr/bin/env bash
-# Idempotent Ubuntu/Debian VPS bootstrap script for Alfred:
-# Sets up `alfred` user, `/opt/alfred-ops` + `/opt/alfred-prod`, builds `dist/alfred/run.js`,
-# scaffolds `.env` / `.env.test` (non-destructively), installs systemd units & scoped sudoers,
-# and enables `alfred-ops` + `alfred-prod` (keeping `alfred-test` on-demand).
+# Idempotent Ubuntu 24.04 / Debian 12 VPS bootstrap script for Alfred:
+# - Creates a 2 GB swapfile (if no active swap) and persists it in /etc/fstab
+# - Installs base packages (git, curl, sqlite3, build-essential, ca-certificates, gnupg) + Node.js 22 LTS
+# - Globally installs headless CLIs (@anthropic-ai/claude-code, @openai/codex, @google/gemini-cli)
+# - Creates `alfred` system user and /opt/alfred-prod, /opt/alfred-ops, /opt/alfred-worktrees, /etc/alfred
+# - Conditionally installs systemd service units & scoped sudoers when /opt/alfred-prod/deploy exists
 
 set -euo pipefail
 
-REPO_URL="${ALFRED_REPO_URL:-https://github.com/gbpepe/alfred.git}"
-BRANCH="${ALFRED_BRANCH:-feat/alfred-core}"
 ALFRED_USER="${ALFRED_SYSTEM_USER:-alfred}"
 OPS_DIR="/opt/alfred-ops"
 PROD_DIR="/opt/alfred-prod"
 WORKTREES_DIR="/opt/alfred-worktrees"
+ETC_ALFRED_DIR="/etc/alfred"
+SWAP_FILE="/swapfile"
+CLIS_RAW="claude,codex,gemini"
+SKIP_CLIS=0
 DRY_RUN=0
-SKIP_START=0
-FORCE_START=0
 
 usage() {
   cat <<'EOF'
 Usage: sudo bash deploy/vps-bootstrap.sh [options]
 
 Options:
-  --repo-url <url>    Git repository URL (default: https://github.com/gbpepe/alfred.git)
-  --branch <name>     Git branch to bootstrap from (default: feat/alfred-core)
-  --user <name>       Linux system user to own /opt/alfred-* (default: alfred)
-  --skip-start        Install everything without starting systemd services
-  --force-start       Start services even if .env files still contain placeholder values
-  --dry-run           Print planned actions without modifying the system
-  -h, --help          Show this help message
+  --skip-clis             Skip global npm installation of CLI providers
+  --clis=<list>           Comma-separated CLIs to install (subset of: claude,codex,gemini)
+                          Default: claude,codex,gemini
+  --user <name>           Linux system user to own /opt/alfred-* (default: alfred)
+  --dry-run               Print planned actions without modifying the system
+  -h, --help              Show this help message
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo-url)
-      REPO_URL="${2:-}"
-      shift 2
+    --skip-clis)
+      SKIP_CLIS=1
+      shift
       ;;
-    --branch)
-      BRANCH="${2:-}"
+    --clis=*)
+      CLIS_RAW="${1#--clis=}"
+      shift
+      ;;
+    --clis)
+      CLIS_RAW="${2:-}"
       shift 2
       ;;
     --user)
       ALFRED_USER="${2:-}"
       shift 2
-      ;;
-    --skip-start)
-      SKIP_START=1
-      shift
-      ;;
-    --force-start)
-      FORCE_START=1
-      shift
       ;;
     --dry-run)
       DRY_RUN=1
@@ -73,17 +70,30 @@ log_info() { echo "[vps-bootstrap] $*"; }
 log_warn() { echo "[vps-bootstrap][WARN] $*" >&2; }
 log_err()  { echo "[vps-bootstrap][ERROR] $*" >&2; }
 
-if [[ ! "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$BRANCH" == *".."* ]] || [[ "$BRANCH" == -* ]]; then
-  log_err "Invalid branch name: '$BRANCH'"
-  exit 1
-fi
 if [[ ! "$ALFRED_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
   log_err "Invalid Linux username: '$ALFRED_USER'"
   exit 1
 fi
-if [[ -z "$REPO_URL" ]]; then
-  log_err "--repo-url cannot be empty"
-  exit 1
+
+SELECTED_CLIS=()
+if [[ "$SKIP_CLIS" != "1" ]]; then
+  if [[ -z "${CLIS_RAW// }" ]]; then
+    log_err "--clis cannot be empty (use --skip-clis to skip CLI installation)"
+    exit 1
+  fi
+  IFS=',' read -ra RAW_ITEMS <<< "$CLIS_RAW"
+  for item in "${RAW_ITEMS[@]}"; do
+    clean_item="${item//[[:space:]]/}"
+    case "$clean_item" in
+      claude|codex|gemini)
+        SELECTED_CLIS+=("$clean_item")
+        ;;
+      *)
+        log_err "Unsupported CLI name in --clis: '$clean_item' (allowed: claude, codex, gemini)"
+        exit 1
+        ;;
+    esac
+  done
 fi
 
 run_cmd() {
@@ -94,176 +104,157 @@ run_cmd() {
   fi
 }
 
-run_as_alfred() {
-  if [[ "$DRY_RUN" == "1" ]]; then
-    log_info "[DRY-RUN] (as $ALFRED_USER) $*"
-  else
-    su -s /bin/bash "$ALFRED_USER" -c "$*"
-  fi
-}
+if [[ "$DRY_RUN" != "1" && "$(id -u)" -ne 0 ]]; then
+  log_err "This script must be run as root (e.g. sudo bash deploy/vps-bootstrap.sh)."
+  exit 1
+fi
 
-if [[ "$DRY_RUN" != "1" ]]; then
-  if [[ "$(id -u)" -ne 0 ]]; then
-    log_err "This script must run as root (e.g. sudo bash deploy/vps-bootstrap.sh)."
-    exit 1
+# 1. Idempotent 2 GB swapfile
+if [[ "$DRY_RUN" == "1" ]] || [[ -z "$(swapon --show --noheadings 2>/dev/null || true)" ]]; then
+  log_info "Configuring 2 GB swap at $SWAP_FILE..."
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log_info "[DRY-RUN] Create 2G $SWAP_FILE (chmod 600, mkswap, swapon) and add to /etc/fstab"
+  else
+    if [[ ! -f "$SWAP_FILE" ]]; then
+      if command -v fallocate >/dev/null 2>&1; then
+        fallocate -l 2G "$SWAP_FILE" || dd if=/dev/zero of="$SWAP_FILE" bs=1M count=2048
+      else
+        dd if=/dev/zero of="$SWAP_FILE" bs=1M count=2048
+      fi
+    fi
+    chmod 600 "$SWAP_FILE"
+    mkswap "$SWAP_FILE"
+    swapon "$SWAP_FILE"
+    if ! grep -qE "^[[:space:]]*${SWAP_FILE}[[:space:]]" /etc/fstab; then
+      printf '%s none swap sw 0 0\n' "$SWAP_FILE" >> /etc/fstab
+    fi
   fi
-  if [[ ! -d /run/systemd/system ]] || ! command -v systemctl >/dev/null 2>&1; then
-    log_err "systemd is required on this host."
-    exit 1
+else
+  log_info "Active swap already detected; skipping $SWAP_FILE creation."
+fi
+
+# 2. Base packages & Node.js 22 LTS
+log_info "Installing base apt packages (git, curl, sqlite3, build-essential, ca-certificates, gnupg)..."
+if [[ "$DRY_RUN" == "1" ]]; then
+  log_info "[DRY-RUN] DEBIAN_FRONTEND=noninteractive apt-get update -y && apt-get install -y git curl sqlite3 build-essential ca-certificates gnupg"
+else
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get install -y git curl sqlite3 build-essential ca-certificates gnupg
+fi
+
+NEED_NODE22=0
+if ! command -v node >/dev/null 2>&1; then
+  NEED_NODE22=1
+else
+  NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+  if [[ "$NODE_MAJOR" -lt 22 ]]; then
+    NEED_NODE22=1
   fi
-  for bin in git node npm visudo; do
-    if ! command -v "$bin" >/dev/null 2>&1; then
-      log_err "Missing required binary: $bin"
-      exit 1
+fi
+
+if [[ "$NEED_NODE22" == "1" ]]; then
+  log_info "Installing Node.js 22 LTS via NodeSource..."
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log_info "[DRY-RUN] curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs"
+  else
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+  fi
+else
+  log_info "Node.js $(node -v) already satisfies >= 22."
+fi
+
+# 3. System user & directory structure (created BEFORE user-level CLI installs)
+if [[ "$DRY_RUN" == "1" ]]; then
+  log_info "[DRY-RUN] Ensure user '$ALFRED_USER' exists and prepare $PROD_DIR, $OPS_DIR, $WORKTREES_DIR, $ETC_ALFRED_DIR, and home dirs (~/.local, ~/.local/bin, ~/.claude, ~/.codex, ~/.gemini, ~/.config)"
+  ALFRED_HOME="/home/$ALFRED_USER"
+else
+  if ! id "$ALFRED_USER" >/dev/null 2>&1; then
+    log_info "Creating system user '$ALFRED_USER'..."
+    useradd -r -m -s /bin/bash "$ALFRED_USER"
+  else
+    log_info "System user '$ALFRED_USER' already exists."
+  fi
+
+  ALFRED_HOME="$(getent passwd "$ALFRED_USER" | cut -d: -f6 || true)"
+  if [[ -z "$ALFRED_HOME" ]]; then
+    ALFRED_HOME="/home/$ALFRED_USER"
+  fi
+  mkdir -p "$ALFRED_HOME/.local/bin" "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.config"
+  chown -R "$ALFRED_USER:$ALFRED_USER" "$ALFRED_HOME/.local" "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini" "$ALFRED_HOME/.config"
+  chmod 700 "$ALFRED_HOME/.claude" "$ALFRED_HOME/.codex" "$ALFRED_HOME/.gemini"
+
+  mkdir -p "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude" \
+    "$OPS_DIR/store" "$OPS_DIR/.claude" "$WORKTREES_DIR"
+  chown -R "$ALFRED_USER:$ALFRED_USER" "$PROD_DIR" "$OPS_DIR" "$WORKTREES_DIR"
+
+  mkdir -p "$ETC_ALFRED_DIR"
+  chown "root:$ALFRED_USER" "$ETC_ALFRED_DIR"
+  chmod 750 "$ETC_ALFRED_DIR"
+fi
+
+# 4. User-level headless CLI installations into $ALFRED_HOME/.local (no sudo needed at runtime)
+if [[ "$SKIP_CLIS" == "1" ]]; then
+  log_info "Skipping user-level CLI installation (--skip-clis)."
+else
+  for cli in "${SELECTED_CLIS[@]}"; do
+    case "$cli" in
+      claude) pkg="@anthropic-ai/claude-code" ;;
+      codex)  pkg="@openai/codex" ;;
+      gemini) pkg="@google/gemini-cli" ;;
+    esac
+    log_info "Installing CLI package into $ALFRED_HOME/.local: $pkg..."
+    if [[ "$DRY_RUN" == "1" ]]; then
+      log_info "[DRY-RUN] su -s /bin/bash $ALFRED_USER -c \"NPM_CONFIG_PREFIX='$ALFRED_HOME/.local' npm install -g '$pkg'\""
+    else
+      su -s /bin/bash "$ALFRED_USER" -c "NPM_CONFIG_PREFIX='$ALFRED_HOME/.local' npm install -g '$pkg'"
     fi
   done
-  NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]")"
-  if [[ "$NODE_MAJOR" -lt 22 ]]; then
-    log_err "Node.js >= 22 is required (found v$(node -v))."
-    exit 1
-  fi
-  if ! command -v sqlite3 >/dev/null 2>&1; then
-    log_warn "sqlite3 CLI not found; promote-to-prod.sh will fall back to file copy for backups (recommended: apt-get install -y sqlite3)."
-  fi
 fi
 
-# 1. System user & directories
-if ! id "$ALFRED_USER" >/dev/null 2>&1; then
-  log_info "Creating system user '$ALFRED_USER'..."
-  run_cmd useradd -r -m -s /bin/bash "$ALFRED_USER"
-fi
-
-log_info "Preparing $OPS_DIR, $PROD_DIR, and $WORKTREES_DIR..."
-run_cmd mkdir -p "$OPS_DIR/store" "$OPS_DIR/.claude" "$PROD_DIR/store" "$PROD_DIR/workspaces" "$PROD_DIR/.claude" "$WORKTREES_DIR"
-run_cmd chown -R "$ALFRED_USER:$ALFRED_USER" "$OPS_DIR" "$PROD_DIR" "$WORKTREES_DIR"
-
-# 2. Clone or update repositories and build dist/alfred/run.js
-sync_and_build_repo() {
-  local target_dir="$1"
-  local target_branch="$2"
-  local create_main="$3"
-
-  if [[ ! -d "$target_dir/.git" ]]; then
-    log_info "Cloning $REPO_URL ($BRANCH) into $target_dir..."
-    run_as_alfred "git clone --branch '$BRANCH' '$REPO_URL' '$target_dir'"
-    if [[ "$create_main" == "1" ]]; then
-      run_as_alfred "cd '$target_dir' && git checkout -B '$target_branch'"
-    fi
-  else
-    log_info "Repository already exists at $target_dir; skipping clone."
-  fi
-
-  log_info "Installing dependencies and building $target_dir..."
-  run_as_alfred "cd '$target_dir' && npm ci && npm run build:alfred"
-}
-
-sync_and_build_repo "$OPS_DIR" "$BRANCH" "0"
-sync_and_build_repo "$PROD_DIR" "main" "1"
-
-# 3. Non-destructive .env scaffolding
-write_env_if_missing() {
-  local file_path="$1"
-  local content="$2"
-  if [[ -f "$file_path" ]]; then
-    log_info "Keeping existing $file_path"
-    return 0
-  fi
+# 5. Conditional systemd units & sudoers installation (if repo is already cloned in /opt/alfred-prod)
+if [[ -d "$PROD_DIR/deploy" ]]; then
+  log_info "Detected $PROD_DIR/deploy; installing systemd units and scoped sudoers..."
   if [[ "$DRY_RUN" == "1" ]]; then
-    log_info "[DRY-RUN] Create starter env file $file_path (0600)"
-    return 0
+    log_info "[DRY-RUN] cp $PROD_DIR/deploy/alfred-*.service /etc/systemd/system/ && systemctl daemon-reload"
+    log_info "[DRY-RUN] cp $PROD_DIR/deploy/alfred-ops.sudoers.example /etc/sudoers.d/alfred-ops && chmod 0440 && visudo -cf"
+  else
+    shopt -s nullglob
+    service_files=("$PROD_DIR/deploy"/alfred-*.service)
+    shopt -u nullglob
+    if [[ ${#service_files[@]} -gt 0 ]]; then
+      cp "${service_files[@]}" /etc/systemd/system/
+      systemctl daemon-reload
+    fi
+
+    if [[ -f "$PROD_DIR/deploy/alfred-ops.sudoers.example" ]]; then
+      cp "$PROD_DIR/deploy/alfred-ops.sudoers.example" /etc/sudoers.d/alfred-ops
+      chmod 0440 /etc/sudoers.d/alfred-ops
+      visudo -cf /etc/sudoers.d/alfred-ops
+    fi
   fi
-  umask 077
-  printf '%s\n' "$content" > "$file_path"
-  chown "$ALFRED_USER:$ALFRED_USER" "$file_path"
-  chmod 600 "$file_path"
-  log_info "Created starter env file: $file_path (fill in real tokens before starting!)"
-}
-
-write_env_if_missing "$OPS_DIR/.env" "ALFRED_ENV=ops
-ALFRED_ENABLED_AGENTS=alfred-ops
-ALFRED_DB_PATH=store/alfred-ops.db
-ALFRED_WORKSPACES_DIR=workspaces
-ALFRED_BUDGET_MULTIPLIER=1.0
-ALFRED_GLOBAL_DAILY_BUDGET_USD=5.0
-
-ALLOWED_USER_IDS=REPLACE_WITH_DISCORD_USER_ID
-DISCORD_BOT_TOKEN=REPLACE_WITH_OPS_BOT_TOKEN
-DISCORD_CHANNEL_ALFRED_OPS=REPLACE_WITH_OPS_CHANNEL_ID
-
-DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1"
-
-write_env_if_missing "$OPS_DIR/.env.test" "ALFRED_ENV=test
-ALFRED_DB_PATH=store/alfred-test.db
-ALFRED_WORKSPACES_DIR=workspaces-test
-ALFRED_BUDGET_MULTIPLIER=0.2
-ALFRED_GLOBAL_DAILY_BUDGET_USD=5.0
-
-ALLOWED_USER_IDS=REPLACE_WITH_DISCORD_USER_ID
-DISCORD_BOT_TOKEN=REPLACE_WITH_TEST_BOT_TOKEN
-DISCORD_CHANNEL_ALFRED_HQ=REPLACE_WITH_TEST_HQ_CHANNEL_ID
-DISCORD_CHANNEL_PROJ_HYPATIA=REPLACE_WITH_TEST_HYPATIA_CHANNEL_ID
-DISCORD_CHANNEL_ALFRED_QA=REPLACE_WITH_TEST_QA_CHANNEL_ID
-DISCORD_CHANNEL_ALFRED_SELF_DEV=REPLACE_WITH_TEST_SELF_DEV_CHANNEL_ID
-
-DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
-VERTEX_EU_PROJECT_ID=REPLACE_WITH_GCP_EU_PROJECT_ID
-VERTEX_EU_LOCATION=eu"
-
-write_env_if_missing "$PROD_DIR/.env" "ALFRED_ENV=production
-ALFRED_DB_PATH=store/alfred-prod.db
-ALFRED_WORKSPACES_DIR=workspaces
-ALFRED_BUDGET_MULTIPLIER=1.0
-ALFRED_GLOBAL_DAILY_BUDGET_USD=15.0
-
-ALLOWED_USER_IDS=REPLACE_WITH_DISCORD_USER_ID
-DISCORD_BOT_TOKEN=REPLACE_WITH_PROD_BOT_TOKEN
-DISCORD_CHANNEL_ALFRED_HQ=REPLACE_WITH_PROD_HQ_CHANNEL_ID
-DISCORD_CHANNEL_PROJ_HYPATIA=REPLACE_WITH_PROD_HYPATIA_CHANNEL_ID
-DISCORD_CHANNEL_ALFRED_QA=REPLACE_WITH_PROD_QA_CHANNEL_ID
-DISCORD_CHANNEL_ALFRED_SELF_DEV=
-DISCORD_CHANNEL_ALFRED_OPS=
-
-DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
-VERTEX_EU_PROJECT_ID=REPLACE_WITH_GCP_EU_PROJECT_ID
-VERTEX_EU_LOCATION=eu"
-
-# 4. Install systemd units & scoped sudoers
-log_info "Installing systemd unit files..."
-run_cmd cp "$OPS_DIR/deploy/alfred-ops.service" /etc/systemd/system/alfred-ops.service
-run_cmd cp "$OPS_DIR/deploy/alfred-prod.service" /etc/systemd/system/alfred-prod.service
-run_cmd cp "$OPS_DIR/deploy/alfred-test.service" /etc/systemd/system/alfred-test.service
-
-log_info "Installing scoped sudoers rules (/etc/sudoers.d/alfred-ops)..."
-run_cmd cp "$OPS_DIR/deploy/alfred-ops.sudoers.example" /etc/sudoers.d/alfred-ops
-run_cmd chmod 0440 /etc/sudoers.d/alfred-ops
-if [[ "$DRY_RUN" != "1" ]]; then
-  visudo -cf /etc/sudoers.d/alfred-ops
-fi
-
-run_cmd systemctl daemon-reload
-run_cmd systemctl enable alfred-ops.service alfred-prod.service
-
-# 5. Start services only if tokens are configured (unless --skip-start or --force-start)
-has_placeholders=0
-for envf in "$OPS_DIR/.env" "$PROD_DIR/.env"; do
-  if [[ -f "$envf" ]] && grep -q 'REPLACE_WITH_' "$envf"; then
-    has_placeholders=1
-  fi
-done
-
-if [[ "$SKIP_START" == "1" ]]; then
-  log_info "Skipping service start (--skip-start)."
-elif [[ "$has_placeholders" == "1" && "$FORCE_START" != "1" ]]; then
-  log_warn "Placeholder values (REPLACE_WITH_*) detected in .env files."
-  log_warn "Fill in real tokens in $OPS_DIR/.env, $OPS_DIR/.env.test, and $PROD_DIR/.env, then run:"
-  log_warn "  sudo systemctl start alfred-ops alfred-prod"
 else
-  log_info "Starting alfred-ops and alfred-prod services..."
-  run_cmd systemctl restart alfred-ops alfred-prod
-  run_cmd su -s /bin/bash "$ALFRED_USER" -c "bash '$OPS_DIR/deploy/check-health.sh'"
+  log_warn "$PROD_DIR/deploy not found yet; skipping systemd & sudoers installation (re-run after git clone)."
 fi
 
-log_info "VPS bootstrap complete."
+# 6. Print remaining manual steps
+cat <<EOF
+
+[vps-bootstrap] Bootstrap complete. Remaining manual steps:
+  1. GitHub SSH key & repository clone as '$ALFRED_USER':
+     sudo -u $ALFRED_USER ssh-keygen -t ed25519 -C "alfred-vps"
+     # Add the public key to GitHub, then clone into $PROD_DIR and $OPS_DIR, and run:
+     #   cd $PROD_DIR && npm ci && npm run build:alfred
+     #   cd $OPS_DIR && npm ci && npm run build:alfred
+     # After cloning, re-run this script once so systemd units & sudoers are installed.
+
+  2. Fill environment secrets in $ETC_ALFRED_DIR/*.env (and/or $PROD_DIR/.env, $OPS_DIR/.env):
+     # Populate DISCORD_BOT_TOKEN, ALLOWED_USER_IDS, DEEPSEEK_API_KEY / VERTEX_EU_*, etc. (chmod 600).
+
+  3. Perform one-time subscription CLI authentication as '$ALFRED_USER' (for enabled CLIs):
+     sudo -u $ALFRED_USER -H claude login
+     sudo -u $ALFRED_USER -H codex login
+     sudo -u $ALFRED_USER -H gemini
+     # Then enable & start services: sudo systemctl enable --now alfred-ops alfred-prod
+EOF

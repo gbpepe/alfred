@@ -9,6 +9,7 @@ import {
   type AlfredAgentDefinition,
   type AlfredAgentsConfig,
 } from './agents-config.js'
+import type { CliProcessRunner } from './cli-runner.js'
 import { runHybridAgentTurn, type ChatMessage, type HybridRouterOutcome } from './model-router.js'
 import { prefixTestReply, resolveAlfredRuntimeEnv } from './runtime-env.js'
 
@@ -121,6 +122,7 @@ export interface HandleDiscordMessageOptions {
   /** Custom sender hook (defaults to Alfred's `getProvider('discord').sendMessage`) */
   sendToDiscord?: DiscordSendFn
   fetchImpl?: typeof fetch
+  cliProcessRunner?: CliProcessRunner
   nowSec?: number
 }
 
@@ -132,7 +134,14 @@ export type HandleDiscordMessageResult =
     agentId: string
     channelId: string
     sentChunks: string[]
-    outcome: Extract<HybridRouterOutcome, { ok: false }>
+    outcome: Extract<HybridRouterOutcome, { ok: false; code: 'BUDGET_EXCEEDED' }>
+  }
+  | {
+    status: 'cli_execution_failed'
+    agentId: string
+    channelId: string
+    sentChunks: string[]
+    outcome: Extract<HybridRouterOutcome, { ok: false; code: 'CLI_EXECUTION_FAILED' }>
   }
   | {
     status: 'replied'
@@ -269,6 +278,7 @@ export async function handleAlfredDiscordMessage(
 
   const sendFn = opts.sendToDiscord ?? createAlfredDiscordSender(envMap)
   const runtimeEnv = resolveAlfredRuntimeEnv(envMap)
+  const pendingQueueNotices: Array<Promise<void>> = []
 
   const outcome = await runHybridAgentTurn({
     db: opts.db,
@@ -279,14 +289,38 @@ export async function handleAlfredDiscordMessage(
     chatId: replyChannelId,
     env: envMap,
     fetchImpl: opts.fetchImpl,
+    cliProcessRunner: opts.cliProcessRunner,
+    onCliQueued: (position) => {
+      const notice = prefixTestReply(
+        `⏳ Sorban állás (${position}. a sorban): jelenleg egy másik CLI feladat fut a szerveren, amint felszabadul, azonnal elindulok.`,
+        runtimeEnv,
+      )
+      const p = Promise.resolve(sendFn(replyChannelId, notice)).catch((err) => {
+        logger.warn({ agentId: agent.id, channelId: replyChannelId, err }, 'Failed to send CLI queue notice to Discord')
+      })
+      pendingQueueNotices.push(p)
+    },
     nowSec: opts.nowSec,
   })
 
+  if (pendingQueueNotices.length > 0) {
+    await Promise.all(pendingQueueNotices)
+  }
+
   if (!outcome.ok) {
-    const outboundBudgetMsg = prefixTestReply(outcome.discordMessage, runtimeEnv)
-    const chunks = splitDiscordMessagePreservingCodeBlocks(outboundBudgetMsg, DISCORD_MAX_CHARS)
+    const outboundErrorMsg = prefixTestReply(outcome.discordMessage, runtimeEnv)
+    const chunks = splitDiscordMessagePreservingCodeBlocks(outboundErrorMsg, DISCORD_MAX_CHARS)
     for (const chunk of chunks) {
       await sendFn(replyChannelId, chunk)
+    }
+    if (outcome.code === 'CLI_EXECUTION_FAILED') {
+      return {
+        status: 'cli_execution_failed',
+        agentId: agent.id,
+        channelId: replyChannelId,
+        sentChunks: chunks,
+        outcome,
+      }
     }
     return {
       status: 'blocked_budget_exceeded',

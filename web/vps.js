@@ -80,6 +80,7 @@
 
       renderRolesGrid(data.roles || [], data.agents || [])
       renderMultiTests(data.multiTests || [])
+      refreshCliProviders()
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
@@ -878,11 +879,69 @@
     }
   }
 
+  async function refreshCliProviders() {
+    const grid = document.getElementById('vpsCliProvidersGrid')
+    const statusEl = document.getElementById('vpsCliProvidersStatus')
+    if (!grid) return
+    try {
+      const data = await apiJson('/api/admin/clis')
+      const clis = data.clis || []
+      grid.innerHTML = clis
+        .map(function (c) {
+          const instBadge = c.installed
+            ? '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#16a34a">' + esc(c.version || 'telepítve') + '</span>'
+            : '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#6b7280">nincs telepítve</span>'
+          const authBadge = c.authConfigured
+            ? '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#2563eb">belépve / auth OK</span>'
+            : '<span style="padding:1px 6px;border-radius:999px;font-size:11px;color:#fff;background:#d97706">nincs belépve</span>'
+          return (
+            '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +
+            '<strong>' + esc(c.provider) + '</strong>' +
+            '<div style="display:flex;gap:4px;flex-wrap:wrap">' + instBadge + authBadge + '</div>' +
+            '</div>' +
+            '<div style="font-size:11px;font-family:monospace;opacity:.8;word-break:break-word">' + esc(c.packageName) + '</div>' +
+            '<div style="font-size:11px;opacity:.7;word-break:break-all">' + esc(c.resolvedPath || c.prefix || '') + '</div>' +
+            '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">' +
+            '<button type="button" class="btn-primary btn-compact" data-cli-action="install" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px">' + (c.installed ? 'Frissítés' : 'Telepítés') + '</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-cli-action="remove" data-cli-id="' + esc(c.id) + '" style="padding:4px 8px;font-size:11px"' + (c.installed ? '' : ' disabled') + '>Eltávolítás</button>' +
+            '</div>' +
+            '</div>'
+          )
+        })
+        .join('')
+
+      grid.querySelectorAll('[data-cli-action]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const action = btn.getAttribute('data-cli-action')
+          const cliId = btn.getAttribute('data-cli-id')
+          if (!action || !cliId) return
+          btn.disabled = true
+          if (statusEl) statusEl.textContent = (action === 'install' ? 'Telepítés / frissítés: ' : 'Eltávolítás: ') + cliId + '...'
+          try {
+            await apiJson('/api/admin/clis/' + encodeURIComponent(cliId) + '/' + action, {
+              method: 'POST',
+              body: '{}',
+            })
+            if (statusEl) statusEl.textContent = cliId + ' ' + (action === 'install' ? 'telepítve / frissítve.' : 'eltávolítva.')
+            await refreshCliProviders()
+          } catch (err) {
+            if (statusEl) statusEl.textContent = 'Hiba (' + cliId + '): ' + err.message
+            btn.disabled = false
+          }
+        })
+      })
+    } catch (err) {
+      if (statusEl) statusEl.textContent = 'CLI állapot lekérdezési hiba: ' + err.message
+    }
+  }
+
   let wired = false
   function wireEvents() {
     if (wired) return
     wired = true
     document.getElementById('vpsOpenApiWizardBtn')?.addEventListener('click', openModelApiWizard)
+    document.getElementById('vpsRefreshClisBtn')?.addEventListener('click', refreshCliProviders)
     document.getElementById('vpsRefreshBtn')?.addEventListener('click', function () {
       refreshVpsStatus()
       refreshVpsLogs()

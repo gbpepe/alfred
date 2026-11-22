@@ -10,7 +10,35 @@ import { agentSpend } from '../costops/agent-budgets.js'
  * - `cache_read` is the cache-hit price per 1M tokens
  * - `output` is the completion (including reasoning) price per 1M tokens
  */
+const CLI_ZERO_COST_MODEL_RE = /^(?:claude|codex|gemini)-cli(?::|$)/i
+
+/**
+ * Returns true when `model` belongs to a subscription-backed CLI provider (`claude-cli`, `codex-cli`, `gemini-cli`),
+ * which is billed at $0 API USD cost while still tracking token counts.
+ */
+export function isZeroCostCliModel(model: string | null | undefined): boolean {
+  return typeof model === 'string' && CLI_ZERO_COST_MODEL_RE.test(model.trim())
+}
+
 export const DEFAULT_TOKEN_PRICES_USD: Record<string, TokenPrice> = {
+  'claude-cli': {
+    input: 0,
+    cache_read: 0,
+    cache_write: 0,
+    output: 0,
+  },
+  'codex-cli': {
+    input: 0,
+    cache_read: 0,
+    cache_write: 0,
+    output: 0,
+  },
+  'gemini-cli': {
+    input: 0,
+    cache_read: 0,
+    cache_write: 0,
+    output: 0,
+  },
   'deepseek-chat': {
     input: 0.27,
     cache_read: 0.07,
@@ -144,6 +172,9 @@ export function globalTokenSpend(
     const o = r.o ?? 0
     const cw = r.cw ?? 0
     const cr = r.cr ?? 0
+    if (isZeroCostCliModel(r.model)) {
+      continue
+    }
     const p = r.model != null && Object.prototype.hasOwnProperty.call(prices, r.model)
       ? prices[r.model]
       : undefined

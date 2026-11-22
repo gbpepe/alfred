@@ -72,3 +72,33 @@ if [[ "$DEPLOY_MODE" == "systemd" ]] && command -v journalctl >/dev/null 2>&1; t
     journalctl -u "$svc" -p err -n 10 --no-pager 2>/dev/null || true
   done
 fi
+
+echo ""
+echo "=== Headless CLI Providers ==="
+cli_runner_js=""
+for candidate in "$PROD_DIR/dist/alfred/cli-runner.js" "$OPS_DIR/dist/alfred/cli-runner.js" "$REPO_ROOT/dist/alfred/cli-runner.js"; do
+  if [[ -f "$candidate" ]]; then
+    cli_runner_js="$candidate"
+    break
+  fi
+done
+
+if [[ -n "$cli_runner_js" ]] && command -v node >/dev/null 2>&1; then
+  CLI_RUNNER_JS="$cli_runner_js" node --input-type=module -e '
+    import { pathToFileURL } from "node:url";
+    const mod = await import(pathToFileURL(process.env.CLI_RUNNER_JS).href);
+    const statuses = await mod.checkCliProvidersHealth({ timeoutMs: 3000 });
+    for (const s of statuses) {
+      const ver = s.version ? ` (${s.version})` : "";
+      console.log(`  - ${s.provider}: installed=${s.installed}${ver} | authConfigured=${s.authConfigured} | bin=${s.binary}`);
+    }
+  ' || true
+else
+  for bin in claude codex gemini; do
+    if path="$(command -v "$bin" 2>/dev/null)"; then
+      echo "  - ${bin}: installed=true | bin=${path}"
+    else
+      echo "  - ${bin}: installed=false"
+    fi
+  done
+fi

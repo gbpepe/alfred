@@ -12,6 +12,8 @@ import {
 
 export * from './agents-config.js'
 export * from './circuit-breaker.js'
+export * from './cli-manager.js'
+export * from './cli-runner.js'
 export * from './tool-executor.js'
 export * from './model-router.js'
 export * from './discord-adapter.js'

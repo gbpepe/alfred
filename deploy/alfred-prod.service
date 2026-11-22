@@ -13,21 +13,24 @@ Environment=NODE_ENV=production
 Environment=ALFRED_ENV=production
 Environment=ALFRED_DB_PATH=store/alfred-prod.db
 Environment=NODE_OPTIONS=--max-old-space-size=384
+Environment=PATH=/home/alfred/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NPM_CONFIG_PREFIX=/home/alfred/.local
 ExecStart=/usr/bin/node /opt/alfred-prod/dist/alfred/run.js
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=15s
 
-# Sized for 2 GB RAM VPS alongside alfred-ops (256M) and on-demand alfred-test (512M)
-MemoryHigh=512M
-MemoryMax=768M
+# Sized for 2 GB RAM VPS alongside alfred-ops (256M) and optional headless CLI child processes
+MemoryHigh=768M
+MemoryMax=1280M
+MemorySwapMax=1G
 CPUQuota=75%
 
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/alfred-prod/store -/opt/alfred-prod/workspaces -/opt/alfred-prod/.claude
+ProtectHome=read-only
+ReadWritePaths=/opt/alfred-prod/store -/opt/alfred-prod/workspaces -/opt/alfred-prod/.claude -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/etc/alfred
 SyslogIdentifier=alfred-prod
 
 [Install]

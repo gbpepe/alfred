@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
@@ -22,9 +23,17 @@ import {
   evaluateCircuitBreaker,
   resolveEffectiveTokenPrices,
 } from '../../alfred/circuit-breaker.js'
+import {
+  CliManagerValidationError,
+  getCliInventory,
+  installOrUpdateCli,
+  removeCli,
+} from '../../alfred/cli-manager.js'
+import { getCliQueueStats } from '../../alfred/cli-runner.js'
 import { runHybridAgentTurn, type ChatMessage } from '../../alfred/model-router.js'
 import { resolveAlfredRuntimeEnv } from '../../alfred/runtime-env.js'
 import { json, readBody } from '../http-helpers.js'
+import { renderAdminDashboardHtml } from './admin-ui.js'
 import type { RouteContext } from './types.js'
 
 const execFileAsync = promisify(execFile)
@@ -265,8 +274,154 @@ function resolveEnvSpecById(envId: string): VpsEnvSpec | undefined {
   return resolveVpsEnvSpecs().find((s) => s.id === envId)
 }
 
+function safeTokenEquals(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a, 'utf8').digest()
+  const hb = createHash('sha256').update(b, 'utf8').digest()
+  return timingSafeEqual(ha, hb)
+}
+
+function authorizeAdminCliRequest(
+  ctx: RouteContext,
+  envMap: Record<string, string | undefined>,
+): { ok: true } | { ok: false; status: 401 | 403; error: string } {
+  if (mayActAsOwner(ctx.auth, ctx.req) || (ctx.auth?.kind === 'token' && !ctx.auth.tokenAgent)) {
+    return { ok: true }
+  }
+
+  const expectedToken = (envMap['DASHBOARD_TOKEN'] ?? process.env['DASHBOARD_TOKEN'] ?? '').trim()
+  if (expectedToken) {
+    const authHeader = typeof ctx.req.headers['authorization'] === 'string' ? ctx.req.headers['authorization'].trim() : ''
+    const bearerMatch = /^Bearer\s+(.+)$/i.exec(authHeader)
+    const xDashToken = typeof ctx.req.headers['x-dashboard-token'] === 'string' ? ctx.req.headers['x-dashboard-token'].trim() : ''
+    const provided = (bearerMatch?.[1] ?? xDashToken).trim()
+    if (provided && safeTokenEquals(provided, expectedToken)) {
+      return { ok: true }
+    }
+  }
+
+  if (ctx.auth) {
+    return { ok: false, status: 403, error: 'Forbidden: DASHBOARD_TOKEN or owner session required' }
+  }
+  return { ok: false, status: 401, error: 'Unauthorized: DASHBOARD_TOKEN or owner session required' }
+}
+
 export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   const { req, res, path, method, url } = ctx
+
+  if ((path === '/admin' || path === '/admin/') && method === 'GET') {
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+    res.end(renderAdminDashboardHtml())
+    return true
+  }
+
+  if (path === '/api/admin/overview' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    const specs = resolveVpsEnvSpecs()
+    const targetSpec = specs.find((s) => s.id === 'prod') ?? specs[0]
+    const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false })
+    const diskSummary = await getDiskSummary()
+    const sys = getSystemMetrics()
+    sys.diskSummary = diskSummary
+    const costs = targetSpec && cfg
+      ? readAgentCostsForEnv(targetSpec, cfg.agents, cfg.global.dailyBudgetUsd)
+      : null
+    const spendByAgent = new Map<string, number>((costs?.agents ?? []).map((a) => [a.id, a.spendUsd]))
+
+    json(res, {
+      ok: true,
+      system: sys,
+      cliQueue: getCliQueueStats(),
+      global: cfg
+        ? {
+            dailyBudgetUsd: cfg.global.dailyBudgetUsd,
+            defaultProvider: cfg.global.defaultProvider,
+            defaultModel: cfg.global.defaultModel,
+            runtimeMode: cfg.global.runtimeMode,
+          }
+        : null,
+      costs: costs ?? {
+        globalSpendUsd: 0,
+        globalBudgetUsd: cfg?.global.dailyBudgetUsd ?? 0,
+        agents: [],
+      },
+      agents: (cfg?.agents ?? []).map((a) => ({
+        id: a.id,
+        displayName: a.displayName,
+        channelName: a.channelName,
+        role: a.role ?? null,
+        provider: a.provider,
+        model: a.model,
+        fallback: a.fallback ?? null,
+        cliTimeoutMs: a.cliTimeoutMs ?? null,
+        dailyBudgetUsd: a.dailyBudgetUsd,
+        spendUsd: spendByAgent.get(a.id) ?? 0,
+        tools: a.tools,
+      })),
+    })
+    return true
+  }
+
+  if (path === '/api/admin/clis' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    const clis = await getCliInventory({ env })
+    json(res, { ok: true, clis })
+    return true
+  }
+
+  const cliInstallMatch = /^\/api\/admin\/clis\/([^/]+)\/install$/.exec(path)
+  if (cliInstallMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const result = await installOrUpdateCli(decodeURIComponent(cliInstallMatch[1]), { env })
+      const clis = await getCliInventory({ env })
+      json(res, { ok: true, result, clis })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
+
+  const cliRemoveMatch = /^\/api\/admin\/clis\/([^/]+)\/remove$/.exec(path)
+  if (cliRemoveMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const body = await readJsonBody<{ purgeAuth?: boolean }>(req).catch(() => ({ purgeAuth: false }))
+      const result = await removeCli(decodeURIComponent(cliRemoveMatch[1]), {
+        env,
+        purgeAuth: Boolean(body?.purgeAuth),
+      })
+      const clis = await getCliInventory({ env })
+      json(res, { ok: true, result, clis })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, err instanceof CliManagerValidationError ? 400 : 500)
+    }
+    return true
+  }
 
   if (path === '/api/vps/status' && method === 'GET') {
     const specs = resolveVpsEnvSpecs()

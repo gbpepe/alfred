@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSyn
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { AlfredAgentDefinition, AllowedToolName } from './agents-config.js'
+import { getCliInventory, installOrUpdateCli, removeCli } from './cli-manager.js'
+import type { CliProcessRunner } from './cli-runner.js'
 
 export interface OpenAiToolSchema {
   type: 'function'
@@ -112,6 +114,33 @@ export const TOOL_SCHEMAS: Record<AllowedToolName, OpenAiToolSchema> = {
             type: 'string',
             enum: ['hot', 'warm', 'cold'],
             description: 'Memory tier (default: "warm"). Never "shared" to preserve strict namespace isolation.',
+          },
+        },
+        required: ['action'],
+      },
+    },
+  },
+  cli_manage: {
+    type: 'function',
+    function: {
+      name: 'cli_manage',
+      description: 'Inspect, install, update, or remove user-level headless CLIs (claude, codex, gemini). Restricted to alfred-ops.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['status', 'install', 'update', 'remove'],
+            description: 'CLI lifecycle operation: status, install, update, or remove.',
+          },
+          provider: {
+            type: 'string',
+            enum: ['claude', 'codex', 'gemini'],
+            description: 'Target CLI provider (required for install, update, and remove).',
+          },
+          purgeAuth: {
+            type: 'boolean',
+            description: 'Only for action="remove": also delete local auth/config directory (default: false).',
           },
         },
         required: ['action'],
@@ -1016,5 +1045,65 @@ const BASH_MUTATING_HINT_RE =
                     if (rows.length === 0) return '(no memories stored in namespace)'
                     return rows.map((r) => `[#${r.id} ${r.category}] ${r.content}`).join('\n')
                   }
+
+                  case 'cli_manage': {
+                    if (ctx.agent.id !== 'alfred-ops') {
+                      throw new ToolNotAllowedError(
+                        ctx.agent.id,
+                        toolName,
+                        allowedTools.filter((t) => t !== 'cli_manage'),
+                      )
+                    }
+                    throw new Error('cli_manage is asynchronous; invoke executeWhitelistedToolAsync()')
+                  }
                 }
               }
+
+/**
+ * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`).
+ * Strictly enforces that `cli_manage` can only be executed by `alfred-ops`.
+ */
+export async function executeWhitelistedToolAsync(
+  ctx: ExecuteToolContext,
+  toolName: string,
+  rawArgs: Record<string, unknown>,
+  opts?: { env?: Record<string, string | undefined>; processRunner?: CliProcessRunner },
+): Promise<string> {
+  const allowedTools = ctx.agent.tools
+  if (!allowedTools.includes(toolName as AllowedToolName)) {
+    throw new ToolNotAllowedError(ctx.agent.id, toolName, allowedTools)
+  }
+
+  if (toolName === 'cli_manage') {
+    if (ctx.agent.id !== 'alfred-ops') {
+      throw new ToolNotAllowedError(
+        ctx.agent.id,
+        toolName,
+        allowedTools.filter((t) => t !== 'cli_manage'),
+      )
+    }
+
+    const action = typeof rawArgs.action === 'string' ? rawArgs.action.trim().toLowerCase() : 'status'
+    if (action === 'status') {
+      const clis = await getCliInventory({ env: opts?.env, processRunner: opts?.processRunner })
+      return JSON.stringify({ ok: true, clis }, null, 2)
+    }
+    if (action === 'install' || action === 'update') {
+      const provider = typeof rawArgs.provider === 'string' ? rawArgs.provider : ''
+      const result = await installOrUpdateCli(provider, { env: opts?.env, processRunner: opts?.processRunner })
+      return JSON.stringify(result, null, 2)
+    }
+    if (action === 'remove') {
+      const provider = typeof rawArgs.provider === 'string' ? rawArgs.provider : ''
+      const result = await removeCli(provider, {
+        purgeAuth: rawArgs.purgeAuth === true,
+        env: opts?.env,
+        processRunner: opts?.processRunner,
+      })
+      return JSON.stringify(result, null, 2)
+    }
+    throw new Error(`cli_manage: unsupported action "${action}". Allowed: status, install, update, remove`)
+  }
+
+  return executeWhitelistedTool(ctx, toolName, rawArgs)
+}

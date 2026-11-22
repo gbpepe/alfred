@@ -92,7 +92,7 @@ describe('Alfred Core (feat/alfred-core)', () => {
         expect(selfCoder.resolvedSystemPrompt).toContain('Alfred Self-Coder')
 
         expect(ops.discordChannelId).toBe('5555555555555555555')
-        expect(ops.tools).toEqual(['bash', 'fs_read', 'memory'])
+        expect(ops.tools).toEqual(['bash', 'fs_read', 'memory', 'cli_manage'])
         expect(ops.allowedBashCommands).toHaveLength(6)
         expect(ops.soulFile).toBe('agents/alfred-ops/SOUL.md')
         expect(ops.resolvedSystemPrompt).toContain('Alfred Ops')
@@ -484,6 +484,7 @@ describe('Alfred Core (feat/alfred-core)', () => {
         expect(outcome.ok).toBe(false)
         if (outcome.ok) return
         expect(outcome.code).toBe('BUDGET_EXCEEDED')
+        if (outcome.code !== 'BUDGET_EXCEEDED') return
         expect(outcome.evaluation.reason).toBe('agent_daily_limit')
         expect(outcome.discordMessage).toContain('BUDGET_EXCEEDED')
         expect(outcome.discordMessage).toContain('alfred-architect')
@@ -548,6 +549,7 @@ describe('Alfred Core (feat/alfred-core)', () => {
         expect(outcome.ok).toBe(false)
         if (outcome.ok) return
         expect(outcome.code).toBe('BUDGET_EXCEEDED')
+        if (outcome.code !== 'BUDGET_EXCEEDED') return
         expect(outcome.evaluation.reason).toBe('global_daily_limit')
       })
     })

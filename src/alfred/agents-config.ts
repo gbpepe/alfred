@@ -5,7 +5,25 @@ import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import { resolveAlfredRuntimeEnv, type AlfredRuntimeMode } from './runtime-env.js'
 
-export type AlfredProviderName = 'deepseek' | 'vertex-eu' | 'xai' | 'openai' | 'gemini'
+export type AlfredCliProviderName = 'claude-cli' | 'codex-cli' | 'gemini-cli'
+
+export type AlfredProviderName =
+  | 'deepseek'
+  | 'vertex-eu'
+  | 'xai'
+  | 'openai'
+  | 'gemini'
+  | AlfredCliProviderName
+
+export const CLI_PROVIDERS: ReadonlySet<AlfredCliProviderName> = new Set<AlfredCliProviderName>([
+  'claude-cli',
+  'codex-cli',
+  'gemini-cli',
+])
+
+export function isCliProvider(provider: string): provider is AlfredCliProviderName {
+  return CLI_PROVIDERS.has(provider as AlfredCliProviderName)
+}
 
 export const ALLOWED_PROVIDERS: ReadonlySet<AlfredProviderName> = new Set<AlfredProviderName>([
   'deepseek',
@@ -13,7 +31,15 @@ export const ALLOWED_PROVIDERS: ReadonlySet<AlfredProviderName> = new Set<Alfred
   'xai',
   'openai',
   'gemini',
+  'claude-cli',
+  'codex-cli',
+  'gemini-cli',
 ])
+
+export interface AlfredFallbackConfig {
+  provider: AlfredProviderName
+  model: string
+}
 
 export type AlfredRoleId = 'tervezo' | 'technikus' | 'szakmunkas' | 'segedmunkas'
 
@@ -74,7 +100,7 @@ const DEFAULT_ROLES: Record<AlfredRoleId, AlfredRoleDefinition> = {
   },
 }
 
-export type AllowedToolName = 'bash' | 'fs_read' | 'fs_write' | 'git' | 'memory'
+export type AllowedToolName = 'bash' | 'fs_read' | 'fs_write' | 'git' | 'memory' | 'cli_manage'
 
 export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'bash',
@@ -82,12 +108,14 @@ export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedTool
   'fs_write',
   'git',
   'memory',
+  'cli_manage',
 ])
 
 const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'bash',
   'fs_write',
   'git',
+  'cli_manage',
 ])
 
 export interface AlfredAgentDefinition {
@@ -114,6 +142,12 @@ export interface AlfredAgentDefinition {
   bashTimeoutMs?: number
   /** Optional per-agent override for max tool-loop iterations in model-router.ts */
   maxToolIterations?: number
+  /** Optional CLI execution timeout in milliseconds (default: ALFRED_CLI_TIMEOUT_MS or 300_000) */
+  cliTimeoutMs?: number
+  /** Optional per-agent CLI profile/auth directory (maps to CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME) */
+  cliConfigDir?: string
+  /** Optional explicit fallback provider/model on CLI execution failure (fail-closed when undefined) */
+  fallback?: AlfredFallbackConfig
   /** Optional relative path to the agent's SOUL.md file (loaded as stable system prompt prefix for caching) */
   soulFile?: string
   /** Optional list of global skill IDs (loaded from skills/<id>/SKILL.md) */
@@ -399,9 +433,10 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
       throw new Error(`agents[${idx}] (${id}): unsupported provider "${String(provider)}". Allowed: ${[...ALLOWED_PROVIDERS].join(', ')}`)
     }
 
-    const model = typeof a.model === 'string' && a.model.trim()
-      ? a.model.trim()
-      : (roleDef?.model ?? defaultModel)
+    const explicitModel = typeof a.model === 'string' && a.model.trim() ? a.model.trim() : undefined
+    const model =
+      explicitModel ??
+      (isCliProvider(provider) && roleDef?.provider !== provider ? 'default' : (roleDef?.model ?? defaultModel))
     const displayName = typeof a.displayName === 'string' && a.displayName.trim() ? a.displayName.trim() : id
     const channelName = typeof a.channelName === 'string' && a.channelName.trim() ? a.channelName.trim() : `#${id}`
     const rawChannelId = typeof a.discordChannelId === 'string' ? a.discordChannelId.trim() : ''
@@ -478,6 +513,50 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
           throw new Error(`agents[${idx}] (${id}): "maxToolIterations" must be an integer between 1 and 50`)
         }
         maxToolIterations = a.maxToolIterations
+      }
+
+      let cliTimeoutMs: number | undefined
+      if (a.cliTimeoutMs !== undefined) {
+        if (typeof a.cliTimeoutMs !== 'number' || !Number.isInteger(a.cliTimeoutMs) || a.cliTimeoutMs < 5_000 || a.cliTimeoutMs > 1_800_000) {
+          throw new Error(`agents[${idx}] (${id}): "cliTimeoutMs" must be an integer between 5000 and 1800000`)
+        }
+        cliTimeoutMs = a.cliTimeoutMs
+      }
+
+      let cliConfigDir: string | undefined
+      if (a.cliConfigDir !== undefined) {
+        if (typeof a.cliConfigDir !== 'string') {
+          throw new Error(`agents[${idx}] (${id}): "cliConfigDir" must be a string`)
+        }
+        const interpolatedDir = interpolateEnvPlaceholders(a.cliConfigDir, envMap).trim()
+        if (interpolatedDir) {
+          if (/[\x00-\x1f\x7f]/.test(interpolatedDir)) {
+            throw new Error(`agents[${idx}] (${id}): "cliConfigDir" contains invalid control characters`)
+          }
+          cliConfigDir = interpolatedDir
+        }
+      }
+
+      let fallback: AlfredFallbackConfig | undefined
+      if (a.fallback !== undefined) {
+        if (!a.fallback || typeof a.fallback !== 'object' || Array.isArray(a.fallback)) {
+          throw new Error(`agents[${idx}] (${id}): "fallback" must be an object with { provider, model }`)
+        }
+        const fb = a.fallback as Record<string, unknown>
+        const fbProvider = typeof fb.provider === 'string' ? fb.provider.trim() : ''
+        if (!ALLOWED_PROVIDERS.has(fbProvider as AlfredProviderName)) {
+          throw new Error(
+            `agents[${idx}] (${id}): unsupported fallback.provider "${fbProvider}". Allowed: ${[...ALLOWED_PROVIDERS].join(', ')}`,
+          )
+        }
+        const fbModel = typeof fb.model === 'string' ? fb.model.trim() : ''
+        if (!fbModel) {
+          throw new Error(`agents[${idx}] (${id}): "fallback.model" must be a non-empty string`)
+        }
+        fallback = {
+          provider: fbProvider as AlfredProviderName,
+          model: fbModel,
+        }
       }
 
       const rawWs = typeof a.workspace === 'string' && a.workspace.trim() ? a.workspace.trim() : undefined
@@ -570,6 +649,9 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
         ...(allowedBashCommands !== undefined ? { allowedBashCommands } : {}),
         ...(bashTimeoutMs !== undefined ? { bashTimeoutMs } : {}),
         ...(maxToolIterations !== undefined ? { maxToolIterations } : {}),
+        ...(cliTimeoutMs !== undefined ? { cliTimeoutMs } : {}),
+        ...(cliConfigDir !== undefined ? { cliConfigDir } : {}),
+        ...(fallback !== undefined ? { fallback } : {}),
         soulFile,
         ...(skills && skills.length > 0 ? { skills } : {}),
         systemPrompt,

@@ -2319,6 +2319,18 @@
         <div id="vpsModelCatalogStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
       </div>
 
+      <div id="vpsCliProvidersCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div>
+            <strong>CLI Szolgáltatók</strong>
+            <span style="font-size:12px;opacity:.7;margin-left:8px">Előfizetéses headless CLI-k (sudo nélkül, user prefixbe)</span>
+          </div>
+          <button class="btn-secondary btn-compact" id="vpsRefreshClisBtn">Állapot frissítése</button>
+        </div>
+        <div id="vpsCliProvidersGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px"></div>
+        <div id="vpsCliProvidersStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
+      </div>
+
       <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <strong>Ops műveletek</strong>

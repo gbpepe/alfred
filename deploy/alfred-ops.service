@@ -14,6 +14,8 @@ Environment=ALFRED_ENV=ops
 Environment=ALFRED_ENABLED_AGENTS=alfred-ops
 Environment=ALFRED_DB_PATH=store/alfred-ops.db
 Environment=NODE_OPTIONS=--max-old-space-size=128
+Environment=PATH=/home/alfred/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NPM_CONFIG_PREFIX=/home/alfred/.local
 ExecStart=/usr/bin/node /opt/alfred-ops/dist/alfred/run.js
 Restart=on-failure
 RestartSec=5s
@@ -28,7 +30,8 @@ CPUQuota=50%
 # `sudo systemctl` on alfred-test / alfred-prod as defined in `deploy/alfred-ops.sudoers.example`.
 PrivateTmp=true
 ProtectSystem=full
-ProtectHome=true
+ProtectHome=read-only
+ReadWritePaths=/opt/alfred-ops/store -/opt/alfred-ops/.claude -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/etc/alfred
 SyslogIdentifier=alfred-ops
 
 [Install]

@@ -3,7 +3,13 @@ import { dirname } from 'node:path'
 import { initDatabase, getDb } from '../db.js'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
-import { AlfredDiscordGateway, bootAlfredCore, resolveAlfredRuntimeEnv } from './index.js'
+import {
+  AlfredDiscordGateway,
+  bootAlfredCore,
+  checkCliProvidersHealth,
+  isCliProvider,
+  resolveAlfredRuntimeEnv,
+} from './index.js'
 import { startTestSimulatorServer } from './test-simulator.js'
 
 function sanitizeStartupError(err: unknown): string {
@@ -29,6 +35,29 @@ async function main(): Promise<void> {
   if (!cfg) {
     logger.error('Alfred Core bootstrap failed; check ALFRED_AGENTS_CONFIG and SOUL.md paths')
     process.exit(1)
+  }
+
+  try {
+    const cliHealth = await checkCliProvidersHealth({ env, timeoutMs: 3_000 })
+    logger.info({ cliProviders: cliHealth }, 'Headless CLI providers pre-flight health check')
+    for (const ag of cfg.agents) {
+      if (!isCliProvider(ag.provider)) continue
+      const status = cliHealth.find((h) => h.provider === ag.provider)
+      if (status && (!status.installed || !status.authConfigured)) {
+        logger.warn(
+          {
+            agentId: ag.id,
+            provider: ag.provider,
+            installed: status.installed,
+            authConfigured: status.authConfigured,
+            binary: status.binary,
+          },
+          'Configured CLI provider for agent is missing binary or authentication',
+        )
+      }
+    }
+  } catch (err) {
+    logger.warn({ err: sanitizeStartupError(err) }, 'Headless CLI pre-flight health check failed')
   }
 
   const simPortRaw = (env['ALFRED_SIM_PORT'] ?? '').trim()
