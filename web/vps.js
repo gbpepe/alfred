@@ -238,7 +238,21 @@
     } catch { /* ignore */ }
   }
 
+  const API_PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
+
   const PROVIDER_MODELS = {
+    'claude-cli': ['default', 'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5'],
+    'codex-cli': ['default', 'gpt-5-codex', 'o3', 'o4-mini', 'gpt-4.1'],
+    'agy-cli': [
+      'default',
+      'gemini-4-neon-high',
+      'gemini-4-neon-medium',
+      'gemini-4-argon-high',
+      'gemini-4-argon-medium',
+      'gemini-4-hydrogen-high',
+      'gemini-3.8-flash-high',
+    ],
+    'gemini-cli': ['default', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     deepseek: ['deepseek-chat', 'deepseek-reasoner'],
     'vertex-eu': ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
     gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
@@ -275,7 +289,7 @@
         : 'Még nem volt API szinkron (alapértelmezett lista)'
     }
     if (!grid || !vpsModelCatalogCache) return
-    grid.innerHTML = PROVIDER_OPTIONS.map(function (p) {
+    grid.innerHTML = API_PROVIDER_OPTIONS.map(function (p) {
       const info = vpsModelCatalogCache[p] || { configured: false, models: PROVIDER_MODELS[p] || [] }
       const meta = CATALOG_PROVIDER_META[p] || { key: '', placeholder: 'API kulcs...', secret: true }
       const badge = info.configured
@@ -691,7 +705,17 @@
     }
   }
 
-  const PROVIDER_OPTIONS = ['deepseek', 'vertex-eu', 'gemini', 'xai', 'openai']
+  const PROVIDER_OPTIONS = [
+    'claude-cli',
+    'codex-cli',
+    'agy-cli',
+    'gemini-cli',
+    'deepseek',
+    'vertex-eu',
+    'gemini',
+    'xai',
+    'openai',
+  ]
 
   function renderRolesGrid(roles, agents) {
     const grid = document.getElementById('vpsRolesGrid')

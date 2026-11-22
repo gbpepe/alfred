@@ -33,12 +33,20 @@ import {
   installOrUpdateCli,
   logoutCli,
   removeCli,
+   resolveCliBinPath,
+  resolveCliNpmPrefix,
   saveCliCredentials,
   startCliLogin,
   submitCliLoginCode,
   testCliConnection,
 } from '../../alfred/cli-manager.js'
-import { getCliQueueStats } from '../../alfred/cli-runner.js'
+import {
+  buildSanitizedCliEnv,
+  detectCliAuthStatus,
+  getCliQueueStats,
+  resolveCliBinary,
+  spawnCliProcess,
+} from '../../alfred/cli-runner.js'
 import {
   callDeepSeekProvider,
   callOpenAiCompatibleProvider,
@@ -2188,6 +2196,18 @@ interface StoredModelCatalog {
 }
 
 const DEFAULT_PROVIDER_MODELS: Record<string, string[]> = {
+  'claude-cli': ['default', 'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5'],
+  'codex-cli': ['default', 'gpt-5-codex', 'o3', 'o4-mini', 'gpt-4.1'],
+  'agy-cli': [
+    'default',
+    'gemini-4-neon-high',
+    'gemini-4-neon-medium',
+    'gemini-4-argon-high',
+    'gemini-4-argon-medium',
+    'gemini-4-hydrogen-high',
+    'gemini-3.8-flash-high',
+  ],
+  'gemini-cli': ['default', 'gemini-2.5-pro', 'gemini-2.5-flash'],
   deepseek: ['deepseek-chat', 'deepseek-reasoner'],
   'vertex-eu': ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
   gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
@@ -2209,6 +2229,9 @@ function readModelCatalog(filePath: string): StoredModelCatalog | null {
 }
 
 function isProviderConfigured(provider: string, env: Record<string, string | undefined>): boolean {
+  if (provider === 'claude-cli' || provider === 'codex-cli' || provider === 'gemini-cli' || provider === 'agy-cli') {
+    return detectCliAuthStatus(provider, env).method !== 'none'
+  }
   if (provider === 'deepseek') return Boolean(env['DEEPSEEK_API_KEY']?.trim())
   if (provider === 'openai') return Boolean(env['OPENAI_API_KEY']?.trim())
   if (provider === 'xai') return Boolean(env['XAI_API_KEY']?.trim())
@@ -2275,6 +2298,27 @@ async function syncAllProviderModels(env: Record<string, string | undefined>): P
           providers[p] = { models: list.length ? list : DEFAULT_PROVIDER_MODELS['gemini'] }
         } else if (p === 'vertex-eu') {
           providers[p] = { models: DEFAULT_PROVIDER_MODELS['vertex-eu'] }
+        } else if (p === 'agy-cli') {
+          const prefix = resolveCliNpmPrefix(env)
+          const agyBin = resolveCliBinPath(prefix, 'agy') ?? resolveCliBinary('agy-cli', env)
+          const res = await spawnCliProcess({
+            command: agyBin,
+            args: ['models'],
+            cwd: process.cwd(),
+            env: buildSanitizedCliEnv('agy-cli', env),
+            timeoutMs: 8_000,
+            killGraceMs: 1_000,
+            maxOutputBytes: 64_000,
+          })
+          const parsedIds = (res.stdout || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim().split(/\s+/)[0] ?? '')
+            .filter((tok) => /^[a-z0-9][a-z0-9._-]+$/i.test(tok) && !tok.toLowerCase().startsWith('fetching'))
+          providers[p] = {
+            models: parsedIds.length > 0 ? ['default', ...parsedIds.filter((x) => x !== 'default')] : DEFAULT_PROVIDER_MODELS['agy-cli'],
+          }
+        } else {
+          providers[p] = { models: DEFAULT_PROVIDER_MODELS[p] ?? ['default'] }
         }
       } catch (err) {
         providers[p] = {

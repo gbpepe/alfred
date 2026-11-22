@@ -48,6 +48,16 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await expect(page.locator('#vpsModelCatalogGrid [data-api-test]')).toHaveCount(5, { timeout: 20_000 })
 
     await page.screenshot({ path: 'test-results/staging-providers-page.png', fullPage: true })
+
+    // Also verify the Agents page (#agents) role & global provider dropdowns include the 4 CLI providers
+    await page.goto(buildTargetUrl('agents'), { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#vpsRolesGrid')).toBeVisible({ timeout: 20_000 })
+    const firstRoleProvSel = page.locator('#vpsRolesGrid [data-role-provider]').first()
+    await expect(firstRoleProvSel).toBeVisible({ timeout: 15_000 })
+    for (const cliProv of ['claude-cli', 'codex-cli', 'agy-cli', 'gemini-cli']) {
+      await expect(firstRoleProvSel.locator(`option[value="${cliProv}"]`)).toHaveCount(1)
+    }
+
     expect(pageErrors).toEqual([])
   })
 
@@ -113,89 +123,89 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
         await testBtn.click()
         const resultEl = card.locator(`[data-cli-test-result="${cliId}"]`)
         await expect(resultEl).toBeVisible({ timeout: 45_000 })
-        if (cliId === 'claude' || cliId === 'codex' || cliId === 'agy') {
-          await expect(resultEl).toContainText('✓ Kapcsolat OK', { timeout: 45_000 })
-        } else {
-          // Wait until "tesztelése (ping)..." resolves to either ✓ Kapcsolat OK or a detailed provider error
-          await expect(resultEl).toContainText(/✓ Kapcsolat OK|✕ Hiba \(\d+ ms\)/, { timeout: 45_000 })
-        }
-        continue
-      }
-
-      const toggleBtn = page.locator(`[data-cli-auth-toggle="${cliId}"]`)
-      await toggleBtn.click()
-
-      const drawer = page.locator(`[data-cli-auth-drawer="${cliId}"]`)
-      await expect(drawer).toBeVisible()
-
-      const startBtn = drawer.locator(`[data-cli-oauth-start="${cliId}"]`)
-      if (await startBtn.isDisabled()) {
-        // If agy-cli is not yet installed on staging, actually click Telepítés and verify install succeeds!
-        if (cliId === 'agy') {
-          await toggleBtn.click()
-          const installBtn = card.locator('[data-cli-action="install"][data-cli-id="agy"]')
-          await installBtn.click()
-          await expect(card.locator('[data-cli-action="install"][data-cli-id="agy"]')).toHaveText('Frissítés', {
-            timeout: 120_000,
-          })
-          await expect(card.locator('[data-cli-test="agy"]')).toBeEnabled()
-          await page.locator('[data-cli-auth-toggle="agy"]').click()
-          await expect(page.locator('[data-cli-auth-drawer="agy"]')).toBeVisible()
-        } else {
-          await toggleBtn.click()
+          if (cliId === 'claude' || cliId === 'codex' || cliId === 'agy') {
+            await expect(resultEl).toContainText('✓ Kapcsolat OK', { timeout: 45_000 })
+          } else {
+            // Wait until "tesztelése (ping)..." resolves to either ✓ Kapcsolat OK or a detailed provider error
+            await expect(resultEl).toContainText(/✓ Kapcsolat OK|✕ Hiba \(\d+ ms\)/, { timeout: 45_000 })
+          }
           continue
         }
+
+        const toggleBtn = page.locator(`[data-cli-auth-toggle="${cliId}"]`)
+        await toggleBtn.click()
+
+        const drawer = page.locator(`[data-cli-auth-drawer="${cliId}"]`)
+        await expect(drawer).toBeVisible()
+
+        const startBtn = drawer.locator(`[data-cli-oauth-start="${cliId}"]`)
+        if (await startBtn.isDisabled()) {
+          // If agy-cli is not yet installed on staging, actually click Telepítés and verify install succeeds!
+          if (cliId === 'agy') {
+            await toggleBtn.click()
+            const installBtn = card.locator('[data-cli-action="install"][data-cli-id="agy"]')
+            await installBtn.click()
+            await expect(card.locator('[data-cli-action="install"][data-cli-id="agy"]')).toHaveText('Frissítés', {
+              timeout: 120_000,
+            })
+            await expect(card.locator('[data-cli-test="agy"]')).toBeEnabled()
+            await page.locator('[data-cli-auth-toggle="agy"]').click()
+            await expect(page.locator('[data-cli-auth-drawer="agy"]')).toBeVisible()
+          } else {
+            await toggleBtn.click()
+            continue
+          }
+        }
+
+        const activeDrawer = page.locator(`[data-cli-auth-drawer="${cliId}"]`)
+        const activeStartBtn = activeDrawer.locator(`[data-cli-oauth-start="${cliId}"]`)
+        await activeStartBtn.click()
+
+        const loginBox = activeDrawer.locator(`[data-cli-login-box="${cliId}"]`)
+        await expect(loginBox).toBeVisible({ timeout: 15_000 })
+
+        const oauthLink = loginBox.locator('a', { hasText: 'OAuth oldal megnyitása' })
+        await expect(oauthLink).toBeVisible({ timeout: 20_000 })
+        const href = await oauthLink.getAttribute('href')
+        expect(href).toMatch(/^https:\/\//)
+
+        if (cliId === 'codex') {
+          await expect(loginBox).toContainText('Eszközkód:')
+        } else {
+          await expect(loginBox.locator(`[data-cli-login-code-inp="${cliId}"]`)).toBeVisible()
+        }
+
+        const cancelBtn = loginBox.locator(`[data-cli-login-cancel="${cliId}"]`)
+        await expect(cancelBtn).toBeVisible()
+        await cancelBtn.click()
+        await expect(loginBox).toBeHidden({ timeout: 10_000 })
+
+        await page.locator(`[data-cli-auth-toggle="${cliId}"]`).click()
+        await expect(activeDrawer).toBeHidden()
       }
 
-      const activeDrawer = page.locator(`[data-cli-auth-drawer="${cliId}"]`)
-      const activeStartBtn = activeDrawer.locator(`[data-cli-oauth-start="${cliId}"]`)
-      await activeStartBtn.click()
+      // Verify Enterprise-only notice on gemini-cli card pointing individual users to agy-cli
+      const geminiCard = page.locator('#vpsCliProvidersGrid > div').filter({
+        has: page.locator('[data-cli-auth-toggle="gemini"]'),
+      })
+      await expect(geminiCard).toContainText('Enterprise')
+      await expect(geminiCard).toContainText('agy-cli')
 
-      const loginBox = activeDrawer.locator(`[data-cli-login-box="${cliId}"]`)
-      await expect(loginBox).toBeVisible({ timeout: 15_000 })
-
-      const oauthLink = loginBox.locator('a', { hasText: 'OAuth oldal megnyitása' })
-      await expect(oauthLink).toBeVisible({ timeout: 20_000 })
-      const href = await oauthLink.getAttribute('href')
-      expect(href).toMatch(/^https:\/\//)
-
-      if (cliId === 'codex') {
-        await expect(loginBox).toContainText('Eszközkód:')
-      } else {
-        await expect(loginBox.locator(`[data-cli-login-code-inp="${cliId}"]`)).toBeVisible()
+      // Verify live quota button + auto-loaded quota strip on Claude card when OAuth is active
+      await expect(page.locator('[data-cli-quota-btn="claude"]')).toBeVisible()
+      await expect(page.locator('[data-cli-quota-btn="codex"]')).toBeVisible()
+      const claudeCard = page.locator('#vpsCliProvidersGrid > div').filter({
+        has: page.locator('[data-cli-auth-toggle="claude"]'),
+      })
+      if ((await claudeCard.getByText('OAuth előfizetés OK').count()) > 0) {
+        const quotaBox = claudeCard.locator('[data-cli-quota-box="claude"]')
+        await expect(quotaBox).toBeVisible({ timeout: 15_000 })
+        await expect(quotaBox).toContainText(/szabad|ablak|Kvóta/, { timeout: 15_000 })
       }
 
-      const cancelBtn = loginBox.locator(`[data-cli-login-cancel="${cliId}"]`)
-      await expect(cancelBtn).toBeVisible()
-      await cancelBtn.click()
-      await expect(loginBox).toBeHidden({ timeout: 10_000 })
-
-      await page.locator(`[data-cli-auth-toggle="${cliId}"]`).click()
-      await expect(activeDrawer).toBeHidden()
-    }
-
-    // Verify Enterprise-only notice on gemini-cli card pointing individual users to agy-cli
-    const geminiCard = page.locator('#vpsCliProvidersGrid > div').filter({
-      has: page.locator('[data-cli-auth-toggle="gemini"]'),
+      expect(pageErrors).toEqual([])
+      expect(failedCliApi).toEqual([])
     })
-    await expect(geminiCard).toContainText('Enterprise')
-    await expect(geminiCard).toContainText('agy-cli')
-
-    // Verify live quota button + auto-loaded quota strip on Claude card when OAuth is active
-    await expect(page.locator('[data-cli-quota-btn="claude"]')).toBeVisible()
-    await expect(page.locator('[data-cli-quota-btn="codex"]')).toBeVisible()
-    const claudeCard = page.locator('#vpsCliProvidersGrid > div').filter({
-      has: page.locator('[data-cli-auth-toggle="claude"]'),
-    })
-    if ((await claudeCard.getByText('OAuth előfizetés OK').count()) > 0) {
-      const quotaBox = claudeCard.locator('[data-cli-quota-box="claude"]')
-      await expect(quotaBox).toBeVisible({ timeout: 15_000 })
-      await expect(quotaBox).toContainText(/szabad|ablak|Kvóta/, { timeout: 15_000 })
-    }
-
-    expect(pageErrors).toEqual([])
-    expect(failedCliApi).toEqual([])
-  })
 
   test('rejects invalid manual OAuth JSON with clear inline error', async ({ page }) => {
     const { pageErrors } = await openStagingProvidersTab(page)
