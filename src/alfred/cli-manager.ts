@@ -494,14 +494,14 @@ const PRIMARY_OAUTH_FILES: Readonly<Record<ManagedCliId, string>> = {
   claude: '.credentials.json',
   codex: 'auth.json',
   gemini: 'oauth_creds.json',
-  agy: 'credentials.json',
+  agy: 'antigravity-oauth-token',
 }
 
 const ALL_OAUTH_FILES: Readonly<Record<ManagedCliId, readonly string[]>> = {
   claude: ['.credentials.json', 'credentials.json'],
   codex: ['auth.json', 'credentials.json'],
   gemini: ['oauth_creds.json', 'google_accounts.json'],
-  agy: ['credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json'],
+  agy: ['antigravity-oauth-token', 'credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json'],
 }
 
 export function resolveCliAuthDir(
@@ -1083,7 +1083,7 @@ function checkLoginSideChannels(session: ActiveCliLoginSession): void {
     }
   }
 
-  if ((session.id === 'gemini' || session.id === 'codex') && session.oauthWatchFile && existsSync(session.oauthWatchFile)) {
+  if ((session.id === 'gemini' || session.id === 'codex' || session.id === 'agy') && session.oauthWatchFile && existsSync(session.oauthWatchFile)) {
     try {
       const st = statSync(session.oauthWatchFile)
       if (st.size > 2 && st.mtimeMs > session.oauthBaselineMtimeMs) {
@@ -1128,7 +1128,7 @@ export async function startCliLogin(
   const childEnv = buildLoginChildEnv(def, envMap, prefix, tempRoot, browserUrlFile)
 
   const oauthWatchFile =
-    (def.id === 'gemini' || def.id === 'codex') && authDir
+    (def.id === 'gemini' || def.id === 'codex' || def.id === 'agy') && authDir
       ? join(authDir, PRIMARY_OAUTH_FILES[def.id])
       : null
   let oauthBaselineMtimeMs = 0

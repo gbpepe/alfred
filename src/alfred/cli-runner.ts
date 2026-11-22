@@ -1458,7 +1458,7 @@ export function detectCliAuthStatus(
   }
   if (provider === 'agy-cli') {
     const agyDir = env['AGY_CONFIG_DIR']?.trim() || (home ? join(home, '.gemini', 'antigravity-cli') : '')
-    const agyCredFiles = ['credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json']
+    const agyCredFiles = ['antigravity-oauth-token', 'credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json']
     for (const f of agyCredFiles) {
       if (agyDir && existsSync(join(agyDir, f))) {
         return { method: 'oauth', detail: `~/.gemini/antigravity-cli/${f}` }

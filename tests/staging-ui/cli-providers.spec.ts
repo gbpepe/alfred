@@ -113,7 +113,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
         await testBtn.click()
         const resultEl = card.locator(`[data-cli-test-result="${cliId}"]`)
         await expect(resultEl).toBeVisible({ timeout: 45_000 })
-        if (cliId === 'claude' || cliId === 'codex') {
+        if (cliId === 'claude' || cliId === 'codex' || cliId === 'agy') {
           await expect(resultEl).toContainText('✓ Kapcsolat OK', { timeout: 45_000 })
         } else {
           // Wait until "tesztelése (ping)..." resolves to either ✓ Kapcsolat OK or a detailed provider error
