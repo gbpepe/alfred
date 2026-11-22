@@ -19,16 +19,19 @@ Environment=ALFRED_WEB_DB_PATH=/opt/alfred-worktrees/alfred-test/store/alfred-te
 Environment=ALFRED_SIM_PORT=3421
 Environment=ALFRED_AGENTS_CONFIG=/opt/alfred-worktrees/alfred-test/config/agents.json
 Environment=NODE_OPTIONS=--max-old-space-size=256
+Environment=PATH=/home/alfred/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NPM_CONFIG_PREFIX=/home/alfred/.local
 ExecStart=/usr/bin/node /opt/alfred-worktrees/alfred-test/dist/web-only.js
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/alfred-worktrees/alfred-test
-MemoryHigh=256M
-MemoryMax=384M
+ProtectHome=read-only
+ReadWritePaths=/opt/alfred-worktrees/alfred-test -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/etc/alfred
+MemoryHigh=384M
+MemoryMax=768M
+MemorySwapMax=1G
 
 [Install]
 WantedBy=multi-user.target

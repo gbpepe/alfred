@@ -17,16 +17,19 @@ Environment=ALFRED_ENV=test
 Environment=ALFRED_WEB_DB_PATH=/opt/alfred-worktrees/alfred-test-%i/store/alfred-test.db
 Environment=ALFRED_AGENTS_CONFIG=/opt/alfred-worktrees/alfred-test-%i/config/agents.json
 Environment=NODE_OPTIONS=--max-old-space-size=256
+Environment=PATH=/home/alfred/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NPM_CONFIG_PREFIX=/home/alfred/.local
 ExecStart=/usr/bin/node /opt/alfred-worktrees/alfred-test-%i/dist/web-only.js
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/alfred-worktrees/alfred-test-%i
-MemoryHigh=256M
-MemoryMax=384M
+ProtectHome=read-only
+ReadWritePaths=/opt/alfred-worktrees/alfred-test-%i -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/etc/alfred
+MemoryHigh=384M
+MemoryMax=768M
+MemorySwapMax=1G
 SyslogIdentifier=alfred-test-web-%i
 
 [Install]

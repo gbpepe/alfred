@@ -17,16 +17,19 @@ Environment=ALFRED_WEB_DB_PATH=/opt/alfred-prod/store/alfred-prod.db
 Environment=ALFRED_PROD_ENV_FILE=/opt/alfred-prod/.env
 Environment=ALFRED_OPS_DIR=/opt/alfred-ops
 Environment=NODE_OPTIONS=--max-old-space-size=256
+Environment=PATH=/home/alfred/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NPM_CONFIG_PREFIX=/home/alfred/.local
 ExecStart=/usr/bin/node /opt/alfred-prod/dist/web-only.js
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
-ProtectHome=true
-ReadWritePaths=/opt/alfred-prod/store /opt/alfred-ops/store /opt/alfred-prod/.env /opt/alfred-prod/config /opt/alfred-ops/config
-MemoryHigh=256M
-MemoryMax=384M
+ProtectHome=read-only
+ReadWritePaths=/opt/alfred-prod/store /opt/alfred-ops/store /opt/alfred-prod/.env /opt/alfred-prod/config /opt/alfred-ops/config -/home/alfred/.local -/home/alfred/.claude -/home/alfred/.codex -/home/alfred/.gemini -/home/alfred/.config -/etc/alfred
+MemoryHigh=384M
+MemoryMax=768M
+MemorySwapMax=1G
 
 [Install]
 WantedBy=multi-user.target
