@@ -1267,7 +1267,7 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
       expect(existsSync(join(fakeHome, '.gemini', 'oauth_creds.json'))).toBe(false)
       expect(loggedOutGemini.status?.authMethod).toBe('api_key')
 
-      // 5) Save Claude OAuth setup token -> writes CLAUDE_CODE_OAUTH_TOKEN to .env and reports 'oauth'
+      // 5) Save Claude OAuth setup token -> writes CLAUDE_CODE_OAUTH_TOKEN to .env and ~/.claude/.oauth-token and reports 'oauth'
       const savedClaudeTok = await saveCliCredentials(
         'claude',
         { token: 'sk-ant-oat01-abcdefghijklmnopqrstuvwxyz0123456789ABCDEF' },
@@ -1277,8 +1277,16 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
       expect(savedClaudeTok.target).toBe('CLAUDE_CODE_OAUTH_TOKEN')
       expect(savedClaudeTok.status?.authMethod).toBe('oauth')
       expect(readFileSync(fakeEnvFile, 'utf-8')).toContain('CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-')
+      expect(existsSync(join(fakeHome, '.claude', '.oauth-token'))).toBe(true)
+      expect(detectCliAuthStatus('claude-cli', { HOME: fakeHome })).toEqual({
+        method: 'oauth',
+        detail: '~/.claude/.oauth-token',
+      })
+      const sanitizedFromFile = buildSanitizedCliEnv('claude-cli', { HOME: fakeHome, ANTHROPIC_API_KEY: 'sk-ant-api-paid' })
+      expect(sanitizedFromFile['CLAUDE_CODE_OAUTH_TOKEN']).toBe('sk-ant-oat01-abcdefghijklmnopqrstuvwxyz0123456789ABCDEF')
+      expect(sanitizedFromFile['ANTHROPIC_API_KEY']).toBeUndefined()
 
-      // 6) Logout Claude -> removes CLAUDE_CODE_OAUTH_TOKEN from .env
+      // 6) Logout Claude -> removes CLAUDE_CODE_OAUTH_TOKEN from .env and ~/.claude/.oauth-token
       const loggedOutClaude = await logoutCli('claude', {
         env: { HOME: fakeHome, CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat01-abcdefghijklmnopqrstuvwxyz0123456789ABCDEF' },
         envFilePath: fakeEnvFile,
@@ -1286,6 +1294,8 @@ describe('Alfred Headless CLI Runner (cli-runner.ts)', () => {
         processRunner: noopRunner,
       })
       expect(loggedOutClaude.clearedEnvKeys).toEqual(['CLAUDE_CODE_OAUTH_TOKEN'])
+      expect(loggedOutClaude.removedFiles).toContain('.oauth-token')
+      expect(existsSync(join(fakeHome, '.claude', '.oauth-token'))).toBe(false)
       expect(readFileSync(fakeEnvFile, 'utf-8')).not.toContain('CLAUDE_CODE_OAUTH_TOKEN=')
       expect(loggedOutClaude.status?.authMethod).toBe('none')
 

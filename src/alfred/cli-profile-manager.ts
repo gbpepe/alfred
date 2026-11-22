@@ -36,7 +36,7 @@ import {
 const ALL_CLI_IDS: readonly ManagedCliId[] = ['claude', 'codex', 'gemini', 'agy'] as const
 
 const CLI_OAUTH_CANDIDATE_FILES: Record<ManagedCliId, readonly string[]> = {
-  claude: ['.credentials.json', 'credentials.json'],
+  claude: ['.credentials.json', 'credentials.json', '.oauth-token'],
   codex: ['auth.json', 'credentials.json'],
   gemini: ['oauth_creds.json', 'google_accounts.json'],
   agy: ['antigravity-oauth-token', 'credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json'],

@@ -498,7 +498,7 @@ const PRIMARY_OAUTH_FILES: Readonly<Record<ManagedCliId, string>> = {
 }
 
 const ALL_OAUTH_FILES: Readonly<Record<ManagedCliId, readonly string[]>> = {
-  claude: ['.credentials.json', 'credentials.json'],
+  claude: ['.credentials.json', 'credentials.json', '.oauth-token'],
   codex: ['auth.json', 'credentials.json'],
   gemini: ['oauth_creds.json', 'google_accounts.json'],
   agy: ['antigravity-oauth-token', 'credentials.json', 'oauth_creds.json', 'auth.json', 'tokens.json', 'token.json'],
@@ -657,6 +657,23 @@ export async function saveCliCredentials(
     } else {
       envKey = 'GEMINI_API_KEY'
     }
+
+    // For Claude OAuth setup tokens (sk-ant-oat...), also persist to ~/.claude/.oauth-token (mode 0600)
+    // so that prod, ops, and staging worktrees automatically share the OAuth subscription token.
+    if (def.id === 'claude' && envKey === 'CLAUDE_CODE_OAUTH_TOKEN') {
+      const authDir = resolveCliAuthDir(def, envMap)
+      if (authDir) {
+        try {
+          if (!existsSync(authDir)) {
+            mkdirSync(authDir, { recursive: true, mode: 0o700 })
+          }
+          atomicWriteFileSync(join(authDir, '.oauth-token'), rawToken + '\n', { mode: 0o600 })
+        } catch (err) {
+          logger.warn({ err, cli: def.id }, 'Failed to write ~/.claude/.oauth-token fallback file')
+        }
+      }
+    }
+
     updateEnvFileAt(envFilePath, { [envKey]: rawToken })
     envMap[envKey] = rawToken
     if (shouldMutateProcessEnv) {

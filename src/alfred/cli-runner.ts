@@ -381,6 +381,28 @@ export function buildSanitizedCliEnv(
     out[PROVIDER_CONFIG_DIR_VAR[provider]] = cliConfigDir.trim()
   }
 
+  // If CLAUDE_CODE_OAUTH_TOKEN is not in env, check ~/.claude/.oauth-token (or <CLAUDE_CONFIG_DIR>/.oauth-token)
+  if (provider === 'claude-cli' && !(out['CLAUDE_CODE_OAUTH_TOKEN'] || '').trim()) {
+    const home = out['HOME'] || out['USERPROFILE'] || sourceEnv['HOME'] || sourceEnv['USERPROFILE'] || ''
+    const candidates = [
+      out['CLAUDE_CONFIG_DIR'] ? join(out['CLAUDE_CONFIG_DIR'], '.oauth-token') : '',
+      home ? join(home, '.claude', '.oauth-token') : '',
+    ].filter(Boolean)
+    for (const tokenPath of candidates) {
+      if (existsSync(tokenPath)) {
+        try {
+          const fileToken = readFileSync(tokenPath, 'utf-8').trim()
+          if (fileToken) {
+            out['CLAUDE_CODE_OAUTH_TOKEN'] = fileToken
+            break
+          }
+        } catch {
+          /* ignore unreadable token file */
+        }
+      }
+    }
+  }
+
   // If OAuth subscription auth is active, strip paid API keys from the CLI subprocess
   // so the CLI always uses the subscription quota instead of pay-per-token billing.
   const auth = detectCliAuthStatus(provider, { ...sourceEnv, ...out })
@@ -1443,6 +1465,20 @@ export function detectCliAuthStatus(
       return { method: 'oauth', detail: 'CLAUDE_CODE_OAUTH_TOKEN (.env)' }
     }
     const dir = env['CLAUDE_CONFIG_DIR']?.trim() || (home ? join(home, '.claude') : '')
+    const hostDir = home ? join(home, '.claude') : ''
+    for (const candidateDir of [dir, hostDir]) {
+      if (!candidateDir) continue
+      const tokenPath = join(candidateDir, '.oauth-token')
+      if (existsSync(tokenPath)) {
+        try {
+          if (readFileSync(tokenPath, 'utf-8').trim().length > 0) {
+            return { method: 'oauth', detail: '~/.claude/.oauth-token' }
+          }
+        } catch {
+          /* ignore unreadable */
+        }
+      }
+    }
     if (dir && existsSync(join(dir, '.credentials.json'))) {
       return { method: 'oauth', detail: '~/.claude/.credentials.json' }
     }
