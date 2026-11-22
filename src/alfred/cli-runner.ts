@@ -1528,7 +1528,7 @@ export async function checkCliProvidersHealth(opts?: {
 }): Promise<CliProviderHealthStatus[]> {
   const envMap = opts?.env ?? { ...readEnvFile(), ...process.env }
   const runner = opts?.processRunner ?? spawnCliProcess
-  const timeoutMs = opts?.timeoutMs ?? 5_000
+  const timeoutMs = opts?.timeoutMs ?? 12_000
   const providers: AlfredCliProviderName[] = ['claude-cli', 'codex-cli', 'gemini-cli', 'agy-cli']
 
   return Promise.all(

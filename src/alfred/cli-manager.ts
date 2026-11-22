@@ -301,7 +301,7 @@ export async function getCliInventory(opts?: {
   const healthList = await checkCliProvidersHealth({
     env: enrichedEnv,
     processRunner: opts?.processRunner,
-    timeoutMs: opts?.timeoutMs ?? 5_000,
+    timeoutMs: opts?.timeoutMs ?? 12_000,
   })
 
   return (['claude', 'codex', 'gemini', 'agy'] as ManagedCliId[]).map((id) => {
