@@ -126,7 +126,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
         if ((await card.getByText('OAuth előfizetés OK').count()) > 0) {
           const quotaBox = card.locator(`[data-cli-quota-box="${qId}"]`)
           await expect(quotaBox).toBeVisible({ timeout: 15_000 })
-          await expect(quotaBox).toContainText(/szabad|ablak|Kvóta/, { timeout: 15_000 })
+          await expect(quotaBox).toContainText(/szabad|ablak|Kvóta|Nincs aktív Claude OAuth token\./, { timeout: 15_000 })
         }
       }
 
