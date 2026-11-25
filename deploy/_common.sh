@@ -65,11 +65,15 @@ log_err() {
 validate_self_branch() {
   local branch="${1:-}"
   if [[ -z "$branch" ]]; then
-    log_err "Branch name is required (must match feat/self-* or fix/self-*)"
+    log_err "Branch name is required"
     return 1
   fi
-  if [[ ! "$branch" =~ ^((feat|fix)/(self|core)-[a-z0-9._/-]{0,79}|core-[a-z0-9._/-]{1,79})$ ]]; then
-    log_err "Invalid branch name '$branch': must match feat/self-*, fix/self-*, feat/core-*, or core-*"
+  if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+    log_err "Invalid branch name '$branch': deploying '$branch' as a staging branch is not allowed"
+    return 1
+  fi
+  if [[ ! "$branch" =~ ^[a-zA-Z0-9._/-]{1,80}$ ]]; then
+    log_err "Invalid branch name '$branch': must match ^[a-zA-Z0-9._/-]{1,80}$"
     return 1
   fi
   if [[ "$branch" == *".."* || "$branch" == *"//"* || "$branch" == -* || "$branch" == *. || "$branch" == */ || "$branch" == *.lock ]]; then

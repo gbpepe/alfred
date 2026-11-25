@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates an isolated staging git worktree for a `feat/self-*` or `fix/self-*` branch,
+# Creates an isolated staging git worktree for a feature/fix branch (excluding `main`/`master`),
 # copies `.env.test`, builds, runs `npm run test:alfred`, and boots `alfred-test`.
 
 set -euo pipefail

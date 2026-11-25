@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Safely promotes a tested `feat/self-*` or `fix/self-*` branch to production (`main`),
+# Safely promotes a tested feature/fix branch (excluding `main`/`master`) to production (`main`),
 # runs quality gates, backs up prod state, restarts `alfred-prod`, verifies 5s health
 # (auto-rolling back on failure), and tears down the staging environment on success.
 

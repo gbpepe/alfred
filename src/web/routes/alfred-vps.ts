@@ -88,9 +88,10 @@ async function readJsonBody<T>(req: RouteContext['req'], maxBytes?: number): Pro
 
 const ALLOWED_LOG_UNITS = new Set(['alfred-prod', 'alfred-ops', 'alfred-test', 'alfred-web'])
 const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'spinup-test', 'reload-test', 'teardown-test'])
-const SAFE_BRANCH_RE = /^((feat|fix)\/(self|core)-[a-z0-9._/-]{0,79}|core-[a-z0-9._/-]{1,79})$/
+const SAFE_BRANCH_RE = /^[a-zA-Z0-9._/-]{1,80}$/
 
 function validateOpsBranch(branch: string): boolean {
+  if (branch === 'main' || branch === 'master') return false
   if (!SAFE_BRANCH_RE.test(branch)) return false
   if (branch.includes('..') || branch.includes('//') || branch.startsWith('-') || branch.endsWith('.') || branch.endsWith('/') || branch.endsWith('.lock')) {
     return false
@@ -1254,7 +1255,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       return true
     }
     if (branch && !validateOpsBranch(branch)) {
-      json(res, { error: 'Invalid branch name (must match feat/self-*, fix/self-*, feat/core-*, or core-*)' }, 400)
+      json(res, { error: 'Invalid branch name (main/master and unsafe characters are not allowed)' }, 400)
       return true
     }
     const opsDir = process.env['ALFRED_OPS_DIR'] || '/opt/alfred-ops'
