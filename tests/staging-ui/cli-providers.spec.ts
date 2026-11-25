@@ -40,6 +40,14 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await expect(page.locator('#vpsRunCleanupBtn')).toBeVisible()
     await page.locator('#vpsRunCleanupBtn').click()
     await expect(page.locator('#vpsStorageCleanupStatus')).toContainText('✓ Takarítás kész:', { timeout: 25_000 })
+    // Verify the new Async Batch API Overview card (#vpsBatchCard) with KPI bar & 4-provider breakdown
+    await expect(page.locator('#vpsBatchCard')).toBeVisible()
+    await expect(page.locator('#vpsBatchKpiBar')).toContainText('Összes megtakarítás', { timeout: 15_000 })
+    await expect(page.locator('#vpsBatchProvidersGrid [data-batch-provider]')).toHaveCount(4, { timeout: 15_000 })
+    for (const bp of ['anthropic', 'gemini', 'vertex-eu', 'openai']) {
+      await expect(page.locator(`#vpsBatchProvidersGrid [data-batch-provider="${bp}"]`)).toBeVisible()
+    }
+    await expect(page.locator('#vpsBatchJobsList')).toBeVisible()
     await expect(page.locator('#vpsServicesGrid')).toBeVisible()
     await expect(page.locator('#providersPage')).toBeHidden()
     await expect(page.locator('#vpsCliProvidersGrid')).toBeHidden()

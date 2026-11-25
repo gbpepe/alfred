@@ -42,30 +42,37 @@ describe('Alfred Core (feat/alfred-core)', () => {
   })
 
   describe('1. Sablonok, config/agents.json és SOUL.md betöltés', () => {
-      it('loads the repository config/agents.json and resolves all 5 configured agents with their SOUL.md files', () => {
+      it('loads the repository config/agents.json and resolves all 6 configured agents with their SOUL.md files', () => {
         const env = {
           DISCORD_CHANNEL_ALFRED_HQ: '1111111111111111111',
           DISCORD_CHANNEL_PROJ_HYPATIA: '2222222222222222222',
           DISCORD_CHANNEL_ALFRED_QA: '3333333333333333333',
           DISCORD_CHANNEL_ALFRED_SELF_DEV: '4444444444444444444',
           DISCORD_CHANNEL_ALFRED_OPS: '5555555555555555555',
+          DISCORD_CHANNEL_ALFRED_BATCH: '6666666666666666666',
           ALFRED_GLOBAL_DAILY_BUDGET_USD: '15',
         }
         const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: true })
-        expect(cfg.agents).toHaveLength(5)
+        expect(cfg.agents).toHaveLength(6)
 
         const architect = cfg.agents.find((a) => a.id === 'alfred-architect')!
         const coder = cfg.agents.find((a) => a.id === 'alfred-coder-hypatia')!
         const qa = cfg.agents.find((a) => a.id === 'alfred-qa')!
         const selfCoder = cfg.agents.find((a) => a.id === 'alfred-self-coder')!
         const ops = cfg.agents.find((a) => a.id === 'alfred-ops')!
+        const batch = cfg.agents.find((a) => a.id === 'alfred-batch')!
 
         expect(architect.discordChannelId).toBe('1111111111111111111')
         expect(architect.provider).toBe('deepseek')
-        expect(architect.tools).toEqual(['fs_read', 'memory'])
+        expect(architect.tools).toEqual(['fs_read', 'memory', 'batch_status', 'batch_list'])
         expect(architect.soulFile).toBe('agents/alfred-architect/SOUL.md')
         expect(architect.resolvedSystemPrompt).toContain('Alfred Architect')
         expect(existsSync(architect.workspaceAbsPath)).toBe(true)
+
+        expect(batch.discordChannelId).toBe('6666666666666666666')
+        expect(batch.tools).toContain('batch_submit')
+        expect(batch.soulFile).toBe('agents/alfred-batch/SOUL.md')
+        expect(batch.resolvedSystemPrompt).toContain('Alfred Batch')
 
         expect(coder.discordChannelId).toBe('2222222222222222222')
         expect(coder.provider).toBe('deepseek')
@@ -184,7 +191,7 @@ describe('Alfred Core (feat/alfred-core)', () => {
         const sentBody = JSON.parse(calledInit.body)
         expect(sentBody.messages[0].role).toBe('system')
         expect(sentBody.messages[0].content).toContain('Alfred Architect')
-        expect(sentBody.tools.map((t: any) => t.function.name)).toEqual(['fs_read', 'memory'])
+        expect(sentBody.tools.map((t: any) => t.function.name)).toEqual(['fs_read', 'memory', 'batch_status', 'batch_list'])
       })
 
       it('routes vertex-eu calls to EU regional endpoint and rejects non-EU regions (GDPR guard)', async () => {
@@ -577,7 +584,7 @@ describe('Alfred Core (feat/alfred-core)', () => {
         const qa = { ...cfg.agents[2], workspaceAbsPath: wsQa }
 
         // Schema-level filtering
-        expect(getWhitelistedToolSchemas(architect).map((s) => s.function.name)).toEqual(['fs_read', 'memory'])
+        expect(getWhitelistedToolSchemas(architect).map((s) => s.function.name)).toEqual(['fs_read', 'memory', 'batch_status', 'batch_list'])
         expect(getWhitelistedToolSchemas(coder).map((s) => s.function.name)).toEqual([
           'bash',
           'fs_read',

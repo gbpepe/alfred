@@ -43,7 +43,7 @@
       "memoryNamespace": "alfred-architect",
       "dailyBudgetUsd": 5.0,
       "allowedUserIds": [],
-      "tools": ["fs_read", "memory"],
+      "tools": ["fs_read", "memory", "batch_status", "batch_list"],
       "soulFile": "agents/alfred-architect/SOUL.md",
       "systemPrompt": "Te vagy Alfred Architect, a rendszer vezető szoftverarchitektje és tervező ágense."
     },
@@ -139,6 +139,36 @@
       "bashTimeoutMs": 180000,
       "soulFile": "agents/alfred-ops/SOUL.md",
       "systemPrompt": "Te vagy Alfred Ops, az Alfred infrastruktúra és életciklus-kezelő DevOps ágense. Kizárólag a jóváhagyott deploy/* scripteket futtatod."
+    },
+    {
+      "id": "alfred-batch",
+      "displayName": "Alfred Batch",
+      "channelName": "#alfred-batch",
+      "discordChannelId": "${DISCORD_CHANNEL_ALFRED_BATCH}",
+      "role": "segedmunkas",
+      "provider": "vertex-eu",
+      "model": "gemini-2.5-flash",
+      "fallback": {
+        "provider": "deepseek",
+        "model": "deepseek-chat"
+      },
+      "workspace": ".",
+      "memoryNamespace": "alfred-batch",
+      "dailyBudgetUsd": 3.0,
+      "allowedUserIds": [],
+      "tools": ["fs_read", "fs_write", "memory", "batch_submit", "batch_status", "batch_list", "batch_cancel"],
+      "protectedPaths": [
+        ".env",
+        ".env.example",
+        ".env.test",
+        "store/",
+        "deploy/",
+        "config/",
+        "src/",
+        "web/"
+      ],
+      "soulFile": "agents/alfred-batch/SOUL.md",
+      "systemPrompt": "Te vagy Alfred Batch, az Alfred több-szolgáltatós aszinkron Batch API koordinátora (50%-os API áron, nulla CLI kvóta felhasználással)."
     }
   ]
 }

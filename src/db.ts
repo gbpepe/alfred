@@ -1437,6 +1437,36 @@ export function initDatabase(dbPathOverride?: string): void {
     )
   `)
 
+  // --- Multi-Provider Async Batch API Jobs (50% discount) ---
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS batch_jobs (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL CHECK(provider IN ('anthropic','gemini','vertex-eu','openai')),
+      requested_provider TEXT NOT NULL DEFAULT 'auto',
+      model TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued' CHECK(status IN ('queued','submitted','running','downloading','completed','failed','cancelled')),
+      external_batch_id TEXT,
+      input_path TEXT NOT NULL,
+      output_path TEXT,
+      total_items INTEGER NOT NULL DEFAULT 0,
+      completed_items INTEGER NOT NULL DEFAULT 0,
+      failed_items INTEGER NOT NULL DEFAULT 0,
+      estimated_cost_usd REAL NOT NULL DEFAULT 0,
+      actual_cost_usd REAL,
+      saved_cost_usd REAL NOT NULL DEFAULT 0,
+      cost_recorded INTEGER NOT NULL DEFAULT 0,
+      discord_channel_id TEXT,
+      error_message TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_batch_jobs_status ON batch_jobs(status, updated_at)`)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_batch_jobs_provider ON batch_jobs(provider, created_at)`)
+  try { db.exec('ALTER TABLE batch_jobs ADD COLUMN actual_cost_usd REAL') } catch { /* already exists */ }
+  try { db.exec('ALTER TABLE batch_jobs ADD COLUMN cost_recorded INTEGER NOT NULL DEFAULT 0') } catch { /* already exists */ }
+  try { db.exec('ALTER TABLE batch_jobs ADD COLUMN error_message TEXT') } catch { /* already exists */ }
+
   // --- Idea Box ---
   db.exec(`
     CREATE TABLE IF NOT EXISTS idea_box (

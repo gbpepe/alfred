@@ -33,10 +33,10 @@ export function agentSpend(
   prices: Record<string, TokenPrice>,
 ): AgentSpend {
   const rows = db.prepare(`
-    SELECT model, SUM(input_tokens) AS i, SUM(output_tokens) AS o,
+    SELECT model, tool_name, SUM(input_tokens) AS i, SUM(output_tokens) AS o,
       SUM(cache_creation_tokens) AS cw, SUM(cache_read_tokens) AS cr
-    FROM token_usage WHERE agent = ? AND timestamp >= ? AND timestamp < ? GROUP BY model
-  `).all(agent, start, end) as Array<{ model: string | null; i: number | null; o: number | null; cw: number | null; cr: number | null }>
+    FROM token_usage WHERE agent = ? AND timestamp >= ? AND timestamp < ? GROUP BY model, tool_name
+  `).all(agent, start, end) as Array<{ model: string | null; tool_name: string | null; i: number | null; o: number | null; cw: number | null; cr: number | null }>
 
   const tokens = { input: 0, output: 0, cache_write: 0, cache_read: 0 }
   let cost = 0
@@ -47,14 +47,22 @@ export function agentSpend(
     if (r.model != null && /^(?:claude|codex|gemini|agy)-cli(?::|$)/i.test(r.model.trim())) {
       continue
     }
-    const p = r.model != null && Object.prototype.hasOwnProperty.call(prices, r.model) ? prices[r.model] : undefined
+    const rawModel = (r.model ?? '').trim()
+    const isBatchMode =
+      rawModel.toLowerCase().startsWith('batch:') ||
+      (r.tool_name ?? '').trim().toLowerCase() === 'batch'
+    const baseModel = rawModel.toLowerCase().startsWith('batch:') ? rawModel.slice(6).trim() : rawModel
+    const multiplier = isBatchMode ? 0.5 : 1.0
+
+    const p = baseModel && Object.prototype.hasOwnProperty.call(prices, baseModel) ? prices[baseModel] : undefined
     if (!p) { unpriced += i + o + cw + cr; continue }
     // thinking_tokens are already part of output_tokens.
-    cost += i * p.input / 1e6 + o * p.output / 1e6
-    if (typeof p.cache_write === 'number') cost += cw * p.cache_write / 1e6
+    let rowCost = i * p.input / 1e6 + o * p.output / 1e6
+    if (typeof p.cache_write === 'number') rowCost += cw * p.cache_write / 1e6
     else unpriced += cw
-    if (typeof p.cache_read === 'number') cost += cr * p.cache_read / 1e6
+    if (typeof p.cache_read === 'number') rowCost += cr * p.cache_read / 1e6
     else unpriced += cr
+    cost += rowCost * multiplier
   }
   return { cost, unpriced_tokens: unpriced, tokens }
 }

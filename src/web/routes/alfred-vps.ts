@@ -68,6 +68,11 @@ import {
   type ChatMessage,
 } from '../../alfred/model-router.js'
 import { resolveAlfredRuntimeEnv } from '../../alfred/runtime-env.js'
+import {
+  BatchValidationError,
+  cancelBatchJob,
+  getAdminBatchesOverview,
+} from '../../alfred/batch-runner.js'
 import { runHousekeeping } from '../../alfred/housekeeper.js'
 import { collectSystemTelemetry } from '../../alfred/system-monitor.js'
 import { json, readBody } from '../http-helpers.js'
@@ -472,6 +477,46 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       json(res, { ok: false, error: msg }, 500)
+    }
+    return true
+  }
+
+  if (path === '/api/admin/batches' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const db = getDb()
+      const overview = getAdminBatchesOverview(db, env)
+      json(res, { ok: true, ...overview })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, 500)
+    }
+    return true
+  }
+
+  const batchCancelMatch = /^\/api\/admin\/batches\/([^/]+)\/cancel$/.exec(path)
+  if (batchCancelMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const batchId = decodeURIComponent(batchCancelMatch[1]).trim()
+      const db = getDb()
+      const job = await cancelBatchJob({ db, batchId, env })
+      const overview = getAdminBatchesOverview(db, env)
+      json(res, { ok: true, job, ...overview })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const status = err instanceof BatchValidationError ? 404 : 500
+      json(res, { ok: false, error: msg }, status)
     }
     return true
   }

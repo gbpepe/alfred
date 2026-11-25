@@ -198,3 +198,13 @@ sudo systemctl restart alfred-prod alfred-ops alfred-web
 # Per-agent izolált CLI profilok jogosultságának ellenőrzése
 ls -la /home/alfred/.cli-profiles/
 ```
+
+---
+
+## 6. Aszinkron Batch Feldolgozás & Költségoptimalizálás (`#alfred-batch` & `#vps`)
+
+Részletes leírás: **[6. Aszinkron Batch Feldolgozás & Költségoptimalizálás](06-batch-feldolgozas-es-koltsegoptimalizalas.md)**
+
+- **50%-os Batch API ár + CLI kvóta védelme:** A tömeges, párhuzamosítható, nem azonnali feladatokat az `alfred-batch` (`#alfred-batch`) koordinátor veszi át `provider: "auto"` útválasztással (`anthropic`, `gemini`, `vertex-eu`, `openai`), `secret-gate` szűréssel és pre-flight költségkeret-ellenőrzéssel.
+- **Kanonikus JSONL & Prompt Caching:** Egységes `custom_id` (`^[a-zA-Z0-9_-]{1,64}$`), job-szintű `worksource-queue` (`store/batch/worksource-queue`), `heavy-job-hold` I/O védelem és automatikus belső `alfred-qa` mintavételezés.
+- **Dashboard `#vps` kártya (`#vpsBatchCard`):** Fő KPI sáv, 4 szolgáltatós megtakarítás-bontás (Elköltve vs. Megtakarítva) és élő köteglista `Cancel` gombbal.

@@ -81,6 +81,7 @@
       renderRolesGrid(data.roles || [], data.agents || [])
       renderMultiTests(data.multiTests || [])
       refreshVpsSystemStorage()
+      refreshVpsBatches()
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
@@ -250,6 +251,159 @@
         statusEl.textContent = '✕ Takarítási hiba: ' + err.message
       }
     } finally {
+      if (btn) btn.disabled = false
+    }
+  }
+
+  const BATCH_PROVIDER_LABELS = {
+    anthropic: 'Anthropic',
+    gemini: 'Gemini',
+    'vertex-eu': 'Vertex EU',
+    openai: 'OpenAI',
+  }
+
+  function batchStatusBadgeColor(st) {
+    if (st === 'completed') return '#16a34a'
+    if (st === 'running' || st === 'submitted' || st === 'downloading') return '#2563eb'
+    if (st === 'queued') return '#d97706'
+    if (st === 'cancelled') return '#64748b'
+    return '#dc2626'
+  }
+
+  function renderVpsBatches(data) {
+    const kpiEl = document.getElementById('vpsBatchKpiBar')
+    const provEl = document.getElementById('vpsBatchProvidersGrid')
+    const jobsEl = document.getElementById('vpsBatchJobsList')
+    if (!kpiEl || !provEl || !jobsEl || !data) return
+
+    const s = data.summary || {
+      totalBatches: 0,
+      activeBatches: 0,
+      totalItems: 0,
+      totalSpentUsd: 0,
+      totalSavedUsd: 0,
+      totalBaselineUsd: 0,
+    }
+    const savingsPct = s.totalBaselineUsd > 0 ? Math.round((s.totalSavedUsd / s.totalBaselineUsd) * 100) : 50
+
+    kpiEl.innerHTML =
+      '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">' +
+        '<div style="font-size:11px;opacity:.75">Összes elköltve (50% Batch ár)</div>' +
+        '<div style="font-size:18px;font-weight:700;margin-top:2px">$' + Number(s.totalSpentUsd || 0).toFixed(4) + '</div>' +
+        '<div style="font-size:11px;opacity:.7">Valós idejű alapár: $' + Number(s.totalBaselineUsd || 0).toFixed(4) + '</div>' +
+      '</div>' +
+      '<div style="padding:10px 12px;border:1px solid #16a34a;border-radius:8px;background:rgba(22,163,74,0.08)">' +
+        '<div style="font-size:11px;color:#15803d;font-weight:600">Összes megtakarítás</div>' +
+        '<div style="font-size:18px;font-weight:800;color:#16a34a;margin-top:2px">$' + Number(s.totalSavedUsd || 0).toFixed(4) + ' <span style="font-size:12px">(-' + savingsPct + '%)</span></div>' +
+        '<div style="font-size:11px;opacity:.8">CLI kvóta felhasználás: $0 / 0 token</div>' +
+      '</div>' +
+      '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">' +
+        '<div style="font-size:11px;opacity:.75">Aktív / Összes köteg</div>' +
+        '<div style="font-size:18px;font-weight:700;margin-top:2px">' + esc(s.activeBatches) + ' / ' + esc(s.totalBatches) + '</div>' +
+        '<div style="font-size:11px;opacity:.7">Feldolgozott elemek: ' + esc(s.totalItems) + '</div>' +
+      '</div>'
+
+    const providers = Array.isArray(data.byProvider) ? data.byProvider : []
+    provEl.innerHTML = providers
+      .map(function (p) {
+        const label = BATCH_PROVIDER_LABELS[p.provider] || p.provider
+        const cfgColor = p.configured ? '#16a34a' : '#64748b'
+        const cfgText = p.configured ? 'Konfigurálva' : 'Nincs kulcs'
+        const pct = p.baselineUsd > 0 ? Math.round((p.savedUsd / p.baselineUsd) * 100) : 50
+        return (
+          '<div data-batch-provider="' + esc(p.provider) + '" style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:5px;font-size:12px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">' +
+              '<strong>' + esc(label) + '</strong>' +
+              '<span style="padding:1px 7px;border-radius:999px;font-size:10px;font-weight:600;color:#fff;background:' + cfgColor + '">' + cfgText + '</span>' +
+            '</div>' +
+            '<div style="opacity:.8">Kötegek: <b>' + esc(p.batchCount) + '</b> · Elemek: <b>' + esc(p.completedItems) + '</b></div>' +
+            '<div style="display:flex;justify-content:space-between;gap:6px">' +
+              '<span>Elköltve: <b>$' + Number(p.spentUsd || 0).toFixed(4) + '</b></span>' +
+              '<span style="color:#16a34a;font-weight:700">Megtakarítva: $' + Number(p.savedUsd || 0).toFixed(4) + ' (-' + pct + '%)</span>' +
+            '</div>' +
+          '</div>'
+        )
+      })
+      .join('')
+
+    const jobs = Array.isArray(data.recentJobs) ? data.recentJobs : []
+    if (jobs.length === 0) {
+      jobsEl.innerHTML = '<div style="font-size:12px;opacity:.7;padding:8px 10px;border:1px dashed var(--border);border-radius:8px">Még nincs rögzített aszinkron Batch köteg. Küldj be egy feladatot az <code>#alfred-batch</code> csatornán!</div>'
+      return
+    }
+
+    jobsEl.innerHTML = jobs
+      .map(function (j) {
+        const total = Math.max(1, Number(j.total_items || 0))
+        const done = Math.min(total, Number(j.completed_items || 0))
+        const pct = Math.round((done / total) * 100)
+        const spent = j.actual_cost_usd != null ? Number(j.actual_cost_usd) : Number(j.estimated_cost_usd || 0)
+        const saved = Number(j.saved_cost_usd || 0)
+        const isActive = j.status === 'queued' || j.status === 'submitted' || j.status === 'running' || j.status === 'downloading'
+        const routeTag = j.requested_provider && j.requested_provider !== j.provider
+          ? esc(j.requested_provider) + ' → ' + esc(j.provider)
+          : esc(j.provider)
+        return (
+          '<div data-batch-job="' + esc(j.id) + '" style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px;font-size:12px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+              '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+                '<code>' + esc(j.id) + '</code>' +
+                '<span style="padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:' + batchStatusBadgeColor(j.status) + '">' + esc(j.status) + '</span>' +
+                '<span style="opacity:.85">' + routeTag + ' · <code>' + esc(j.model) + '</code></span>' +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<span>$' + spent.toFixed(4) + ' <span style="color:#16a34a;font-weight:600">(mentve: $' + saved.toFixed(4) + ')</span></span>' +
+                (isActive
+                  ? '<button type="button" class="btn-secondary btn-compact" data-batch-cancel="' + esc(j.id) + '">Cancel</button>'
+                  : '') +
+              '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+              '<div style="flex:1;height:6px;border-radius:999px;background:rgba(128,128,128,0.2);overflow:hidden">' +
+                '<div style="height:100%;width:' + pct + '%;background:' + batchStatusBadgeColor(j.status) + ';border-radius:999px"></div>' +
+              '</div>' +
+              '<span style="font-size:11px;opacity:.8;white-space:nowrap">' + esc(j.completed_items) + ' / ' + esc(j.total_items) + ' (' + pct + '%)' + (j.failed_items ? ' · ' + esc(j.failed_items) + ' hiba' : '') + '</span>' +
+            '</div>' +
+          '</div>'
+        )
+      })
+      .join('')
+
+    jobsEl.querySelectorAll('[data-batch-cancel]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        cancelVpsBatch(btn.getAttribute('data-batch-cancel'), btn)
+      })
+    })
+  }
+
+  async function refreshVpsBatches() {
+    const kpiEl = document.getElementById('vpsBatchKpiBar')
+    if (!kpiEl) return
+    try {
+      const data = await apiJson('/api/admin/batches')
+      renderVpsBatches(data)
+    } catch (err) {
+      kpiEl.innerHTML = '<div style="font-size:12px;color:#dc2626">Batch betöltési hiba: ' + esc(err.message) + '</div>'
+    }
+  }
+
+  async function cancelVpsBatch(batchId, btn) {
+    const msgEl = document.getElementById('vpsBatchStatusMsg')
+    if (!batchId) return
+    if (btn) btn.disabled = true
+    if (msgEl) {
+      msgEl.hidden = false
+      msgEl.textContent = 'Köteg lemondása (' + batchId + ')...'
+    }
+    try {
+      const data = await apiJson('/api/admin/batches/' + encodeURIComponent(batchId) + '/cancel', {
+        method: 'POST',
+        body: '{}',
+      })
+      renderVpsBatches(data)
+      if (msgEl) msgEl.textContent = '✓ Köteg lemondva: ' + batchId
+    } catch (err) {
+      if (msgEl) msgEl.textContent = '✕ Lemondási hiba: ' + err.message
       if (btn) btn.disabled = false
     }
   }
@@ -3181,6 +3335,7 @@
   const simNav = document.getElementById('sbTestSim')
   if (simNav) simNav.hidden = !isTestEnv
 
+  document.getElementById('vpsBatchRefreshBtn')?.addEventListener('click', refreshVpsBatches)
   wireSimEvents()
   if (!location.hash && isTestEnv) {
     location.hash = 'testsim'

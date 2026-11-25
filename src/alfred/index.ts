@@ -23,6 +23,7 @@ export * from './runtime-env.js'
 export * from './vertex-auth.js'
 export * from './system-monitor.js'
 export * from './housekeeper.js'
+export * from './batch-runner.js'
 
 interface DiscordAccessFile {
   dmPolicy?: 'pairing' | 'allowlist' | 'disabled'

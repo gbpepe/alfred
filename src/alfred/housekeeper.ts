@@ -237,6 +237,7 @@ export function inspectBatchJobsTable(db?: Database.Database | null): BatchTable
 
     for (const row of rows) {
       const status = String(row['status'] ?? '').trim().toLowerCase()
+      // Active/protected statuses: queued, submitted, running, downloading (and any unknown non-closed status)
       const isClosed = status === 'completed' || status === 'failed' || status === 'cancelled'
       const targetSet = isClosed ? closedIdentifiers : activeIdentifiers
 

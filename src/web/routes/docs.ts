@@ -58,7 +58,7 @@ export async function tryHandleDocs(ctx: RouteContext): Promise<boolean> {
         const rank = pinRank(name)
         return { name, title, created, pinned: rank < 100, searchText, rank, ms }
       })
-      // Pinned tutorial/handbook chapters (00-..05-, README.md) come first in numerical order,
+      // Pinned tutorial/handbook chapters (00-..06-, README.md) come first in numerical order,
       // followed by remaining docs newest-first.
       .sort((a, b) => (a.rank - b.rank) || (b.ms - a.ms) || a.name.localeCompare(b.name))
       .map(({ name, title, created, pinned, searchText }) => ({ name, title, created, pinned, searchText }))
