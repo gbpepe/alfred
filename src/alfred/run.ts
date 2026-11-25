@@ -14,7 +14,9 @@ import {
   createAlfredDiscordSender,
   formatSystemAlertDiscordMessage,
   isCliProvider,
+  pollPendingBatches,
   prefixTestReply,
+  recoverStuckBatchJobs,
   resolveAlfredRuntimeEnv,
   runHousekeeping,
   SystemAlertTracker,
@@ -39,6 +41,7 @@ export interface ResourceHeartbeatTickOptions {
   runRoutineWalCheckpoint?: boolean
   collectTelemetryFn?: typeof collectSystemTelemetry
   runHousekeepingFn?: typeof runHousekeeping
+  pollPendingBatchesFn?: typeof pollPendingBatches
 }
 
 export interface ResourceHeartbeatTickResult {
@@ -47,6 +50,7 @@ export interface ResourceHeartbeatTickResult {
   alertSent: boolean
   opsChannelId: string | null
   alertMessage: string | null
+  batchPollResult?: { polled: number; completed: number; failed: number; errors: Array<{ batchId: string; error: string }> } | null
 }
 
 function resolveOpsDiscordChannelId(
@@ -128,12 +132,31 @@ export async function runResourceHeartbeatTick(
     }
   }
 
+  let batchPollResult: ResourceHeartbeatTickResult['batchPollResult'] = null
+  if (opts.db) {
+    try {
+      const pollFn = opts.pollPendingBatchesFn ?? pollPendingBatches
+      batchPollResult = await pollFn({
+        db: opts.db,
+        projectRoot: opts.projectRoot,
+        env,
+        runtimeEnv: opts.runtimeEnv,
+        agentsConfig: opts.agentsConfig,
+        sendToDiscord: opts.sendToDiscord,
+        nowSec: opts.nowMs ? Math.floor(opts.nowMs / 1000) : undefined,
+      })
+    } catch (err) {
+      logger.warn({ err: sanitizeStartupError(err) }, 'Heartbeat pollPendingBatches failed (non-fatal)')
+    }
+  }
+
   return {
     telemetry,
     cleanupResult,
     alertSent,
     opsChannelId,
     alertMessage,
+    batchPollResult,
   }
 }
 
@@ -155,6 +178,15 @@ async function main(): Promise<void> {
   }
   initDatabase(runtimeEnv.dbPath)
   const db = getDb()
+
+  try {
+    const rec = recoverStuckBatchJobs(db)
+    if (rec.recoveredDownloadingJobs > 0 || rec.cleanedOrphanHolds > 0) {
+      logger.info(rec, 'Recovered stuck batch jobs / orphaned heavy-job-holds on startup')
+    }
+  } catch (err) {
+    logger.warn({ err: sanitizeStartupError(err) }, 'Batch startup crash-recovery failed (non-fatal)')
+  }
 
   let cfg = bootAlfredCore({ env })
   if (!cfg) {

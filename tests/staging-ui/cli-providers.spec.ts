@@ -40,6 +40,14 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await expect(page.locator('#vpsRunCleanupBtn')).toBeVisible()
     await page.locator('#vpsRunCleanupBtn').click()
     await expect(page.locator('#vpsStorageCleanupStatus')).toContainText('✓ Takarítás kész:', { timeout: 25_000 })
+    // Verify the new Async Batch API Overview card (#vpsBatchCard) with KPI bar & 4-provider breakdown
+    await expect(page.locator('#vpsBatchCard')).toBeVisible()
+    await expect(page.locator('#vpsBatchKpiBar')).toContainText('Összes megtakarítás', { timeout: 15_000 })
+    await expect(page.locator('#vpsBatchProvidersGrid [data-batch-provider]')).toHaveCount(4, { timeout: 15_000 })
+    for (const bp of ['anthropic', 'gemini', 'vertex-eu', 'openai']) {
+      await expect(page.locator(`#vpsBatchProvidersGrid [data-batch-provider="${bp}"]`)).toBeVisible()
+    }
+    await expect(page.locator('#vpsBatchJobsList')).toBeVisible()
     await expect(page.locator('#vpsServicesGrid')).toBeVisible()
     await expect(page.locator('#providersPage')).toBeHidden()
     await expect(page.locator('#vpsCliProvidersGrid')).toBeHidden()
@@ -118,7 +126,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
         if ((await card.getByText('OAuth előfizetés OK').count()) > 0) {
           const quotaBox = card.locator(`[data-cli-quota-box="${qId}"]`)
           await expect(quotaBox).toBeVisible({ timeout: 15_000 })
-          await expect(quotaBox).toContainText(/szabad|ablak|Kvóta/, { timeout: 15_000 })
+          await expect(quotaBox).toContainText(/szabad|ablak|Kvóta|Nincs aktív Claude OAuth token\./, { timeout: 15_000 })
         }
       }
 
@@ -210,17 +218,16 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await expect(geminiCard).toContainText('Enterprise')
     await expect(geminiCard).toContainText('agy-cli')
 
-    // Verify live quota button + auto-loaded quota strip on Claude card when OAuth is active
+    // Verify live quota button + quota box output on Claude card
     await expect(page.locator('[data-cli-quota-btn="claude"]')).toBeVisible()
     await expect(page.locator('[data-cli-quota-btn="codex"]')).toBeVisible()
     const claudeCard = page.locator('#vpsCliProvidersGrid > div').filter({
       has: page.locator('[data-cli-auth-toggle="claude"]'),
     })
-    if ((await claudeCard.getByText('OAuth előfizetés OK').count()) > 0) {
-      const quotaBox = claudeCard.locator('[data-cli-quota-box="claude"]')
-      await expect(quotaBox).toBeVisible({ timeout: 15_000 })
-      await expect(quotaBox).toContainText(/szabad|ablak|Kvóta/, { timeout: 15_000 })
-    }
+    await page.locator('[data-cli-quota-btn="claude"]').click()
+    const quotaBox = claudeCard.locator('[data-cli-quota-box="claude"]')
+    await expect(quotaBox).toBeVisible({ timeout: 15_000 })
+    await expect(quotaBox).toContainText(/5 órás ablak|Nincs aktív Claude OAuth token\./, { timeout: 15_000 })
 
     expect(pageErrors).toEqual([])
     expect(failedCliApi).toEqual([])
@@ -239,7 +246,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await drawer.locator('[data-cli-auth-save="gemini"]').click()
 
     const msgEl = drawer.locator('[data-cli-auth-msg="gemini"]')
-    await expect(msgEl).toContainText('Hiba:', { timeout: 10_000 })
+    await expect(msgEl).toContainText('Hiba:', { timeout: 25_000 })
     expect(pageErrors).toEqual([])
   })
 

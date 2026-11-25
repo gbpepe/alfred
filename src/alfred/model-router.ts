@@ -1,6 +1,16 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type Database from 'better-sqlite3'
+import { PROJECT_ROOT } from '../config.js'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
+import {
+  decideQuotaAction,
+  QUOTA_GATE,
+  type QuotaAction,
+  type QuotaSnapshot,
+  type QuotaWorkClass,
+} from '../quota-gate.js'
 import type { AlfredAgentDefinition, AlfredCliProviderName, AlfredProviderName } from './agents-config.js'
 import { isCliProvider } from './agents-config.js'
 import {
@@ -64,6 +74,15 @@ export interface ProviderCallResult {
   model: string
 }
 
+export interface QuotaBatchAdvice {
+  provider: AlfredCliProviderName
+  action: QuotaAction
+  reason: string
+  pressure: number | null
+  recommendBatch: boolean
+  suggestionHu: string | null
+}
+
 export interface HybridRouterOptions {
   db: Database.Database
   agent: AlfredAgentDefinition
@@ -79,6 +98,9 @@ export interface HybridRouterOptions {
   cliProcessRunner?: CliProcessRunner
   onCliQueued?: (position: number) => void
   nowSec?: number
+  projectRoot?: string
+  quotaWorkClass?: QuotaWorkClass
+  quotaSnapshotOverride?: QuotaSnapshot | null
 }
 
 export type HybridRouterOutcome =
@@ -90,6 +112,7 @@ export type HybridRouterOutcome =
     iterations: number
     totalUsage: ProviderUsageMetrics
     toolCallsExecuted: Array<{ name: string; args: Record<string, unknown>; output: string }>
+    quotaAdvice?: QuotaBatchAdvice
   }
   | {
     ok: false
@@ -107,6 +130,73 @@ export type HybridRouterOutcome =
   }
 
 const EU_VERTEX_REGION_RE = /^(eu|europe-[a-z0-9-]+)$/
+
+/**
+ * Provider-aware quota-gate evaluation for CLI providers (`claude-cli`, `agy-cli`, `codex-cli`, `gemini-cli`).
+ * Reads `store/usage-latest.json` (selecting the matching provider section) and invokes `decideQuotaAction`.
+ * Returns structured metadata (`QuotaBatchAdvice`) so callers can surface a Batch redirect suggestion
+ * without mutating the model's raw `replyText`.
+ */
+export function evaluateCliQuotaForBatch(opts: {
+  provider: AlfredCliProviderName
+  projectRoot?: string
+  env?: Record<string, string | undefined>
+  nowMs?: number
+  workClass?: QuotaWorkClass
+  snapshotOverride?: QuotaSnapshot | null
+}): QuotaBatchAdvice {
+  const nowMs = opts.nowMs ?? Date.now()
+  let snapshot: QuotaSnapshot | null = opts.snapshotOverride !== undefined ? opts.snapshotOverride : null
+
+  if (opts.snapshotOverride === undefined) {
+    const usageFile = join(opts.projectRoot ?? PROJECT_ROOT, 'store', 'usage-latest.json')
+    if (existsSync(usageFile)) {
+      try {
+        const raw = JSON.parse(readFileSync(usageFile, 'utf-8')) as Record<string, unknown>
+        const keyCandidates: Record<AlfredCliProviderName, string[]> = {
+          'claude-cli': ['claude', 'claude-cli'],
+          'agy-cli': ['agy', 'antigravity', 'agy-cli'],
+          'codex-cli': ['codex', 'codex-cli'],
+          'gemini-cli': ['gemini', 'gemini-cli'],
+        }
+        for (const k of keyCandidates[opts.provider] ?? []) {
+          const sec = raw[k]
+          if (sec && typeof sec === 'object' && !Array.isArray(sec)) {
+            snapshot = sec as QuotaSnapshot
+            break
+          }
+        }
+      } catch {
+        snapshot = null
+      }
+    }
+  }
+
+  const hardRaw = Number(opts.env?.['QUOTA_GATE_HARD_AT_PERCENT'] ?? process.env['QUOTA_GATE_HARD_AT_PERCENT'] ?? 0)
+  const hardAtPercent = Number.isFinite(hardRaw) && hardRaw > 0 ? hardRaw : undefined
+
+  const decision = decideQuotaAction({
+    snapshot,
+    nowMs,
+    workClass: opts.workClass ?? 'background',
+    hardAtPercent,
+  })
+
+  const recommendBatch =
+    decision.action === 'defer' ||
+    (decision.pressure !== null && decision.pressure >= QUOTA_GATE.nearResetPercent)
+
+  return {
+    provider: opts.provider,
+    action: decision.action,
+    reason: decision.reason,
+    pressure: decision.pressure,
+    recommendBatch,
+    suggestionHu: recommendBatch
+      ? `A(z) ${opts.provider} előfizetési kvóta telítettsége magas (${decision.pressure ?? 'ismeretlen'}%, ${decision.reason}). Tömeges vagy nem azonnali feladatokhoz irányítsd át a munkát az alfred-batch (#alfred-batch) 50%-os Batch API feldolgozójához!`
+      : null,
+  }
+}
 
 /**
  * Validates that a Vertex AI location is strictly inside the European Union
@@ -482,6 +572,26 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
       throw err
     }
 
+    const quotaAdvice = evaluateCliQuotaForBatch({
+      provider: opts.agent.provider,
+      projectRoot: opts.projectRoot,
+      env: envMap,
+      nowMs: opts.nowSec ? opts.nowSec * 1000 : Date.now(),
+      workClass: opts.quotaWorkClass,
+      snapshotOverride: opts.quotaSnapshotOverride,
+    })
+    if (quotaAdvice.recommendBatch) {
+      logger.info(
+        {
+          agentId: opts.agent.id,
+          provider: opts.agent.provider,
+          pressure: quotaAdvice.pressure,
+          reason: quotaAdvice.reason,
+        },
+        'QuotaGate suggests redirecting bulk/deferrable work to alfred-batch',
+      )
+    }
+
     const cliRunner = opts.cliRunner ?? runCliAgent
     try {
       const cliRes = await cliRunner({
@@ -517,6 +627,7 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
         iterations: 1,
         totalUsage: cliRes.usage,
         toolCallsExecuted: [],
+        quotaAdvice,
       }
     } catch (err) {
       if (err instanceof ProtectedPathError) {

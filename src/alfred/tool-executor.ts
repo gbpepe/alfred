@@ -5,6 +5,16 @@ import type Database from 'better-sqlite3'
 import type { AlfredAgentDefinition, AllowedToolName } from './agents-config.js'
 import { getCliInventory, installOrUpdateCli, removeCli } from './cli-manager.js'
 import type { CliProcessRunner } from './cli-runner.js'
+import {
+  cancelBatchJob,
+  getBatchJobById,
+  listBatchJobs,
+  pollBatchJob,
+  resolveBatchConfinedPath,
+  submitBatchJob,
+  type BatchTaskType,
+  type RequestedBatchProvider,
+} from './batch-runner.js'
 import { runHousekeeping } from './housekeeper.js'
 import { collectSystemTelemetry } from './system-monitor.js'
 
@@ -164,6 +174,100 @@ export const TOOL_SCHEMAS: Record<AllowedToolName, OpenAiToolSchema> = {
           },
         },
         required: ['action'],
+      },
+    },
+  },
+  batch_submit: {
+    type: 'function',
+    function: {
+      name: 'batch_submit',
+      description: 'Submit a canonical JSONL file (under batch/ or store/batch/) to the Multi-Provider Async Batch API (50% API discount). Supports auto provider selection, GDPR eu_only routing, secret-gate scanning, and pre-flight budget checks.',
+      parameters: {
+        type: 'object',
+        properties: {
+          input_path: {
+            type: 'string',
+            description: 'Relative path to canonical JSONL input file inside batch/ or store/batch/.',
+          },
+          provider: {
+            type: 'string',
+            enum: ['auto', 'anthropic', 'gemini', 'vertex-eu', 'openai'],
+            description: 'Target Batch provider (default: "auto").',
+          },
+          model: {
+            type: 'string',
+            description: 'Optional model override for the chosen provider.',
+          },
+          task_type: {
+            type: 'string',
+            enum: ['code', 'reasoning', 'translation', 'extraction', 'general'],
+            description: 'Optional task type hint for auto routing.',
+          },
+          eu_only: {
+            type: 'boolean',
+            description: 'When true, strictly routes to vertex-eu (europe-central2) with no non-EU fallback.',
+          },
+        },
+        required: ['input_path'],
+      },
+    },
+  },
+  batch_status: {
+    type: 'function',
+    function: {
+      name: 'batch_status',
+      description: 'Inspect the status, progress, and cost/savings of a batch job. Set poll=true to query the upstream provider now.',
+      parameters: {
+        type: 'object',
+        properties: {
+          batch_id: {
+            type: 'string',
+            description: 'Local batch job ID (e.g. "batch_1700000000_abcd1234").',
+          },
+          poll: {
+            type: 'boolean',
+            description: 'Whether to poll the upstream provider immediately (default: false).',
+          },
+        },
+        required: ['batch_id'],
+      },
+    },
+  },
+  batch_list: {
+    type: 'function',
+    function: {
+      name: 'batch_list',
+      description: 'List recent asynchronous batch jobs, optionally filtered by status.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['queued', 'submitted', 'running', 'downloading', 'completed', 'failed', 'cancelled'],
+            description: 'Optional status filter.',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum number of jobs to return (default: 20, max: 100).',
+          },
+        },
+      },
+    },
+  },
+  batch_cancel: {
+    type: 'function',
+    function: {
+      name: 'batch_cancel',
+      description: 'Cancel an active asynchronous batch job at the upstream provider and mark it cancelled locally.',
+      parameters: {
+        type: 'object',
+        properties: {
+          batch_id: {
+            type: 'string',
+            description: 'Local batch job ID to cancel.',
+          },
+        },
+        required: ['batch_id'],
       },
     },
   },
@@ -962,6 +1066,12 @@ export function executeWhitelistedTool(
       const reqPath = typeof rawArgs.path === 'string' ? rawArgs.path.trim() : ''
       if (!reqPath) throw new Error('fs_write requires a non-empty "path"')
       const content = typeof rawArgs.content === 'string' ? rawArgs.content : ''
+      if (ctx.agent.id === 'alfred-batch') {
+        const confinedTarget = resolveBatchConfinedPath(ctx.agent.workspaceAbsPath, reqPath)
+        mkdirSync(dirname(confinedTarget), { recursive: true })
+        writeFileSync(confinedTarget, content, 'utf-8')
+        return `OK: Wrote ${Buffer.byteLength(content, 'utf-8')} bytes to ${reqPath}`
+      }
       const target = resolvePathInWorkspace(ctx.agent.workspaceAbsPath, reqPath)
       assertWriteAllowed(ctx.agent, target, reqPath)
       mkdirSync(dirname(target), { recursive: true })
@@ -1087,6 +1197,13 @@ export function executeWhitelistedTool(
       }
       throw new Error('system_storage is asynchronous; invoke executeWhitelistedToolAsync()')
     }
+
+    case 'batch_submit':
+    case 'batch_status':
+    case 'batch_list':
+    case 'batch_cancel': {
+      throw new Error(`${toolName} is asynchronous; invoke executeWhitelistedToolAsync()`)
+    }
   }
 }
 
@@ -1174,6 +1291,73 @@ export async function executeWhitelistedToolAsync(
       return JSON.stringify({ ok: true, cleanup, system }, null, 2)
     }
     throw new Error(`system_storage: unsupported action "${action}". Allowed: status, cleanup`)
+  }
+
+  if (toolName === 'batch_submit') {
+    const inputPath = typeof rawArgs.input_path === 'string' ? rawArgs.input_path.trim() : ''
+    if (!inputPath) throw new Error('batch_submit requires a non-empty "input_path"')
+    const provider =
+      typeof rawArgs.provider === 'string' && rawArgs.provider.trim()
+        ? (rawArgs.provider.trim() as RequestedBatchProvider)
+        : 'auto'
+    const model = typeof rawArgs.model === 'string' && rawArgs.model.trim() ? rawArgs.model.trim() : undefined
+    const taskType =
+      typeof rawArgs.task_type === 'string' && rawArgs.task_type.trim()
+        ? (rawArgs.task_type.trim() as BatchTaskType)
+        : undefined
+    const euOnly = rawArgs.eu_only === true
+    const job = await submitBatchJob({
+      db: ctx.db,
+      inputPath,
+      provider,
+      model,
+      taskType,
+      euOnly,
+      agentId: ctx.agent.id,
+      agentDailyLimitUsd: ctx.agent.dailyBudgetUsd,
+      discordChannelId: ctx.chatId ?? ctx.agent.discordChannelId ?? null,
+      projectRoot: ctx.agent.workspaceAbsPath,
+      env: opts?.env,
+    })
+    return JSON.stringify({ ok: true, job }, null, 2)
+  }
+
+  if (toolName === 'batch_status') {
+    const batchId = typeof rawArgs.batch_id === 'string' ? rawArgs.batch_id.trim() : ''
+    if (!batchId) throw new Error('batch_status requires a non-empty "batch_id"')
+    if (rawArgs.poll === true) {
+      const res = await pollBatchJob({
+        db: ctx.db,
+        batchId,
+        projectRoot: ctx.agent.workspaceAbsPath,
+        env: opts?.env,
+      })
+      return JSON.stringify({ ok: true, ...res }, null, 2)
+    }
+    const job = getBatchJobById(ctx.db, batchId)
+    if (!job) {
+      return JSON.stringify({ ok: false, error: `Batch job not found: ${batchId}` })
+    }
+    return JSON.stringify({ ok: true, job }, null, 2)
+  }
+
+  if (toolName === 'batch_list') {
+    const status = typeof rawArgs.status === 'string' ? rawArgs.status.trim() : undefined
+    const limit = typeof rawArgs.limit === 'number' && Number.isFinite(rawArgs.limit) ? rawArgs.limit : 20
+    const jobs = listBatchJobs(ctx.db, { status, limit })
+    return JSON.stringify({ ok: true, count: jobs.length, jobs }, null, 2)
+  }
+
+  if (toolName === 'batch_cancel') {
+    const batchId = typeof rawArgs.batch_id === 'string' ? rawArgs.batch_id.trim() : ''
+    if (!batchId) throw new Error('batch_cancel requires a non-empty "batch_id"')
+    const job = await cancelBatchJob({
+      db: ctx.db,
+      batchId,
+      projectRoot: ctx.agent.workspaceAbsPath,
+      env: opts?.env,
+    })
+    return JSON.stringify({ ok: true, job }, null, 2)
   }
 
   return executeWhitelistedTool(ctx, toolName, rawArgs)

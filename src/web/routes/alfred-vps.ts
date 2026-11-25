@@ -68,6 +68,11 @@ import {
   type ChatMessage,
 } from '../../alfred/model-router.js'
 import { resolveAlfredRuntimeEnv } from '../../alfred/runtime-env.js'
+import {
+  BatchValidationError,
+  cancelBatchJob,
+  getAdminBatchesOverview,
+} from '../../alfred/batch-runner.js'
 import { runHousekeeping } from '../../alfred/housekeeper.js'
 import { collectSystemTelemetry } from '../../alfred/system-monitor.js'
 import { json, readBody } from '../http-helpers.js'
@@ -83,9 +88,10 @@ async function readJsonBody<T>(req: RouteContext['req'], maxBytes?: number): Pro
 
 const ALLOWED_LOG_UNITS = new Set(['alfred-prod', 'alfred-ops', 'alfred-test', 'alfred-web'])
 const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'spinup-test', 'reload-test', 'teardown-test'])
-const SAFE_BRANCH_RE = /^((feat|fix)\/(self|core)-[a-z0-9._/-]{0,79}|core-[a-z0-9._/-]{1,79})$/
+const SAFE_BRANCH_RE = /^[a-zA-Z0-9._/-]{1,80}$/
 
 function validateOpsBranch(branch: string): boolean {
+  if (branch === 'main' || branch === 'master') return false
   if (!SAFE_BRANCH_RE.test(branch)) return false
   if (branch.includes('..') || branch.includes('//') || branch.startsWith('-') || branch.endsWith('.') || branch.endsWith('/') || branch.endsWith('.lock')) {
     return false
@@ -472,6 +478,46 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       json(res, { ok: false, error: msg }, 500)
+    }
+    return true
+  }
+
+  if (path === '/api/admin/batches' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const db = getDb()
+      const overview = getAdminBatchesOverview(db, env)
+      json(res, { ok: true, ...overview })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      json(res, { ok: false, error: msg }, 500)
+    }
+    return true
+  }
+
+  const batchCancelMatch = /^\/api\/admin\/batches\/([^/]+)\/cancel$/.exec(path)
+  if (batchCancelMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const batchId = decodeURIComponent(batchCancelMatch[1]).trim()
+      const db = getDb()
+      const job = await cancelBatchJob({ db, batchId, env })
+      const overview = getAdminBatchesOverview(db, env)
+      json(res, { ok: true, job, ...overview })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const status = err instanceof BatchValidationError ? 404 : 500
+      json(res, { ok: false, error: msg }, status)
     }
     return true
   }
@@ -1209,7 +1255,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       return true
     }
     if (branch && !validateOpsBranch(branch)) {
-      json(res, { error: 'Invalid branch name (must match feat/self-*, fix/self-*, feat/core-*, or core-*)' }, 400)
+      json(res, { error: 'Invalid branch name (main/master and unsafe characters are not allowed)' }, 400)
       return true
     }
     const opsDir = process.env['ALFRED_OPS_DIR'] || '/opt/alfred-ops'

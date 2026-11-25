@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates an isolated staging git worktree for a `feat/self-*` or `fix/self-*` branch,
+# Creates an isolated staging git worktree for a feature/fix branch (excluding `main`/`master`),
 # copies `.env.test`, builds, runs `npm run test:alfred`, and boots `alfred-test`.
 
 set -euo pipefail
@@ -71,6 +71,16 @@ git -C "$SOURCE_REPO" worktree add "$TEST_DIR" "$BRANCH"
 mkdir -p "$TEST_DIR/store"
 cp "$TEST_ENV_FILE" "$TEST_DIR/.env"
 chmod 600 "$TEST_DIR/.env" || true
+if [[ -f "$PROD_DIR/.env" ]]; then
+  PROD_CLAUDE_OAUTH="$(grep -E '^CLAUDE_CODE_OAUTH_TOKEN=' "$PROD_DIR/.env" | tail -n 1 | cut -d= -f2- || true)"
+  if [[ -n "${PROD_CLAUDE_OAUTH// }" ]] && ! grep -qE '^CLAUDE_CODE_OAUTH_TOKEN=.+' "$TEST_DIR/.env"; then
+    if grep -qE '^CLAUDE_CODE_OAUTH_TOKEN=' "$TEST_DIR/.env"; then
+      sed -i.bak '/^CLAUDE_CODE_OAUTH_TOKEN=/d' "$TEST_DIR/.env" && rm -f "$TEST_DIR/.env.bak"
+    fi
+    printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$PROD_CLAUDE_OAUTH" >> "$TEST_DIR/.env"
+    log_info "Copied CLAUDE_CODE_OAUTH_TOKEN from $PROD_DIR/.env into staging .env"
+  fi
+fi
 rm -f "$TEST_DIR/store/alfred-test.db" "$TEST_DIR/store/alfred-test.db-wal" "$TEST_DIR/store/alfred-test.db-shm"
 if [[ -n "$TEST_SLUG" ]]; then
   write_test_ports_file "$TEST_DIR" "$BRANCH" "$TEST_SLUG"

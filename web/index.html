@@ -2337,6 +2337,24 @@
         <div id="vpsStorageDirs" style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px"></div>
         <div id="vpsStorageCleanupStatus" hidden style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px"></div>
       </div>
+
+      <div id="vpsBatchCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <strong>Aszinkron Batch Feldolgozó (50%-os API ár)</strong>
+            <span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#16a34a">-50% CostOps</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn-secondary btn-compact" id="vpsBatchRefreshBtn">Batch frissítése</button>
+          </div>
+        </div>
+        <div id="vpsBatchKpiBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px"></div>
+        <div style="font-size:12px;font-weight:600;opacity:.8;margin-bottom:6px">Szolgáltatónkénti megtakarítás-bontás</div>
+        <div id="vpsBatchProvidersGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:12px"></div>
+        <div style="font-size:12px;font-weight:600;opacity:.8;margin-bottom:6px">Futó és legutóbbi kötegek</div>
+        <div id="vpsBatchJobsList" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div id="vpsBatchStatusMsg" hidden style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px"></div>
+      </div>
       <div id="vpsServicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px"></div>
 
       <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">

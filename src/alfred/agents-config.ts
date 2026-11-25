@@ -110,6 +110,10 @@ export type AllowedToolName =
   | 'memory'
   | 'cli_manage'
   | 'system_storage'
+  | 'batch_submit'
+  | 'batch_status'
+  | 'batch_list'
+  | 'batch_cancel'
 
 export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'bash',
@@ -119,6 +123,10 @@ export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedTool
   'memory',
   'cli_manage',
   'system_storage',
+  'batch_submit',
+  'batch_status',
+  'batch_list',
+  'batch_cancel',
 ])
 
 const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
@@ -127,6 +135,8 @@ const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'git',
   'cli_manage',
   'system_storage',
+  'batch_submit',
+  'batch_cancel',
 ])
 
 export interface AlfredAgentDefinition {
