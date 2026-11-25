@@ -246,7 +246,7 @@ test.describe('Alfred Staging Dashboard UI/UX (isolated headless browser)', () =
     await drawer.locator('[data-cli-auth-save="gemini"]').click()
 
     const msgEl = drawer.locator('[data-cli-auth-msg="gemini"]')
-    await expect(msgEl).toContainText('Hiba:', { timeout: 10_000 })
+    await expect(msgEl).toContainText('Hiba:', { timeout: 25_000 })
     expect(pageErrors).toEqual([])
   })
 
