@@ -3408,7 +3408,7 @@
           }).join('')
 
           const secretWarnings = (m.missingSecrets || []).map(function (sec) {
-            return '<button type="button" data-vault-jump="' + esc(sec) + '" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.12);color:#b45309;cursor:pointer">⚠ Hiányzó kulcs: ' + esc(sec) + '</button>'
+            return '<button type="button" data-vault-jump="' + esc(sec) + '" title="API-kulcsokat és tokeneket mindig a titkosított #vault tárolóba vegyél fel — soha ne illessz be kulcsot chatbe!" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.12);color:#b45309;cursor:pointer">⚠ Hiányzó kulcs: ' + esc(sec) + '</button>'
           }).join('')
 
           const actionBtn = m.builtIn
@@ -3669,12 +3669,52 @@
       try { localStorage.setItem('alfred.modulesTipDismissed', '1') } catch { /* ignore */ }
     })
 
+    const helpBtn = document.getElementById('modulesHelpBtn')
     const helpPop = document.getElementById('modulesHelpPopover')
-    document.getElementById('modulesHelpBtn')?.addEventListener('click', function () {
+    helpBtn?.addEventListener('click', function (e) {
+      e.stopPropagation()
       if (helpPop) helpPop.hidden = !helpPop.hidden
     })
     document.getElementById('modulesHelpPopoverClose')?.addEventListener('click', function () {
       if (helpPop) helpPop.hidden = true
+    })
+    document.getElementById('modulesHelpOpenDocsBtn')?.addEventListener('click', function () {
+      if (helpPop) helpPop.hidden = true
+      if (typeof window.openDocChapter === 'function') {
+        window.openDocChapter('07-modul-es-ugynok-katalogus.md')
+      } else {
+        window._pendingDocName = '07-modul-es-ugynok-katalogus.md'
+        if (typeof window.switchPage === 'function') {
+          location.hash = 'docs'
+          window.switchPage('docs')
+        } else {
+          location.hash = 'docs'
+        }
+      }
+    })
+    document.getElementById('modulesRestoreTipsBtn')?.addEventListener('click', function () {
+      try { localStorage.removeItem('alfred.modulesTipDismissed') } catch { /* ignore */ }
+      if (tipEl) { tipEl.hidden = false; tipEl.style.display = 'flex' }
+      if (helpPop) helpPop.hidden = true
+    })
+
+    document.addEventListener('click', function (e) {
+      if (!helpPop || helpPop.hidden) return
+      if (helpPop.contains(e.target) || (helpBtn && helpBtn.contains(e.target))) return
+      helpPop.hidden = true
+    })
+
+    const sectionHelps = [
+      ['modulesRamHelpBtn', 'modulesRamHelpBox'],
+      ['systemModulesHelpBtn', 'systemModulesHelpBox'],
+      ['agentCatalogHelpBtn', 'agentCatalogHelpBox'],
+    ]
+    sectionHelps.forEach(function (pair) {
+      const btn = document.getElementById(pair[0])
+      const box = document.getElementById(pair[1])
+      btn?.addEventListener('click', function () {
+        if (box) box.hidden = !box.hidden
+      })
     })
 
     document.getElementById('modulesRefreshBtn')?.addEventListener('click', refreshModulesPage)
@@ -3753,6 +3793,10 @@
 
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return
+      if (helpPop && !helpPop.hidden) {
+        helpPop.hidden = true
+        return
+      }
       const overlays = ['moduleConfirmOverlay', 'agentPostInstallOverlay', 'moduleDetailModalOverlay']
       for (let i = 0; i < overlays.length; i++) {
         const el = document.getElementById(overlays[i])

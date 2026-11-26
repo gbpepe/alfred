@@ -4787,7 +4787,7 @@ function renderAgents() {
       <div class="agent-card-top">
         <div class="agent-avatar ${gradientClass}">${avatarHtml}</div>
         <div class="agent-card-info">
-          <div class="agent-name">${escapeHtml(label)}${agent.nickname ? ` <span class="agent-nickname">${escapeHtml(agent.nickname)}</span>` : ''}${isCoreDisabled ? ' <span class="agent-disabled-badge" style="padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;background:#64748b;color:#fff;margin-left:4px">Kikapcsolva</span>' : ''}</div>
+          <div class="agent-name">${escapeHtml(label)}${agent.nickname ? ` <span class="agent-nickname">${escapeHtml(agent.nickname)}</span>` : ''}${isCoreDisabled ? ' <span class="agent-disabled-badge" title="Telepítve, de leállítva (0 MB RAM, nem válaszol Discordon) — egy kattintással bekapcsolható" style="padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;background:#64748b;color:#fff;margin-left:4px;cursor:help">Kikapcsolva</span>' : ''}</div>
           <div class="agent-desc">${escapeHtml(agent.description || '')}</div>
         </div>
       </div>
@@ -22765,10 +22765,20 @@ async function loadDocs() {
     return
   }
   const searchVal = document.getElementById('docsSearchInput')?.value || ''
-  const initialDoc = docs[0].name
+  const pendingDoc = window._pendingDocName
+  window._pendingDocName = null
+  const initialDoc = (pendingDoc && docs.some(d => d.name === pendingDoc)) ? pendingDoc : docs[0].name
   _docsCurrentName = initialDoc
   renderDocsSidebarList(searchVal)
   openDoc(initialDoc)
+}
+
+window.openDocChapter = function (name) {
+  window._pendingDocName = name
+  location.hash = 'docs'
+  if (typeof switchPage === 'function') {
+    switchPage('docs')
+  }
 }
 
 async function openDoc(name) {

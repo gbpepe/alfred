@@ -40,12 +40,45 @@ test.describe('Alfred Staging Dashboard — Module & Specialist Agent Manager (#
       await expect(page.locator('#modulesRamBar')).toBeVisible()
       await expect(page.locator('#modulesRamSummaryText')).toContainText('MB', { timeout: 15_000 })
 
-      // Inline tip & ? help popover
+      // Inline tip (dismiss + restore) & ? help popover (Esc close + section helps)
+      const introTip = page.locator('[data-inline-tip="modules-intro"]')
+      await expect(introTip).toBeVisible()
+      await page.locator('#modulesIntroTipClose').click()
+      await expect(introTip).toBeHidden()
+
       await expect(page.locator('#modulesHelpBtn')).toBeVisible()
       await page.locator('#modulesHelpBtn').click()
       await expect(page.locator('#modulesHelpPopover')).toBeVisible()
-      await page.locator('#modulesHelpPopoverClose').click()
+      await page.locator('#modulesRestoreTipsBtn').click()
+      await expect(introTip).toBeVisible()
       await expect(page.locator('#modulesHelpPopover')).toBeHidden()
+
+      // Escape key closes help popover
+      await page.locator('#modulesHelpBtn').click()
+      await expect(page.locator('#modulesHelpPopover')).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#modulesHelpPopover')).toBeHidden()
+
+      // Section-level ? inline help toggles
+      for (const [btnId, boxId] of [
+        ['#modulesRamHelpBtn', '#modulesRamHelpBox'],
+        ['#systemModulesHelpBtn', '#systemModulesHelpBox'],
+        ['#agentCatalogHelpBtn', '#agentCatalogHelpBox'],
+      ]) {
+        await page.locator(btnId).click()
+        await expect(page.locator(boxId)).toBeVisible()
+        await page.locator(btnId).click()
+        await expect(page.locator(boxId)).toBeHidden()
+      }
+
+      // Direct #docs chapter 07 API + popover jump verification
+      const docResp = await request.get('/api/docs/07-modul-es-ugynok-katalogus.md', { headers: authHeaders })
+      expect(docResp.status()).toBe(200)
+      const docsListResp = await request.get('/api/docs', { headers: authHeaders })
+      expect(docsListResp.status()).toBe(200)
+      const docsList = (await docsListResp.json()) as Array<{ name: string; pinned?: boolean }>
+      const ch07 = docsList.find((d) => d.name === '07-modul-es-ugynok-katalogus.md')
+      expect(ch07?.pinned).toBe(true)
 
       // 2. Built-in modules locked, batch-api active
       for (const builtInId of ['core-cli', 'core-ops']) {
@@ -122,6 +155,16 @@ test.describe('Alfred Staging Dashboard — Module & Specialist Agent Manager (#
       await page.locator('.sb-link[data-page="vps"]').click()
       await expect(page.locator('#vpsBatchCard')).toBeVisible({ timeout: 15_000 })
       await expect(page.locator('#vpsHiddenModulesNotice')).toBeHidden({ timeout: 15_000 })
+
+      // 10. Open chapter 07 directly from #modules header ? popover -> #docs
+      await page.locator('.sb-link[data-page="modules"]').click()
+      await expect(page.locator('#modulesPage')).toBeVisible({ timeout: 15_000 })
+      await page.locator('#modulesHelpBtn').click()
+      await expect(page.locator('#modulesHelpPopover')).toBeVisible()
+      await page.locator('#modulesHelpOpenDocsBtn').click()
+      await expect(page.locator('#docsPage')).toBeVisible({ timeout: 15_000 })
+      await expect(page.locator('#docsContent')).toContainText('Modul- és Ügynökkatalógus', { timeout: 15_000 })
+      await expect(page.locator('#docsContent')).toContainText('Admin REST API Referencia', { timeout: 15_000 })
 
       expect(pageErrors).toEqual([])
     } finally {
