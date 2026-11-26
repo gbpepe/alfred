@@ -24,8 +24,41 @@
       },
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data.error || data.output || 'HTTP ' + res.status)
+    if (!res.ok) {
+      const err = new Error(data.error || data.output || 'HTTP ' + res.status)
+      err.status = res.status
+      err.code = data.code
+      err.details = data.details
+      throw err
+    }
     return data
+  }
+
+  function applyModuleCardVisibility(activeModuleIds) {
+    const cards = document.querySelectorAll('#vpsPage [data-module-card]')
+    const noticeEl = document.getElementById('vpsHiddenModulesNotice')
+    const noticeTextEl = document.getElementById('vpsHiddenModulesText')
+    if (!Array.isArray(activeModuleIds) || activeModuleIds.length === 0) {
+      cards.forEach(function (el) { el.hidden = false })
+      if (noticeEl) { noticeEl.hidden = true; noticeEl.style.display = 'none' }
+      return null
+    }
+    const activeSet = new Set(activeModuleIds)
+    let hiddenCount = 0
+    cards.forEach(function (el) {
+      const modId = el.getAttribute('data-module-card')
+      const shouldHide = Boolean(modId && !activeSet.has(modId))
+      el.hidden = shouldHide
+      if (shouldHide) hiddenCount += 1
+    })
+    if (noticeEl) {
+      noticeEl.hidden = hiddenCount === 0
+      noticeEl.style.display = hiddenCount === 0 ? 'none' : 'flex'
+      if (noticeTextEl && hiddenCount > 0) {
+        noticeTextEl.textContent = hiddenCount + ' kikapcsolt modul kártyája elrejtve'
+      }
+    }
+    return activeSet
   }
 
   async function refreshVpsStatus() {
@@ -80,8 +113,11 @@
 
       renderRolesGrid(data.roles || [], data.agents || [])
       renderMultiTests(data.multiTests || [])
+      const activeModSet = applyModuleCardVisibility(data.activeModuleIds)
       refreshVpsSystemStorage()
-      refreshVpsBatches()
+      if (!activeModSet || activeModSet.has('batch-api')) {
+        refreshVpsBatches()
+      }
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
@@ -3051,12 +3087,675 @@
     refreshProvidersMcpServers()
   }
 
+  // === Odoo-style Modules & Specialist Agent Catalog (#modulesPage) ===
+  let modulesDataCache = { modules: [], agentPackages: [], totalActiveRamMb: 0, systemMemory: null }
+  let modFilterQuery = ''
+  let modFilterState = 'all'
+  let modFilterCategory = 'all'
+  let modulesWired = false
+  let pendingConfirmHandler = null
+  let postInstallAgentId = null
+
+  const MODULE_CAT_ICONS = {
+    core: '⚙️',
+    storage: '☁️',
+    compute: '🖥️',
+    automation: '⚡',
+    security: '🛡️',
+    development: '💻',
+    quality: '🧪',
+    architecture: '🏛️',
+    media: '🎬',
+    general: '🤖',
+  }
+
+  function showModulesStatus(msg, isError) {
+    const el = document.getElementById('modulesActionStatus')
+    if (!el) return
+    if (!msg) {
+      el.hidden = true
+      el.textContent = ''
+      return
+    }
+    el.hidden = false
+    el.style.borderColor = isError ? '#dc2626' : '#16a34a'
+    el.style.color = isError ? '#dc2626' : '#15803d'
+    el.textContent = msg
+  }
+
+  function openOverlayModal(id) {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.hidden = false
+    el.classList.add('active')
+  }
+
+  function closeOverlayModal(id) {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.classList.remove('active')
+    el.hidden = true
+  }
+
+  function openVaultWithPrefill(secretKey) {
+    closeOverlayModal('agentPostInstallOverlay')
+    closeOverlayModal('moduleDetailModalOverlay')
+    if (typeof window.switchPage === 'function') {
+      location.hash = 'vault'
+      window.switchPage('vault')
+    } else {
+      location.hash = 'vault'
+    }
+    setTimeout(function () {
+      const panel = document.getElementById('vaultAddPanel')
+      const inp = document.getElementById('vaultPageIdInput')
+      if (panel) panel.hidden = false
+      if (inp) {
+        inp.value = secretKey || ''
+        inp.focus()
+      }
+    }, 150)
+  }
+
+  async function syncAfterModuleMutation(data) {
+    if (data && Array.isArray(data.modules)) {
+      modulesDataCache = {
+        modules: data.modules,
+        agentPackages: Array.isArray(data.agentPackages) ? data.agentPackages : modulesDataCache.agentPackages,
+        totalActiveRamMb: typeof data.totalActiveRamMb === 'number' ? data.totalActiveRamMb : modulesDataCache.totalActiveRamMb,
+        systemMemory: data.systemMemory || modulesDataCache.systemMemory,
+      }
+      const activeIds = data.modules.filter(function (m) { return m.state === 'active' }).map(function (m) { return m.id })
+      applyModuleCardVisibility(activeIds)
+    }
+    renderModulesPage()
+    try { await ensureVpsRolesData(true) } catch { /* ignore */ }
+    if (document.getElementById('vpsPage') && !document.getElementById('vpsPage').hidden) {
+      refreshVpsStatus()
+    }
+    if (typeof window.loadAgents === 'function') {
+      try { window.loadAgents() } catch { /* ignore */ }
+    }
+  }
+
+  function openModuleDetailModal(kind, id) {
+    const titleEl = document.getElementById('moduleDetailTitle')
+    const bodyEl = document.getElementById('moduleDetailBody')
+    if (!titleEl || !bodyEl) return
+    if (kind === 'module') {
+      const m = (modulesDataCache.modules || []).find(function (x) { return x.id === id })
+      if (!m) return
+      titleEl.textContent = (MODULE_CAT_ICONS[m.category] || '📦') + ' ' + m.name + ' (v' + m.version + ')'
+      const depAgents = (m.activeDependentAgents || []).map(function (a) { return a.displayName + ' (' + a.id + ')' })
+      bodyEl.innerHTML =
+        '<div style="opacity:.85;line-height:1.45">' + esc(m.description) + '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">' +
+          '<div><div style="font-size:11px;opacity:.7">Azonosító</div><code>' + esc(m.id) + '</code></div>' +
+          '<div><div style="font-size:11px;opacity:.7">Kategória</div><b>' + esc(m.category) + '</b></div>' +
+          '<div><div style="font-size:11px;opacity:.7">Állapot</div><b>' + esc(m.state) + (m.builtIn ? ' (Alapmodul 🔒)' : '') + '</b></div>' +
+          '<div><div style="font-size:11px;opacity:.7">Becsült RAM</div><b>+' + esc(m.ramImpactMb) + ' MB</b></div>' +
+        '</div>' +
+        '<div><strong>Regisztrált eszközök (tools):</strong> ' + (m.tools && m.tools.length ? m.tools.map(function (t) { return '<code>' + esc(t) + '</code>' }).join(' ') : '<span style="opacity:.65">nincs</span>') + '</div>' +
+        '<div><strong>Függőségek (depends):</strong> ' + (m.depends && m.depends.length ? m.depends.map(function (d) { return '<code>' + esc(d) + '</code>' }).join(' ') : '<span style="opacity:.65">nincs</span>') + '</div>' +
+        '<div><strong>Kapcsolódó UI kártyák:</strong> ' + (m.uiCardIds && m.uiCardIds.length ? m.uiCardIds.map(function (c) { return '<code>#' + esc(c) + '</code>' }).join(' ') : '<span style="opacity:.65">nincs</span>') + '</div>' +
+        '<div><strong>Kötelező Vault kulcsok:</strong> ' + (m.requiredSecrets && m.requiredSecrets.length ? m.requiredSecrets.map(function (s) { return '<code>' + esc(s) + '</code>' }).join(' ') : '<span style="opacity:.65">nincs</span>') + '</div>' +
+        (m.activeDependentModules && m.activeDependentModules.length ? '<div><strong>Aktív függő modulok:</strong> ' + m.activeDependentModules.map(function (d) { return '<code>' + esc(d) + '</code>' }).join(' ') + '</div>' : '') +
+        (depAgents.length ? '<div><strong>Aktív függő ügynökök:</strong> ' + depAgents.map(esc).join(', ') + '</div>' : '')
+    } else {
+      const p = (modulesDataCache.agentPackages || []).find(function (x) { return x.id === id })
+      if (!p) return
+      titleEl.textContent = (MODULE_CAT_ICONS[p.category] || '🤖') + ' ' + p.displayName + ' (' + p.id + ')'
+      bodyEl.innerHTML =
+        '<div style="opacity:.85;line-height:1.45">' + esc(p.description) + '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">' +
+          '<div><div style="font-size:11px;opacity:.7">Szerepkör</div><b>' + esc(p.role) + '</b></div>' +
+          '<div><div style="font-size:11px;opacity:.7">Ajánlott modell</div><code>' + esc(p.recommendedProvider + '/' + p.recommendedModel) + '</code></div>' +
+          '<div><div style="font-size:11px;opacity:.7">Napi keret</div><b>$' + Number(p.dailyBudgetUsd || 0).toFixed(2) + '</b></div>' +
+          '<div><div style="font-size:11px;opacity:.7">Állapot</div><b>' + (p.installed ? (p.enabled ? 'Aktív' : 'Telepítve · Kikapcsolva') : 'Elérhető') + '</b></div>' +
+        '</div>' +
+        '<div><strong>Kötelező modulok:</strong> ' + (p.requiredModules && p.requiredModules.length ? p.requiredModules.map(function (m) { return '<code>' + esc(m) + '</code>' }).join(' ') : '<span style="opacity:.65">nincs</span>') + '</div>' +
+        '<div><strong>Eszközök (tools):</strong> ' + (p.tools && p.tools.length ? p.tools.map(function (t) { return '<code>' + esc(t) + '</code>' }).join(' ') : '<span style="opacity:.65">Zero-tool</span>') + '</div>' +
+        '<div><strong>Csomag skillek:</strong> ' + (p.skills && p.skills.length ? p.skills.map(function (s) { return '<code>' + esc(s) + '</code>' }).join(' ') : '<span style="opacity:.65">nincs</span>') + '</div>' +
+        (p.protectedPaths && p.protectedPaths.length ? '<div><strong>Védett útvonalak (protectedPaths):</strong> ' + p.protectedPaths.map(function (r) { return '<code>' + esc(r) + '</code>' }).join(' ') + '</div>' : '') +
+        (p.soulPreview
+          ? '<div><div style="font-weight:600;margin-bottom:4px">SOUL.md előnézet</div><pre style="white-space:pre-wrap;font-family:monospace;font-size:11px;max-height:220px;overflow:auto;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);margin:0">' + esc(p.soulPreview) + '</pre></div>'
+          : '')
+    }
+    openOverlayModal('moduleDetailModalOverlay')
+  }
+
+  function openConfirmModal(title, bodyHtml, okLabel, onConfirm) {
+    const titleEl = document.getElementById('moduleConfirmTitle')
+    const bodyEl = document.getElementById('moduleConfirmBody')
+    const okBtn = document.getElementById('moduleConfirmOkBtn')
+    if (!titleEl || !bodyEl || !okBtn) return
+    titleEl.textContent = title
+    bodyEl.innerHTML = bodyHtml
+    okBtn.textContent = okLabel || 'Megerősítés'
+    okBtn.disabled = false
+    pendingConfirmHandler = onConfirm
+    openOverlayModal('moduleConfirmOverlay')
+  }
+
+  function openPostInstallModal(agentId, result) {
+    const titleEl = document.getElementById('agentPostInstallTitle')
+    const bodyEl = document.getElementById('agentPostInstallBody')
+    const startBtn = document.getElementById('agentPostInstallStartBtn')
+    if (!titleEl || !bodyEl || !startBtn) return
+    const ag = (result && result.agent) || { id: agentId, displayName: agentId, missingModules: [], inactiveModules: [] }
+    postInstallAgentId = ag.id
+    titleEl.textContent = '✓ Telepítés kész: ' + (ag.displayName || ag.id)
+
+    const missingKeys = Array.isArray(result && result.missingSecretsOrEnv) ? result.missingSecretsOrEnv : []
+    const step1Html = missingKeys.length > 0
+      ? '<div style="padding:10px;border:1px solid #d97706;border-radius:8px;background:rgba(217,119,6,0.08)">' +
+          '<div style="font-weight:600;margin-bottom:6px">1. Hiányzó kulcsok / csatorna változók</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          missingKeys.map(function (k) {
+            return '<button type="button" class="btn-secondary btn-compact" data-vault-prefill="' + esc(k) + '" style="font-size:11px">🔑 ' + esc(k) + ' felvétele a Vaultba →</button>'
+          }).join('') +
+          '</div></div>'
+      : '<div style="padding:10px;border:1px solid #16a34a;border-radius:8px;background:rgba(22,163,74,0.08)"><b>1. Kulcsok &amp; előfeltételek:</b> Minden szükséges kulcs rendben van.</div>'
+
+    const step2Html =
+      '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<div><b>2. Finomhangolás (modell, szerepkör, hangprofil)</b><div style="font-size:11px;opacity:.75">Az ügynök biztonságosan Kikapcsolva állapotban jött létre.</div></div>' +
+        '<button type="button" class="btn-secondary btn-compact" id="postInstallGoAgentsBtn" style="font-size:12px">Megnyitás az Ügynökök lapon →</button>' +
+      '</div>'
+
+    const step3Html =
+      '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px">' +
+        '<b>3. Indítás:</b> Ha minden beállítás kész, kattints lent az <b>„Ügynök indítása most”</b> gombra.' +
+      '</div>'
+
+    bodyEl.innerHTML = step1Html + step2Html + step3Html
+    const canStart = !(ag.missingModules && ag.missingModules.length) && !(ag.inactiveModules && ag.inactiveModules.length)
+    startBtn.disabled = !canStart || Boolean(ag.enabled)
+    startBtn.textContent = ag.enabled ? 'Már aktív' : 'Ügynök indítása most'
+
+    bodyEl.querySelectorAll('[data-vault-prefill]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openVaultWithPrefill(btn.getAttribute('data-vault-prefill'))
+      })
+    })
+    document.getElementById('postInstallGoAgentsBtn')?.addEventListener('click', function () {
+      closeOverlayModal('agentPostInstallOverlay')
+      if (typeof window.switchPage === 'function') {
+        location.hash = 'agents'
+        window.switchPage('agents')
+      } else {
+        location.hash = 'agents'
+      }
+    })
+    openOverlayModal('agentPostInstallOverlay')
+  }
+
+  function renderModulesRamBar() {
+    const textEl = document.getElementById('modulesRamSummaryText')
+    const fillEl = document.getElementById('modulesRamBarFill')
+    const subEl = document.getElementById('modulesStatsSub')
+    if (!textEl || !fillEl) return
+    const sysMem = modulesDataCache.systemMemory || { memTotalMb: 2048, memUsedMb: 0, memAvailMb: 2048 }
+    const totalMb = Math.max(1, Number(sysMem.memTotalMb || 2048))
+    const usedMb = Math.max(0, Number(sysMem.memUsedMb || 0))
+    const availMb = Math.max(0, Number(sysMem.memAvailMb || Math.max(0, totalMb - usedMb)))
+    const pct = Math.max(0, Math.min(100, Math.round((usedMb / totalMb) * 100)))
+    const extraRam = Number(modulesDataCache.totalActiveRamMb || 0)
+    const color = pct > 90 ? '#dc2626' : pct >= 80 ? '#d97706' : '#16a34a'
+
+    fillEl.style.width = pct + '%'
+    fillEl.style.background = color
+    textEl.style.color = color
+    textEl.textContent = usedMb + ' / ' + totalMb + ' MB (' + pct + '%) · Szabad: ' + availMb + ' MB · Aktív modulok: +' + extraRam + ' MB'
+
+    if (subEl) {
+      const mods = modulesDataCache.modules || []
+      const activeMods = mods.filter(function (m) { return m.state === 'active' }).length
+      const pkgs = modulesDataCache.agentPackages || []
+      const installedPkgs = pkgs.filter(function (p) { return p.installed }).length
+      const activePkgs = pkgs.filter(function (p) { return p.installed && p.enabled }).length
+      subEl.textContent = activeMods + ' / ' + mods.length + ' rendszermodul aktív · ' + activePkgs + ' aktív / ' + installedPkgs + ' telepített specialista ügynök (katalógus: ' + pkgs.length + ')'
+    }
+  }
+
+  function matchesModuleFilters(item, isModule) {
+    const q = modFilterQuery.trim().toLowerCase()
+    if (q) {
+      const hay = [
+        item.id,
+        item.name || item.displayName,
+        item.description,
+        item.category,
+        (item.tools || []).join(' '),
+        (item.skills || []).join(' '),
+      ].join(' ').toLowerCase()
+      if (hay.indexOf(q) < 0) return false
+    }
+    if (modFilterCategory !== 'all' && item.category !== modFilterCategory) return false
+
+    if (modFilterState === 'active') {
+      return isModule ? item.state === 'active' : Boolean(item.installed && item.enabled)
+    }
+    if (modFilterState === 'disabled') {
+      return isModule ? item.state !== 'active' : Boolean(!item.installed || !item.enabled)
+    }
+    if (modFilterState === 'needs_config') {
+      if (isModule) {
+        return (item.missingSecrets && item.missingSecrets.length > 0) || (item.missingDependencies && item.missingDependencies.length > 0)
+      }
+      return (item.missingModules && item.missingModules.length > 0) ||
+        (item.inactiveModules && item.inactiveModules.length > 0) ||
+        (item.missingOptionalEnv && item.missingOptionalEnv.length > 0)
+    }
+    return true
+  }
+
+  function renderModulesPage() {
+    renderModulesRamBar()
+    const modGrid = document.getElementById('systemModulesGrid')
+    const pkgGrid = document.getElementById('agentCatalogGrid')
+    const modCnt = document.getElementById('systemModulesCount')
+    const pkgCnt = document.getElementById('agentCatalogCount')
+    if (!modGrid || !pkgGrid) return
+
+    const mods = (modulesDataCache.modules || []).filter(function (m) { return matchesModuleFilters(m, true) })
+    const pkgs = (modulesDataCache.agentPackages || []).filter(function (p) { return matchesModuleFilters(p, false) })
+
+    if (modCnt) modCnt.textContent = mods.length + ' megjelenítve'
+    if (pkgCnt) pkgCnt.textContent = pkgs.length + ' megjelenítve'
+
+    modGrid.innerHTML = mods.length === 0
+      ? '<div style="font-size:12px;opacity:.65;padding:12px;border:1px dashed var(--border);border-radius:8px">Nincs a szűrőnek megfelelő rendszermodul.</div>'
+      : mods.map(function (m) {
+          const icon = MODULE_CAT_ICONS[m.category] || '📦'
+          const badge = m.builtIn
+            ? '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#0f766e">Alapmodul 🔒</span>'
+            : m.state === 'active'
+              ? '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#16a34a">Aktív</span>'
+              : m.state === 'installed_disabled'
+                ? '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#64748b">Kikapcsolva</span>'
+                : '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#2563eb">Elérhető</span>'
+
+          const depChips = (m.depends || []).map(function (d) {
+            return '<span style="font-size:10px;padding:1px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg)">↳ ' + esc(d) + '</span>'
+          }).join('')
+
+          const secretWarnings = (m.missingSecrets || []).map(function (sec) {
+            return '<button type="button" data-vault-jump="' + esc(sec) + '" style="font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.12);color:#b45309;cursor:pointer">⚠ Hiányzó kulcs: ' + esc(sec) + '</button>'
+          }).join('')
+
+          const actionBtn = m.builtIn
+            ? '<button type="button" class="btn-secondary btn-compact" disabled title="Az alaprendszer kötelező modulja, nem kapcsolható ki">Zárolva 🔒</button>'
+            : m.state === 'active'
+              ? '<button type="button" class="btn-secondary btn-compact" data-mod-action="disable" data-mod-id="' + esc(m.id) + '">Kikapcsolás</button>'
+              : '<button type="button" class="btn-primary btn-compact" data-mod-action="enable" data-mod-id="' + esc(m.id) + '">Bekapcsolás</button>'
+
+          return (
+            '<div data-module-item="' + esc(m.id) + '" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
+              '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+                '<div>' +
+                  '<div style="font-weight:700;font-size:14px">' + icon + ' ' + esc(m.name) + '</div>' +
+                  '<div style="font-size:11px;opacity:.65"><code>' + esc(m.id) + '</code> · v' + esc(m.version) + ' · ' + esc(m.category) + '</div>' +
+                '</div>' +
+                badge +
+              '</div>' +
+              '<div style="font-size:12px;opacity:.85;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px">' + esc(m.description) + '</div>' +
+              '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+                '<span style="font-size:10px;padding:1px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg)">+' + esc(m.ramImpactMb) + ' MB RAM</span>' +
+                depChips +
+                secretWarnings +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">' +
+                '<button type="button" class="btn-secondary btn-compact" data-mod-detail="' + esc(m.id) + '" style="font-size:12px">Részletek</button>' +
+                actionBtn +
+              '</div>' +
+            '</div>'
+          )
+        }).join('')
+
+    pkgGrid.innerHTML = pkgs.length === 0
+      ? '<div style="font-size:12px;opacity:.65;padding:12px;border:1px dashed var(--border);border-radius:8px">Nincs a szűrőnek megfelelő specialista ügynökcsomag.</div>'
+      : pkgs.map(function (p) {
+          const icon = MODULE_CAT_ICONS[p.category] || '🤖'
+          const hasMissingMods = Array.isArray(p.missingModules) && p.missingModules.length > 0
+          const badge = hasMissingMods
+            ? '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#d97706">Előkészített · Hiányzó modul</span>'
+            : p.installed && p.enabled
+              ? '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#16a34a">Aktív</span>'
+              : p.installed
+                ? '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#64748b">Kikapcsolva</span>'
+                : '<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#2563eb">Elérhető</span>'
+
+          const reqChips = (p.requiredModules || []).map(function (rm) {
+            const isMiss = (p.missingModules || []).indexOf(rm) >= 0
+            const isInact = (p.inactiveModules || []).indexOf(rm) >= 0
+            const style = isMiss
+              ? 'border:1px solid #dc2626;background:rgba(220,38,38,0.1);color:#dc2626'
+              : isInact
+                ? 'border:1px solid #d97706;background:rgba(217,119,6,0.1);color:#b45309'
+                : 'border:1px solid var(--border);background:var(--bg)'
+            return '<span style="font-size:10px;padding:1px 6px;border-radius:6px;' + style + '">' + (isMiss ? '✕ ' : isInact ? '⏸ ' : '✓ ') + esc(rm) + '</span>'
+          }).join('')
+
+          let actionsHtml = ''
+          if (!p.installed) {
+            if (hasMissingMods) {
+              actionsHtml = '<button type="button" class="btn-secondary btn-compact" data-pkg-action="install" data-pkg-id="' + esc(p.id) + '" disabled title="Hiányzó modulok: ' + esc(p.missingModules.join(', ')) + '">Telepítés</button>'
+            } else {
+              actionsHtml = '<button type="button" class="btn-primary btn-compact" data-pkg-action="install" data-pkg-id="' + esc(p.id) + '">Telepítés</button>'
+            }
+          } else {
+            const toggleBtn = p.enabled
+              ? '<button type="button" class="btn-secondary btn-compact" data-pkg-action="disable" data-pkg-id="' + esc(p.id) + '">Kikapcsolás</button>'
+              : '<button type="button" class="btn-primary btn-compact" data-pkg-action="enable" data-pkg-id="' + esc(p.id) + '">Bekapcsolás</button>'
+            const uninstBtn = '<button type="button" class="btn-secondary btn-compact" data-pkg-action="uninstall" data-pkg-id="' + esc(p.id) + '" style="color:#dc2626">Eltávolítás</button>'
+            actionsHtml = '<div style="display:flex;gap:6px">' + toggleBtn + uninstBtn + '</div>'
+          }
+
+          return (
+            '<div data-agent-package="' + esc(p.id) + '" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
+              '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+                '<div>' +
+                  '<div style="font-weight:700;font-size:14px">' + icon + ' ' + esc(p.displayName) + '</div>' +
+                  '<div style="font-size:11px;opacity:.65"><code>' + esc(p.id) + '</code> · ' + esc(p.role) + ' · ' + esc(p.recommendedModel) + '</div>' +
+                '</div>' +
+                badge +
+              '</div>' +
+              '<div style="font-size:12px;opacity:.85;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px">' + esc(p.description) + '</div>' +
+              '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + reqChips + '</div>' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">' +
+                '<button type="button" class="btn-secondary btn-compact" data-pkg-detail="' + esc(p.id) + '" style="font-size:12px">Részletek</button>' +
+                actionsHtml +
+              '</div>' +
+            '</div>'
+          )
+        }).join('')
+
+    // Wire card actions
+    modGrid.querySelectorAll('[data-mod-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModuleDetailModal('module', btn.getAttribute('data-mod-detail'))
+      })
+    })
+    modGrid.querySelectorAll('[data-vault-jump]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openVaultWithPrefill(btn.getAttribute('data-vault-jump'))
+      })
+    })
+    modGrid.querySelectorAll('[data-mod-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        handleModuleAction(btn.getAttribute('data-mod-id'), btn.getAttribute('data-mod-action'), btn)
+      })
+    })
+    pkgGrid.querySelectorAll('[data-pkg-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModuleDetailModal('agent', btn.getAttribute('data-pkg-detail'))
+      })
+    })
+    pkgGrid.querySelectorAll('[data-pkg-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        handleAgentPackageAction(btn.getAttribute('data-pkg-id'), btn.getAttribute('data-pkg-action'), btn)
+      })
+    })
+  }
+
+  async function executeModuleDisable(modId, disableDependentAgents, btn) {
+    const origText = btn ? btn.textContent : ''
+    if (btn) { btn.disabled = true; btn.textContent = 'Kikapcsolás...' }
+    try {
+      const data = await apiJson('/api/admin/modules/' + encodeURIComponent(modId) + '/disable', {
+        method: 'POST',
+        body: JSON.stringify({ disableDependentAgents: Boolean(disableDependentAgents) }),
+      })
+      const disAgents = (data.result && data.result.disabledAgents) || []
+      showModulesStatus(
+        '✓ Modul kikapcsolva: ' + modId + (disAgents.length ? ' (kikapcsolt ügynökök: ' + disAgents.join(', ') + ')' : ''),
+        false,
+      )
+      await syncAfterModuleMutation(data)
+    } catch (err) {
+      if (err.code === 'DEPENDENT_MODULES_ACTIVE' && err.details && Array.isArray(err.details.activeDependentAgents) && err.details.activeDependentAgents.length > 0 && !disableDependentAgents) {
+        const names = err.details.activeDependentAgents.map(function (a) { return '<b>' + esc(a.displayName || a.id) + '</b>' }).join(', ')
+        openConfirmModal(
+          'Függő ügynök kikapcsolása?',
+          '<p style="margin:0">Az alábbi aktív ügynök igényli a(z) <code>' + esc(modId) + '</code> modult: ' + names + '.</p>' +
+          '<p style="margin:8px 0 0">Kikapcsolod az ügynököt a modullal együtt? (A konfiguráció és a korábbi adatok megmaradnak.)</p>',
+          'Igen, kikapcsolás együtt',
+          async function () {
+            await executeModuleDisable(modId, true, null)
+          },
+        )
+      } else {
+        showModulesStatus('✕ Hiba: ' + err.message, true)
+      }
+      if (btn) { btn.disabled = false; btn.textContent = origText }
+    }
+  }
+
+  async function handleModuleAction(modId, action, btn) {
+    if (!modId || !action) return
+    if (action === 'disable') {
+      const mod = (modulesDataCache.modules || []).find(function (m) { return m.id === modId })
+      if (mod && Array.isArray(mod.activeDependentAgents) && mod.activeDependentAgents.length > 0 && (!mod.activeDependentModules || mod.activeDependentModules.length === 0)) {
+        const names = mod.activeDependentAgents.map(function (a) { return '<b>' + esc(a.displayName || a.id) + '</b>' }).join(', ')
+        openConfirmModal(
+          'Függő ügynök kikapcsolása?',
+          '<p style="margin:0">Az alábbi aktív ügynök jelenleg igényli a(z) <code>' + esc(modId) + '</code> modult: ' + names + '.</p>' +
+          '<p style="margin:8px 0 0">Kikapcsolod a modullal együtt? (Az adatok és a <code>SOUL.md</code> megmaradnak.)</p>',
+          'Igen, kikapcsolás együtt',
+          async function () {
+            await executeModuleDisable(modId, true, btn)
+          },
+        )
+        return
+      }
+      await executeModuleDisable(modId, false, btn)
+      return
+    }
+
+    const origText = btn ? btn.textContent : ''
+    if (btn) { btn.disabled = true; btn.textContent = 'Bekapcsolás...' }
+    try {
+      const data = await apiJson('/api/admin/modules/' + encodeURIComponent(modId) + '/enable', {
+        method: 'POST',
+        body: JSON.stringify({ withDependencies: true }),
+      })
+      showModulesStatus('✓ Modul bekapcsolva: ' + modId, false)
+      await syncAfterModuleMutation(data)
+    } catch (err) {
+      showModulesStatus('✕ Hiba: ' + err.message, true)
+      if (btn) { btn.disabled = false; btn.textContent = origText }
+    }
+  }
+
+  async function handleAgentPackageAction(agentId, action, btn) {
+    if (!agentId || !action) return
+    if (action === 'uninstall') {
+      openConfirmModal(
+        'Ügynök eltávolítása a konfigurációból?',
+        '<p style="margin:0">Eltávolítod a(z) <b>' + esc(agentId) + '</b> ügynököt a <code>config/agents.json</code> listából?</p>' +
+        '<p style="margin:8px 0 0;padding:8px 10px;border-radius:6px;border:1px solid #16a34a;background:rgba(22,163,74,0.08)"><b>Adatbiztonság:</b> A <code>SOUL.md</code>, a <code>workspaces/' + esc(agentId) + '</code> munkakönyvtár és a SQLite memória érintetlenül megmarad, nem vész el adat.</p>',
+        'Eltávolítás',
+        async function () {
+          const data = await apiJson('/api/admin/agent-packages/' + encodeURIComponent(agentId) + '/uninstall', {
+            method: 'POST',
+            body: '{}',
+          })
+          showModulesStatus('✓ Ügynök eltávolítva a konfigurációból (SOUL.md és memória megőrizve): ' + agentId, false)
+          await syncAfterModuleMutation(data)
+        },
+      )
+      return
+    }
+
+    const origText = btn ? btn.textContent : ''
+    if (btn) {
+      btn.disabled = true
+      btn.textContent = action === 'install' ? 'Telepítés...' : (action === 'enable' ? 'Bekapcsolás...' : 'Kikapcsolás...')
+    }
+    try {
+      const endpoint = '/api/admin/agent-packages/' + encodeURIComponent(agentId) + '/' + encodeURIComponent(action)
+      const payload = action === 'install' ? { enableRequiredModules: true } : {}
+      const data = await apiJson(endpoint, { method: 'POST', body: JSON.stringify(payload) })
+      await syncAfterModuleMutation(data)
+      if (action === 'install') {
+        showModulesStatus('✓ Specialista ügynök telepítve (Kikapcsolva állapotban): ' + agentId, false)
+        openPostInstallModal(agentId, data.result)
+      } else {
+        showModulesStatus('✓ Ügynök ' + (action === 'enable' ? 'bekapcsolva' : 'kikapcsolva') + ': ' + agentId, false)
+      }
+    } catch (err) {
+      showModulesStatus('✕ Hiba: ' + err.message, true)
+      if (btn) { btn.disabled = false; btn.textContent = origText }
+    }
+  }
+
+  async function refreshModulesPage() {
+    try {
+      const data = await apiJson('/api/admin/modules')
+      modulesDataCache = {
+        modules: data.modules || [],
+        agentPackages: data.agentPackages || [],
+        totalActiveRamMb: data.totalActiveRamMb || 0,
+        systemMemory: data.systemMemory || null,
+      }
+      renderModulesPage()
+    } catch (err) {
+      showModulesStatus('✕ Modulok betöltési hiba: ' + err.message, true)
+    }
+  }
+
+  function wireModulesEvents() {
+    if (modulesWired) return
+    modulesWired = true
+
+    const tipEl = document.getElementById('modulesIntroTip')
+    try {
+      if (tipEl && localStorage.getItem('alfred.modulesTipDismissed') === '1') {
+        tipEl.hidden = true
+        tipEl.style.display = 'none'
+      }
+    } catch { /* ignore */ }
+
+    document.getElementById('modulesIntroTipClose')?.addEventListener('click', function () {
+      if (tipEl) { tipEl.hidden = true; tipEl.style.display = 'none' }
+      try { localStorage.setItem('alfred.modulesTipDismissed', '1') } catch { /* ignore */ }
+    })
+
+    const helpPop = document.getElementById('modulesHelpPopover')
+    document.getElementById('modulesHelpBtn')?.addEventListener('click', function () {
+      if (helpPop) helpPop.hidden = !helpPop.hidden
+    })
+    document.getElementById('modulesHelpPopoverClose')?.addEventListener('click', function () {
+      if (helpPop) helpPop.hidden = true
+    })
+
+    document.getElementById('modulesRefreshBtn')?.addEventListener('click', refreshModulesPage)
+
+    document.getElementById('modulesSearchInp')?.addEventListener('input', function (e) {
+      modFilterQuery = e.target.value || ''
+      renderModulesPage()
+    })
+
+    document.querySelectorAll('#modulesStateTabs [data-mod-state]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        modFilterState = btn.getAttribute('data-mod-state') || 'all'
+        document.querySelectorAll('#modulesStateTabs [data-mod-state]').forEach(function (other) {
+          other.className = (other === btn ? 'btn-primary' : 'btn-secondary') + ' btn-compact'
+        })
+        renderModulesPage()
+      })
+    })
+
+    document.querySelectorAll('#modulesCategoryChips [data-mod-cat]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        modFilterCategory = btn.getAttribute('data-mod-cat') || 'all'
+        document.querySelectorAll('#modulesCategoryChips [data-mod-cat]').forEach(function (other) {
+          other.className = (other === btn ? 'btn-primary' : 'btn-secondary') + ' btn-compact'
+        })
+        renderModulesPage()
+      })
+    })
+
+    document.getElementById('moduleDetailClose')?.addEventListener('click', function () {
+      closeOverlayModal('moduleDetailModalOverlay')
+    })
+    document.getElementById('moduleConfirmClose')?.addEventListener('click', function () {
+      pendingConfirmHandler = null
+      closeOverlayModal('moduleConfirmOverlay')
+    })
+    document.getElementById('moduleConfirmCancelBtn')?.addEventListener('click', function () {
+      pendingConfirmHandler = null
+      closeOverlayModal('moduleConfirmOverlay')
+    })
+    document.getElementById('moduleConfirmOkBtn')?.addEventListener('click', async function () {
+      const okBtn = document.getElementById('moduleConfirmOkBtn')
+      const fn = pendingConfirmHandler
+      pendingConfirmHandler = null
+      if (!fn) { closeOverlayModal('moduleConfirmOverlay'); return }
+      if (okBtn) { okBtn.disabled = true; okBtn.textContent = 'Folyamatban...' }
+      try {
+        await fn()
+        closeOverlayModal('moduleConfirmOverlay')
+      } catch (err) {
+        showModulesStatus('✕ Hiba: ' + err.message, true)
+        closeOverlayModal('moduleConfirmOverlay')
+      } finally {
+        if (okBtn) okBtn.disabled = false
+      }
+    })
+
+    document.getElementById('agentPostInstallClose')?.addEventListener('click', function () {
+      closeOverlayModal('agentPostInstallOverlay')
+    })
+    document.getElementById('agentPostInstallDoneBtn')?.addEventListener('click', function () {
+      closeOverlayModal('agentPostInstallOverlay')
+    })
+    document.getElementById('agentPostInstallStartBtn')?.addEventListener('click', async function () {
+      const btn = document.getElementById('agentPostInstallStartBtn')
+      if (!postInstallAgentId) return
+      if (btn) { btn.disabled = true; btn.textContent = 'Indítás...' }
+      try {
+        const data = await apiJson('/api/admin/agent-packages/' + encodeURIComponent(postInstallAgentId) + '/enable', {
+          method: 'POST',
+          body: '{}',
+        })
+        await syncAfterModuleMutation(data)
+        showModulesStatus('✓ Ügynök elindítva: ' + postInstallAgentId, false)
+        closeOverlayModal('agentPostInstallOverlay')
+      } catch (err) {
+        showModulesStatus('✕ Hiba: ' + err.message, true)
+        if (btn) { btn.disabled = false; btn.textContent = 'Ügynök indítása most' }
+      }
+    })
+
+    document.getElementById('vpsHiddenModulesLink')?.addEventListener('click', function (e) {
+      e.preventDefault()
+      if (typeof window.switchPage === 'function') {
+        location.hash = 'modules'
+        window.switchPage('modules')
+      } else {
+        location.hash = 'modules'
+      }
+    })
+  }
+
+  window.loadModulesPage = function () {
+    wireEvents()
+    wireModulesEvents()
+    refreshModulesPage()
+  }
+
   wireEvents()
+  wireModulesEvents()
   if (document.getElementById('vpsPage') && !document.getElementById('vpsPage').hidden) {
     window.loadVpsPage()
   }
   if (document.getElementById('providersPage') && !document.getElementById('providersPage').hidden) {
     window.loadProvidersPage()
+  }
+  if (document.getElementById('modulesPage') && !document.getElementById('modulesPage').hidden) {
+    window.loadModulesPage()
   }
 
   // === Phase 4: Voice Communication (Browser STT + AI/Browser TTS) ===

@@ -612,8 +612,10 @@ function switchPage(pageId) {
   if (pageId === 'federation') loadFederationPage()
   if (pageId === 'vps' && typeof window.loadVpsPage === 'function') window.loadVpsPage()
   if (pageId === 'providers' && typeof window.loadProvidersPage === 'function') window.loadProvidersPage()
+  if (pageId === 'modules' && typeof window.loadModulesPage === 'function') window.loadModulesPage()
   if (pageId === 'testsim' && typeof window.loadTestSimPage === 'function') window.loadTestSimPage()
 }
+window.switchPage = switchPage
 
 // Mobile off-canvas sidebar toggle. No-op visual effect on desktop (the
 // hamburger/backdrop are display:none there); on narrow screens it slides the
@@ -656,7 +658,7 @@ const SIDEBAR_GROUPS = [
   { key: 'team',        labelKey: 'nav.group.team',        pages: ['agents', 'messages', 'tasks', 'bgTasks'] },
   { key: 'knowledge',   labelKey: 'nav.group.knowledge',   pages: ['memories', 'skills', 'research', 'ideas'] },
   { key: 'stats',       labelKey: 'nav.group.stats',       pages: ['costs', 'tokenUsage'] },
-  { key: 'system',      labelKey: 'nav.group.system',      pages: ['vps', 'providers', 'status', 'naplo', 'updates', 'settings', 'vault'] },
+  { key: 'system',      labelKey: 'nav.group.system',      pages: ['vps', 'providers', 'modules', 'status', 'naplo', 'updates', 'settings', 'vault'] },
   { key: 'connections', labelKey: 'nav.group.connections', pages: ['connectors', 'clitools', 'federation', 'migrate'] },
 ]
 const sidebarGroupEls = document.querySelectorAll('.sb-group[data-group]')
@@ -4770,15 +4772,22 @@ function renderAgents() {
     const chConnected = agentOwnChannelConnected(agent)
     const chDotClass = chConnected ? 'connected' : 'disconnected'
     const chLabel = chConnected ? t('agents.status.online') : t('agents.status.offline')
+    const isCoreDisabled = agent.coreEnabled === false
     const isRunning = agent.running || false
     const runDotClass = isRunning ? 'running' : 'stopped'
-    const runLabel = isRunning ? t('agents.status.running') : t('agents.status.stopped')
+    const runLabel = isCoreDisabled ? 'Kikapcsolva' : (isRunning ? t('agents.status.running') : t('agents.status.stopped'))
+    if (isCoreDisabled) {
+      card.style.opacity = '0.72'
+      card.dataset.coreEnabled = 'false'
+    } else if (agent.coreEnabled === true) {
+      card.dataset.coreEnabled = 'true'
+    }
 
     card.innerHTML = `
       <div class="agent-card-top">
         <div class="agent-avatar ${gradientClass}">${avatarHtml}</div>
         <div class="agent-card-info">
-          <div class="agent-name">${escapeHtml(label)}${agent.nickname ? ` <span class="agent-nickname">${escapeHtml(agent.nickname)}</span>` : ''}</div>
+          <div class="agent-name">${escapeHtml(label)}${agent.nickname ? ` <span class="agent-nickname">${escapeHtml(agent.nickname)}</span>` : ''}${isCoreDisabled ? ' <span class="agent-disabled-badge" style="padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;background:#64748b;color:#fff;margin-left:4px">Kikapcsolva</span>' : ''}</div>
           <div class="agent-desc">${escapeHtml(agent.description || '')}</div>
         </div>
       </div>
@@ -4802,6 +4811,9 @@ function renderAgents() {
           <span class="agent-sharedenv-text">${escapeHtml(t('agents.sharedEnvAuth.label'))}: ${escapeHtml(agent.sharedEnvAuthKeys.join(', '))}</span>
         </div>` : ''}
       <div class="agent-card-actions">
+        ${isCoreDisabled
+          ? `<button type="button" class="btn-primary btn-compact agent-quick-enable-btn" data-agent-quick-enable="${escapeHtml(agent.name)}">Bekapcsolás</button>`
+          : ''}
         <button class="btn-secondary btn-compact agent-conversation-btn" title="${t('agents.btn.conversation')}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           ${t('agents.btn.conversation')}
@@ -4813,6 +4825,28 @@ function renderAgents() {
       </div>
       <div class="agent-card-activity"></div>
     `
+    card.querySelector('[data-agent-quick-enable]')?.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      const btn = e.currentTarget
+      btn.disabled = true
+      btn.textContent = 'Bekapcsolás...'
+      try {
+        const res = await fetch('/api/admin/agent-packages/' + encodeURIComponent(agent.name) + '/enable', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status))
+        await loadAgents()
+        if (typeof window.loadAgentsRoles === 'function') window.loadAgentsRoles()
+      } catch (err) {
+        btn.disabled = false
+        btn.textContent = 'Bekapcsolás'
+        if (typeof showToast === 'function') showToast('Hiba: ' + err.message, 'error')
+      }
+    })
     // Login button handler (start → confirm flow)
     card.querySelectorAll('.agent-login-btn').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); handleAgentLogin(agent.name, btn) })
