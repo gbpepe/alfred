@@ -1,0 +1,14 @@
+{
+  "id": "alfred-qa",
+  "displayName": "Alfred QA",
+  "role": "technikus",
+  "category": "quality",
+  "description": "Zero-tool minőségbiztosítási, kódreview, GDPR-megfelelőségi és Batch mintavételes ellenőrző specialista ügynök.",
+  "requiredModules": ["core-cli"],
+  "recommendedProvider": "vertex-eu",
+  "recommendedModel": "gemini-3.8-flash",
+  "dailyBudgetUsd": 2.0,
+  "tools": [],
+  "skills": ["qa-gdpr-review"],
+  "optionalEnvVars": ["DISCORD_CHANNEL_ALFRED_QA"]
+}

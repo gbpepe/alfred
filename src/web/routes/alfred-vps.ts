@@ -2,10 +2,10 @@ import { execFile } from 'node:child_process'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import Database from 'better-sqlite3'
-import { getDb } from '../../db.js'
+import { getDb, listInstalledModuleRows, upsertInstalledModuleRow, type InstalledModuleRow } from '../../db.js'
 import { readEnvFile } from '../../env.js'
 import { parseEnvContent } from '../../env-parse.js'
 import { logger } from '../../logger.js'
@@ -74,6 +74,16 @@ import {
   getAdminBatchesOverview,
 } from '../../alfred/batch-runner.js'
 import { runHousekeeping } from '../../alfred/housekeeper.js'
+import {
+  disableModule,
+  enableModule,
+  installAgentPackage,
+  listAgentPackages,
+  listModules,
+  ModuleManagerError,
+  toggleAgentPackage,
+  uninstallAgentPackage,
+} from '../../alfred/module-manager.js'
 import { collectSystemTelemetry } from '../../alfred/system-monitor.js'
 import { json, readBody } from '../http-helpers.js'
 import type { RouteContext } from './types.js'
@@ -336,6 +346,129 @@ function resolveWritableAgentConfigPaths(): string[] {
   return candidates.filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
 }
 
+function resolveTargetRuntimeDbPaths(
+  sourceDb: Database.Database | undefined,
+  env: Record<string, string | undefined>,
+): string[] {
+  const candidates: string[] = []
+  const explicitRaw = (env['ALFRED_DB_PATH'] ?? process.env['ALFRED_DB_PATH'] ?? '').trim()
+  if (explicitRaw && explicitRaw !== ':memory:') {
+    candidates.push(resolveAlfredRuntimeEnv(env).dbPath)
+  }
+
+  const isTest = (env['ALFRED_ENV'] ?? process.env['ALFRED_ENV'] ?? '').trim().toLowerCase() === 'test'
+  const specs = resolveVpsEnvSpecs()
+  for (const s of specs) {
+    if (isTest) {
+      if (s.id === 'test') candidates.push(s.dbPath)
+    } else if (s.id === 'prod' || s.id === 'ops') {
+      candidates.push(s.dbPath)
+    }
+  }
+
+  const sourcePathNorm =
+    sourceDb && typeof sourceDb.name === 'string' && sourceDb.name && sourceDb.name !== ':memory:'
+      ? resolve(sourceDb.name)
+      : null
+
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of candidates) {
+    if (!raw || raw === ':memory:') continue
+    const abs = resolve(raw)
+    if (sourcePathNorm && abs === sourcePathNorm) continue
+    if (seen.has(abs)) continue
+    seen.add(abs)
+    if (existsSync(abs)) out.push(abs)
+  }
+  return out
+}
+
+function ensureInstalledModulesTable(targetDb: Database.Database): void {
+  targetDb.exec(`
+    CREATE TABLE IF NOT EXISTS installed_modules (
+      module_id TEXT PRIMARY KEY,
+      state TEXT NOT NULL CHECK(state IN ('available', 'installed_disabled', 'active')),
+      installed_at TEXT,
+      updated_at TEXT,
+      config_json TEXT
+    )
+  `)
+}
+
+function syncInstalledModulesFromPrimaryRuntimeDb(
+  sourceDb: Database.Database | undefined,
+  env: Record<string, string | undefined>,
+): void {
+  if (!sourceDb) return
+  const targets = resolveTargetRuntimeDbPaths(sourceDb, env)
+  const primaryPath = targets[0]
+  if (!primaryPath) return
+
+  let runtimeDb: Database.Database | null = null
+  try {
+    runtimeDb = new Database(primaryPath, { readonly: true, fileMustExist: true })
+    const hasTable = runtimeDb
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='installed_modules'")
+      .get()
+    if (!hasTable) return
+    const runtimeRows = runtimeDb
+      .prepare('SELECT module_id, state, installed_at, updated_at, config_json FROM installed_modules')
+      .all() as InstalledModuleRow[]
+    if (runtimeRows.length === 0) return
+
+    ensureInstalledModulesTable(sourceDb)
+    const localMap = new Map(listInstalledModuleRows(sourceDb).map((r) => [r.module_id, r]))
+    for (const r of runtimeRows) {
+      const local = localMap.get(r.module_id)
+      const runtimeTs = r.updated_at ?? ''
+      const localTs = local?.updated_at ?? ''
+      if (!local || (runtimeTs && runtimeTs > localTs)) {
+        upsertInstalledModuleRow(r, sourceDb)
+      }
+    }
+  } catch {
+    // Non-fatal: keep Dashboard DB snapshot if runtime DB is unavailable
+  } finally {
+    runtimeDb?.close()
+  }
+}
+
+function syncInstalledModulesToRuntimeDbs(
+  sourceDb: Database.Database,
+  env: Record<string, string | undefined>,
+): void {
+  const targets = resolveTargetRuntimeDbPaths(sourceDb, env)
+  if (targets.length === 0) return
+
+  let rows: InstalledModuleRow[] = []
+  try {
+    rows = listInstalledModuleRows(sourceDb)
+  } catch {
+    return
+  }
+  if (rows.length === 0) return
+
+  for (const targetPath of targets) {
+    let targetDb: Database.Database | null = null
+    try {
+      targetDb = new Database(targetPath)
+      targetDb.pragma('busy_timeout = 3000')
+      ensureInstalledModulesTable(targetDb)
+      const tx = targetDb.transaction((items: InstalledModuleRow[]) => {
+        for (const row of items) {
+          upsertInstalledModuleRow(row, targetDb!)
+        }
+      })
+      tx(rows)
+    } catch (err) {
+      logger.warn({ targetPath, err }, 'Failed to sync installed_modules to runtime SQLite DB')
+    } finally {
+      targetDb?.close()
+    }
+  }
+}
+
 function resolveEnvSpecById(envId: string): VpsEnvSpec | undefined {
   return resolveVpsEnvSpecs().find((s) => s.id === envId)
 }
@@ -383,7 +516,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     }
     const specs = resolveVpsEnvSpecs()
     const targetSpec = specs.find((s) => s.id === 'prod') ?? specs[0]
-    const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false })
+    const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false, includeDisabled: true })
     const diskSummary = await getDiskSummary()
     const sys = getSystemMetrics()
     sys.diskSummary = diskSummary
@@ -412,6 +545,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       agents: (cfg?.agents ?? []).map((a) => ({
         id: a.id,
         displayName: a.displayName,
+        enabled: a.enabled !== false,
         channelName: a.channelName,
         role: a.role ?? null,
         provider: a.provider,
@@ -518,6 +652,230 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       const msg = err instanceof Error ? err.message : String(err)
       const status = err instanceof BatchValidationError ? 404 : 500
       json(res, { ok: false, error: msg }, status)
+    }
+    return true
+  }
+
+  // --- Module & Specialist Agent Package Manager Admin API ---
+  const buildModulesSnapshot = (env: Record<string, string | undefined>, db?: Database.Database) => {
+    syncInstalledModulesFromPrimaryRuntimeDb(db, env)
+    const writablePaths = resolveWritableAgentConfigPaths()
+    const modOpts = {
+      ...(db ? { db } : {}),
+      env,
+      ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+    }
+    const modules = listModules(modOpts)
+    const agentPackages = listAgentPackages(modOpts)
+    const totalActiveRamMb = modules
+      .filter((m) => m.state === 'active')
+      .reduce((sum, m) => sum + m.ramImpactMb, 0)
+    const sys = getSystemMetrics()
+    return {
+      modules,
+      agentPackages,
+      totalActiveRamMb,
+      systemMemory: {
+        memTotalMb: sys.memTotalMb,
+        memUsedMb: sys.memUsedMb,
+        memAvailMb: sys.memAvailMb,
+      },
+    }
+  }
+
+  const sendModuleError = (err: unknown): void => {
+    if (err instanceof ModuleManagerError) {
+      json(
+        res,
+        {
+          ok: false,
+          error: err.message,
+          code: err.code,
+          ...(err.details ? { details: err.details } : {}),
+        },
+        err.statusHttp,
+      )
+      return
+    }
+    json(res, { ok: false, error: err instanceof Error ? err.message : String(err) }, 500)
+  }
+
+  if (path === '/api/admin/modules' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      let activeDb: Database.Database | undefined
+      try {
+        activeDb = getDb()
+      } catch {
+        activeDb = undefined
+      }
+      json(res, { ok: true, ...buildModulesSnapshot(env, activeDb) })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const modEnableMatch = /^\/api\/admin\/modules\/([^/]+)\/enable$/.exec(path)
+  if (modEnableMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const id = decodeURIComponent(modEnableMatch[1]).trim()
+      const body = await readJsonBody<{ withDependencies?: boolean }>(req).catch(() => ({
+        withDependencies: true,
+      }))
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const result = enableModule(id, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+        withDependencies: body?.withDependencies !== false,
+      })
+      syncInstalledModulesToRuntimeDbs(db, env)
+      json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const modDisableMatch = /^\/api\/admin\/modules\/([^/]+)\/disable$/.exec(path)
+  if (modDisableMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const id = decodeURIComponent(modDisableMatch[1]).trim()
+      const body = await readJsonBody<{ disableDependentAgents?: boolean }>(req).catch(() => ({
+        disableDependentAgents: false,
+      }))
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const result = disableModule(id, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+        disableDependentAgents: body?.disableDependentAgents === true,
+      })
+      syncInstalledModulesToRuntimeDbs(db, env)
+      json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const agentPkgInstallMatch = /^\/api\/admin\/agent-packages\/([^/]+)\/install$/.exec(path)
+  if (agentPkgInstallMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const agentId = decodeURIComponent(agentPkgInstallMatch[1]).trim()
+      const body = await readJsonBody<{ enableRequiredModules?: boolean }>(req).catch(() => ({
+        enableRequiredModules: true,
+      }))
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const result = installAgentPackage(agentId, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+        enableRequiredModules: body?.enableRequiredModules !== false,
+      })
+      syncInstalledModulesToRuntimeDbs(db, env)
+      json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const agentPkgEnableMatch = /^\/api\/admin\/agent-packages\/([^/]+)\/enable$/.exec(path)
+  if (agentPkgEnableMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const agentId = decodeURIComponent(agentPkgEnableMatch[1]).trim()
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const result = toggleAgentPackage(agentId, true, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+      })
+      json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const agentPkgDisableMatch = /^\/api\/admin\/agent-packages\/([^/]+)\/disable$/.exec(path)
+  if (agentPkgDisableMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const agentId = decodeURIComponent(agentPkgDisableMatch[1]).trim()
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const result = toggleAgentPackage(agentId, false, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+      })
+      json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const agentPkgUninstallMatch = /^\/api\/admin\/agent-packages\/([^/]+)\/uninstall$/.exec(path)
+  if (agentPkgUninstallMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const agentId = decodeURIComponent(agentPkgUninstallMatch[1]).trim()
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const result = uninstallAgentPackage(agentId, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+      })
+      json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
+    } catch (err) {
+      sendModuleError(err)
     }
     return true
   }
@@ -834,8 +1192,31 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   if (path === '/api/vps/status' && method === 'GET') {
     const specs = resolveVpsEnvSpecs()
     const env = { ...readEnvFile(), ...process.env }
-    const cfg = loadAlfredAgentsConfig({ env })
+    const cfg = loadAlfredAgentsConfig({ env, provisionWorkspaces: false, includeDisabled: true })
     const includeTestTokens = mayActAsOwner(ctx.auth, req) || (ctx.auth?.kind === 'token' && !ctx.auth.tokenAgent)
+    let activeModuleIds: string[] = []
+    let disabledCardCount = 0
+    try {
+      let safeDb: Database.Database | undefined
+      try {
+        safeDb = getDb()
+      } catch {
+        safeDb = undefined
+      }
+      syncInstalledModulesFromPrimaryRuntimeDb(safeDb, env)
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const mods = listModules({
+        ...(safeDb ? { db: safeDb } : {}),
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+      })
+      activeModuleIds = mods.filter((m) => m.state === 'active').map((m) => m.id)
+      disabledCardCount = mods
+        .filter((m) => m.state !== 'active')
+        .reduce((sum, m) => sum + m.uiCardIds.length, 0)
+    } catch {
+      // fallback to empty module list on minimal test environments
+    }
     const [services, disk, multiTests] = await Promise.all([
       Promise.all(
         specs.map(async (s) => {
@@ -880,6 +1261,8 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       system: sys,
       services,
       multiTests,
+      activeModuleIds,
+      disabledCardCount,
       global: cfg
         ? {
           dailyBudgetUsd: cfg.global.dailyBudgetUsd,
@@ -892,6 +1275,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       agents: (cfg?.agents ?? []).map((a) => ({
         id: a.id,
         displayName: a.displayName,
+        enabled: a.enabled !== false,
         role: a.role ?? null,
         hasOverride: rawAgentsOverride.has(a.id),
         channelName: a.channelName,

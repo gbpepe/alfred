@@ -99,7 +99,7 @@ describe('Alfred Core (feat/alfred-core)', () => {
         expect(selfCoder.resolvedSystemPrompt).toContain('Alfred Self-Coder')
 
         expect(ops.discordChannelId).toBe('5555555555555555555')
-        expect(ops.tools).toEqual(['bash', 'fs_read', 'memory', 'cli_manage', 'system_storage'])
+        expect(ops.tools).toEqual(['bash', 'fs_read', 'memory', 'cli_manage', 'system_storage', 'module_manage'])
         expect(ops.allowedBashCommands).toHaveLength(6)
         expect(ops.soulFile).toBe('agents/alfred-ops/SOUL.md')
         expect(ops.resolvedSystemPrompt).toContain('Alfred Ops')

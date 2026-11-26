@@ -2,6 +2,7 @@ import { execFileSync, execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type Database from 'better-sqlite3'
+import { MAIN_AGENT_ID } from '../config.js'
 import type { AlfredAgentDefinition, AllowedToolName } from './agents-config.js'
 import { getCliInventory, installOrUpdateCli, removeCli } from './cli-manager.js'
 import type { CliProcessRunner } from './cli-runner.js'
@@ -16,6 +17,15 @@ import {
   type RequestedBatchProvider,
 } from './batch-runner.js'
 import { runHousekeeping } from './housekeeper.js'
+import {
+  disableModule,
+  enableModule,
+  installAgentPackage,
+  listAgentPackages,
+  listModules,
+  resolveToolOwnerModule,
+  toggleAgentPackage,
+} from './module-manager.js'
 import { collectSystemTelemetry } from './system-monitor.js'
 
 export interface OpenAiToolSchema {
@@ -177,6 +187,44 @@ export const TOOL_SCHEMAS: Record<AllowedToolName, OpenAiToolSchema> = {
       },
     },
   },
+  module_manage: {
+    type: 'function',
+    function: {
+      name: 'module_manage',
+      description: 'List, install, enable, or disable Alfred system modules and specialist agent packages. Restricted to main agent and alfred-ops.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: [
+              'list',
+              'install_module',
+              'enable_module',
+              'disable_module',
+              'install_agent',
+              'enable_agent',
+              'disable_agent',
+            ],
+            description: 'Module or agent package lifecycle operation.',
+          },
+          target_id: {
+            type: 'string',
+            description: 'Target module ID or specialist agent package ID (required for all actions except list).',
+          },
+          with_dependencies: {
+            type: 'boolean',
+            description: 'When enabling a module, recursively enable required dependency modules (default: true).',
+          },
+          disable_dependent_agents: {
+            type: 'boolean',
+            description: 'When disabling a module, also disable active specialist agents that require it (default: false).',
+          },
+        },
+        required: ['action'],
+      },
+    },
+  },
   batch_submit: {
     type: 'function',
     function: {
@@ -273,14 +321,43 @@ export const TOOL_SCHEMAS: Record<AllowedToolName, OpenAiToolSchema> = {
   },
 }
 
+function isModuleManageAuthorized(agentId: string | undefined): boolean {
+  if (!agentId) return false
+  return agentId === MAIN_AGENT_ID || agentId === 'alfred' || agentId === 'alfred-core' || agentId === 'alfred-ops'
+}
+
+function buildModuleDisabledResponse(toolName: string, moduleId: string): string {
+  return JSON.stringify(
+    {
+      ok: false,
+      code: 'MODULE_DISABLED_ERROR',
+      tool: toolName,
+      moduleId,
+      message: `A(z) "${moduleId}" modul jelenleg ki van kapcsolva, ezért a(z) "${toolName}" eszköz nem hívható. Kapcsold be a Dashboard #modules felületén vagy a module_manage eszközzel.`,
+    },
+    null,
+    2,
+  )
+}
+
 /**
  * Layer 1 of Tool Whitelist enforcement:
  * Returns ONLY the OpenAI/Gemini function schemas for the tools explicitly listed
- * in `agent.tools`. For zero-tool agents (`tools: []`), returns `[]`.
+ * in `agent.tools` whose owning system module is currently `active`.
+ * For zero-tool agents (`tools: []`), returns `[]`.
  */
-export function getWhitelistedToolSchemas(agent: Pick<AlfredAgentDefinition, 'tools'>): OpenAiToolSchema[] {
+export function getWhitelistedToolSchemas(
+  agent: Pick<AlfredAgentDefinition, 'tools'> & { id?: string },
+  opts?: { db?: Database.Database; projectRoot?: string },
+): OpenAiToolSchema[] {
   return agent.tools
-    .filter((t): t is AllowedToolName => Object.prototype.hasOwnProperty.call(TOOL_SCHEMAS, t))
+    .filter((t): t is AllowedToolName => {
+      if (!Object.prototype.hasOwnProperty.call(TOOL_SCHEMAS, t)) return false
+      if (t === 'module_manage' && agent.id && !isModuleManageAuthorized(agent.id)) return false
+      const owner = resolveToolOwnerModule(t, { db: opts?.db, projectRoot: opts?.projectRoot })
+      if (owner && !owner.active) return false
+      return true
+    })
     .map((t) => TOOL_SCHEMAS[t])
 }
 
@@ -1027,12 +1104,13 @@ export interface ExecuteToolContext {
   agent: AlfredAgentDefinition
   db: Database.Database
   chatId?: string
+  projectRoot?: string
 }
 
 /**
  * Layer 2 of Tool Whitelist enforcement:
- * Verifies at runtime that `toolName` is in `agent.tools`, then executes the tool
- * strictly confined to `agent.workspaceAbsPath` and `agent.memoryNamespace`.
+ * Verifies at runtime that `toolName` is in `agent.tools` and that its owning module is active,
+ * then executes the tool strictly confined to `agent.workspaceAbsPath` and `agent.memoryNamespace`.
  */
 export function executeWhitelistedTool(
   ctx: ExecuteToolContext,
@@ -1042,6 +1120,14 @@ export function executeWhitelistedTool(
   const allowedTools = ctx.agent.tools
   if (!allowedTools.includes(toolName as AllowedToolName)) {
     throw new ToolNotAllowedError(ctx.agent.id, toolName, allowedTools)
+  }
+
+  const moduleOwner = resolveToolOwnerModule(toolName, {
+    db: ctx.db,
+    projectRoot: ctx.projectRoot,
+  })
+  if (moduleOwner && !moduleOwner.active) {
+    return buildModuleDisabledResponse(toolName, moduleOwner.moduleId)
   }
 
   switch (toolName as AllowedToolName) {
@@ -1198,6 +1284,17 @@ export function executeWhitelistedTool(
       throw new Error('system_storage is asynchronous; invoke executeWhitelistedToolAsync()')
     }
 
+    case 'module_manage': {
+      if (!isModuleManageAuthorized(ctx.agent.id)) {
+        throw new ToolNotAllowedError(
+          ctx.agent.id,
+          toolName,
+          allowedTools.filter((t) => t !== 'module_manage'),
+        )
+      }
+      throw new Error('module_manage is asynchronous; invoke executeWhitelistedToolAsync()')
+    }
+
     case 'batch_submit':
     case 'batch_status':
     case 'batch_list':
@@ -1208,10 +1305,7 @@ export function executeWhitelistedTool(
 }
 
 /**
- * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`).
- * Strictly enforces that `cli_manage` can only be executed by `alfred-ops`.
- * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`, `system_storage`).
- * Strictly enforces that `cli_manage` and `system_storage` can only be executed by `alfred-ops`.
+ * Async tool executor extending `executeWhitelistedTool` for async lifecycle tools (`cli_manage`, `system_storage`, `module_manage`, `batch_*`).
  */
 export async function executeWhitelistedToolAsync(
   ctx: ExecuteToolContext,
@@ -1222,6 +1316,76 @@ export async function executeWhitelistedToolAsync(
   const allowedTools = ctx.agent.tools
   if (!allowedTools.includes(toolName as AllowedToolName)) {
     throw new ToolNotAllowedError(ctx.agent.id, toolName, allowedTools)
+  }
+
+  const moduleOwner = resolveToolOwnerModule(toolName, {
+    db: ctx.db,
+    projectRoot: ctx.projectRoot,
+  })
+  if (moduleOwner && !moduleOwner.active) {
+    return buildModuleDisabledResponse(toolName, moduleOwner.moduleId)
+  }
+
+  if (toolName === 'module_manage') {
+    if (!isModuleManageAuthorized(ctx.agent.id)) {
+      throw new ToolNotAllowedError(
+        ctx.agent.id,
+        toolName,
+        allowedTools.filter((t) => t !== 'module_manage'),
+      )
+    }
+
+    const action = typeof rawArgs.action === 'string' ? rawArgs.action.trim().toLowerCase() : 'list'
+    const targetId = typeof rawArgs.target_id === 'string' ? rawArgs.target_id.trim() : ''
+    const modOpts = {
+      db: ctx.db,
+      projectRoot: ctx.projectRoot,
+      env: opts?.env,
+    }
+
+    if (action === 'list') {
+      return JSON.stringify(
+        {
+          ok: true,
+          modules: listModules(modOpts),
+          agentPackages: listAgentPackages(modOpts),
+        },
+        null,
+        2,
+      )
+    }
+    if (action === 'install_module' || action === 'enable_module') {
+      const result = enableModule(targetId, {
+        ...modOpts,
+        withDependencies: rawArgs.with_dependencies !== false,
+      })
+      return JSON.stringify({ ok: true, ...result }, null, 2)
+    }
+    if (action === 'disable_module') {
+      const result = disableModule(targetId, {
+        ...modOpts,
+        disableDependentAgents: rawArgs.disable_dependent_agents === true,
+      })
+      return JSON.stringify({ ok: true, ...result }, null, 2)
+    }
+    if (action === 'install_agent') {
+      const result = installAgentPackage(targetId, {
+        ...modOpts,
+        enableRequiredModules: rawArgs.with_dependencies !== false,
+      })
+      return JSON.stringify({ ok: true, ...result }, null, 2)
+    }
+    if (action === 'enable_agent') {
+      const result = toggleAgentPackage(targetId, true, modOpts)
+      return JSON.stringify({ ok: true, ...result }, null, 2)
+    }
+    if (action === 'disable_agent') {
+      const result = toggleAgentPackage(targetId, false, modOpts)
+      return JSON.stringify({ ok: true, ...result }, null, 2)
+    }
+    throw new Error(
+      `module_manage: unsupported action "${action}". Allowed: list, install_module, enable_module, disable_module, install_agent, enable_agent, disable_agent`,
+    )
   }
 
   if (toolName === 'cli_manage') {

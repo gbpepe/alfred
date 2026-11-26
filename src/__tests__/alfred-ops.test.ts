@@ -65,7 +65,7 @@ describe('Alfred Ops (#alfred-ops & strict bash whitelist)', () => {
     const ops = loadOpsAgent(ws)
     expect(ops.id).toBe('alfred-ops')
     expect(ops.channelName).toBe('#alfred-ops')
-    expect(ops.tools).toEqual(['bash', 'fs_read', 'memory', 'cli_manage', 'system_storage'])
+    expect(ops.tools).toEqual(['bash', 'fs_read', 'memory', 'cli_manage', 'system_storage', 'module_manage'])
     expect(ops.bashTimeoutMs).toBe(180_000)
     expect(ops.resolvedSystemPrompt).toContain('Alfred Ops')
     expect(ops.resolvedSystemPrompt).toContain('spinup-test.sh')

@@ -192,6 +192,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
             <span class="sb-label">API &amp; CLI</span>
           </a>
+          <a href="#" class="sb-link" data-page="modules">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            <span class="sb-label">Modulok &amp; Ügynökök</span>
+          </a>
           <a href="#" class="sb-link" data-page="status">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span class="sb-label">Státusz</span>
@@ -2323,7 +2327,7 @@
         </div>
       </div>
       <div id="vpsSystemBar" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px">Betöltés...</div>
-      <div id="vpsStorageCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+      <div id="vpsStorageCard" data-module-card="core-ops" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <strong>Memória &amp; SSD</strong>
@@ -2338,7 +2342,7 @@
         <div id="vpsStorageCleanupStatus" hidden style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px"></div>
       </div>
 
-      <div id="vpsBatchCard" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+      <div id="vpsBatchCard" data-module-card="batch-api" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <strong>Aszinkron Batch Feldolgozó (50%-os API ár)</strong>
@@ -2385,6 +2389,14 @@
           </select>
         </div>
         <pre id="vpsLogOutput" style="white-space:pre-wrap;font-family:monospace;font-size:11px;height:320px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);margin:0"></pre>
+      </div>
+
+      <div id="vpsHiddenModulesNotice" hidden style="margin-top:14px;padding:10px 14px;border:1px dashed var(--border);border-radius:10px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span title="A kikapcsolt rendszermodulok vezérlőkártyái automatikusan elrejtődnek a #vps nézetről, így a felület átlátható marad és 0 háttérerőforrást fogyasztanak.">ℹ️</span>
+          <span id="vpsHiddenModulesText" style="opacity:.85"></span>
+        </div>
+        <a href="#modules" id="vpsHiddenModulesLink" class="btn-secondary btn-compact" style="text-decoration:none;font-size:12px">Kezelés a Moduloknál →</a>
       </div>
     </section>
 
@@ -2483,6 +2495,109 @@
         </div>
         <div id="vpsMcpServersGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px"></div>
         <div id="vpsMcpServersStatus" style="font-size:12px;margin-top:8px;opacity:.8"></div>
+      </div>
+    </section>
+
+    <section class="page" id="modulesPage" hidden>
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;position:relative">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div>
+            <h1 style="margin:0">Modulok &amp; Ügynökök</h1>
+            <div style="font-size:12px;opacity:.75">Odoo-stílusú rendszermodul-kapuzás és telepíthető specialista ügynökcsomagok (2 GB RAM védelemmel)</div>
+          </div>
+          <button type="button" id="modulesHelpBtn" class="btn-secondary btn-compact" title="Mi a különbség a modulok és az ügynökök között?" style="border-radius:999px;width:28px;height:28px;padding:0;font-weight:700">?</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn-secondary btn-compact" id="modulesRefreshBtn">Frissítés</button>
+        </div>
+        <div id="modulesHelpPopover" hidden style="position:absolute;top:100%;left:0;z-index:40;width:min(460px, calc(100vw - 32px));max-width:100%;margin-top:6px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);box-shadow:0 10px 28px rgba(0,0,0,.18);font-size:12px;line-height:1.5">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong>💡 Rendszermodul vs. Specialista Ügynök</strong>
+            <button type="button" id="modulesHelpPopoverClose" aria-label="Súgó bezárása" style="background:none;border:none;font-size:16px;cursor:pointer;line-height:1">&times;</button>
+          </div>
+          <div style="margin-bottom:6px"><b>Rendszermodul:</b> technikai képesség, LLM eszközcsoport (<code>tool-executor</code>) és <code>#vps</code> felületi kártya. Kikapcsolva nulla memóriát és nulla LLM kontextus-tokent fogyaszt.</div>
+          <div style="margin-bottom:10px"><b>Specialista Ügynök:</b> előre hangolt szerepkör (<code>SOUL.md</code> + ellenőrzött <code>SKILL.md</code> csomag), amely telepítés után <code>Kikapcsolva</code> állapotban várja a finomhangolást.</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)">
+            <button type="button" id="modulesHelpOpenDocsBtn" class="btn-primary btn-compact" style="font-size:11px">📘 Teljes útmutató és tutorialok megnyitása (#docs) →</button>
+            <button type="button" id="modulesRestoreTipsBtn" class="btn-secondary btn-compact" style="font-size:11px">Tippek visszaállítása</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="modulesIntroTip" data-inline-tip="modules-intro" style="padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;font-size:12px;line-height:1.5">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div><strong>💡 Gyors útmutató:</strong></div>
+          <div>1. <b>Rendszermodul</b> = képesség / eszközcsoport (kikapcsolva 0 token- és RAM-zaj, a Heartbeat sem futtatja).</div>
+          <div>2. <b>Specialista Ügynök</b> = szerepkör + ellenőrzött <code>SKILL.md</code> csomag (telepítés után kikapcsolva indul, eltávolításkor a <code>SOUL.md</code> és munkakönyvtára megmarad).</div>
+        </div>
+        <button type="button" id="modulesIntroTipClose" aria-label="Tipp elrejtése" title="Elrejtés (a fejléc ? súgójából bármikor visszaállítható)" style="background:none;border:none;font-size:16px;cursor:pointer;opacity:.7;line-height:1">&times;</button>
+      </div>
+
+      <div id="modulesSummaryBar" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px;display:flex;flex-direction:column;gap:12px">
+        <div id="modulesRamBar" style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <strong>2 GB VPS Memória-keret &amp; Aktív modul-lábnyom</strong>
+              <button type="button" id="modulesRamHelpBtn" class="btn-secondary btn-compact" title="Valós VPS RAM vs. aktív modulok becsült +MB lábnyoma" style="border-radius:999px;width:20px;height:20px;padding:0;font-size:11px;font-weight:700;line-height:1">?</button>
+            </div>
+            <span id="modulesRamSummaryText" style="font-weight:600">Betöltés...</span>
+          </div>
+          <div id="modulesRamHelpBox" hidden style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:11px;line-height:1.45;opacity:.9">
+            A csík a VPS <b>valós fizikai memóriahasználatát</b> (<code>/proc/meminfo</code>) mutatja (&lt;80% zöld, 80–90% borostyán, &gt;90% piros), a <b>+X MB</b> érték pedig az aktív modulok összesített becsült RAM-lábnyoma. Opcionális modul kikapcsolásával azonnal csökkenthető a memórianyomás és az LLM kontextus-terhelés.
+          </div>
+          <div style="height:8px;border-radius:999px;background:rgba(128,128,128,0.2);overflow:hidden">
+            <div id="modulesRamBarFill" style="height:100%;width:0%;background:#16a34a;border-radius:999px;transition:width .25s ease"></div>
+          </div>
+          <div id="modulesStatsSub" style="font-size:11px;opacity:.78"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+          <input type="search" id="modulesSearchInp" class="input" placeholder="🔎 Keresés modulra, ügynökre vagy eszközre..." autocomplete="off" style="flex:1;min-width:210px;max-width:340px;padding:6px 10px;font-size:12px">
+          <div id="modulesStateTabs" style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn-primary btn-compact" data-mod-state="all" style="font-size:12px">Összes</button>
+            <button type="button" class="btn-secondary btn-compact" data-mod-state="active" style="font-size:12px">Aktív</button>
+            <button type="button" class="btn-secondary btn-compact" data-mod-state="disabled" style="font-size:12px">Kikapcsolva</button>
+            <button type="button" class="btn-secondary btn-compact" data-mod-state="needs_config" title="Hiányzó Vault-kulcs vagy modulfüggőség — API-kulcsokat és tokeneket mindig a #vault tárolóba vegyél fel, soha ne chatbe!" style="font-size:12px">Konfigurációra vár ⚠</button>
+          </div>
+        </div>
+        <div id="modulesCategoryChips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:11px">
+          <span style="opacity:.7">Kategória:</span>
+          <button type="button" class="btn-primary btn-compact" data-mod-cat="all" style="font-size:11px;padding:3px 9px">Mind</button>
+          <button type="button" class="btn-secondary btn-compact" data-mod-cat="core" style="font-size:11px;padding:3px 9px">core</button>
+          <button type="button" class="btn-secondary btn-compact" data-mod-cat="storage" style="font-size:11px;padding:3px 9px">storage</button>
+          <button type="button" class="btn-secondary btn-compact" data-mod-cat="compute" style="font-size:11px;padding:3px 9px">compute</button>
+          <button type="button" class="btn-secondary btn-compact" data-mod-cat="automation" style="font-size:11px;padding:3px 9px">automation</button>
+          <button type="button" class="btn-secondary btn-compact" data-mod-cat="security" style="font-size:11px;padding:3px 9px">security</button>
+        </div>
+      </div>
+
+      <div id="modulesActionStatus" hidden style="margin-bottom:14px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:12px"></div>
+
+      <div style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <h2 style="margin:0;font-size:16px">Rendszermodulok</h2>
+            <button type="button" id="systemModulesHelpBtn" class="btn-secondary btn-compact" title="Alapmodulok védelme, függőségi lánc és MODULE_DISABLED_ERROR kapuzás" style="border-radius:999px;width:20px;height:20px;padding:0;font-size:11px;font-weight:700;line-height:1">?</button>
+          </div>
+          <span id="systemModulesCount" style="font-size:12px;opacity:.7"></span>
+        </div>
+        <div id="systemModulesHelpBox" hidden style="margin-bottom:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:11px;line-height:1.45;opacity:.9">
+          A <b>🔒 Alapmodulok</b> (<code>core-cli</code>, <code>core-ops</code>) nem kapcsolhatók ki. Opcionális modul kikapcsolásakor a rendszer ellenőrzi a függőségi láncot, az eszközei pedig azonnal eltűnnek az LLM sémákból (futásidejű <code>MODULE_DISABLED_ERROR</code> védelemmel).
+        </div>
+        <div id="systemModulesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px"></div>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <h2 style="margin:0;font-size:16px">Specialista Ügynök Katalógus</h2>
+            <button type="button" id="agentCatalogHelpBtn" class="btn-secondary btn-compact" title="enabled: false indulás, SKILL.md szkenner, adatmegőrző eltávolítás és előkészített csomagok" style="border-radius:999px;width:20px;height:20px;padding:0;font-size:11px;font-weight:700;line-height:1">?</button>
+          </div>
+          <span id="agentCatalogCount" style="font-size:12px;opacity:.7"></span>
+        </div>
+        <div id="agentCatalogHelpBox" hidden style="margin-bottom:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:11px;line-height:1.45;opacity:.9">
+          Minden új ügynökcsomag <code>SKILL.md</code> biztonsági szkennelés után, biztonságosan <b>Kikapcsolva</b> (<code>enabled: false</code>) indul. Eltávolításkor a <code>SOUL.md</code> és a <code>workspaces/&lt;id&gt;</code> mappa megmarad. Az <b>„Előkészített · Hiányzó modul”</b> csomagok (pl. <code>iris-video</code>) azért szürkék, mert a hozzájuk tartozó jövőbeli modulok még nincsenek telepítve.
+        </div>
+        <div id="agentCatalogGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px"></div>
       </div>
     </section>
 
@@ -4121,6 +4236,51 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- Modal: Module / Agent Package Details -->
+  <div class="modal-overlay" id="moduleDetailModalOverlay" hidden>
+    <div class="modal modal-wide" style="max-width:680px">
+      <div class="modal-header">
+        <h2 id="moduleDetailTitle" style="margin:0;font-size:16px">Részletek</h2>
+        <button type="button" class="modal-close" id="moduleDetailClose">&times;</button>
+      </div>
+      <div class="modal-body" id="moduleDetailBody" style="display:flex;flex-direction:column;gap:12px;font-size:13px;max-height:70vh;overflow:auto"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Module / Agent Action Confirmation (cascade disable & safe uninstall) -->
+  <div class="modal-overlay" id="moduleConfirmOverlay" hidden>
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header">
+        <h2 id="moduleConfirmTitle" style="margin:0;font-size:16px">Megerősítés</h2>
+        <button type="button" class="modal-close" id="moduleConfirmClose">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;font-size:13px">
+        <div id="moduleConfirmBody"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+          <button type="button" class="btn-secondary btn-compact" id="moduleConfirmCancelBtn">Mégse</button>
+          <button type="button" class="btn-primary btn-compact" id="moduleConfirmOkBtn">Megerősítés</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Post-Install 3-step Specialist Agent Onboarding -->
+  <div class="modal-overlay" id="agentPostInstallOverlay" hidden>
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <h2 id="agentPostInstallTitle" style="margin:0;font-size:16px">Telepítés kész — Indítási Ellenőrzőlista</h2>
+        <button type="button" class="modal-close" id="agentPostInstallClose">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;font-size:13px">
+        <div id="agentPostInstallBody" style="display:flex;flex-direction:column;gap:10px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px">
+          <button type="button" class="btn-secondary btn-compact" id="agentPostInstallDoneBtn">Később indítom</button>
+          <button type="button" class="btn-primary btn-compact" id="agentPostInstallStartBtn">Ügynök indítása most</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Simulated Alfred Core Live Terminal modal -->
   <div class="modal-overlay" id="agentCoreTerminalOverlay" hidden>

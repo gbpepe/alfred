@@ -950,7 +950,11 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
   if (path === '/api/agents' && method === 'GET') {
     const summaries = listAgentSummaries() as unknown as Array<Record<string, unknown>>
     try {
-      const cfg = loadAlfredAgentsConfig({ env: { ...readEnvFile(), ...process.env } })
+      const cfg = loadAlfredAgentsConfig({
+        env: { ...readEnvFile(), ...process.env },
+        includeDisabled: true,
+        provisionWorkspaces: false,
+      })
       const coreById = new Map((cfg?.agents ?? []).map((a) => [a.id, a]))
       for (const s of summaries) {
         const id = typeof s.name === 'string' ? s.name : ''
@@ -958,11 +962,20 @@ export async function tryHandleAgents(ctx: RouteContext, webDir: string): Promis
         if (!core) continue
         s.displayName = core.displayName || id
         s.model = `${core.provider}/${core.model}`
-        s.activeModel = `${core.provider}/${core.model}`
-        s.running = true
-        s.status = 'running'
-        s.channelConnected = true
         s.skillCount = Array.isArray(core.skills) ? core.skills.length : 0
+        if (core.enabled === false) {
+          s.activeModel = null
+          s.running = false
+          s.runState = 'stopped'
+          s.status = 'configured'
+          s.coreEnabled = false
+        } else {
+          s.activeModel = `${core.provider}/${core.model}`
+          s.running = true
+          s.status = 'running'
+          s.channelConnected = true
+          s.coreEnabled = true
+        }
       }
     } catch { /* fallback to base summaries */ }
     jsonMaybeGzip(req, res, summaries)

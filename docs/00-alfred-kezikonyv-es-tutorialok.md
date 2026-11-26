@@ -208,3 +208,12 @@ Részletes leírás: **[6. Aszinkron Batch Feldolgozás & Költségoptimalizál�
 - **50%-os Batch API ár + CLI kvóta védelme:** A tömeges, párhuzamosítható, nem azonnali feladatokat az `alfred-batch` (`#alfred-batch`) koordinátor veszi át `provider: "auto"` útválasztással (`anthropic`, `gemini`, `vertex-eu`, `openai`), `secret-gate` szűréssel és pre-flight költségkeret-ellenőrzéssel.
 - **Kanonikus JSONL & Prompt Caching:** Egységes `custom_id` (`^[a-zA-Z0-9_-]{1,64}$`), job-szintű `worksource-queue` (`store/batch/worksource-queue`), `heavy-job-hold` I/O védelem és automatikus belső `alfred-qa` mintavételezés.
 - **Dashboard `#vps` kártya (`#vpsBatchCard`):** Fő KPI sáv, 4 szolgáltatós megtakarítás-bontás (Elköltve vs. Megtakarítva) és élő köteglista `Cancel` gombbal.
+
+---
+
+## 7. Modul- és Ügynökkatalógus (`#modules`)
+
+Részletes leírás: **[7. Modul- és Ügynökkatalógus](07-modul-es-ugynok-katalogus.md)**
+
+- **Rendszermodulok & 2 GB RAM keret:** Egyetlen kattintással kapcsolhatók az opcionális modulok (pl. `batch-api`), miközben a `builtIn` alapmodulok (`core-cli`, `core-ops`) védettek maradnak, a kikapcsolt modulok eszközei és Heartbeat-ciklusai pedig automatikusan leállnak.
+- **Specialista Ügynökök & Adatmegőrzés:** Biztonsági szkennerrel ellenőrzött ügynökcsomagok (`alfred-batch`, `alfred-self-coder`, `alfred-qa`, `alfred-architect`, `iris-video`), biztonságos `enabled: false` telepítéssel, azonnali hot-reloaddal és teljes `SOUL.md` / `workspaces/` adatmegőrzéssel.

@@ -110,6 +110,7 @@ export type AllowedToolName =
   | 'memory'
   | 'cli_manage'
   | 'system_storage'
+  | 'module_manage'
   | 'batch_submit'
   | 'batch_status'
   | 'batch_list'
@@ -123,6 +124,7 @@ export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedTool
   'memory',
   'cli_manage',
   'system_storage',
+  'module_manage',
   'batch_submit',
   'batch_status',
   'batch_list',
@@ -135,6 +137,7 @@ const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'git',
   'cli_manage',
   'system_storage',
+  'module_manage',
   'batch_submit',
   'batch_cancel',
 ])
@@ -142,6 +145,8 @@ const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
 export interface AlfredAgentDefinition {
   id: string
   displayName: string
+  /** Whether the agent is active at runtime (defaults to true for backward compatibility) */
+  enabled?: boolean
   channelName: string
   discordChannelId: string
   role?: AlfredRoleId
@@ -310,6 +315,8 @@ export interface LoadAgentsConfigOptions {
   projectRoot?: string
   env?: Record<string, string | undefined>
   provisionWorkspaces?: boolean
+  /** Include agents configured with `enabled: false` (default: false for runtime callers) */
+  includeDisabled?: boolean
 }
 
 function roundUsd(amount: number): number {
@@ -647,6 +654,7 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
           : undefined,
       )
 
+      const enabled = a.enabled !== false
       const soulFile = typeof a.soulFile === 'string' && a.soulFile.trim() ? a.soulFile.trim() : undefined
       const systemPrompt = typeof a.systemPrompt === 'string' && a.systemPrompt.trim() ? a.systemPrompt.trim() : undefined
       const skills = Array.isArray(a.skills)
@@ -660,6 +668,7 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
       agents.push({
         id,
         displayName,
+        enabled,
         channelName,
         discordChannelId,
         ...(role ? { role } : {}),
@@ -694,6 +703,10 @@ export function loadAlfredAgentsConfig(opts: LoadAgentsConfigOptions = {}): Alfr
       }
       const enabledSet = new Set(runtimeEnv.enabledAgentIds)
       agents = agents.filter((ag) => enabledSet.has(ag.id))
+    }
+
+    if (opts.includeDisabled !== true) {
+      agents = agents.filter((ag) => ag.enabled !== false)
     }
 
     if (opts.provisionWorkspaces !== false) {

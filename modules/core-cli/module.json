@@ -1,0 +1,19 @@
+{
+  "id": "core-cli",
+  "name": "Alap Eszközök & Headless CLI Motor",
+  "category": "core",
+  "version": "1.0.0",
+  "description": "Az Alfred alaprendszer magja: izolált workspace fájlkezelés, git, bash, memória névtér és a 4 előfizetéses headless CLI motor.",
+  "depends": [],
+  "requiredSecrets": [],
+  "tools": ["fs_read", "fs_write", "bash", "git", "memory"],
+  "uiCardIds": [
+    "vpsCliProvidersCard",
+    "vpsModelCatalogCard",
+    "vpsSkillsCatalogCard",
+    "vpsMcpServersCard"
+  ],
+  "ramImpactMb": 0,
+  "builtIn": true,
+  "defaultEnabled": true
+}

@@ -1,0 +1,14 @@
+{
+  "id": "alfred-architect",
+  "displayName": "Alfred Architect",
+  "role": "tervezo",
+  "category": "architecture",
+  "description": "Vezető szoftverarchitekt és rendszertervező ügynök: specifikációk, adatmodellek, biztonsági auditok és erőforrás-tervezés.",
+  "requiredModules": ["core-cli"],
+  "recommendedProvider": "deepseek",
+  "recommendedModel": "deepseek-reasoner",
+  "dailyBudgetUsd": 5.0,
+  "tools": ["fs_read", "memory", "batch_status", "batch_list"],
+  "skills": ["system-architecture"],
+  "optionalEnvVars": ["DISCORD_CHANNEL_ALFRED_HQ"]
+}
