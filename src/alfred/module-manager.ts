@@ -61,6 +61,55 @@ export class ModuleManagerError extends Error {
   }
 }
 
+export type WizardFieldType =
+  | 'secret'
+  | 'text'
+  | 'number'
+  | 'select'
+  | 'boolean'
+  | 'discord_channel'
+  | 'oauth_redirect'
+
+export type WizardFieldStorage = 'vault' | 'config_json' | 'env' | 'action'
+export type WizardRequirementMode = 'any_one' | 'all_required'
+export type WizardStepType = 'fields' | 'verify_and_activate'
+
+export interface WizardFieldOption {
+  value: string
+  label: string
+}
+
+export interface ModuleWizardField {
+  key: string
+  label: string
+  type: WizardFieldType
+  storage: WizardFieldStorage
+  required?: boolean
+  placeholder?: string
+  validationRegex?: string
+  helpText?: string
+  defaultValue?: string | number | boolean
+  options?: WizardFieldOption[]
+  targetAgentId?: string
+}
+
+export interface ModuleWizardStep {
+  id: string
+  title: string
+  description: string
+  type?: WizardStepType
+  requirementMode?: WizardRequirementMode
+  fields?: ModuleWizardField[]
+}
+
+export interface ModuleSetupWizardSchema {
+  title: string
+  summary: string
+  testAction?: string
+  docChapter?: string
+  steps: ModuleWizardStep[]
+}
+
 export interface ModuleManifest {
   id: string
   name: string
@@ -74,6 +123,7 @@ export interface ModuleManifest {
   ramImpactMb: number
   builtIn: boolean
   defaultEnabled: boolean
+  setupWizard?: ModuleSetupWizardSchema
 }
 
 export interface DependentAgentRef {
@@ -91,6 +141,8 @@ export interface ModuleStatusView extends ModuleManifest {
   activeDependentModules: string[]
   /** Currently enabled installed agents whose catalog `requiredModules` includes this module */
   activeDependentAgents: DependentAgentRef[]
+  hasWizard: boolean
+  needsSetup: boolean
 }
 
 export interface AgentPackageManifest {
@@ -235,6 +287,197 @@ function parseStringArray(raw: unknown): string[] {
   return out
 }
 
+const ALLOWED_WIZARD_FIELD_TYPES: ReadonlySet<WizardFieldType> = new Set([
+  'secret',
+  'text',
+  'number',
+  'select',
+  'boolean',
+  'discord_channel',
+  'oauth_redirect',
+])
+
+const ALLOWED_WIZARD_STORAGES: ReadonlySet<WizardFieldStorage> = new Set([
+  'vault',
+  'config_json',
+  'env',
+  'action',
+])
+
+function parseSetupWizardSchema(raw: unknown): ModuleSetupWizardSchema | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const obj = raw as Record<string, unknown>
+  if (!Array.isArray(obj.steps) || obj.steps.length === 0) return undefined
+
+  const steps: ModuleWizardStep[] = []
+  for (const rawStep of obj.steps) {
+    if (!rawStep || typeof rawStep !== 'object' || Array.isArray(rawStep)) continue
+    const s = rawStep as Record<string, unknown>
+    const stepId = typeof s.id === 'string' ? s.id.trim() : ''
+    if (!stepId) continue
+    const stepType: WizardStepType | undefined =
+      s.type === 'verify_and_activate' || s.type === 'fields' ? s.type : undefined
+    const requirementMode: WizardRequirementMode | undefined =
+      s.requirementMode === 'any_one' || s.requirementMode === 'all_required'
+        ? s.requirementMode
+        : undefined
+
+    let fields: ModuleWizardField[] | undefined
+    if (Array.isArray(s.fields)) {
+      fields = []
+      for (const rawField of s.fields) {
+        if (!rawField || typeof rawField !== 'object' || Array.isArray(rawField)) continue
+        const f = rawField as Record<string, unknown>
+        const key = typeof f.key === 'string' ? f.key.trim() : ''
+        const fType = typeof f.type === 'string' ? (f.type.trim() as WizardFieldType) : ''
+        const storage = typeof f.storage === 'string' ? (f.storage.trim() as WizardFieldStorage) : ''
+        if (
+          !key ||
+          !ALLOWED_WIZARD_FIELD_TYPES.has(fType as WizardFieldType) ||
+          !ALLOWED_WIZARD_STORAGES.has(storage as WizardFieldStorage)
+        ) {
+          continue
+        }
+        let options: WizardFieldOption[] | undefined
+        if (Array.isArray(f.options)) {
+          options = f.options
+            .filter((o): o is Record<string, unknown> => Boolean(o && typeof o === 'object' && !Array.isArray(o)))
+            .map((o) => ({
+              value: String(o.value ?? '').trim(),
+              label: String(o.label ?? o.value ?? '').trim(),
+            }))
+            .filter((o) => o.value.length > 0)
+        }
+        const defaultValue =
+          typeof f.defaultValue === 'string' ||
+          typeof f.defaultValue === 'number' ||
+          typeof f.defaultValue === 'boolean'
+            ? f.defaultValue
+            : undefined
+        fields.push({
+          key,
+          label: typeof f.label === 'string' && f.label.trim() ? f.label.trim() : key,
+          type: fType as WizardFieldType,
+          storage: storage as WizardFieldStorage,
+          ...(typeof f.required === 'boolean' ? { required: f.required } : {}),
+          ...(typeof f.placeholder === 'string' ? { placeholder: f.placeholder } : {}),
+          ...(typeof f.validationRegex === 'string' && f.validationRegex.trim()
+            ? { validationRegex: f.validationRegex.trim() }
+            : {}),
+          ...(typeof f.helpText === 'string' && f.helpText.trim() ? { helpText: f.helpText.trim() } : {}),
+          ...(defaultValue !== undefined ? { defaultValue } : {}),
+          ...(options && options.length > 0 ? { options } : {}),
+          ...(typeof f.targetAgentId === 'string' && f.targetAgentId.trim()
+            ? { targetAgentId: f.targetAgentId.trim() }
+            : {}),
+        })
+      }
+    }
+
+    steps.push({
+      id: stepId,
+      title: typeof s.title === 'string' && s.title.trim() ? s.title.trim() : stepId,
+      description: typeof s.description === 'string' ? s.description.trim() : '',
+      ...(stepType ? { type: stepType } : {}),
+      ...(requirementMode ? { requirementMode } : {}),
+      ...(fields ? { fields } : {}),
+    })
+  }
+
+  if (steps.length === 0) return undefined
+  return {
+    title: typeof obj.title === 'string' && obj.title.trim() ? obj.title.trim() : 'Modul beállítása',
+    summary: typeof obj.summary === 'string' ? obj.summary.trim() : '',
+    ...(typeof obj.testAction === 'string' && obj.testAction.trim() ? { testAction: obj.testAction.trim() } : {}),
+    ...(typeof obj.docChapter === 'string' && obj.docChapter.trim() ? { docChapter: obj.docChapter.trim() } : {}),
+    steps,
+  }
+}
+
+export function parseModuleConfigJson(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw || typeof raw !== 'string') return {}
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch {
+    // ignore malformed config_json
+  }
+  return {}
+}
+
+/**
+ * Decryption-free wizard readiness evaluation: checks whether all required wizard steps
+ * (`any_one` or `all_required`) are satisfied using metadata-only secret IDs (`listSecrets()` + env)
+ * and `installed_modules.config_json`.
+ */
+export function evaluateWizardReadiness(
+  wizard: ModuleSetupWizardSchema | undefined,
+  presentSecretIds: ReadonlySet<string>,
+  configObj: Record<string, unknown>,
+  env: Record<string, string | undefined>,
+): { configured: boolean; needsSetup: boolean; completedSteps: string[]; missingRequirements: string[] } {
+  if (!wizard) {
+    return { configured: true, needsSetup: false, completedSteps: [], missingRequirements: [] }
+  }
+
+  const isFieldSet = (f: ModuleWizardField): boolean => {
+    if (f.storage === 'action') return true
+    if (f.storage === 'vault') {
+      return presentSecretIds.has(f.key)
+    }
+    if (f.storage === 'config_json') {
+      const v = configObj[f.key]
+      if (v !== undefined && v !== null && String(v).trim() !== '') return true
+      const envFallback = env[f.key]
+      return typeof envFallback === 'string' && envFallback.trim().length > 0
+    }
+    if (f.storage === 'env') {
+      const envVal = env[f.key]
+      return typeof envVal === 'string' && envVal.trim().length > 0
+    }
+    return false
+  }
+
+  const completedSteps: string[] = []
+  const missingRequirements: string[] = []
+
+  for (const step of wizard.steps) {
+    if (step.type === 'verify_and_activate' || !step.fields || step.fields.length === 0) {
+      continue
+    }
+    const mode: WizardRequirementMode = step.requirementMode ?? 'all_required'
+    const nonActionFields = step.fields.filter((f) => f.storage !== 'action')
+
+    if (mode === 'any_one') {
+      const anySet = nonActionFields.some((f) => isFieldSet(f))
+      if (anySet || nonActionFields.length === 0) {
+        completedSteps.push(step.id)
+      } else {
+        missingRequirements.push(`${step.title}: legalább 1 mező megadása szükséges`)
+      }
+    } else {
+      const missingInStep = nonActionFields.filter((f) => f.required === true && !isFieldSet(f))
+      if (missingInStep.length === 0) {
+        completedSteps.push(step.id)
+      } else {
+        for (const mf of missingInStep) {
+          missingRequirements.push(`${mf.label} (${mf.key})`)
+        }
+      }
+    }
+  }
+
+  const configured = missingRequirements.length === 0
+  return {
+    configured,
+    needsSetup: !configured,
+    completedSteps,
+    missingRequirements,
+  }
+}
+
 function loadModuleManifests(projectRoot: string): Map<string, ModuleManifest> {
   const rootAbs = resolve(projectRoot)
   const cached = moduleManifestCache.get(rootAbs)
@@ -276,6 +519,7 @@ function loadModuleManifests(projectRoot: string): Map<string, ModuleManifest> {
               : 0,
           builtIn: raw.builtIn === true,
           defaultEnabled: raw.defaultEnabled === true,
+          ...(parseSetupWizardSchema(raw.setupWizard) ? { setupWizard: parseSetupWizardSchema(raw.setupWizard) } : {}),
         }
         result.set(manifest.id, manifest)
       } catch {
@@ -463,6 +707,9 @@ export function listModules(opts?: ModuleManagerOptions): ModuleStatusView[] {
       }
     }
 
+    const configObj = parseModuleConfigJson(row?.config_json)
+    const wizardReadiness = evaluateWizardReadiness(manifest.setupWizard, presentSecrets, configObj, env)
+
     out.push({
       ...manifest,
       state,
@@ -472,6 +719,8 @@ export function listModules(opts?: ModuleManagerOptions): ModuleStatusView[] {
       missingDependencies,
       activeDependentModules,
       activeDependentAgents,
+      hasWizard: Boolean(manifest.setupWizard),
+      needsSetup: Boolean(manifest.setupWizard) && wizardReadiness.needsSetup,
     })
   }
 

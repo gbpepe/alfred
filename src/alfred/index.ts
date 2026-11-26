@@ -24,6 +24,8 @@ export * from './vertex-auth.js'
 export * from './system-monitor.js'
 export * from './housekeeper.js'
 export * from './batch-runner.js'
+export * from './module-manager.js'
+export * from './module-wizard.js'
 
 interface DiscordAccessFile {
   dmPolicy?: 'pairing' | 'allowlist' | 'disabled'

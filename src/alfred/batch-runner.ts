@@ -17,11 +17,13 @@ import type Database from 'better-sqlite3'
 import { PROJECT_ROOT } from '../config.js'
 import type { TokenPrice } from '../costops/config.js'
 import { evaluateAgentBudgets, agentSpend } from '../costops/agent-budgets.js'
+import { getInstalledModuleRow } from '../db.js'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import { wrapUntrusted } from '../prompt-safety.js'
 import { scanFile } from '../security/secret-gate.js'
 import { composeBatchInjection, type BatchInjectItem } from '../web/batch-inject.js'
+import { getSecret, listSecrets } from '../web/vault.js'
 import {
   holdStorePath,
   jobKey,
@@ -500,29 +502,106 @@ export function computeBatchCostBreakdown(
   return { batchCostUsd, baselineCostUsd, savedCostUsd }
 }
 
+export interface BatchVaultOps {
+  listSecrets?: () => Array<{ id: string }>
+  getSecret?: (id: string) => string | null
+}
+
+const BATCH_VAULT_SECRET_KEYS = [
+  'GEMINI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+] as const
+
+/**
+ * Resolves effective Batch configuration with precedence:
+ * - API keys (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`): Vault (`getSecret`) -> `env`
+ * - `VERTEX_EU_BATCH_BUCKET`: `installed_modules.config_json` (`batch-api`) -> `env`
+ * When `decryptSecrets` is false (status/overview views), uses decryption-free `listSecrets()`.
+ */
+export function resolveBatchRuntimeEnv(
+  baseEnv: Record<string, string | undefined>,
+  opts?: {
+    db?: Database.Database | null
+    decryptSecrets?: boolean
+    vaultOps?: BatchVaultOps
+  },
+): Record<string, string | undefined> {
+  const effective: Record<string, string | undefined> = { ...baseEnv }
+
+  // 1. `VERTEX_EU_BATCH_BUCKET`: installed_modules.config_json ('batch-api') -> env
+  if (opts?.db) {
+    try {
+      const row = getInstalledModuleRow('batch-api', opts.db)
+      if (row?.config_json) {
+        const parsed = JSON.parse(row.config_json) as Record<string, unknown>
+        const cfgBucket = typeof parsed['VERTEX_EU_BATCH_BUCKET'] === 'string'
+          ? parsed['VERTEX_EU_BATCH_BUCKET'].trim()
+          : ''
+        if (cfgBucket) {
+          effective['VERTEX_EU_BATCH_BUCKET'] = cfgBucket
+        }
+      }
+    } catch {
+      // Minimal test DB without installed_modules or invalid JSON: fall back to baseEnv
+    }
+  }
+
+  // 2. API keys: Vault -> env
+  if (opts?.decryptSecrets) {
+    const getter = opts.vaultOps?.getSecret ?? getSecret
+    for (const key of BATCH_VAULT_SECRET_KEYS) {
+      try {
+        const val = getter(key)
+        if (typeof val === 'string' && val.trim().length > 0) {
+          effective[key] = val.trim()
+        }
+      } catch {
+        // Vault unavailable: keep baseEnv fallback
+      }
+    }
+  } else {
+    const lister = opts?.vaultOps?.listSecrets ?? listSecrets
+    try {
+      const ids = new Set(lister().map((e) => e.id))
+      for (const key of BATCH_VAULT_SECRET_KEYS) {
+        if (ids.has(key) && !(effective[key] ?? '').trim()) {
+          effective[key] = '__vault_present__'
+        }
+      }
+    } catch {
+      // Vault unavailable: keep baseEnv fallback
+    }
+  }
+
+  return effective
+}
+
 export function isBatchProviderConfigured(
   provider: BatchProviderName,
   env: Record<string, string | undefined>,
+  opts?: { db?: Database.Database | null; vaultOps?: BatchVaultOps },
 ): boolean {
+  const effectiveEnv = opts ? resolveBatchRuntimeEnv(env, { db: opts.db, decryptSecrets: false, vaultOps: opts.vaultOps }) : env
   if (provider === 'anthropic') {
-    return Boolean((env['ANTHROPIC_API_KEY'] ?? '').trim())
+    return Boolean((effectiveEnv['ANTHROPIC_API_KEY'] ?? '').trim())
   }
   if (provider === 'gemini') {
-    return Boolean((env['GEMINI_API_KEY'] ?? '').trim())
+    return Boolean((effectiveEnv['GEMINI_API_KEY'] ?? '').trim())
   }
   if (provider === 'openai') {
-    return Boolean((env['OPENAI_API_KEY'] ?? '').trim())
+    return Boolean((effectiveEnv['OPENAI_API_KEY'] ?? '').trim())
   }
   if (provider === 'vertex-eu') {
-    const bucket = (env['VERTEX_EU_BATCH_BUCKET'] ?? '').trim()
+    const bucket = (effectiveEnv['VERTEX_EU_BATCH_BUCKET'] ?? '').trim()
     if (!bucket) return false
     const hasAuth = Boolean(
-      (env['VERTEX_EU_ACCESS_TOKEN'] ?? '').trim() ||
-      (env['GOOGLE_APPLICATION_CREDENTIALS'] ?? '').trim() ||
-      (env['VERTEX_EU_PROJECT_ID'] ?? '').trim(),
+      (effectiveEnv['VERTEX_EU_ACCESS_TOKEN'] ?? '').trim() ||
+      (effectiveEnv['GOOGLE_APPLICATION_CREDENTIALS'] ?? '').trim() ||
+      (effectiveEnv['VERTEX_EU_PROJECT_ID'] ?? '').trim(),
     )
     if (!hasAuth) return false
-    const rawLocation = (env['VERTEX_EU_BATCH_LOCATION'] ?? env['VERTEX_EU_LOCATION'] ?? 'europe-central2').trim()
+    const rawLocation = (effectiveEnv['VERTEX_EU_BATCH_LOCATION'] ?? effectiveEnv['VERTEX_EU_LOCATION'] ?? 'europe-central2').trim()
     try {
       assertVertexEuRegion(rawLocation)
       return true
@@ -1751,12 +1830,18 @@ export interface SubmitBatchJobOptions {
   tokenPrices?: Record<string, TokenPrice>
   maxAnthropicRequests?: number
   maxAnthropicBytes?: number
+  vaultOps?: BatchVaultOps
 }
 
 export async function submitBatchJob(opts: SubmitBatchJobOptions): Promise<BatchJobRecord> {
   ensureBatchJobsTable(opts.db)
   const projectRoot = resolve(opts.projectRoot ?? PROJECT_ROOT)
-  const env = opts.env ?? { ...readEnvFile(), ...process.env }
+  const rawEnv = opts.env ?? { ...readEnvFile(), ...process.env }
+  const env = resolveBatchRuntimeEnv(rawEnv, {
+    db: opts.db,
+    decryptSecrets: true,
+    vaultOps: opts.vaultOps,
+  })
   const fetchImpl = opts.fetchImpl ?? fetch
   const nowSec = opts.nowSec ?? Math.floor(Date.now() / 1000)
   const requestedProvider: RequestedBatchProvider = opts.provider ?? 'auto'
@@ -1966,6 +2051,7 @@ export async function cancelBatchJob(opts: {
   env?: Record<string, string | undefined>
   fetchImpl?: typeof fetch
   nowSec?: number
+  vaultOps?: BatchVaultOps
 }): Promise<BatchJobRecord> {
   ensureBatchJobsTable(opts.db)
   const job = getBatchJobById(opts.db, opts.batchId)
@@ -1976,7 +2062,12 @@ export async function cancelBatchJob(opts: {
     return job
   }
 
-  const env = opts.env ?? { ...readEnvFile(), ...process.env }
+  const rawEnv = opts.env ?? { ...readEnvFile(), ...process.env }
+  const env = resolveBatchRuntimeEnv(rawEnv, {
+    db: opts.db,
+    decryptSecrets: true,
+    vaultOps: opts.vaultOps,
+  })
   const fetchImpl = opts.fetchImpl ?? fetch
   const projectRoot = resolve(opts.projectRoot ?? PROJECT_ROOT)
   const nowSec = opts.nowSec ?? Math.floor(Date.now() / 1000)
@@ -2047,6 +2138,7 @@ export interface PollBatchJobOptions {
   nowSec?: number
   tokenPrices?: Record<string, TokenPrice>
   qaRunnerFn?: (qaAgent: AlfredAgentDefinition, prompt: string) => Promise<string | null>
+  vaultOps?: BatchVaultOps
 }
 
 export interface PollBatchJobResult {
@@ -2100,7 +2192,12 @@ export async function pollBatchJob(opts: PollBatchJobOptions): Promise<PollBatch
 
   inFlightPollIds.add(existing.id)
   const projectRoot = resolve(opts.projectRoot ?? PROJECT_ROOT)
-  const env = opts.env ?? { ...readEnvFile(), ...process.env }
+  const rawEnv = opts.env ?? { ...readEnvFile(), ...process.env }
+  const env = resolveBatchRuntimeEnv(rawEnv, {
+    db: opts.db,
+    decryptSecrets: true,
+    vaultOps: opts.vaultOps,
+  })
   const fetchImpl = opts.fetchImpl ?? fetch
   const nowSec = opts.nowSec ?? Math.floor(Date.now() / 1000)
   const prices = resolveEffectiveTokenPrices(opts.tokenPrices)
@@ -2339,6 +2436,7 @@ export interface PollPendingBatchesOptions {
   nowSec?: number
   tokenPrices?: Record<string, TokenPrice>
   qaRunnerFn?: (qaAgent: AlfredAgentDefinition, prompt: string) => Promise<string | null>
+  vaultOps?: BatchVaultOps
 }
 
 export async function pollPendingBatches(opts: PollPendingBatchesOptions): Promise<{
@@ -2405,17 +2503,24 @@ export interface AdminBatchesOverview {
 export function getAdminBatchesOverview(
   db: Database.Database,
   env: Record<string, string | undefined>,
+  opts?: { vaultOps?: BatchVaultOps },
 ): AdminBatchesOverview {
   ensureBatchJobsTable(db)
   const allRows = db
     .prepare(`SELECT * FROM batch_jobs ORDER BY created_at DESC`)
     .all() as BatchJobRecord[]
 
+  const effectiveEnv = resolveBatchRuntimeEnv(env, {
+    db,
+    decryptSecrets: false,
+    vaultOps: opts?.vaultOps,
+  })
+
   const byProvMap = new Map<BatchProviderName, BatchProviderSummary>()
   for (const p of BATCH_PROVIDERS) {
     byProvMap.set(p, {
       provider: p,
-      configured: isBatchProviderConfigured(p, env),
+      configured: isBatchProviderConfigured(p, effectiveEnv),
       batchCount: 0,
       completedItems: 0,
       spentUsd: 0,
