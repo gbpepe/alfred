@@ -13,6 +13,7 @@ Alfred egy önfejlesztő, proaktív Multi-Agent AI rendszer és egységes VPS Da
 | **[4. VPS Erőforrás-figyelés & Housekeeping](04-vps-eroforras-figyeles-es-housekeeping.md)** | `#vps` Memória & SSD kártya (Top RSS, Linux PSI), `wal_checkpoint(TRUNCATE)`, feltételes `VACUUM`, `.gz` logrotáció, 30 napos artifact takarítás és `system_storage` eszköz |
 | **[5. Hibaelhárítás & Üzemeltetési Parancsok](05-hibaelharitas-es-uzemeltetesi-parancsok.md)** | Gyakori hibák (`AUTH_REQUIRED`, blokkolt `SKILL.md`, `ProtectHome=read-only` / `ReadWritePaths`) és `systemctl` / `journalctl` parancsok |
 | **[6. Aszinkron Batch Feldolgozás & Költségoptimalizálás](06-batch-feldolgozas-es-koltsegoptimalizalas.md)** | 50%-os több-szolgáltatós Batch API (`anthropic`, `gemini`, `vertex-eu`, `openai`), kanonikus JSONL, `auto` router, `alfred-batch` koordinátor, belső `alfred-qa` mintavétel és `#vps` megtakarítás kártya |
+| **[7. Modul- és Ügynökkatalógus](07-modul-es-ugynok-katalogus.md)** | Egységes `#modules` vezérlőpult: Rendszermodulok vs. Specialista Ügynökök, 2 GB RAM keret, Vault-kulcs ellenőrzés, kaszkád kikapcsolás, `mtimeMs` hot-reload és `SOUL.md` / `workspaces/` adatmegőrzés |
 
 ---
 

@@ -73,6 +73,7 @@ export interface DiscordGatewayReadyInfo {
 export interface AlfredDiscordGatewayOptions {
   db: Database.Database
   agentsConfig: AlfredAgentsConfig
+  getAgentsConfig?: () => AlfredAgentsConfig
   token?: string
   intents?: number
   env?: Record<string, string | undefined>
@@ -230,6 +231,7 @@ export async function sendDiscordTypingIndicator(
 export class AlfredDiscordGateway {
   private readonly db: Database.Database
   private readonly agentsConfig: AlfredAgentsConfig
+  private readonly getAgentsConfigFn?: () => AlfredAgentsConfig
   private readonly envMap: Record<string, string | undefined>
   private readonly runtimeEnv: AlfredRuntimeEnv
   private readonly token: string
@@ -269,6 +271,7 @@ export class AlfredDiscordGateway {
   constructor(opts: AlfredDiscordGatewayOptions) {
     this.db = opts.db
     this.agentsConfig = opts.agentsConfig
+    this.getAgentsConfigFn = opts.getAgentsConfig
     this.envMap = opts.env ?? { ...readEnvFile(), ...process.env }
     this.runtimeEnv = opts.runtimeEnv ?? resolveAlfredRuntimeEnv(this.envMap)
     this.token = (opts.token ?? this.envMap['DISCORD_BOT_TOKEN'] ?? process.env['DISCORD_BOT_TOKEN'] ?? '').trim()
@@ -690,14 +693,15 @@ export class AlfredDiscordGateway {
   private async processChannelMessage(d: DiscordMessageCreatePayload): Promise<void> {
     if (this.stopped || !d.author) return
 
-    let agent = getAgentByChannelId(this.agentsConfig, d.channel_id)
+    const activeAgentsConfig = this.getAgentsConfigFn ? this.getAgentsConfigFn() : this.agentsConfig
+    let agent = getAgentByChannelId(activeAgentsConfig, d.channel_id)
     let parentChannelId: string | undefined
 
     if (!agent) {
       const resolvedParent = await this.resolveParentChannelId(d.channel_id)
       if (resolvedParent) {
         parentChannelId = resolvedParent
-        agent = getAgentByChannelId(this.agentsConfig, resolvedParent)
+        agent = getAgentByChannelId(activeAgentsConfig, resolvedParent)
       }
     }
 
@@ -731,7 +735,7 @@ export class AlfredDiscordGateway {
     try {
       const result = await handleAlfredDiscordMessage({
         db: this.db,
-        agentsConfig: this.agentsConfig,
+        agentsConfig: activeAgentsConfig,
         message: {
           channelId: d.channel_id,
           parentChannelId,

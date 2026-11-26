@@ -2,11 +2,13 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import type Database from 'better-sqlite3'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
 import type { AlfredAgentDefinition, AlfredCliProviderName } from './agents-config.js'
 import { ensureAgentCliProfile } from './cli-profile-manager.js'
 import type { ChatMessage, ProviderUsageMetrics } from './model-router.js'
+import { resolveToolOwnerModule } from './module-manager.js'
 import { mapWhitelistToClaudePermissions, matchProtectedPath, ProtectedPathError } from './tool-executor.js'
 
 export type CliErrorKind =
@@ -57,6 +59,8 @@ export interface RunCliAgentOptions {
   userMessage: string
   conversationHistory?: readonly ChatMessage[]
   env?: Record<string, string | undefined>
+  db?: Database.Database
+  projectRoot?: string
   processRunner?: CliProcessRunner
   gitRunner?: CliGitRunner
   queue?: CliExecutionQueue
@@ -506,6 +510,8 @@ export function buildCliCommandSpec(params: {
   userMessage: string
   conversationHistory?: readonly ChatMessage[]
   env: Record<string, string | undefined>
+  db?: Database.Database
+  projectRoot?: string
 }): CliCommandSpec {
   const provider = params.agent.provider as AlfredCliProviderName
   const command = resolveCliBinary(provider, params.env)
@@ -518,7 +524,11 @@ export function buildCliCommandSpec(params: {
     maxChars,
   )
 
-  const hasWriteTools = params.agent.tools.some((t) => WRITE_TOOLS.has(t))
+  const activeTools = params.agent.tools.filter((t) => {
+    const owner = resolveToolOwnerModule(t, { db: params.db, projectRoot: params.projectRoot })
+    return !owner || owner.active
+  })
+  const hasWriteTools = activeTools.some((t) => WRITE_TOOLS.has(t))
   const model = params.agent.model?.trim() ?? 'default'
   const hasExplicitModel = Boolean(model && model !== 'default')
 
@@ -530,7 +540,7 @@ export function buildCliCommandSpec(params: {
     if (hasExplicitModel) {
       args.push('--model', model)
     }
-    const perms = mapWhitelistToClaudePermissions(params.agent.tools, params.agent.workspaceAbsPath, {
+    const perms = mapWhitelistToClaudePermissions(activeTools, params.agent.workspaceAbsPath, {
       protectedPaths: params.agent.protectedPaths,
       allowedBashCommands: params.agent.allowedBashCommands,
     })
@@ -1392,6 +1402,8 @@ export async function runCliAgent(opts: RunCliAgentOptions): Promise<CliRunResul
         userMessage: opts.userMessage,
         conversationHistory: opts.conversationHistory,
         env: envMap,
+        db: opts.db,
+        projectRoot: opts.projectRoot,
       })
 
       const snapshot = captureProtectedSnapshot(opts.agent, gitRunner)

@@ -29,6 +29,7 @@ import {
   type CliProcessRunner,
   type RunCliAgentFn,
 } from './cli-runner.js'
+import { resolveToolOwnerModule } from './module-manager.js'
 import {
   executeWhitelistedToolAsync,
   getWhitelistedToolSchemas,
@@ -572,15 +573,22 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
       throw err
     }
 
-    const quotaAdvice = evaluateCliQuotaForBatch({
-      provider: opts.agent.provider,
+    const batchOwner = resolveToolOwnerModule('batch_submit', {
+      db: opts.db,
       projectRoot: opts.projectRoot,
-      env: envMap,
-      nowMs: opts.nowSec ? opts.nowSec * 1000 : Date.now(),
-      workClass: opts.quotaWorkClass,
-      snapshotOverride: opts.quotaSnapshotOverride,
     })
-    if (quotaAdvice.recommendBatch) {
+    const batchModuleActive = !batchOwner || batchOwner.active
+    const quotaAdvice = batchModuleActive
+      ? evaluateCliQuotaForBatch({
+        provider: opts.agent.provider,
+        projectRoot: opts.projectRoot,
+        env: envMap,
+        nowMs: opts.nowSec ? opts.nowSec * 1000 : Date.now(),
+        workClass: opts.quotaWorkClass,
+        snapshotOverride: opts.quotaSnapshotOverride,
+      })
+      : undefined
+    if (quotaAdvice?.recommendBatch) {
       logger.info(
         {
           agentId: opts.agent.id,
@@ -599,6 +607,8 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
         userMessage: opts.userMessage,
         conversationHistory: opts.conversationHistory,
         env: envMap,
+        db: opts.db,
+        projectRoot: opts.projectRoot,
         processRunner: opts.cliProcessRunner,
         onQueued: opts.onCliQueued,
       })
@@ -692,7 +702,10 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
     opts.conversationHistory ?? [],
     opts.userMessage,
   )
-  const toolSchemas = getWhitelistedToolSchemas(opts.agent)
+  const toolSchemas = getWhitelistedToolSchemas(opts.agent, {
+    db: opts.db,
+    projectRoot: opts.projectRoot,
+  })
 
   const totalUsage: ProviderUsageMetrics = {
     inputTokens: 0,
@@ -823,7 +836,7 @@ export async function runHybridAgentTurn(opts: HybridRouterOptions): Promise<Hyb
       }
 
       const output = await executeWhitelistedToolAsync(
-        { agent: opts.agent, db: opts.db, chatId: opts.chatId },
+        { agent: opts.agent, db: opts.db, chatId: opts.chatId, projectRoot: opts.projectRoot },
         tc.function.name,
         parsedArgs,
         { env: envMap, processRunner: opts.cliProcessRunner },

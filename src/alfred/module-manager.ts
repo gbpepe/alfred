@@ -956,6 +956,15 @@ export function toggleAgentPackage(
   opts?: ModuleManagerOptions,
 ): { agent: AgentPackageStatusView } {
   const id = assertValidId(agentId, 'agent')
+  if (!enabled && PROTECTED_CORE_AGENTS.has(id)) {
+    throw new ModuleManagerError(
+      'PROTECTED_CORE_AGENT',
+      409,
+      `Core operational agent "${id}" cannot be disabled.`,
+      { agentId: id },
+    )
+  }
+
   const projectRoot = resolveProjectRoot(opts)
   const env = resolveEnvMap(opts)
   const db = resolveOptionalDb(opts)
@@ -979,28 +988,61 @@ export function toggleAgentPackage(
   }
 
   const targetPaths = resolveTargetConfigPaths(projectRoot, env, opts?.configPaths)
-  let found = false
+  // Pre-flight check BEFORE mutating any config file on disk
+  let matchedRawEntry: Record<string, unknown> | null = null
+  const parsedConfigs: Array<{ cfgPath: string; parsed: { agents?: Array<Record<string, unknown>> }; entry: Record<string, unknown> }> = []
   for (const cfgPath of targetPaths) {
     if (!existsSync(cfgPath)) continue
     const parsed = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { agents?: Array<Record<string, unknown>> }
     const entry = (parsed.agents ?? []).find((a) => a.id === id)
     if (!entry) continue
-    found = true
-    entry.enabled = enabled
-    atomicWriteFileSync(cfgPath, JSON.stringify(parsed, null, 2) + '\n')
+    if (!matchedRawEntry) matchedRawEntry = entry
+    parsedConfigs.push({ cfgPath, parsed, entry })
   }
 
-  if (!found) {
+  if (parsedConfigs.length === 0) {
     throw new ModuleManagerError('AGENT_PACKAGE_NOT_FOUND', 404, `Installed agent not found in config/agents.json: ${id}`)
+  }
+
+  for (const item of parsedConfigs) {
+    item.entry.enabled = enabled
+    atomicWriteFileSync(item.cfgPath, JSON.stringify(item.parsed, null, 2) + '\n')
   }
 
   bestEffortSyncCliProfiles(projectRoot, env, targetPaths[0], opts?.homeOverride)
 
   const updated = listAgentPackages({ ...opts, db: db ?? undefined, projectRoot, env }).find((p) => p.id === id)
-  if (!updated) {
-    throw new ModuleManagerError('AGENT_PACKAGE_NOT_FOUND', 404, `Agent package not found in catalog: ${id}`)
+  if (updated) {
+    return { agent: updated }
   }
-  return { agent: updated }
+
+  // Fallback status view for custom / project agents present in config/agents.json outside catalog/agents/
+  const raw = matchedRawEntry!
+  const fallbackView: AgentPackageStatusView = {
+    id,
+    displayName: typeof raw.displayName === 'string' && raw.displayName.trim() ? raw.displayName.trim() : id,
+    role: (typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : 'szakmunkas') as AlfredRoleId,
+    category: 'custom',
+    description: typeof raw.systemPrompt === 'string' ? raw.systemPrompt.trim() : '',
+    requiredModules: [],
+    recommendedProvider: (
+      typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider.trim() : 'deepseek'
+    ) as AlfredProviderName,
+    recommendedModel: typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : 'deepseek-chat',
+    dailyBudgetUsd: typeof raw.dailyBudgetUsd === 'number' && Number.isFinite(raw.dailyBudgetUsd) ? raw.dailyBudgetUsd : 3.0,
+    tools: parseStringArray(raw.tools).filter((t): t is AllowedToolName => CANONICAL_TOOLS.has(t as AllowedToolName)),
+    skills: parseStringArray(raw.skills),
+    optionalEnvVars: [],
+    ...(typeof raw.workspace === 'string' && raw.workspace.trim() ? { workspace: raw.workspace.trim() } : {}),
+    ...(Array.isArray(raw.protectedPaths) ? { protectedPaths: parseStringArray(raw.protectedPaths) } : {}),
+    installed: true,
+    enabled,
+    missingModules: [],
+    inactiveModules: [],
+    missingOptionalEnv: [],
+    soulPreview: '',
+  }
+  return { agent: fallbackView }
 }
 
 export function uninstallAgentPackage(

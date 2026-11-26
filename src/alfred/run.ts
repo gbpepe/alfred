@@ -1,10 +1,13 @@
-import { mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { mkdirSync, statSync } from 'node:fs'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
+import { PROJECT_ROOT } from '../config.js'
 import { initDatabase, getDb } from '../db.js'
 import { readEnvFile } from '../env.js'
 import { logger } from '../logger.js'
+import { loadAlfredAgentsConfig } from './agents-config.js'
+import { resolveToolOwnerModule } from './module-manager.js'
 import {
   AlfredDiscordGateway,
   bootAlfredCore,
@@ -133,7 +136,10 @@ export async function runResourceHeartbeatTick(
   }
 
   let batchPollResult: ResourceHeartbeatTickResult['batchPollResult'] = null
-  if (opts.db) {
+  const batchOwner = opts.db
+    ? resolveToolOwnerModule('batch_submit', { db: opts.db, projectRoot: opts.projectRoot })
+    : null
+  if (opts.db && (!batchOwner || batchOwner.active)) {
     try {
       const pollFn = opts.pollPendingBatchesFn ?? pollPendingBatches
       batchPollResult = await pollFn({
@@ -157,6 +163,76 @@ export async function runResourceHeartbeatTick(
     opsChannelId,
     alertMessage,
     batchPollResult,
+  }
+}
+
+function resolveAgentsConfigFilePath(
+  env: Record<string, string | undefined>,
+  configPath?: string,
+  projectRoot: string = PROJECT_ROOT,
+): string {
+  const raw = (configPath ?? env['ALFRED_AGENTS_CONFIG'] ?? '').trim()
+  if (!raw) return join(projectRoot, 'config', 'agents.json')
+  return isAbsolute(raw) ? resolve(raw) : resolve(projectRoot, raw)
+}
+
+/**
+ * Lightweight mtimeMs-cached `config/agents.json` loader for a running `alfred-prod`/`alfred-test` process.
+ * Allows toggling `enabled` or channel mappings from the Dashboard to take effect immediately on the next
+ * Discord message without restarting the process or interrupting active sessions.
+ */
+export function createMtimeCachedAgentsConfigLoader(opts: {
+  initialConfig: AlfredAgentsConfig
+  env: Record<string, string | undefined>
+  runtimeEnv?: AlfredRuntimeEnv
+  configPath?: string
+  projectRoot?: string
+}): () => AlfredAgentsConfig {
+  const projectRoot = opts.projectRoot ?? PROJECT_ROOT
+  const filePath = resolveAgentsConfigFilePath(opts.env, opts.configPath, projectRoot)
+  let cached = opts.initialConfig
+  let lastMtimeMs: number | null = null
+  try {
+    lastMtimeMs = statSync(filePath).mtimeMs
+  } catch {
+    lastMtimeMs = null
+  }
+
+  return () => {
+    let currentMtimeMs: number | null = null
+    try {
+      currentMtimeMs = statSync(filePath).mtimeMs
+    } catch {
+      return cached
+    }
+    if (currentMtimeMs === lastMtimeMs) {
+      return cached
+    }
+    try {
+      const reloaded = loadAlfredAgentsConfig({
+        configPath: filePath,
+        projectRoot,
+        env: opts.env,
+        provisionWorkspaces: false,
+      })
+      const enabledFilter = opts.runtimeEnv?.enabledAgentIds
+      if (enabledFilter && enabledFilter.length > 0) {
+        const allowSet = new Set(enabledFilter)
+        reloaded.agents = reloaded.agents.filter((a) => allowSet.has(a.id))
+      }
+      cached = reloaded
+      lastMtimeMs = currentMtimeMs
+      logger.info(
+        { configPath: filePath, activeAgents: reloaded.agents.map((a) => a.id) },
+        'Reloaded config/agents.json after mtime change (live hot-reload)',
+      )
+    } catch (err) {
+      logger.warn(
+        { configPath: filePath, err: sanitizeStartupError(err) },
+        'Failed to hot-reload config/agents.json; keeping last good snapshot',
+      )
+    }
+    return cached
   }
 }
 
@@ -194,6 +270,12 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
+  const getLatestAgentsConfig = createMtimeCachedAgentsConfigLoader({
+    initialConfig: cfg,
+    env,
+    runtimeEnv,
+  })
+
   try {
     const cliHealth = await checkCliProvidersHealth({ env, timeoutMs: 3_000 })
     logger.info({ cliProviders: cliHealth }, 'Headless CLI providers pre-flight health check')
@@ -224,11 +306,11 @@ async function main(): Promise<void> {
       db,
       env,
       port: simPort,
-      getAgentsConfig: () => cfg!,
+      getAgentsConfig: () => getLatestAgentsConfig(),
       reloadAgentsConfig: () => {
         const next = bootAlfredCore({ env })
         if (next) cfg = next
-        return cfg!
+        return getLatestAgentsConfig()
       },
     })
     : null
@@ -239,6 +321,7 @@ async function main(): Promise<void> {
     : new AlfredDiscordGateway({
       db,
       agentsConfig: cfg,
+      getAgentsConfig: getLatestAgentsConfig,
       env,
       runtimeEnv,
       onFatalError: (err) => {
@@ -278,7 +361,7 @@ async function main(): Promise<void> {
         dbPath: runtimeEnv.dbPath,
         env,
         runtimeEnv,
-        agentsConfig: cfg,
+        agentsConfig: getLatestAgentsConfig(),
         alertTracker,
         sendToDiscord: discordSender,
         runRoutineWalCheckpoint: heartbeatTickCounter % 6 === 1,

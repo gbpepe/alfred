@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import type http from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import Database from 'better-sqlite3'
 import { tryHandleAgents } from '../web/routes/agents.js'
 import { tryHandleAlfredVps } from '../web/routes/alfred-vps.js'
 import type { RouteContext } from '../web/routes/types.js'
@@ -15,6 +16,8 @@ import {
   upsertInstalledModuleRow,
 } from '../db.js'
 import { loadAlfredAgentsConfig, type AlfredAgentDefinition } from '../alfred/agents-config.js'
+import { buildCliCommandSpec } from '../alfred/cli-runner.js'
+import { runHybridAgentTurn } from '../alfred/model-router.js'
 import {
   disableModule,
   enableModule,
@@ -27,11 +30,53 @@ import {
   toggleAgentPackage,
   uninstallAgentPackage,
 } from '../alfred/module-manager.js'
+import { createMtimeCachedAgentsConfigLoader, runResourceHeartbeatTick } from '../alfred/run.js'
+import { SystemAlertTracker } from '../alfred/system-monitor.js'
 import {
   executeWhitelistedToolAsync,
   getWhitelistedToolSchemas,
   ToolNotAllowedError,
 } from '../alfred/tool-executor.js'
+
+function mockHttp(
+  method: string,
+  path: string,
+  opts?: { body?: unknown; headers?: Record<string, string>; auth?: RouteContext['auth'] },
+) {
+  const req = new EventEmitter() as http.IncomingMessage
+  req.method = method
+  req.url = path
+  req.headers = { 'content-type': 'application/json', ...(opts?.headers ?? {}) }
+  if (opts?.body !== undefined) {
+    queueMicrotask(() => {
+      req.emit('data', Buffer.from(JSON.stringify(opts.body), 'utf-8'))
+      req.emit('end')
+    })
+  } else {
+    queueMicrotask(() => req.emit('end'))
+  }
+  let status = 200
+  let rawBody = ''
+  const res = {
+    writeHead(code: number) {
+      status = code
+      return this
+    },
+    end(chunk?: string | Buffer) {
+      if (chunk) rawBody += chunk.toString()
+      return this
+    },
+    setHeader() {
+      return this
+    },
+  } as unknown as http.ServerResponse
+  const url = new URL(`http://127.0.0.1:3420${path}`)
+  return {
+    ctx: { req, res, path: url.pathname, method, url, auth: opts?.auth } as RouteContext,
+    getStatus: () => status,
+    getJson: () => JSON.parse(rawBody || '{}') as Record<string, unknown>,
+  }
+}
 
 function writeJson(filePath: string, data: unknown): void {
   mkdirSync(join(filePath, '..'), { recursive: true })
@@ -671,46 +716,6 @@ describe('Alfred Module Manager (feat/module-manager)', () => {
   })
 
   it('enforces admin auth (401/403/200), handles module/agent HTTP lifecycle, and syncs /api/vps/status + /api/agents', async () => {
-    const mockHttp = (
-      method: string,
-      path: string,
-      opts?: { body?: unknown; headers?: Record<string, string>; auth?: RouteContext['auth'] },
-    ) => {
-      const req = new EventEmitter() as http.IncomingMessage
-      req.method = method
-      req.url = path
-      req.headers = { 'content-type': 'application/json', ...(opts?.headers ?? {}) }
-      if (opts?.body !== undefined) {
-        queueMicrotask(() => {
-          req.emit('data', Buffer.from(JSON.stringify(opts.body), 'utf-8'))
-          req.emit('end')
-        })
-      } else {
-        queueMicrotask(() => req.emit('end'))
-      }
-      let status = 200
-      let rawBody = ''
-      const res = {
-        writeHead(code: number) {
-          status = code
-          return this
-        },
-        end(chunk?: string | Buffer) {
-          if (chunk) rawBody += chunk.toString()
-          return this
-        },
-        setHeader() {
-          return this
-        },
-      } as unknown as http.ServerResponse
-      const url = new URL(`http://127.0.0.1:3420${path}`)
-      return {
-        ctx: { req, res, path: url.pathname, method, url, auth: opts?.auth } as RouteContext,
-        getStatus: () => status,
-        getJson: () => JSON.parse(rawBody || '{}') as Record<string, unknown>,
-      }
-    }
-
     const prevEnv: Record<string, string | undefined> = {
       ALFRED_ENV: process.env.ALFRED_ENV,
       ALFRED_AGENTS_CONFIG: process.env.ALFRED_AGENTS_CONFIG,
@@ -842,5 +847,353 @@ describe('Alfred Module Manager (feat/module-manager)', () => {
         else process.env[k] = v
       }
     }
+  })
+
+  it('P0-1: model-router forwards { db, projectRoot } to getWhitelistedToolSchemas and Admin API syncs split runtime SQLite DB', async () => {
+    // 1. Separate isolated SQLite DB (simulating alfred-prod opening its own DB handle)
+    const runtimeDb = new Database(':memory:')
+    const ddlRows = getDb()
+      .prepare("SELECT sql FROM sqlite_master WHERE type IN ('table', 'index') AND tbl_name IN ('token_usage', 'installed_modules') AND sql IS NOT NULL ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END")
+      .all() as Array<{ sql: string }>
+    for (const row of ddlRows) {
+      if (row.sql) runtimeDb.exec(row.sql)
+    }
+    seedDefaultInstalledModules(runtimeDb)
+    upsertInstalledModuleRow(
+      {
+        module_id: 'batch-api',
+        state: 'installed_disabled',
+        installed_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-02T00:00:00.000Z',
+        config_json: '{}',
+      },
+      runtimeDb,
+    )
+    // Global getDb() still has batch-api active -> proves model-router uses opts.db, NOT global getDb()!
+    expect(isModuleActive('batch-api', { db: getDb(), projectRoot: tmp.root })).toBe(true)
+
+    const cfg = loadAlfredAgentsConfig({ projectRoot: tmp.root, env: tmp.env, provisionWorkspaces: false })
+    const batchAgent = cfg.agents.find((a) => a.id === 'alfred-batch')!
+    let sentToolNames: string[] = []
+    const fakeFetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { tools?: Array<{ function?: { name?: string } }> }
+      sentToolNames = (body.tools ?? []).map((t) => String(t.function?.name ?? ''))
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'ok', tool_calls: [] } }],
+          usage: { prompt_tokens: 10, completion_tokens: 5 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    })
+
+    const outcome = await runHybridAgentTurn({
+      db: runtimeDb,
+      projectRoot: tmp.root,
+      agent: { ...batchAgent, provider: 'deepseek', model: 'deepseek-chat' },
+      globalDailyBudgetUsd: 15,
+      userMessage: 'list batches',
+      env: { ...tmp.env, DEEPSEEK_API_KEY: 'sk-test-key' },
+      fetchImpl: fakeFetch as unknown as typeof fetch,
+    })
+    expect(outcome.ok).toBe(true)
+    expect(sentToolNames).toContain('fs_read')
+    expect(sentToolNames).not.toContain('batch_submit')
+    expect(sentToolNames).not.toContain('batch_list')
+    runtimeDb.close()
+
+    // 2. Split-DB sync via Admin API: Dashboard getDb() (:memory:) -> target runtime SQLite file (ALFRED_DB_PATH)
+    const runtimeDbPath = join(tmp.root, 'store', 'alfred-prod-runtime.db')
+    mkdirSync(join(tmp.root, 'store'), { recursive: true })
+    const fileDb = new Database(runtimeDbPath)
+    fileDb.exec('CREATE TABLE IF NOT EXISTS dummy (id INTEGER PRIMARY KEY)')
+    fileDb.close()
+
+    const prevEnv = {
+      ALFRED_AGENTS_CONFIG: process.env['ALFRED_AGENTS_CONFIG'],
+      ALFRED_ENV: process.env['ALFRED_ENV'],
+      ALFRED_DB_PATH: process.env['ALFRED_DB_PATH'],
+      DASHBOARD_TOKEN: process.env['DASHBOARD_TOKEN'],
+      HOME: process.env['HOME'],
+    }
+    process.env['ALFRED_AGENTS_CONFIG'] = join(tmp.root, 'config', 'agents.json')
+    process.env['ALFRED_ENV'] = 'test'
+    process.env['ALFRED_DB_PATH'] = runtimeDbPath
+    process.env['DASHBOARD_TOKEN'] = 'split-db-token'
+    process.env['HOME'] = tmp.home
+
+    try {
+      const disReq = mockHttp('POST', '/api/admin/modules/batch-api/disable', {
+        headers: { authorization: 'Bearer split-db-token' },
+        body: { disableDependentAgents: true },
+      })
+      expect(await tryHandleAlfredVps(disReq.ctx)).toBe(true)
+      expect(disReq.getStatus()).toBe(200)
+
+      const verifyDb = new Database(runtimeDbPath, { readonly: true })
+      const syncedRow = getInstalledModuleRow('batch-api', verifyDb)
+      verifyDb.close()
+      expect(syncedRow?.state).toBe('installed_disabled')
+    } finally {
+      for (const [k, v] of Object.entries(prevEnv)) {
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+      }
+    }
+  })
+
+  it('P1-1: disabled batch-api skips Heartbeat pollPendingBatches and suppresses CLI quota batch advice', async () => {
+    const db = getDb()
+    disableModule('batch-api', {
+      db,
+      projectRoot: tmp.root,
+      env: tmp.env,
+      homeOverride: tmp.home,
+      disableDependentAgents: true,
+    })
+
+    // 1. Heartbeat pollPendingBatches must NOT run when batch-api is disabled
+    const pollSpy = vi.fn(async () => ({ polled: 1, completed: 0, failed: 0, errors: [] }))
+    const fakeTelemetry = (async () => ({
+      capturedAt: new Date().toISOString(),
+      hostname: 'test-vps',
+      uptimeSec: 120,
+      memory: {
+        totalBytes: 2048 * 1048576,
+        usedBytes: 512 * 1048576,
+        availBytes: 1536 * 1048576,
+        usedPct: 25,
+        totalMb: 2048,
+        usedMb: 512,
+        availMb: 1536,
+        swapTotalBytes: 0,
+        swapUsedBytes: 0,
+        swapFreeBytes: 0,
+        swapUsedPct: 0,
+        swapTotalMb: 0,
+        swapUsedMb: 0,
+        swapFreeMb: 0,
+        processRssBytes: 64 * 1048576,
+        processRssMb: 64,
+        processHeapUsedBytes: 32 * 1048576,
+        processHeapUsedMb: 32,
+        processHeapTotalBytes: 64 * 1048576,
+        processHeapTotalMb: 64,
+        psiMemSome10: null,
+        psiCpuSome10: null,
+        topRss: null,
+      },
+      partitions: [],
+      directories: [],
+      thresholds: { memWarnPct: 85, diskWarnPct: 80, diskCritPct: 90, cooldownMs: 3600000 },
+      health: { memLevel: 'ok' as const, diskLevel: 'ok' as const, overallLevel: 'ok' as const, maxDiskUsedPct: 10, reasons: [] },
+    })) as unknown as NonNullable<Parameters<typeof runResourceHeartbeatTick>[0]['collectTelemetryFn']>
+
+    const tickDisabled = await runResourceHeartbeatTick({
+      db,
+      projectRoot: tmp.root,
+      env: tmp.env,
+      alertTracker: new SystemAlertTracker(),
+      collectTelemetryFn: fakeTelemetry,
+      pollPendingBatchesFn: pollSpy,
+    })
+    expect(pollSpy).toHaveBeenCalledTimes(0)
+    expect(tickDisabled.batchPollResult).toBeNull()
+
+    // 2. CLI quota advice must NOT recommend #alfred-batch while batch-api is disabled
+    const cfg = loadAlfredAgentsConfig({ projectRoot: tmp.root, env: tmp.env, provisionWorkspaces: false })
+    const coder = cfg.agents.find((a) => a.id === 'alfred-architect')!
+    const cliRunnerMock = vi.fn(async () => ({
+      content: 'done',
+      model: 'claude-cli:sonnet',
+      usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0, thinkingTokens: 0 },
+    }))
+    const cliDisabledRes = await runHybridAgentTurn({
+      db,
+      projectRoot: tmp.root,
+      agent: { ...coder, provider: 'claude-cli', model: 'sonnet' },
+      globalDailyBudgetUsd: 15,
+      userMessage: 'bulk refactor',
+      env: tmp.env,
+      quotaWorkClass: 'background',
+      quotaSnapshotOverride: {
+        source: 'authoritative',
+        generatedAtMs: Date.now(),
+        windows: { five_hour: { used_percent: 95 }, seven_day: { used_percent: 90 } },
+      },
+      cliRunner: cliRunnerMock,
+    })
+    expect(cliDisabledRes.ok).toBe(true)
+    if (cliDisabledRes.ok) {
+      expect(cliDisabledRes.quotaAdvice).toBeUndefined()
+    }
+
+    // Re-enabling batch-api restores Heartbeat polling
+    enableModule('batch-api', { db, projectRoot: tmp.root, env: tmp.env })
+    await runResourceHeartbeatTick({
+      db,
+      projectRoot: tmp.root,
+      env: tmp.env,
+      alertTracker: new SystemAlertTracker(),
+      collectTelemetryFn: fakeTelemetry,
+      pollPendingBatchesFn: pollSpy,
+    })
+    expect(pollSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('P1-2: createMtimeCachedAgentsConfigLoader hot-reloads enabled changes immediately on mtime bump', () => {
+    const cfgPath = join(tmp.root, 'config', 'agents.json')
+    const initial = loadAlfredAgentsConfig({
+      configPath: cfgPath,
+      projectRoot: tmp.root,
+      env: tmp.env,
+      provisionWorkspaces: false,
+    })
+    expect(initial.agents.some((a) => a.id === 'alfred-batch')).toBe(true)
+
+    const getLatest = createMtimeCachedAgentsConfigLoader({
+      initialConfig: initial,
+      configPath: cfgPath,
+      projectRoot: tmp.root,
+      env: tmp.env,
+    })
+    expect(getLatest().agents.some((a) => a.id === 'alfred-batch')).toBe(true)
+
+    // Disable alfred-batch on disk and bump mtime explicitly
+    toggleAgentPackage('alfred-batch', false, {
+      db: getDb(),
+      projectRoot: tmp.root,
+      env: tmp.env,
+      homeOverride: tmp.home,
+    })
+    const future = new Date(Date.now() + 5000)
+    utimesSync(cfgPath, future, future)
+
+    const reloaded = getLatest()
+    expect(reloaded.agents.some((a) => a.id === 'alfred-batch')).toBe(false)
+  })
+
+  it('P1-3: toggleAgentPackage blocks disabling PROTECTED_CORE_AGENTS before write and supports custom non-catalog agents', () => {
+    const db = getDb()
+    const cfgPath = join(tmp.root, 'config', 'agents.json')
+
+    // 1. Disabling alfred-ops must throw 409 PROTECTED_CORE_AGENT WITHOUT mutating config/agents.json
+    const rawBefore = readFileSync(cfgPath, 'utf-8')
+    try {
+      toggleAgentPackage('alfred-ops', false, { db, projectRoot: tmp.root, env: tmp.env, homeOverride: tmp.home })
+      expect.unreachable('should reject disabling alfred-ops')
+    } catch (err) {
+      expect(err).toBeInstanceOf(ModuleManagerError)
+      expect((err as ModuleManagerError).code).toBe('PROTECTED_CORE_AGENT')
+      expect((err as ModuleManagerError).statusHttp).toBe(409)
+    }
+    expect(readFileSync(cfgPath, 'utf-8')).toBe(rawBefore)
+
+    // 2. Non-existent agent throws 404 BEFORE mutating disk
+    try {
+      toggleAgentPackage('ghost-agent', false, { db, projectRoot: tmp.root, env: tmp.env, homeOverride: tmp.home })
+      expect.unreachable('should throw 404 for unknown agent')
+    } catch (err) {
+      expect((err as ModuleManagerError).code).toBe('AGENT_PACKAGE_NOT_FOUND')
+      expect((err as ModuleManagerError).statusHttp).toBe(404)
+    }
+    expect(readFileSync(cfgPath, 'utf-8')).toBe(rawBefore)
+
+    // 3. Custom non-catalog agent (e.g. alfred-coder-hypatia) can be toggled cleanly with fallback view
+    const parsed = JSON.parse(rawBefore) as { agents: Array<Record<string, unknown>> }
+    parsed.agents.push({
+      id: 'alfred-coder-hypatia',
+      displayName: 'Alfred Coder (Hypatia)',
+      channelName: '#proj-hypatia',
+      discordChannelId: '',
+      role: 'szakmunkas',
+      workspace: 'workspaces/hypatia',
+      memoryNamespace: 'alfred-coder-hypatia',
+      dailyBudgetUsd: 8,
+      allowedUserIds: [],
+      tools: ['fs_read', 'fs_write'],
+      soulFile: 'agents/alfred-self-coder/SOUL.md',
+      systemPrompt: 'Custom project coder',
+    })
+    writeJson(cfgPath, parsed)
+
+    const disabledCustom = toggleAgentPackage('alfred-coder-hypatia', false, {
+      db,
+      projectRoot: tmp.root,
+      env: tmp.env,
+      homeOverride: tmp.home,
+    })
+    expect(disabledCustom.agent.id).toBe('alfred-coder-hypatia')
+    expect(disabledCustom.agent.category).toBe('custom')
+    expect(disabledCustom.agent.enabled).toBe(false)
+
+    const enabledCustom = toggleAgentPackage('alfred-coder-hypatia', true, {
+      db,
+      projectRoot: tmp.root,
+      env: tmp.env,
+      homeOverride: tmp.home,
+    })
+    expect(enabledCustom.agent.enabled).toBe(true)
+  })
+
+  it('P1-4: buildCliCommandSpec filters out tools owned by disabled modules before computing CLI permissions', () => {
+    const db = getDb()
+    // Override a temp project where fs_write is owned by a non-builtIn disabled module
+    writeJson(join(tmp.root, 'modules', 'core-cli', 'module.json'), {
+      id: 'core-cli',
+      name: 'Core CLI',
+      category: 'core',
+      version: '1.0.0',
+      description: 'Core read-only tools',
+      depends: [],
+      requiredSecrets: [],
+      tools: ['fs_read', 'memory'],
+      uiCardIds: [],
+      ramImpactMb: 0,
+      builtIn: true,
+      defaultEnabled: true,
+    })
+    writeJson(join(tmp.root, 'modules', 'opt-writer', 'module.json'), {
+      id: 'opt-writer',
+      name: 'Optional Writer',
+      category: 'automation',
+      version: '1.0.0',
+      description: 'Optional write module',
+      depends: ['core-cli'],
+      requiredSecrets: [],
+      tools: ['fs_write', 'bash'],
+      uiCardIds: [],
+      ramImpactMb: 10,
+      builtIn: false,
+      defaultEnabled: false,
+    })
+    invalidateModuleManifestCache(tmp.root)
+
+    const cfg = loadAlfredAgentsConfig({ projectRoot: tmp.root, env: tmp.env, provisionWorkspaces: false })
+    const coder = cfg.agents.find((a) => a.id === 'alfred-architect')!
+
+    const claudeSpec = buildCliCommandSpec({
+      agent: { ...coder, provider: 'claude-cli', model: 'sonnet', tools: ['fs_read', 'fs_write', 'bash'] },
+      userMessage: 'edit file',
+      env: tmp.env,
+      db,
+      projectRoot: tmp.root,
+    })
+    const disallowIdx = claudeSpec.args.indexOf('--disallowedTools')
+    expect(disallowIdx).toBeGreaterThan(-1)
+    const disallowed = claudeSpec.args[disallowIdx + 1]
+    expect(disallowed).toContain('Edit')
+    expect(disallowed).toContain('Write')
+    expect(disallowed).toContain('Bash')
+
+    const codexSpec = buildCliCommandSpec({
+      agent: { ...coder, provider: 'codex-cli', model: 'default', tools: ['fs_read', 'fs_write'] },
+      userMessage: 'edit file',
+      env: tmp.env,
+      db,
+      projectRoot: tmp.root,
+    })
+    const sandboxIdx = codexSpec.args.indexOf('--sandbox')
+    expect(codexSpec.args[sandboxIdx + 1]).toBe('read-only')
   })
 })

@@ -2,10 +2,10 @@ import { execFile } from 'node:child_process'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import Database from 'better-sqlite3'
-import { getDb } from '../../db.js'
+import { getDb, listInstalledModuleRows, upsertInstalledModuleRow, type InstalledModuleRow } from '../../db.js'
 import { readEnvFile } from '../../env.js'
 import { parseEnvContent } from '../../env-parse.js'
 import { logger } from '../../logger.js'
@@ -346,6 +346,129 @@ function resolveWritableAgentConfigPaths(): string[] {
   return candidates.filter((p, idx, arr) => arr.indexOf(p) === idx && existsSync(p))
 }
 
+function resolveTargetRuntimeDbPaths(
+  sourceDb: Database.Database | undefined,
+  env: Record<string, string | undefined>,
+): string[] {
+  const candidates: string[] = []
+  const explicitRaw = (env['ALFRED_DB_PATH'] ?? process.env['ALFRED_DB_PATH'] ?? '').trim()
+  if (explicitRaw && explicitRaw !== ':memory:') {
+    candidates.push(resolveAlfredRuntimeEnv(env).dbPath)
+  }
+
+  const isTest = (env['ALFRED_ENV'] ?? process.env['ALFRED_ENV'] ?? '').trim().toLowerCase() === 'test'
+  const specs = resolveVpsEnvSpecs()
+  for (const s of specs) {
+    if (isTest) {
+      if (s.id === 'test') candidates.push(s.dbPath)
+    } else if (s.id === 'prod' || s.id === 'ops') {
+      candidates.push(s.dbPath)
+    }
+  }
+
+  const sourcePathNorm =
+    sourceDb && typeof sourceDb.name === 'string' && sourceDb.name && sourceDb.name !== ':memory:'
+      ? resolve(sourceDb.name)
+      : null
+
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of candidates) {
+    if (!raw || raw === ':memory:') continue
+    const abs = resolve(raw)
+    if (sourcePathNorm && abs === sourcePathNorm) continue
+    if (seen.has(abs)) continue
+    seen.add(abs)
+    if (existsSync(abs)) out.push(abs)
+  }
+  return out
+}
+
+function ensureInstalledModulesTable(targetDb: Database.Database): void {
+  targetDb.exec(`
+    CREATE TABLE IF NOT EXISTS installed_modules (
+      module_id TEXT PRIMARY KEY,
+      state TEXT NOT NULL CHECK(state IN ('available', 'installed_disabled', 'active')),
+      installed_at TEXT,
+      updated_at TEXT,
+      config_json TEXT
+    )
+  `)
+}
+
+function syncInstalledModulesFromPrimaryRuntimeDb(
+  sourceDb: Database.Database | undefined,
+  env: Record<string, string | undefined>,
+): void {
+  if (!sourceDb) return
+  const targets = resolveTargetRuntimeDbPaths(sourceDb, env)
+  const primaryPath = targets[0]
+  if (!primaryPath) return
+
+  let runtimeDb: Database.Database | null = null
+  try {
+    runtimeDb = new Database(primaryPath, { readonly: true, fileMustExist: true })
+    const hasTable = runtimeDb
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='installed_modules'")
+      .get()
+    if (!hasTable) return
+    const runtimeRows = runtimeDb
+      .prepare('SELECT module_id, state, installed_at, updated_at, config_json FROM installed_modules')
+      .all() as InstalledModuleRow[]
+    if (runtimeRows.length === 0) return
+
+    ensureInstalledModulesTable(sourceDb)
+    const localMap = new Map(listInstalledModuleRows(sourceDb).map((r) => [r.module_id, r]))
+    for (const r of runtimeRows) {
+      const local = localMap.get(r.module_id)
+      const runtimeTs = r.updated_at ?? ''
+      const localTs = local?.updated_at ?? ''
+      if (!local || (runtimeTs && runtimeTs > localTs)) {
+        upsertInstalledModuleRow(r, sourceDb)
+      }
+    }
+  } catch {
+    // Non-fatal: keep Dashboard DB snapshot if runtime DB is unavailable
+  } finally {
+    runtimeDb?.close()
+  }
+}
+
+function syncInstalledModulesToRuntimeDbs(
+  sourceDb: Database.Database,
+  env: Record<string, string | undefined>,
+): void {
+  const targets = resolveTargetRuntimeDbPaths(sourceDb, env)
+  if (targets.length === 0) return
+
+  let rows: InstalledModuleRow[] = []
+  try {
+    rows = listInstalledModuleRows(sourceDb)
+  } catch {
+    return
+  }
+  if (rows.length === 0) return
+
+  for (const targetPath of targets) {
+    let targetDb: Database.Database | null = null
+    try {
+      targetDb = new Database(targetPath)
+      targetDb.pragma('busy_timeout = 3000')
+      ensureInstalledModulesTable(targetDb)
+      const tx = targetDb.transaction((items: InstalledModuleRow[]) => {
+        for (const row of items) {
+          upsertInstalledModuleRow(row, targetDb!)
+        }
+      })
+      tx(rows)
+    } catch (err) {
+      logger.warn({ targetPath, err }, 'Failed to sync installed_modules to runtime SQLite DB')
+    } finally {
+      targetDb?.close()
+    }
+  }
+}
+
 function resolveEnvSpecById(envId: string): VpsEnvSpec | undefined {
   return resolveVpsEnvSpecs().find((s) => s.id === envId)
 }
@@ -535,6 +658,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
 
   // --- Module & Specialist Agent Package Manager Admin API ---
   const buildModulesSnapshot = (env: Record<string, string | undefined>, db?: Database.Database) => {
+    syncInstalledModulesFromPrimaryRuntimeDb(db, env)
     const writablePaths = resolveWritableAgentConfigPaths()
     const modOpts = {
       ...(db ? { db } : {}),
@@ -618,6 +742,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
         withDependencies: body?.withDependencies !== false,
       })
+      syncInstalledModulesToRuntimeDbs(db, env)
       json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
     } catch (err) {
       sendModuleError(err)
@@ -646,6 +771,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
         disableDependentAgents: body?.disableDependentAgents === true,
       })
+      syncInstalledModulesToRuntimeDbs(db, env)
       json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
     } catch (err) {
       sendModuleError(err)
@@ -674,6 +800,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
         enableRequiredModules: body?.enableRequiredModules !== false,
       })
+      syncInstalledModulesToRuntimeDbs(db, env)
       json(res, { ok: true, result, ...buildModulesSnapshot(env, db) })
     } catch (err) {
       sendModuleError(err)
@@ -1076,6 +1203,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       } catch {
         safeDb = undefined
       }
+      syncInstalledModulesFromPrimaryRuntimeDb(safeDb, env)
       const writablePaths = resolveWritableAgentConfigPaths()
       const mods = listModules({
         ...(safeDb ? { db: safeDb } : {}),

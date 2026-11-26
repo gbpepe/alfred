@@ -171,7 +171,9 @@
         "deploy/",
         "config/",
         "src/",
-        "web/"
+        "web/",
+        "modules/",
+        "catalog/"
       ],
       "soulFile": "agents/alfred-batch/SOUL.md",
       "systemPrompt": "Te vagy Alfred Batch, az Alfred több-szolgáltatós aszinkron Batch API koordinátora (50%-os API áron, nulla CLI kvóta felhasználással)."

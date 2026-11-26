@@ -3279,12 +3279,39 @@
       })
     })
     document.getElementById('postInstallGoAgentsBtn')?.addEventListener('click', function () {
+      const targetAgentId = postInstallAgentId
       closeOverlayModal('agentPostInstallOverlay')
       if (typeof window.switchPage === 'function') {
         location.hash = 'agents'
         window.switchPage('agents')
       } else {
         location.hash = 'agents'
+      }
+      if (targetAgentId) {
+        const focusCard = function () {
+          const cards = document.querySelectorAll('#agentsGrid .agent-card[data-name], .agent-card[data-name]')
+          let match = null
+          cards.forEach(function (c) {
+            if (!match && c.getAttribute('data-name') === targetAgentId) match = c
+          })
+          if (match) {
+            try { match.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch {}
+            const prevOutline = match.style.outline
+            const prevOffset = match.style.outlineOffset
+            match.style.outline = '2px solid var(--accent, #22c55e)'
+            match.style.outlineOffset = '3px'
+            setTimeout(function () {
+              match.style.outline = prevOutline
+              match.style.outlineOffset = prevOffset
+            }, 2200)
+          }
+        }
+        const maybePromise = typeof window.loadAgents === 'function' ? window.loadAgents() : null
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          maybePromise.then(function () { setTimeout(focusCard, 60) }).catch(function () { setTimeout(focusCard, 250) })
+        } else {
+          setTimeout(focusCard, 300)
+        }
       }
     })
     openOverlayModal('agentPostInstallOverlay')
@@ -3345,7 +3372,7 @@
       }
       return (item.missingModules && item.missingModules.length > 0) ||
         (item.inactiveModules && item.inactiveModules.length > 0) ||
-        (item.missingOptionalEnv && item.missingOptionalEnv.length > 0)
+        (Boolean(item.installed) && item.missingOptionalEnv && item.missingOptionalEnv.length > 0)
     }
     return true
   }
@@ -3680,6 +3707,9 @@
     document.getElementById('moduleDetailClose')?.addEventListener('click', function () {
       closeOverlayModal('moduleDetailModalOverlay')
     })
+    document.getElementById('moduleDetailModalOverlay')?.addEventListener('click', function (e) {
+      if (e.target === e.currentTarget) closeOverlayModal('moduleDetailModalOverlay')
+    })
     document.getElementById('moduleConfirmClose')?.addEventListener('click', function () {
       pendingConfirmHandler = null
       closeOverlayModal('moduleConfirmOverlay')
@@ -3687,6 +3717,12 @@
     document.getElementById('moduleConfirmCancelBtn')?.addEventListener('click', function () {
       pendingConfirmHandler = null
       closeOverlayModal('moduleConfirmOverlay')
+    })
+    document.getElementById('moduleConfirmOverlay')?.addEventListener('click', function (e) {
+      if (e.target === e.currentTarget) {
+        pendingConfirmHandler = null
+        closeOverlayModal('moduleConfirmOverlay')
+      }
     })
     document.getElementById('moduleConfirmOkBtn')?.addEventListener('click', async function () {
       const okBtn = document.getElementById('moduleConfirmOkBtn')
@@ -3710,6 +3746,22 @@
     })
     document.getElementById('agentPostInstallDoneBtn')?.addEventListener('click', function () {
       closeOverlayModal('agentPostInstallOverlay')
+    })
+    document.getElementById('agentPostInstallOverlay')?.addEventListener('click', function (e) {
+      if (e.target === e.currentTarget) closeOverlayModal('agentPostInstallOverlay')
+    })
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return
+      const overlays = ['moduleConfirmOverlay', 'agentPostInstallOverlay', 'moduleDetailModalOverlay']
+      for (let i = 0; i < overlays.length; i++) {
+        const el = document.getElementById(overlays[i])
+        if (el && !el.hidden && el.style.display !== 'none') {
+          if (overlays[i] === 'moduleConfirmOverlay') pendingConfirmHandler = null
+          closeOverlayModal(overlays[i])
+          break
+        }
+      }
     })
     document.getElementById('agentPostInstallStartBtn')?.addEventListener('click', async function () {
       const btn = document.getElementById('agentPostInstallStartBtn')
