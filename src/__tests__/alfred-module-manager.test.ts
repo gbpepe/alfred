@@ -1,7 +1,12 @@
+import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import type http from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tryHandleAgents } from '../web/routes/agents.js'
+import { tryHandleAlfredVps } from '../web/routes/alfred-vps.js'
+import type { RouteContext } from '../web/routes/types.js'
 import {
   getDb,
   getInstalledModuleRow,
@@ -663,5 +668,179 @@ describe('Alfred Module Manager (feat/module-manager)', () => {
     )
     const iris = realCatalog.find((p) => p.id === 'iris-video')!
     expect(iris.missingModules).toEqual(['cloud-storage', 'worker-machines'])
+  })
+
+  it('enforces admin auth (401/403/200), handles module/agent HTTP lifecycle, and syncs /api/vps/status + /api/agents', async () => {
+    const mockHttp = (
+      method: string,
+      path: string,
+      opts?: { body?: unknown; headers?: Record<string, string>; auth?: RouteContext['auth'] },
+    ) => {
+      const req = new EventEmitter() as http.IncomingMessage
+      req.method = method
+      req.url = path
+      req.headers = { 'content-type': 'application/json', ...(opts?.headers ?? {}) }
+      if (opts?.body !== undefined) {
+        queueMicrotask(() => {
+          req.emit('data', Buffer.from(JSON.stringify(opts.body), 'utf-8'))
+          req.emit('end')
+        })
+      } else {
+        queueMicrotask(() => req.emit('end'))
+      }
+      let status = 200
+      let rawBody = ''
+      const res = {
+        writeHead(code: number) {
+          status = code
+          return this
+        },
+        end(chunk?: string | Buffer) {
+          if (chunk) rawBody += chunk.toString()
+          return this
+        },
+        setHeader() {
+          return this
+        },
+      } as unknown as http.ServerResponse
+      const url = new URL(`http://127.0.0.1:3420${path}`)
+      return {
+        ctx: { req, res, path: url.pathname, method, url, auth: opts?.auth } as RouteContext,
+        getStatus: () => status,
+        getJson: () => JSON.parse(rawBody || '{}') as Record<string, unknown>,
+      }
+    }
+
+    const prevEnv: Record<string, string | undefined> = {
+      ALFRED_ENV: process.env.ALFRED_ENV,
+      ALFRED_AGENTS_CONFIG: process.env.ALFRED_AGENTS_CONFIG,
+      ALFRED_SKILLS_DIR: process.env.ALFRED_SKILLS_DIR,
+      ALFRED_CLI_PROFILES_DIR: process.env.ALFRED_CLI_PROFILES_DIR,
+      DASHBOARD_TOKEN: process.env.DASHBOARD_TOKEN,
+    }
+
+    const token = 'test-module-admin-token-999'
+    process.env.ALFRED_ENV = 'test'
+    process.env.ALFRED_AGENTS_CONFIG = tmp.env.ALFRED_AGENTS_CONFIG
+    process.env.ALFRED_SKILLS_DIR = tmp.env.ALFRED_SKILLS_DIR
+    process.env.ALFRED_CLI_PROFILES_DIR = tmp.env.ALFRED_CLI_PROFILES_DIR
+    process.env.DASHBOARD_TOKEN = token
+
+    const authHeaders = { authorization: `Bearer ${token}` }
+
+    try {
+      // 1. Unauthenticated -> 401; non-owner sub-agent token -> 403
+      const unauth = mockHttp('GET', '/api/admin/modules')
+      expect(await tryHandleAlfredVps(unauth.ctx)).toBe(true)
+      expect(unauth.getStatus()).toBe(401)
+
+      const forbidden = mockHttp('GET', '/api/admin/modules', {
+        auth: { kind: 'token', tokenAgent: 'alfred-qa', user: 'alfred-qa' } as RouteContext['auth'],
+      })
+      expect(await tryHandleAlfredVps(forbidden.ctx)).toBe(true)
+      expect(forbidden.getStatus()).toBe(403)
+
+      // 2. Authenticated GET /api/admin/modules -> 200 with modules, agentPackages, totalActiveRamMb & systemMemory
+      const listReq = mockHttp('GET', '/api/admin/modules', { headers: authHeaders })
+      expect(await tryHandleAlfredVps(listReq.ctx)).toBe(true)
+      expect(listReq.getStatus()).toBe(200)
+      const listData = listReq.getJson()
+      expect(listData.ok).toBe(true)
+      expect(Array.isArray(listData.modules)).toBe(true)
+      expect(Array.isArray(listData.agentPackages)).toBe(true)
+      expect(typeof listData.totalActiveRamMb).toBe('number')
+      expect((listData.systemMemory as Record<string, unknown>).memTotalMb).toBeGreaterThan(0)
+
+      // 3. Built-in module disable -> 409 BUILTIN_MODULE_LOCKED
+      const lockReq = mockHttp('POST', '/api/admin/modules/core-cli/disable', { headers: authHeaders, body: {} })
+      expect(await tryHandleAlfredVps(lockReq.ctx)).toBe(true)
+      expect(lockReq.getStatus()).toBe(409)
+      expect(lockReq.getJson().code).toBe('BUILTIN_MODULE_LOCKED')
+
+      // 4. Disabling batch-api without cascade -> 409 DEPENDENT_MODULES_ACTIVE with details.activeDependentAgents
+      const depBlockReq = mockHttp('POST', '/api/admin/modules/batch-api/disable', {
+        headers: authHeaders,
+        body: {},
+      })
+      expect(await tryHandleAlfredVps(depBlockReq.ctx)).toBe(true)
+      expect(depBlockReq.getStatus()).toBe(409)
+      expect(depBlockReq.getJson().code).toBe('DEPENDENT_MODULES_ACTIVE')
+      expect((depBlockReq.getJson().details as { activeDependentAgents?: unknown[] })?.activeDependentAgents).toEqual([
+        { id: 'alfred-batch', displayName: 'Alfred Batch' },
+      ])
+
+      // 5. Cascade disable -> 200 disables batch-api AND alfred-batch
+      const cascadeReq = mockHttp('POST', '/api/admin/modules/batch-api/disable', {
+        headers: authHeaders,
+        body: { disableDependentAgents: true },
+      })
+      expect(await tryHandleAlfredVps(cascadeReq.ctx)).toBe(true)
+      expect(cascadeReq.getStatus()).toBe(200)
+      expect((cascadeReq.getJson().result as { disabledAgents?: string[] })?.disabledAgents).toEqual(['alfred-batch'])
+
+      // 6. GET /api/vps/status reflects activeModuleIds, disabledCardCount >= 1, and enabled: false on alfred-batch
+      const vpsReq = mockHttp('GET', '/api/vps/status', { headers: authHeaders })
+      expect(await tryHandleAlfredVps(vpsReq.ctx)).toBe(true)
+      expect(vpsReq.getStatus()).toBe(200)
+      const vpsData = vpsReq.getJson()
+      expect(vpsData.activeModuleIds).not.toContain('batch-api')
+      expect(vpsData.activeModuleIds).toContain('core-cli')
+      expect(Number(vpsData.disabledCardCount)).toBeGreaterThanOrEqual(1)
+      const vpsBatchAgent = (vpsData.agents as Array<{ id: string; enabled: boolean }>).find(
+        (a) => a.id === 'alfred-batch',
+      )
+      expect(vpsBatchAgent?.enabled).toBe(false)
+
+      // 7. GET /api/agents returns coreEnabled: false, running: false, status: 'configured' for disabled alfred-batch
+      const agentsReq = mockHttp('GET', '/api/agents', { headers: authHeaders })
+      expect(await tryHandleAgents(agentsReq.ctx, join(process.cwd(), 'web'))).toBe(true)
+      expect(agentsReq.getStatus()).toBe(200)
+      const summaries = agentsReq.getJson() as unknown as Array<Record<string, unknown>>
+      const batchSummary = summaries.find((s) => s.name === 'alfred-batch')
+      expect(batchSummary).toBeDefined()
+      expect(batchSummary?.coreEnabled).toBe(false)
+      expect(batchSummary?.running).toBe(false)
+      expect(batchSummary?.runState).toBe('stopped')
+      expect(batchSummary?.status).toBe('configured')
+      expect(batchSummary?.activeModel).toBeNull()
+
+      // 8. Re-enabling batch-api + alfred-batch via Admin API -> 200
+      const reEnableMod = mockHttp('POST', '/api/admin/modules/batch-api/enable', {
+        headers: authHeaders,
+        body: { withDependencies: true },
+      })
+      expect(await tryHandleAlfredVps(reEnableMod.ctx)).toBe(true)
+      expect(reEnableMod.getStatus()).toBe(200)
+
+      const reEnableAgent = mockHttp('POST', '/api/admin/agent-packages/alfred-batch/enable', {
+        headers: authHeaders,
+        body: {},
+      })
+      expect(await tryHandleAlfredVps(reEnableAgent.ctx)).toBe(true)
+      expect(reEnableAgent.getStatus()).toBe(200)
+
+      // 9. Installing iris-video via Admin API -> 409 MISSING_REQUIRED_MODULES
+      const irisReq = mockHttp('POST', '/api/admin/agent-packages/iris-video/install', {
+        headers: authHeaders,
+        body: {},
+      })
+      expect(await tryHandleAlfredVps(irisReq.ctx)).toBe(true)
+      expect(irisReq.getStatus()).toBe(409)
+      expect(irisReq.getJson().code).toBe('MISSING_REQUIRED_MODULES')
+
+      // 10. Uninstalling protected alfred-ops -> 409 PROTECTED_CORE_AGENT
+      const uninstOps = mockHttp('POST', '/api/admin/agent-packages/alfred-ops/uninstall', {
+        headers: authHeaders,
+        body: {},
+      })
+      expect(await tryHandleAlfredVps(uninstOps.ctx)).toBe(true)
+      expect(uninstOps.getStatus()).toBe(409)
+      expect(uninstOps.getJson().code).toBe('PROTECTED_CORE_AGENT')
+    } finally {
+      for (const [k, v] of Object.entries(prevEnv)) {
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+      }
+    }
   })
 })
