@@ -22766,8 +22766,10 @@ async function loadDocs() {
   }
   const searchVal = document.getElementById('docsSearchInput')?.value || ''
   const pendingDoc = window._pendingDocName
-  window._pendingDocName = null
   const initialDoc = (pendingDoc && docs.some(d => d.name === pendingDoc)) ? pendingDoc : docs[0].name
+  if (pendingDoc && initialDoc === pendingDoc) {
+    window._pendingDocName = null
+  }
   _docsCurrentName = initialDoc
   renderDocsSidebarList(searchVal)
   openDoc(initialDoc)
@@ -22775,9 +22777,10 @@ async function loadDocs() {
 
 window.openDocChapter = function (name) {
   window._pendingDocName = name
-  location.hash = 'docs'
   if (typeof switchPage === 'function') {
     switchPage('docs')
+  } else {
+    location.hash = 'docs'
   }
 }
 
