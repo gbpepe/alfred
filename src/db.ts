@@ -1953,6 +1953,22 @@ export function initDatabase(dbPathOverride?: string): void {
   // alone, which neither composite index above can serve.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_otel_spans_start ON otel_spans(start_ms)`)
 
+  // --- Installed System Modules (feat/module-manager) ---
+  // Declarative module lifecycle state: 'available' | 'installed_disabled' | 'active'.
+  // Built-in modules (core-cli, core-ops) are always forced 'active'; default-enabled
+  // optional modules (batch-api) use INSERT OR IGNORE so an operator disabling them
+  // persists across restarts.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS installed_modules (
+      module_id TEXT PRIMARY KEY,
+      state TEXT NOT NULL CHECK(state IN ('available', 'installed_disabled', 'active')),
+      installed_at TEXT,
+      updated_at TEXT,
+      config_json TEXT
+    )
+  `)
+  seedDefaultInstalledModules(db)
+
   // One-shot migration from the old JSON file (which had a read-modify-write
   // race). Import rows if they exist, then rename the file so we don't keep
   // re-importing. Wrapped in a transaction so a crash mid-import is safe.
@@ -8425,4 +8441,73 @@ export function claimCommandWriteEvidence(chatId: string, messageId: string, now
     'INSERT OR IGNORE INTO command_write_evidence (chat_id, message_id, used_at) VALUES (?, ?, ?)',
   ).run(chatId, messageId, nowMs)
   return r.changes === 1
+}
+
+// --- Installed System Modules (feat/module-manager) ---
+
+export type ModuleLifecycleState = 'available' | 'installed_disabled' | 'active'
+
+export interface InstalledModuleRow {
+  module_id: string
+  state: ModuleLifecycleState
+  installed_at: string | null
+  updated_at: string | null
+  config_json: string | null
+}
+
+const BUILTIN_DEFAULT_MODULES = ['core-cli', 'core-ops'] as const
+const OPTIONAL_DEFAULT_ENABLED_MODULES = ['batch-api'] as const
+
+/**
+ * Seeds default module rows inside an immediate transaction:
+ * - Built-in modules (`core-cli`, `core-ops`) are always enforced as `'active'`.
+ * - Optional pre-existing modules (`batch-api`) use `INSERT OR IGNORE` so manual
+ *   disabling survives database restarts.
+ */
+export function seedDefaultInstalledModules(d: Database.Database = db): void {
+  const nowIso = new Date().toISOString()
+  d.transaction(() => {
+    const upsertBuiltIn = d.prepare(`
+      INSERT INTO installed_modules (module_id, state, installed_at, updated_at, config_json)
+      VALUES (?, 'active', ?, ?, '{}')
+      ON CONFLICT(module_id) DO UPDATE SET
+        state = 'active',
+        updated_at = excluded.updated_at
+    `)
+    for (const id of BUILTIN_DEFAULT_MODULES) {
+      upsertBuiltIn.run(id, nowIso, nowIso)
+    }
+
+    const insertOptional = d.prepare(`
+      INSERT OR IGNORE INTO installed_modules (module_id, state, installed_at, updated_at, config_json)
+      VALUES (?, 'active', ?, ?, '{}')
+    `)
+    for (const id of OPTIONAL_DEFAULT_ENABLED_MODULES) {
+      insertOptional.run(id, nowIso, nowIso)
+    }
+  }).immediate()
+}
+
+export function listInstalledModuleRows(d: Database.Database = db): InstalledModuleRow[] {
+  return d
+    .prepare('SELECT module_id, state, installed_at, updated_at, config_json FROM installed_modules ORDER BY module_id ASC')
+    .all() as InstalledModuleRow[]
+}
+
+export function getInstalledModuleRow(moduleId: string, d: Database.Database = db): InstalledModuleRow | undefined {
+  return d
+    .prepare('SELECT module_id, state, installed_at, updated_at, config_json FROM installed_modules WHERE module_id = ?')
+    .get(moduleId) as InstalledModuleRow | undefined
+}
+
+export function upsertInstalledModuleRow(row: InstalledModuleRow, d: Database.Database = db): void {
+  d.prepare(`
+    INSERT INTO installed_modules (module_id, state, installed_at, updated_at, config_json)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(module_id) DO UPDATE SET
+      state = excluded.state,
+      installed_at = COALESCE(installed_modules.installed_at, excluded.installed_at),
+      updated_at = excluded.updated_at,
+      config_json = COALESCE(excluded.config_json, installed_modules.config_json)
+  `).run(row.module_id, row.state, row.installed_at, row.updated_at, row.config_json)
 }

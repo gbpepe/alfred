@@ -92,7 +92,10 @@
         "src/alfred/circuit-breaker.ts",
         "src/alfred/tool-executor.ts",
         "src/alfred/agents-config.ts",
+        "src/alfred/module-manager.ts",
         "config/agents.json",
+        "modules/",
+        "catalog/",
         ".env",
         ".env.example",
         "store/",
@@ -116,7 +119,7 @@
       "memoryNamespace": "alfred-ops",
       "dailyBudgetUsd": 2.0,
       "allowedUserIds": [],
-      "tools": ["bash", "fs_read", "memory", "cli_manage", "system_storage"],
+      "tools": ["bash", "fs_read", "memory", "cli_manage", "system_storage", "module_manage"],
       "protectedPaths": [
         ".env",
         ".env.example",
@@ -124,9 +127,12 @@
         "store/",
         "deploy/",
         "config/agents.json",
+        "modules/",
+        "catalog/",
         "src/alfred/circuit-breaker.ts",
         "src/alfred/tool-executor.ts",
-        "src/alfred/agents-config.ts"
+        "src/alfred/agents-config.ts",
+        "src/alfred/module-manager.ts"
       ],
       "allowedBashCommands": [
         "bash deploy/spinup-test.sh <self-branch>",

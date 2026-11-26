@@ -1,0 +1,33 @@
+{
+  "id": "alfred-self-coder",
+  "displayName": "Alfred Self-Coder",
+  "role": "szakmunkas",
+  "category": "development",
+  "description": "Önfejlesztő szoftvermérnök ügynök szigorú feat/self-* branch-védelemmel, protectedPaths korláttal és kötelező typecheck/vitest ellenőrzéssel.",
+  "requiredModules": ["core-cli"],
+  "recommendedProvider": "deepseek",
+  "recommendedModel": "deepseek-reasoner",
+  "dailyBudgetUsd": 5.0,
+  "tools": ["bash", "fs_read", "fs_write", "git", "memory"],
+  "skills": ["self-dev-safety"],
+  "optionalEnvVars": ["DISCORD_CHANNEL_ALFRED_SELF_DEV"],
+  "workspace": ".",
+  "protectedPaths": [
+    "src/alfred/circuit-breaker.ts",
+    "src/alfred/tool-executor.ts",
+    "src/alfred/agents-config.ts",
+    "src/alfred/module-manager.ts",
+    "config/agents.json",
+    "modules/",
+    "catalog/",
+    ".env",
+    ".env.example",
+    "store/",
+    "deploy/",
+    "vitest.config.ts",
+    "vitest.alfred.config.ts",
+    "tsconfig.alfred.json",
+    "tsconfig.alfred.build.json",
+    "package.json"
+  ]
+}

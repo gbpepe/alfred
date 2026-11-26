@@ -1,0 +1,27 @@
+{
+  "id": "alfred-batch",
+  "displayName": "Alfred Batch",
+  "role": "segedmunkas",
+  "category": "automation",
+  "description": "Több-szolgáltatós aszinkron Batch API koordinátor: 50%-os API kedvezmény, Prompt Caching és automatikus GDPR eu_only útválasztás.",
+  "requiredModules": ["core-cli", "batch-api"],
+  "recommendedProvider": "vertex-eu",
+  "recommendedModel": "gemini-2.5-flash",
+  "dailyBudgetUsd": 3.0,
+  "tools": ["fs_read", "fs_write", "memory", "batch_submit", "batch_status", "batch_list", "batch_cancel"],
+  "skills": ["batch-jsonl-ops"],
+  "optionalEnvVars": ["DISCORD_CHANNEL_ALFRED_BATCH"],
+  "workspace": ".",
+  "protectedPaths": [
+    ".env",
+    ".env.example",
+    ".env.test",
+    "store/",
+    "deploy/",
+    "config/",
+    "src/",
+    "web/",
+    "modules/",
+    "catalog/"
+  ]
+}

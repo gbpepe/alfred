@@ -1,0 +1,14 @@
+{
+  "id": "batch-api",
+  "name": "Multi-Provider Batch API (-50% CostOps)",
+  "category": "automation",
+  "version": "1.0.0",
+  "description": "Aszinkron JSONL kötegelt feldolgozás 50%-os API kedvezménnyel (Anthropic, Gemini, Vertex EU GDPR, OpenAI), nulla CLI kvóta felhasználással.",
+  "depends": ["core-cli"],
+  "requiredSecrets": [],
+  "tools": ["batch_submit", "batch_status", "batch_list", "batch_cancel"],
+  "uiCardIds": ["vpsBatchCard"],
+  "ramImpactMb": 15,
+  "builtIn": false,
+  "defaultEnabled": true
+}
