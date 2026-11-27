@@ -105,7 +105,7 @@ async function readJsonBody<T>(req: RouteContext['req'], maxBytes?: number): Pro
 }
 
 const ALLOWED_LOG_UNITS = new Set(['alfred-prod', 'alfred-ops', 'alfred-test', 'alfred-web'])
-const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'spinup-test', 'reload-test', 'teardown-test'])
+const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'spinup-test', 'reload-test', 'teardown-test', 'restart-prod'])
 const SAFE_BRANCH_RE = /^[a-zA-Z0-9._/-]{1,80}$/
 
 function validateOpsBranch(branch: string): boolean {
@@ -1760,6 +1760,44 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     const branch = typeof body?.branch === 'string' ? body.branch.trim() : ''
     if (!ALLOWED_OPS_ACTIONS.has(action)) {
       json(res, { error: `Unsupported ops action: ${action}` }, 400)
+      return true
+    }
+    if (action === 'restart-prod') {
+      const env = { ...readEnvFile(), ...process.env }
+      const authCheck = authorizeAdminCliRequest(ctx, env)
+      if (!authCheck.ok) {
+        json(res, { ok: false, error: authCheck.error }, authCheck.status)
+        return true
+      }
+      if (process.platform !== 'linux') {
+        json(res, {
+          ok: true,
+          action,
+          restarted: [],
+          output: 'Fejlesztői környezet: systemd nem elérhető ezen a platformon.',
+        })
+        return true
+      }
+      try {
+        await execFileAsync('sudo', ['-n', 'systemctl', 'restart', 'alfred-prod'], { timeout: 15_000 })
+        json(res, {
+          ok: true,
+          action,
+          restarted: ['alfred-prod'],
+          output: 'alfred-prod szolgáltatás sikeresen újraindítva.',
+        })
+      } catch (err) {
+        const e = err as { stdout?: string; stderr?: string; message?: string }
+        json(
+          res,
+          {
+            ok: false,
+            action,
+            error: sanitizeOutput([e.stderr, e.stdout, e.message].filter(Boolean).join('\n') || 'Újraindítás sikertelen.'),
+          },
+          500,
+        )
+      }
       return true
     }
     if (action === 'spinup-test' && !branch) {

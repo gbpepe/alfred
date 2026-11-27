@@ -77,7 +77,56 @@ Az Alfred katalógusa két egymásra épülő, tisztán elválasztott rétegből
 
 ---
 
-## 7.4. Lépésről-lépésre Tutorialok
+## 7.4. Deklaratív Modul Telepítő Varázsló (`setupWizard`)
+
+Azok a rendszermodulok, amelyek a `modules/<id>/module.json` fájlban deklaratív `setupWizard` sémát adnak meg (elsőként a **`batch-api`**), a `#modules` kártyáról közvetlenül indítható, többlépéses **Stepper Modal** varázslót kapnak — SSH és kézi `.env`-szerkesztés nélkül.
+
+- **Kártya-állapotok:** Ha `hasWizard === true && needsSetup === true`, a kártyán megjelenik a **„⚙ Beállításra vár”** jelvény, a fő gomb pedig **„Beállítás & Aktiválás”**. Már aktív vagy konfigurált modulnál a `Részletek` mellett a **„⚙ Varázsló”** gomb nyitja meg újra a beállításokat.
+- **3 lépéses `batch-api` beüzemelés SSH nélkül:**
+  1. **Batch szolgáltatók (`requirementMode: "any_one"`):** Legalább 1 szolgáltató megadása kötelező (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` vagy `VERTEX_EU_BATCH_BUCKET`). Az élő számláló valós időben mutatja a beállított szolgáltatók számát; a már elmentett titkoknál a *„✓ Már beállítva — hagyd üresen a megtartáshoz”* jelvény védi a meglévő kulcsot.
+  2. **Discord csatorna & ügynök:** Opcionális `DISCORD_CHANNEL_ALFRED_BATCH` (17–20 számjegyű Discord csatorna ID validációval) és az `alfred-batch` koordinátor azonnali bekapcsolásának kapcsolója.
+  3. **Ellenőrzés & Aktiválás (`verify_and_activate`):** A **„Kapcsolat tesztelése”** gomb 0-tokenes próbahívással (`batch_provider_probe`) ellenőrzi a konfigurált szolgáltatókat, majd a **„Mentés és Aktiválás”** gomb aktiválja a modult és az ügynököt. Ha `.env` változó is módosult (`restartRequired: true`), a záró nézeten megjelenik az egykattintásos **„`alfred-prod` újraindítása most”** gomb.
+
+### Tárolási rétegek a varázslóban
+
+| `storage` típus | Hova kerül? | Újraindítás kell? | Megjegyzés |
+| :--- | :--- | :---: | :--- |
+| **`vault`** | Titkosított Vault (`store/vault.json`) | Nem | Nyers kulcs soha nem kerül vissza a kliensre; üres mező megőrzi a meglévő értéket. |
+| **`config_json`** | SQLite `installed_modules.config_json` | Nem | Split-DB szinkronnal azonnal elérhető a `prod`/`test` futtatóknak is. |
+| **`env`** | Projekt `.env` (atomi írás) | Igen (`restartRequired`) | Rendszerkritikus kulcsok (`PATH`, `DASHBOARD_TOKEN`, `DISCORD_BOT_TOKEN` stb.) tiltólistán (`400 FORBIDDEN_ENV_KEY`). |
+| **`action`** | Aktiválási művelet (pl. `enableAgentId`) | Nem | A `/wizard/complete` lépésben fut le. |
+
+### `setupWizard` példa fejlesztőknek (`modules/<id>/module.json`)
+
+```json
+"setupWizard": {
+  "title": "Saját modul beállítása",
+  "summary": "Rövid összefoglaló a varázsló fejlécébe.",
+  "testAction": "batch_provider_probe",
+  "docChapter": "07-modul-es-ugynok-katalogus.md",
+  "steps": [
+    {
+      "id": "credentials",
+      "title": "Kulcsok",
+      "description": "Adj meg legalább egy API kulcsot.",
+      "requirementMode": "any_one",
+      "fields": [
+        { "key": "MY_API_KEY", "label": "API kulcs", "type": "secret", "storage": "vault", "placeholder": "sk-..." }
+      ]
+    },
+    {
+      "id": "verify",
+      "title": "Ellenőrzés & Aktiválás",
+      "description": "Teszteld a kapcsolatot és kapcsold be a modult.",
+      "type": "verify_and_activate"
+    }
+  ]
+}
+```
+
+---
+
+## 7.5. Lépésről-lépésre Tutorialok
 
 ### Tutorial 1: Modul kikapcsolása kaszkád védelemmel (`batch-api` + `Alfred Batch`)
 1. Nyisd meg a bal oldali menüben a **Rendszer → Modulok & Ügynökök (`#modules`)** oldalt.
@@ -145,15 +194,19 @@ A `module_manage` eszköz kizárólag a fő ügynök és az **`alfred-ops`** sz�
 
 ---
 
-## 7.5. Admin REST API Referencia
+## 7.6. Admin REST API Referencia
 
 Minden végpont `authorizeAdminCliRequest` (Dashboard Bearer token vagy Owner munkamenet) védelemmel fut:
 
 | Metódus & Útvonal | Törzs (JSON) | Leírás |
 | :--- | :--- | :--- |
-| `GET /api/admin/modules` | — | Összes rendszermodul, ügynökcsomag, `totalActiveRamMb` és valós `systemMemory` (`memTotalMb`, `memUsedMb`, `memAvailMb`). |
+| `GET /api/admin/modules` | — | Összes rendszermodul (`hasWizard`, `needsSetup`), ügynökcsomag, `totalActiveRamMb` és valós `systemMemory`. |
 | `POST /api/admin/modules/:id/enable` | `{ "withDependencies": true }` | Modul (és opcionálisan függőségei) bekapcsolása + runtime DB szinkron. |
 | `POST /api/admin/modules/:id/disable` | `{ "disableDependentAgents": false }` | Opcionális modul kikapcsolása; `true` esetén kaszkád módon kikapcsolja a függő ügynököket is. |
+| `GET /api/admin/modules/:id/wizard` | — | Dekriptálás-mentes varázsló állapot (`steps`, `isSet`, `completedSteps`, `missingRequirements`) — nyers titkok nélkül. |
+| `POST /api/admin/modules/:id/wizard/save` | `{ "stepId", "values", "clearKeys" }` | Lépés mentése Vaultba / `config_json`-ba / `.env`-be szigorú mező- és tiltólista-validációval (`restartRequired` jelzővel). |
+| `POST /api/admin/modules/:id/wizard/test` | `{}` | 0-tokenes kapcsolat- és konfiguráció-teszt (`testAction`, pl. `batch_provider_probe`). |
+| `POST /api/admin/modules/:id/wizard/complete` | `{ "enableAgent": true }` | Modul aktiválása (`enableModule`) és opcionális kapcsolódó ügynökcsomag bekapcsolása. |
 | `POST /api/admin/agent-packages/:agentId/install` | `{ "enableRequiredModules": true }` | `SKILL.md` szkennelés, modul-aktiválás, `SOUL.md` másolás, `enabled: false` regisztráció + onboarding checklist. |
 | `POST /api/admin/agent-packages/:agentId/enable` | `{}` | Telepített (vagy egyedi) ügynök aktiválása (`enabled: true`), előzetes modulfüggőség-ellenőrzéssel. |
 | `POST /api/admin/agent-packages/:agentId/disable` | `{}` | Ügynök leállítása (`enabled: false`), `PROTECTED_CORE_AGENT` védelemmel. |
@@ -161,7 +214,7 @@ Minden végpont `authorizeAdminCliRequest` (Dashboard Bearer token vagy Owner mu
 
 ---
 
-## 7.6. Hibaelhárítás (Hibakódok)
+## 7.7. Hibaelhárítás (Hibakódok)
 
 | Hibakód | HTTP | Ok | Megoldás |
 | :--- | :---: | :--- | :--- |
