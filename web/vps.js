@@ -611,10 +611,10 @@
       'gemini-4-hydrogen-high',
       'gemini-3.8-flash-high',
     ],
-    'gemini-cli': ['default', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+    'gemini-cli': ['default', 'gemini-3.8-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     deepseek: ['deepseek-chat', 'deepseek-reasoner'],
     'vertex-eu': ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-    gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    gemini: ['gemini-3.8-flash', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
     xai: ['grok-3', 'grok-3-mini', 'grok-4'],
     openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'],
   }
@@ -746,6 +746,69 @@
     })
   }
 
+  function refreshWizardModelDatalist() {
+    const dl = document.getElementById('moduleWizardGeminiModelsList')
+    if (!dl) return
+    const list = getModelsForProvider('gemini')
+    dl.innerHTML = list.map(function (m) {
+      return '<option value="' + esc(m) + '"></option>'
+    }).join('')
+  }
+
+  function applyModelCatalogEverywhere() {
+    renderModelCatalog()
+    if (Array.isArray(vpsRolesCache) && vpsRolesCache.length > 0) {
+      renderRolesGrid(vpsRolesCache, vpsAgentsCache)
+      renderGlobalConfigBar()
+    }
+    const provSel = document.getElementById('agentCoreProvSel')
+    const modelSel = document.getElementById('agentCoreModelSel')
+    const modelInp = document.getElementById('agentCoreModelInp')
+    if (provSel && modelSel && provSel.value) {
+      const currentVal = modelSel.value === '__custom__' ? (modelInp ? modelInp.value : '') : modelSel.value
+      populateCoreModelSelect(provSel.value, currentVal)
+    }
+    refreshWizardModelDatalist()
+  }
+
+  async function syncAllModelsEverywhere(triggerBtn, statusEl) {
+    const origText = triggerBtn ? triggerBtn.textContent : ''
+    if (triggerBtn) {
+      triggerBtn.disabled = true
+      triggerBtn.textContent = origText.trim() === '🔄' ? '⏳' : 'Frissítés...'
+    }
+    if (statusEl) statusEl.textContent = 'Modellek lekérdezése a beregisztrált API-któl...'
+    try {
+      const data = await apiJson('/api/vps/models/sync', { method: 'POST', body: '{}' })
+      vpsModelCatalogCache = data.providers || null
+      vpsModelSyncedAt = data.syncedAt || null
+      applyModelCatalogEverywhere()
+      const provCount = vpsModelCatalogCache ? Object.keys(vpsModelCatalogCache).length : 0
+      let totalModels = 0
+      if (vpsModelCatalogCache) {
+        Object.keys(vpsModelCatalogCache).forEach(function (k) {
+          const arr = vpsModelCatalogCache[k] && vpsModelCatalogCache[k].models
+          if (Array.isArray(arr)) totalModels += arr.length
+        })
+      }
+      const msg = '✓ Modellek frissítve mindenhol (' + provCount + ' szolgáltató, ' + totalModels + ' modell)'
+      if (statusEl) statusEl.textContent = msg
+      if (typeof window.showToast === 'function') window.showToast(msg)
+      return data
+    } catch (err) {
+      const errMsg = 'Hiba: ' + err.message
+      if (statusEl) statusEl.textContent = errMsg
+      if (typeof window.showToast === 'function') window.showToast(errMsg)
+      throw err
+    } finally {
+      if (triggerBtn) {
+        triggerBtn.disabled = false
+        triggerBtn.textContent = origText
+      }
+    }
+  }
+  window.syncAllModelsEverywhere = syncAllModelsEverywhere
+
   async function ensureModelCatalog(force) {
     if (!force && vpsModelCatalogCache) {
       renderModelCatalog()
@@ -755,7 +818,7 @@
       const data = await apiJson('/api/vps/models')
       vpsModelCatalogCache = data.providers || null
       vpsModelSyncedAt = data.syncedAt || null
-      renderModelCatalog()
+      applyModelCatalogEverywhere()
     } catch { /* fallback to defaults */ }
   }
 
@@ -2196,24 +2259,23 @@
       })
     }
 
-    // Model Catalog sync button
+    // Model Catalog sync buttons (everywhere: #providers, #agents, #agentDetailModal)
     const syncModelsBtn = document.getElementById('vpsSyncModelsBtn')
     if (syncModelsBtn) {
-      syncModelsBtn.addEventListener('click', async function () {
-        const statusEl = document.getElementById('vpsModelCatalogStatus')
-        syncModelsBtn.disabled = true
-        if (statusEl) statusEl.textContent = 'Modellek lekérdezése a beregisztrált API-któl...'
-        try {
-          const data = await apiJson('/api/vps/models/sync', { method: 'POST', body: '{}' })
-          vpsModelCatalogCache = data.providers || null
-          vpsModelSyncedAt = data.syncedAt || null
-          renderModelCatalog()
-          if (statusEl) statusEl.textContent = 'Modell katalógus frissítve!'
-        } catch (err) {
-          if (statusEl) statusEl.textContent = 'Hiba: ' + err.message
-        } finally {
-          syncModelsBtn.disabled = false
-        }
+      syncModelsBtn.addEventListener('click', function () {
+        syncAllModelsEverywhere(syncModelsBtn, document.getElementById('vpsModelCatalogStatus')).catch(function () {})
+      })
+    }
+    const agentsSyncBtn = document.getElementById('agentsSyncModelsBtn')
+    if (agentsSyncBtn) {
+      agentsSyncBtn.addEventListener('click', function () {
+        syncAllModelsEverywhere(agentsSyncBtn, null).catch(function () {})
+      })
+    }
+    const coreSyncBtn = document.getElementById('agentCoreSyncModelsBtn')
+    if (coreSyncBtn) {
+      coreSyncBtn.addEventListener('click', function () {
+        syncAllModelsEverywhere(coreSyncBtn, null).catch(function () {})
       })
     }
 
@@ -3569,6 +3631,16 @@
               '<input type="password" autocomplete="new-password" spellcheck="false" data-wiz-field="' + esc(f.key) + '" value="' + esc(val) + '" placeholder="' + esc(f.placeholder || '') + '" style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:monospace;font-size:12px">' +
               '<button type="button" class="btn-secondary btn-compact" data-wiz-eye="' + esc(f.key) + '" title="Mutat / elrejt" style="padding:5px 8px">👁</button>' +
             '</div>'
+        } else if (f.key === 'GEMINI_BATCH_MODEL') {
+          const geminiModels = getModelsForProvider('gemini')
+          html +=
+            '<div style="display:flex;gap:6px;align-items:center">' +
+              '<input type="text" list="moduleWizardGeminiModelsList" spellcheck="false" data-wiz-field="' + esc(f.key) + '" value="' + esc(val) + '" placeholder="' + esc(f.placeholder || '') + '" style="flex:1;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:monospace;font-size:12px">' +
+              '<button type="button" class="btn-secondary btn-compact" data-wiz-sync-models="gemini" title="Elérhető Gemini modellek élő frissítése" style="padding:5px 8px">🔄</button>' +
+            '</div>' +
+            '<datalist id="moduleWizardGeminiModelsList">' +
+              geminiModels.map(function (m) { return '<option value="' + esc(m) + '"></option>' }).join('') +
+            '</datalist>'
         } else {
           const inpType = f.type === 'number' ? 'number' : 'text'
           html +=
@@ -3658,6 +3730,12 @@
           inp.type = 'password'
           btn.textContent = '👁'
         }
+      })
+    })
+
+    contentEl.querySelectorAll('[data-wiz-sync-models]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncAllModelsEverywhere(btn, null).catch(function () {})
       })
     })
 

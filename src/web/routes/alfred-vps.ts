@@ -31,7 +31,7 @@ import {
   type McpServerRecord,
 } from '../../alfred/cli-profile-manager.js'
 import { atomicWriteFileSync } from '../atomic-write.js'
-import { listSecrets } from '../vault.js'
+import { getSecret, listSecrets } from '../vault.js'
 import { mayActAsOwner, OWNER_SESSION_REQUIRED } from './auth.js'
 import {
   evaluateCircuitBreaker,
@@ -2004,7 +2004,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   }
 
   if (path === '/api/vps/models' && method === 'GET') {
-    const env = { ...readEnvFile(), ...process.env }
+    const env = resolveModelSyncEnv({ ...readEnvFile(), ...process.env }, { decryptSecrets: false })
     const catalogPath = resolveModelCatalogPath()
     const cached = readModelCatalog(catalogPath)
     const providers = buildProviderCatalogView(env, cached)
@@ -2013,11 +2013,14 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   }
 
   if (path === '/api/vps/models/sync' && method === 'POST') {
-    if (!mayActAsOwner(ctx.auth, req)) {
-      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Syncing model catalog requires an owner session.' }, 403)
+    const baseEnv = { ...readEnvFile(), ...process.env }
+    const ownerOk = mayActAsOwner(ctx.auth, req)
+    const adminOk = ownerOk || authorizeAdminCliRequest(ctx, baseEnv).ok
+    if (!adminOk) {
+      json(res, { ...OWNER_SESSION_REQUIRED, error: 'Syncing model catalog requires an owner or admin session.' }, 403)
       return true
     }
-    const env = { ...readEnvFile(), ...process.env }
+    const env = resolveModelSyncEnv(baseEnv, { decryptSecrets: true })
     const synced = await syncAllProviderModels(env)
     const catalogPath = resolveModelCatalogPath()
     mkdirSync(dirname(catalogPath), { recursive: true })
@@ -3196,6 +3199,45 @@ interface StoredModelCatalog {
   providers: Record<string, { models: string[]; error?: string }>
 }
 
+const MODEL_SYNC_VAULT_KEYS = [
+  'GEMINI_API_KEY',
+  'OPENAI_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'XAI_API_KEY',
+  'ANTHROPIC_API_KEY',
+] as const
+
+function resolveModelSyncEnv(
+  baseEnv: Record<string, string | undefined>,
+  opts: { decryptSecrets: boolean },
+): Record<string, string | undefined> {
+  const effective: Record<string, string | undefined> = { ...baseEnv }
+  if (opts.decryptSecrets) {
+    for (const key of MODEL_SYNC_VAULT_KEYS) {
+      try {
+        const val = getSecret(key)
+        if (typeof val === 'string' && val.trim().length > 0) {
+          effective[key] = val.trim()
+        }
+      } catch {
+        // Vault unavailable: keep baseEnv fallback
+      }
+    }
+  } else {
+    try {
+      const ids = new Set(listSecrets().map((e) => e.id))
+      for (const key of MODEL_SYNC_VAULT_KEYS) {
+        if (ids.has(key) && !(effective[key] ?? '').trim()) {
+          effective[key] = '__vault_present__'
+        }
+      }
+    } catch {
+      // Vault unavailable: keep baseEnv fallback
+    }
+  }
+  return effective
+}
+
 const DEFAULT_PROVIDER_MODELS: Record<string, string[]> = {
   'claude-cli': ['default', 'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5'],
   'codex-cli': ['default', 'gpt-5-codex', 'o3', 'o4-mini', 'gpt-4.1'],
@@ -3208,12 +3250,13 @@ const DEFAULT_PROVIDER_MODELS: Record<string, string[]> = {
     'gemini-4-hydrogen-high',
     'gemini-3.8-flash-high',
   ],
-  'gemini-cli': ['default', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+  'gemini-cli': ['default', 'gemini-3.8-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
   deepseek: ['deepseek-chat', 'deepseek-reasoner'],
   'vertex-eu': ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+  gemini: ['gemini-3.8-flash', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
   xai: ['grok-3', 'grok-3-mini', 'grok-4'],
   openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'],
+  anthropic: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5'],
 }
 
 function resolveModelCatalogPath(): string {
@@ -3286,7 +3329,8 @@ async function syncAllProviderModels(env: Record<string, string | undefined>): P
           providers[p] = { models: await fetchOpenAiCompatModels('https://api.x.ai/v1', env['XAI_API_KEY']!.trim()) }
         } else if (p === 'gemini') {
           const key = env['GEMINI_API_KEY']!.trim()
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`, {
+          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+            headers: { 'x-goog-api-key': key },
             signal: AbortSignal.timeout(8000),
           })
           if (!res.ok) throw new Error(`HTTP ${res.status}`)

@@ -608,6 +608,7 @@
             <button class="btn-secondary btn-compact" id="importAgentBtn" data-i18n="agents.page.import_btn">Ügynök importálása</button>
             <input type="file" id="importAgentFile" accept=".gz,.tgz,application/gzip" hidden>
             <button class="btn-secondary btn-compact" id="analyzeAllModelsBtn" data-i18n="agents.page.analyze_btn">Modell elemzés</button>
+            <button class="btn-secondary btn-compact" id="agentsSyncModelsBtn" title="Elérhető modellek élő frissítése minden szolgáltatónál és legördülőben">🔄 Modellek frissítése</button>
           </div>
         </div>
       </div>
@@ -3132,6 +3133,7 @@
               <select id="agentCoreProvSel" class="input" style="padding:4px 8px;font-size:12px"></select>
               <select id="agentCoreModelSel" class="input" style="flex:1;min-width:160px;padding:4px 8px;font-size:12px"></select>
               <input type="text" id="agentCoreModelInp" class="input" placeholder="Egyéni model ID" hidden style="flex:1;min-width:160px;padding:4px 8px;font-size:12px">
+              <button type="button" class="btn-secondary btn-compact" id="agentCoreSyncModelsBtn" title="Elérhető modellek élő frissítése" style="padding:4px 8px;font-size:12px">🔄</button>
             </div>
           </div>
           <div id="agentCoreMetaBox" hidden style="margin-bottom:14px;display:flex;flex-direction:column;gap:14px">
