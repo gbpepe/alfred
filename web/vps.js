@@ -3955,21 +3955,21 @@
           }).join('')
 
           const actionBtn = m.builtIn
-            ? '<button type="button" class="btn-secondary btn-compact" disabled title="Az alaprendszer kötelező modulja, nem kapcsolható ki">Zárolva 🔒</button>'
+            ? '<button type="button" class="btn-secondary btn-compact" disabled title="Az alaprendszer kötelező modulja, nem kapcsolható ki" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Zárolva 🔒</button>'
             : needsSetup && m.state !== 'active'
-              ? '<button type="button" class="btn-primary btn-compact" data-mod-wizard="' + esc(m.id) + '">Beállítás &amp; Aktiválás</button>'
+              ? '<button type="button" class="btn-primary btn-compact" data-mod-wizard="' + esc(m.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Beállítás &amp; Aktiválás</button>'
               : m.state === 'active'
-                ? '<button type="button" class="btn-secondary btn-compact" data-mod-action="disable" data-mod-id="' + esc(m.id) + '">Kikapcsolás</button>'
-                : '<button type="button" class="btn-primary btn-compact" data-mod-action="enable" data-mod-id="' + esc(m.id) + '">Bekapcsolás</button>'
+                ? '<button type="button" class="btn-secondary btn-compact" data-mod-action="disable" data-mod-id="' + esc(m.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Kikapcsolás</button>'
+                : '<button type="button" class="btn-primary btn-compact" data-mod-action="enable" data-mod-id="' + esc(m.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Bekapcsolás</button>'
 
           const wizardSideBtn = hasWizard && (!needsSetup || m.state === 'active')
-            ? '<button type="button" class="btn-secondary btn-compact" data-mod-wizard="' + esc(m.id) + '" style="font-size:12px">⚙ Varázsló</button>'
+            ? '<button type="button" class="btn-secondary btn-compact" data-mod-wizard="' + esc(m.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">⚙ Varázsló</button>'
             : ''
 
           return (
-            '<div data-module-item="' + esc(m.id) + '" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
+            '<div data-module-item="' + esc(m.id) + '" style="min-width:0;box-sizing:border-box;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
               '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-                '<div>' +
+                '<div style="min-width:0">' +
                   '<div style="font-weight:700;font-size:14px">' + icon + ' ' + esc(m.name) + '</div>' +
                   '<div style="font-size:11px;opacity:.65"><code>' + esc(m.id) + '</code> · v' + esc(m.version) + ' · ' + esc(m.category) + '</div>' +
                 '</div>' +
@@ -3981,9 +3981,9 @@
                 depChips +
                 secretWarnings +
               '</div>' +
-              '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap">' +
                 '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-                  '<button type="button" class="btn-secondary btn-compact" data-mod-detail="' + esc(m.id) + '" style="font-size:12px">Részletek</button>' +
+                  '<button type="button" class="btn-secondary btn-compact" data-mod-detail="' + esc(m.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Részletek</button>' +
                   wizardSideBtn +
                 '</div>' +
                 actionBtn +
@@ -4019,22 +4019,22 @@
           let actionsHtml = ''
           if (!p.installed) {
             if (hasMissingMods) {
-              actionsHtml = '<button type="button" class="btn-secondary btn-compact" data-pkg-action="install" data-pkg-id="' + esc(p.id) + '" disabled title="Hiányzó modulok: ' + esc(p.missingModules.join(', ')) + '">Telepítés</button>'
+              actionsHtml = '<button type="button" class="btn-secondary btn-compact" data-pkg-action="install" data-pkg-id="' + esc(p.id) + '" disabled title="Hiányzó modulok: ' + esc(p.missingModules.join(', ')) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Telepítés</button>'
             } else {
-              actionsHtml = '<button type="button" class="btn-primary btn-compact" data-pkg-action="install" data-pkg-id="' + esc(p.id) + '">Telepítés</button>'
+              actionsHtml = '<button type="button" class="btn-primary btn-compact" data-pkg-action="install" data-pkg-id="' + esc(p.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Telepítés</button>'
             }
           } else {
             const toggleBtn = p.enabled
-              ? '<button type="button" class="btn-secondary btn-compact" data-pkg-action="disable" data-pkg-id="' + esc(p.id) + '">Kikapcsolás</button>'
-              : '<button type="button" class="btn-primary btn-compact" data-pkg-action="enable" data-pkg-id="' + esc(p.id) + '">Bekapcsolás</button>'
-            const uninstBtn = '<button type="button" class="btn-secondary btn-compact" data-pkg-action="uninstall" data-pkg-id="' + esc(p.id) + '" style="color:#dc2626">Eltávolítás</button>'
-            actionsHtml = '<div style="display:flex;gap:6px">' + toggleBtn + uninstBtn + '</div>'
+              ? '<button type="button" class="btn-secondary btn-compact" data-pkg-action="disable" data-pkg-id="' + esc(p.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Kikapcsolás</button>'
+              : '<button type="button" class="btn-primary btn-compact" data-pkg-action="enable" data-pkg-id="' + esc(p.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Bekapcsolás</button>'
+            const uninstBtn = '<button type="button" class="btn-secondary btn-compact" data-pkg-action="uninstall" data-pkg-id="' + esc(p.id) + '" style="color:#dc2626;font-size:11.5px;padding:4px 9px;white-space:nowrap">Eltávolítás</button>'
+            actionsHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + toggleBtn + uninstBtn + '</div>'
           }
 
           return (
-            '<div data-agent-package="' + esc(p.id) + '" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
+            '<div data-agent-package="' + esc(p.id) + '" style="min-width:0;box-sizing:border-box;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px">' +
               '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-                '<div>' +
+                '<div style="min-width:0">' +
                   '<div style="font-weight:700;font-size:14px">' + icon + ' ' + esc(p.displayName) + '</div>' +
                   '<div style="font-size:11px;opacity:.65"><code>' + esc(p.id) + '</code> · ' + esc(p.role) + ' · ' + esc(p.recommendedModel) + '</div>' +
                 '</div>' +
@@ -4042,8 +4042,8 @@
               '</div>' +
               '<div style="font-size:12px;opacity:.85;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px">' + esc(p.description) + '</div>' +
               '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + reqChips + '</div>' +
-              '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">' +
-                '<button type="button" class="btn-secondary btn-compact" data-pkg-detail="' + esc(p.id) + '" style="font-size:12px">Részletek</button>' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">' +
+                '<button type="button" class="btn-secondary btn-compact" data-pkg-detail="' + esc(p.id) + '" style="font-size:11.5px;padding:4px 9px;white-space:nowrap">Részletek</button>' +
                 actionsHtml +
               '</div>' +
             '</div>'
