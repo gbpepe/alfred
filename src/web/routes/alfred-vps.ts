@@ -74,6 +74,9 @@ import {
   getAdminBatchesOverview,
 } from '../../alfred/batch-runner.js'
 import {
+  cloudList,
+  cloudMkdir,
+  cloudShare,
   CloudStorageError,
   completeCloudOAuthFlow,
   disconnectCloudAccount,
@@ -859,6 +862,109 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
       const status = await getCloudAdminStatus({ db, env, includeLiveQuota: false })
       const redirectUri = `${resolveRequestOrigin()}/oauth-cloud-callback.html`
       json(res, { ok: true, disconnected, redirectUri, ...status })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudBrowseMatch = /^\/api\/admin\/cloud\/([^/]+)\/browse$/.exec(path)
+  if (cloudBrowseMatch && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudBrowseMatch[1]).trim()
+      const account = url.searchParams.get('account')?.trim() || undefined
+      const folderRef = url.searchParams.get('folder')?.trim() || undefined
+      const query = url.searchParams.get('query')?.trim() || undefined
+      const kindParam = url.searchParams.get('kind')?.trim()
+      const kind = kindParam === 'file' || kindParam === 'folder' || kindParam === 'all' ? kindParam : undefined
+      const limitRaw = Number(url.searchParams.get('limit') || 100)
+      const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(200, Math.floor(limitRaw)) : 100
+      const db = getDb()
+      const listed = await cloudList(
+        { provider, account, folderRef, query, kind, limit },
+        { db, env, agentId: 'dashboard' },
+      )
+      json(res, { ok: true, ...listed, folderRef: folderRef ?? null })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudMkdirMatch = /^\/api\/admin\/cloud\/([^/]+)\/mkdir$/.exec(path)
+  if (cloudMkdirMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudMkdirMatch[1]).trim()
+      const body = await readJsonBody<{ account?: string; parentRef?: string; pathOrName?: string }>(req)
+      const pathOrName = String(body?.pathOrName ?? '').trim()
+      if (!pathOrName) {
+        json(res, { ok: false, error: 'A mappa neve (pathOrName) kötelező.' }, 400)
+        return true
+      }
+      const db = getDb()
+      const created = await cloudMkdir(
+        {
+          provider,
+          account: body?.account?.trim() || undefined,
+          parentRef: body?.parentRef?.trim() || undefined,
+          pathOrName,
+        },
+        { db, env, agentId: 'dashboard' },
+      )
+      json(res, { ok: true, ...created })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudShareMatch = /^\/api\/admin\/cloud\/([^/]+)\/share$/.exec(path)
+  if (cloudShareMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudShareMatch[1]).trim()
+      const body = await readJsonBody<{
+        account?: string
+        fileRefOrPath?: string
+        email?: string
+        publicLink?: boolean
+        role?: 'reader' | 'writer'
+      }>(req)
+      const fileRefOrPath = String(body?.fileRefOrPath ?? '').trim()
+      if (!fileRefOrPath) {
+        json(res, { ok: false, error: 'A megosztandó fájl azonosítója (fileRefOrPath) kötelező.' }, 400)
+        return true
+      }
+      const db = getDb()
+      const shared = await cloudShare(
+        {
+          provider,
+          account: body?.account?.trim() || undefined,
+          fileRefOrPath,
+          email: body?.email?.trim() || undefined,
+          publicLink: body?.publicLink === true,
+          role: body?.role === 'writer' ? 'writer' : 'reader',
+        },
+        { db, env, agentId: 'dashboard' },
+      )
+      json(res, { ok: true, share: shared })
     } catch (err) {
       sendCloudError(err)
     }

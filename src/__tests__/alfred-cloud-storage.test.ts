@@ -1100,6 +1100,15 @@ describe('Cloud Storage Module (feat/cloud-storage)', () => {
       const handled = await tryHandleAlfredVps(unauth.ctx)
       expect(handled).toBe(true)
       expect([401, 403]).toContain(unauth.getResult().status)
+
+      const unauthBrowse = createMockReqRes({
+        method: 'GET',
+        path: '/api/admin/cloud/gdrive/browse',
+        auth: undefined,
+      })
+      const handledBrowse = await tryHandleAlfredVps(unauthBrowse.ctx)
+      expect(handledBrowse).toBe(true)
+      expect([401, 403]).toContain(unauthBrowse.getResult().status)
     })
   })
 })

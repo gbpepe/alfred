@@ -94,7 +94,8 @@ test.describe('Alfred Staging Dashboard — Cloud Storage Module & Multi-Account
       await gdriveTab.click()
       await expect(gdriveTab).toHaveClass(/btn-primary/)
 
-      // Multi-account add controls + help links visible inside active provider body
+      // Multi-account add controls + embedded file browser + help links visible inside active provider body
+      await expect(page.locator('#vpsCloudBrowserPanel')).toBeVisible()
       await expect(page.locator('#vpsCloudHelpDetails')).toBeVisible()
       await page.locator('#vpsCloudHelpDetails summary').click()
       await expect(page.locator('#vpsCloudHelpDetails a[href*="one.dash.cloudflare.com"]')).toBeVisible()
@@ -122,7 +123,7 @@ test.describe('Alfred Staging Dashboard — Cloud Storage Module & Multi-Account
             headers: authHeaders,
             data: {},
           })
-          .catch(() => {})
+          .catch(() => { })
       }
     }
   })

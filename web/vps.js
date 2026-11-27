@@ -453,6 +453,17 @@
   let vpsCloudWired = false
   let vpsCloudPendingOAuthProvider = null
 
+  let vpsCloudBrowser = {
+    provider: 'gdrive',
+    account: '',
+    stack: [],
+    query: '',
+    items: [],
+    loaded: false,
+    loading: false,
+    error: '',
+  }
+
   function setCloudStatusMsg(text, isError) {
     const el = document.getElementById('vpsCloudStatusMsg')
     if (!el) return
@@ -645,6 +656,7 @@
               '<button type="button" class="btn-primary btn-compact" data-cloud-oauth="' + esc(acc.account) + '" data-cloud-mode="' + esc(acc.accessMode) + '" style="font-size:11px;padding:3px 8px">' +
                 (acc.needsReauth ? '🔄 Újrahitelesítés' : acc.hasRefreshToken ? 'Fiók váltás (OAuth2)' : '🔗 Fiókválasztó OAuth2') +
               '</button>' +
+              (acc.hasRefreshToken && !acc.needsReauth ? '<button type="button" class="btn-secondary btn-compact" data-cloud-browse="' + esc(acc.account) + '" style="font-size:11px;padding:3px 8px">📂 Böngészés</button>' : '') +
               (acc.hasRefreshToken ? '<button type="button" class="btn-secondary btn-compact" data-cloud-test="' + esc(acc.account) + '" style="font-size:11px;padding:3px 8px">🔌 Teszt &amp; Kvóta</button>' : '') +
               (acc.hasRefreshToken ? '<button type="button" class="btn-secondary btn-compact" data-cloud-disconnect="' + esc(acc.account) + '" style="font-size:11px;padding:3px 8px;color:#dc2626">Leválasztás</button>' : '') +
             '</div>' +
@@ -659,6 +671,47 @@
         '</div>'
     })
     html += '</div>'
+
+    const connectedAccounts = accounts.filter(function (a) { return a.hasRefreshToken && !a.needsReauth })
+    if (vpsCloudBrowser.provider !== activeProv.id || !connectedAccounts.some(function (a) { return a.account === vpsCloudBrowser.account })) {
+      vpsCloudBrowser.provider = activeProv.id
+      vpsCloudBrowser.account = connectedAccounts[0] ? connectedAccounts[0].account : ''
+      vpsCloudBrowser.stack = []
+      vpsCloudBrowser.query = ''
+      vpsCloudBrowser.items = []
+      vpsCloudBrowser.loaded = false
+      vpsCloudBrowser.error = ''
+    }
+    const activeBrowserAcc = connectedAccounts.find(function (a) { return a.account === vpsCloudBrowser.account }) || null
+
+    html +=
+      '<div id="vpsCloudBrowserPanel" style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<div style="font-size:12px;font-weight:700">📂 Fájlböngésző (' + esc(activeProv.displayName) + ')</div>' +
+          (connectedAccounts.length > 0
+            ? '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+                '<select id="vpsCloudBrowserAccSel" class="input" style="padding:3px 7px;font-size:11.5px">' +
+                  connectedAccounts.map(function (a) {
+                    return '<option value="' + esc(a.account) + '"' + (a.account === vpsCloudBrowser.account ? ' selected' : '') + '>' + esc(a.account + (a.accountEmail ? ' (' + a.accountEmail + ')' : '')) + '</option>'
+                  }).join('') +
+                '</select>' +
+                '<button type="button" class="btn-secondary btn-compact" id="vpsCloudBrowserRefreshBtn" style="font-size:11px;padding:3px 8px">↻ Betöltés / Frissítés</button>' +
+              '</div>'
+            : '<span style="font-size:11px;opacity:.7">Kösd össze legalább egy ' + esc(activeProv.displayName) + ' fiókot a böngészéshez.</span>') +
+        '</div>' +
+        (connectedAccounts.length > 0
+          ? '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+              '<input type="text" id="vpsCloudBrowserSearchInp" class="input" value="' + esc(vpsCloudBrowser.query || '') + '" placeholder="Keresés fájlnévre vagy tartalomra..." style="flex:1;min-width:170px;padding:4px 8px;font-size:11.5px">' +
+              '<button type="button" class="btn-secondary btn-compact" id="vpsCloudBrowserSearchBtn" style="font-size:11px;padding:4px 8px">🔍 Keresés</button>' +
+              (activeBrowserAcc && activeBrowserAcc.accessMode !== 'read_only'
+                ? '<input type="text" id="vpsCloudBrowserNewDirInp" class="input" placeholder="Új mappa neve..." style="width:150px;padding:4px 8px;font-size:11.5px">' +
+                  '<button type="button" class="btn-secondary btn-compact" id="vpsCloudBrowserMkdirBtn" style="font-size:11px;padding:4px 8px">➕ Új mappa</button>'
+                : '') +
+            '</div>' +
+            '<div id="vpsCloudBrowserBreadcrumb" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;font-size:11.5px"></div>' +
+            '<div id="vpsCloudBrowserList" style="display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto"></div>'
+          : '') +
+      '</div>'
 
     html +=
       '<div style="padding:10px;border:1px dashed var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:8px">' +
@@ -811,6 +864,187 @@
         }
       })
     })
+
+    bodyEl.querySelectorAll('[data-cloud-browse]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const acc = btn.getAttribute('data-cloud-browse') || ''
+        vpsCloudBrowser.provider = activeProv.id
+        vpsCloudBrowser.account = acc
+        vpsCloudBrowser.stack = []
+        vpsCloudBrowser.query = ''
+        const sel = document.getElementById('vpsCloudBrowserAccSel')
+        if (sel) sel.value = acc
+        loadVpsCloudBrowserFolder()
+        document.getElementById('vpsCloudBrowserPanel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      })
+    })
+
+    function renderVpsCloudBrowserContents() {
+      const bcEl = document.getElementById('vpsCloudBrowserBreadcrumb')
+      const listEl = document.getElementById('vpsCloudBrowserList')
+      if (!bcEl || !listEl) return
+
+      let bcHtml = '<button type="button" class="btn-secondary btn-compact" data-cloud-crumb="-1" style="font-size:11px;padding:2px 6px">🏠 Gyökér</button>'
+      vpsCloudBrowser.stack.forEach(function (entry, idx) {
+        bcHtml += '<span style="opacity:.5">/</span>' +
+          '<button type="button" class="btn-secondary btn-compact" data-cloud-crumb="' + idx + '" style="font-size:11px;padding:2px 6px">' + esc(entry.name) + '</button>'
+      })
+      bcEl.innerHTML = bcHtml
+      bcEl.querySelectorAll('[data-cloud-crumb]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const idx = Number(btn.getAttribute('data-cloud-crumb'))
+          vpsCloudBrowser.stack = idx < 0 ? [] : vpsCloudBrowser.stack.slice(0, idx + 1)
+          vpsCloudBrowser.query = ''
+          const sInp = document.getElementById('vpsCloudBrowserSearchInp')
+          if (sInp) sInp.value = ''
+          loadVpsCloudBrowserFolder()
+        })
+      })
+
+      if (vpsCloudBrowser.loading) {
+        listEl.innerHTML = '<div style="font-size:11.5px;opacity:.75;padding:6px">Fájlok és mappák betöltése...</div>'
+        return
+      }
+      if (vpsCloudBrowser.error) {
+        listEl.innerHTML = '<div style="font-size:11.5px;color:#dc2626;padding:6px">✕ ' + esc(vpsCloudBrowser.error) + '</div>'
+        return
+      }
+      if (!vpsCloudBrowser.loaded) {
+        listEl.innerHTML = '<div style="font-size:11.5px;opacity:.7;padding:6px">Kattints a <strong>📂 Böngészés</strong> vagy <strong>↻ Betöltés / Frissítés</strong> gombra a tárhely tartalmának megjelenítéséhez.</div>'
+        return
+      }
+      if (!vpsCloudBrowser.items || vpsCloudBrowser.items.length === 0) {
+        listEl.innerHTML = '<div style="font-size:11.5px;opacity:.7;padding:6px">Ez a mappa üres (vagy nincs találat a keresésre).</div>'
+        return
+      }
+
+      const isReadOnly = activeBrowserAcc && activeBrowserAcc.accessMode === 'read_only'
+      listEl.innerHTML = vpsCloudBrowser.items.map(function (it) {
+        const isDir = it.kind === 'folder'
+        const sizeStr = !isDir && it.sizeBytes != null ? formatBytesUi(it.sizeBytes) : (isDir ? 'Mappa' : '—')
+        const modStr = it.modifiedAt ? new Date(it.modifiedAt).toLocaleString('hu-HU', { dateStyle: 'short', timeStyle: 'short' }) : ''
+        const openRef = activeProv.id === 'dropbox' ? (it.pathDisplay || it.id) : it.id
+        return (
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:11.5px;flex-wrap:wrap">' +
+            '<div style="display:flex;align-items:center;gap:6px;min-width:180px;flex:1">' +
+              '<span>' + (isDir ? '📁' : '📄') + '</span>' +
+              (isDir
+                ? '<button type="button" data-cloud-open-dir="' + esc(openRef) + '" data-cloud-dir-name="' + esc(it.name) + '" style="background:none;border:none;padding:0;color:var(--accent,#3b82f6);font-weight:600;cursor:pointer;text-align:left;font-size:11.5px">' + esc(it.name) + '</button>'
+                : '<span style="font-weight:500;word-break:break-word">' + esc(it.name) + '</span>') +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+              '<span style="opacity:.7;font-size:11px">' + esc(sizeStr) + (modStr ? ' · ' + esc(modStr) : '') + '</span>' +
+              (it.webUrl ? '<a href="' + esc(it.webUrl) + '" target="_blank" rel="noopener noreferrer" class="btn-secondary btn-compact" style="font-size:10.5px;padding:2px 6px;text-decoration:none">↗ Megnyitás</a>' : '') +
+              (!isReadOnly ? '<button type="button" class="btn-secondary btn-compact" data-cloud-share-item="' + esc(openRef) + '" data-cloud-share-name="' + esc(it.name) + '" style="font-size:10.5px;padding:2px 6px">🔗 Megosztás</button>' : '') +
+            '</div>' +
+          '</div>'
+        )
+      }).join('')
+
+      listEl.querySelectorAll('[data-cloud-open-dir]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const dirRef = btn.getAttribute('data-cloud-open-dir') || ''
+          const dirName = btn.getAttribute('data-cloud-dir-name') || dirRef
+          if (!dirRef) return
+          vpsCloudBrowser.stack.push({ id: dirRef, name: dirName })
+          vpsCloudBrowser.query = ''
+          const sInp = document.getElementById('vpsCloudBrowserSearchInp')
+          if (sInp) sInp.value = ''
+          loadVpsCloudBrowserFolder()
+        })
+      })
+
+      listEl.querySelectorAll('[data-cloud-share-item]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const ref = btn.getAttribute('data-cloud-share-item') || ''
+          const name = btn.getAttribute('data-cloud-share-name') || ref
+          if (!ref) return
+          btn.disabled = true
+          try {
+            const res = await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/share', {
+              method: 'POST',
+              body: JSON.stringify({ account: vpsCloudBrowser.account || undefined, fileRefOrPath: ref }),
+            })
+            const shareUrl = res.share && res.share.webUrl ? res.share.webUrl : ''
+            const who = res.share && res.share.sharedWith ? res.share.sharedWith : ''
+            setCloudStatusMsg('✓ Megosztva (' + name + ' → ' + who + ')' + (shareUrl ? ': ' + shareUrl : ''), false)
+          } catch (err) {
+            setCloudStatusMsg('✕ Megosztási hiba (' + name + '): ' + err.message, true)
+          } finally {
+            btn.disabled = false
+          }
+        })
+      })
+    }
+
+    async function loadVpsCloudBrowserFolder() {
+      if (!vpsCloudBrowser.account) return
+      vpsCloudBrowser.loading = true
+      vpsCloudBrowser.error = ''
+      renderVpsCloudBrowserContents()
+      try {
+        const curFolder = vpsCloudBrowser.stack.length > 0 ? vpsCloudBrowser.stack[vpsCloudBrowser.stack.length - 1].id : ''
+        const qs = new URLSearchParams()
+        if (vpsCloudBrowser.account) qs.set('account', vpsCloudBrowser.account)
+        if (curFolder) qs.set('folder', curFolder)
+        if (vpsCloudBrowser.query) qs.set('query', vpsCloudBrowser.query)
+        const res = await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/browse?' + qs.toString())
+        vpsCloudBrowser.items = Array.isArray(res.items) ? res.items : []
+        vpsCloudBrowser.loaded = true
+      } catch (err) {
+        vpsCloudBrowser.error = err.message || String(err)
+      } finally {
+        vpsCloudBrowser.loading = false
+        renderVpsCloudBrowserContents()
+      }
+    }
+
+    document.getElementById('vpsCloudBrowserAccSel')?.addEventListener('change', function () {
+      vpsCloudBrowser.account = this.value || ''
+      vpsCloudBrowser.stack = []
+      vpsCloudBrowser.query = ''
+      loadVpsCloudBrowserFolder()
+    })
+    document.getElementById('vpsCloudBrowserRefreshBtn')?.addEventListener('click', function () {
+      loadVpsCloudBrowserFolder()
+    })
+    document.getElementById('vpsCloudBrowserSearchBtn')?.addEventListener('click', function () {
+      vpsCloudBrowser.query = document.getElementById('vpsCloudBrowserSearchInp')?.value.trim() || ''
+      loadVpsCloudBrowserFolder()
+    })
+    document.getElementById('vpsCloudBrowserSearchInp')?.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault()
+        vpsCloudBrowser.query = this.value.trim()
+        loadVpsCloudBrowserFolder()
+      }
+    })
+    document.getElementById('vpsCloudBrowserMkdirBtn')?.addEventListener('click', async function () {
+      const inp = document.getElementById('vpsCloudBrowserNewDirInp')
+      const name = inp ? inp.value.trim() : ''
+      if (!name) {
+        setCloudStatusMsg('Add meg az új mappa nevét.', true)
+        return
+      }
+      this.disabled = true
+      try {
+        const curFolder = vpsCloudBrowser.stack.length > 0 ? vpsCloudBrowser.stack[vpsCloudBrowser.stack.length - 1].id : undefined
+        await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/mkdir', {
+          method: 'POST',
+          body: JSON.stringify({ account: vpsCloudBrowser.account || undefined, parentRef: curFolder, pathOrName: name }),
+        })
+        if (inp) inp.value = ''
+        setCloudStatusMsg('✓ Mappa létrehozva: ' + name, false)
+        await loadVpsCloudBrowserFolder()
+      } catch (err) {
+        setCloudStatusMsg('✕ Mappa létrehozási hiba: ' + err.message, true)
+      } finally {
+        this.disabled = false
+      }
+    })
+    if (connectedAccounts.length > 0) {
+      renderVpsCloudBrowserContents()
+    }
 
     bodyEl.querySelectorAll('[data-cloud-test]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
