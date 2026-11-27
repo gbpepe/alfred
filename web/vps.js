@@ -118,6 +118,9 @@
       if (!activeModSet || activeModSet.has('batch-api')) {
         refreshVpsBatches()
       }
+      if (activeModSet && activeModSet.has('cloud-storage')) {
+        refreshVpsCloudStorage(false)
+      }
     } catch (err) {
       sysEl.textContent = 'Hiba: ' + err.message
     }
@@ -442,6 +445,443 @@
       if (msgEl) msgEl.textContent = '✕ Lemondási hiba: ' + err.message
       if (btn) btn.disabled = false
     }
+  }
+
+  // === Multi-Cloud & Multi-Account Storage Card (#vpsCloudStorageCard) ===
+  let vpsCloudCache = null
+  let vpsCloudActiveTab = 'gdrive'
+  let vpsCloudWired = false
+  let vpsCloudPendingOAuthProvider = null
+
+  function setCloudStatusMsg(text, isError) {
+    const el = document.getElementById('vpsCloudStatusMsg')
+    if (!el) return
+    if (!text) {
+      el.hidden = true
+      el.textContent = ''
+      return
+    }
+    el.hidden = false
+    el.style.borderColor = isError ? '#dc2626' : '#16a34a'
+    el.style.color = isError ? '#dc2626' : '#15803d'
+    el.textContent = text
+  }
+
+  function cloudHealthBadge(status) {
+    if (status === 'connected') return '<span style="padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;color:#fff;background:#16a34a">Csatlakoztatva</span>'
+    if (status === 'needs_reauth') return '<span style="padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;color:#fff;background:#dc2626">⚠ Újrahitelesítés (needs_reauth)</span>'
+    if (status === 'client_configured') return '<span style="padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;color:#fff;background:#2563eb">Kliens kész · OAuth vár</span>'
+    return '<span style="padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;color:#fff;background:#64748b">Nincs összekötve</span>'
+  }
+
+  function renderVpsCloudStorage(data) {
+    const tabsEl = document.getElementById('vpsCloudProviderTabs')
+    const bodyEl = document.getElementById('vpsCloudProviderBody')
+    const badgeEl = document.getElementById('vpsCloudDefaultBadge')
+    const defProvSel = document.getElementById('vpsCloudDefaultProviderSel')
+    const defEmailInp = document.getElementById('vpsCloudDefaultShareEmailInp')
+    const allowPubChk = document.getElementById('vpsCloudAllowPublicChk')
+    const limitsEl = document.getElementById('vpsCloudLimitsText')
+    const actEl = document.getElementById('vpsCloudActivityList')
+    if (!tabsEl || !bodyEl || !data) return
+
+    vpsCloudCache = data
+    if (badgeEl) badgeEl.textContent = 'Alap: ' + (data.defaultProvider || 'gdrive')
+    if (defProvSel && data.defaultProvider) defProvSel.value = data.defaultProvider
+    if (defEmailInp) defEmailInp.value = data.defaultShareEmail || ''
+    if (allowPubChk) allowPubChk.checked = Boolean(data.allowPublicLinks)
+    if (limitsEl) {
+      limitsEl.textContent = 'Max. letöltés: ' + (data.maxDownloadMb || 250) + ' MB · Max. feltöltés: ' + (data.maxUploadMb || 500) + ' MB'
+    }
+
+    const providers = Array.isArray(data.providers) ? data.providers : []
+    if (!providers.some(function (p) { return p.id === vpsCloudActiveTab }) && providers.length > 0) {
+      vpsCloudActiveTab = providers[0].id
+    }
+
+    tabsEl.innerHTML = providers.map(function (p) {
+      const isActive = p.id === vpsCloudActiveTab
+      const isDefault = p.id === data.defaultProvider
+      const countBadge = p.connectedCount > 0 ? ' (' + p.connectedCount + ')' : ''
+      return (
+        '<button type="button" class="' + (isActive ? 'btn-primary' : 'btn-secondary') + ' btn-compact" data-cloud-tab="' + esc(p.id) + '" style="font-size:12px">' +
+          esc(p.displayName) + countBadge + (isDefault ? ' ★' : '') +
+        '</button>'
+      )
+    }).join('')
+
+    tabsEl.querySelectorAll('[data-cloud-tab]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        vpsCloudActiveTab = btn.getAttribute('data-cloud-tab') || 'gdrive'
+        renderVpsCloudStorage(vpsCloudCache)
+      })
+    })
+
+    const activeProv = providers.find(function (p) { return p.id === vpsCloudActiveTab }) || providers[0]
+    if (!activeProv) {
+      bodyEl.innerHTML = '<div style="font-size:12px;opacity:.7">Nincs elérhető felhőtárhely adapter.</div>'
+      return
+    }
+
+    const redirectUri = data.redirectUri || (window.location.origin + '/oauth-cloud-callback.html')
+    const clientBadge = activeProv.hasClientId && activeProv.hasClientSecret
+      ? '<span style="font-size:11px;padding:1px 7px;border-radius:999px;background:rgba(22,163,74,0.14);color:#15803d;font-weight:600">✓ OAuth2 kliens Vaultban</span>'
+      : '<span style="font-size:11px;padding:1px 7px;border-radius:999px;background:rgba(217,119,6,0.14);color:#b45309;font-weight:600">Hiányzó OAuth2 kliens</span>'
+
+    let html = ''
+    html +=
+      '<div style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<div><strong>' + esc(activeProv.displayName) + ' — OAuth2 App Kliens (Vault)</strong></div>' +
+          clientBadge +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px">' +
+          '<input type="password" autocomplete="new-password" id="vpsCloudClientIdInp" class="input" placeholder="Client ID / App Key (üres = megtartás)" style="padding:5px 8px;font-size:12px;font-family:monospace">' +
+          '<input type="password" autocomplete="new-password" id="vpsCloudClientSecretInp" class="input" placeholder="Client Secret (üres = megtartás)" style="padding:5px 8px;font-size:12px;font-family:monospace">' +
+          '<button type="button" class="btn-secondary btn-compact" id="vpsCloudSaveClientBtn">Kliens mentése Vaultba</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;opacity:.85">' +
+          '<span>Redirect URI:</span>' +
+          '<code style="padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface)">' + esc(redirectUri) + '</code>' +
+          '<button type="button" class="btn-secondary btn-compact" id="vpsCloudCopyRedirectBtn" style="font-size:11px;padding:2px 7px">Másolás</button>' +
+        '</div>' +
+      '</div>'
+
+    const accounts = Array.isArray(activeProv.accounts) ? activeProv.accounts : []
+    html += '<div style="display:flex;flex-direction:column;gap:8px">'
+    accounts.forEach(function (acc) {
+      const q = acc.quota
+      const quotaHtml = q && (q.usedBytes != null || q.totalBytes != null)
+        ? '<div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:11px;opacity:.85">' +
+              '<span>Tárhelykvóta: ' + esc(formatBytesUi(q.usedBytes || 0)) + (q.totalBytes ? ' / ' + esc(formatBytesUi(q.totalBytes)) : ' (korlátlan)') + '</span>' +
+              (q.usedPct != null ? '<strong>' + esc(q.usedPct) + '%</strong>' : '') +
+            '</div>' +
+            (q.usedPct != null
+              ? '<div style="height:6px;border-radius:999px;background:rgba(128,128,128,0.2);overflow:hidden"><div style="height:100%;width:' + Math.min(100, Math.max(0, q.usedPct)) + '%;background:' + (q.usedPct >= 90 ? '#dc2626' : q.usedPct >= 80 ? '#d97706' : '#16a34a') + '"></div></div>'
+              : '') +
+          '</div>'
+        : ''
+
+      const modeBadge = acc.accessMode === 'read_only'
+        ? '<span style="padding:1px 6px;border-radius:999px;font-size:10px;border:1px solid #d97706;color:#b45309">🔒 Csak olvasható</span>'
+        : '<span style="padding:1px 6px;border-radius:999px;font-size:10px;border:1px solid var(--border);opacity:.8">Írás-olvasás</span>'
+
+      const defBadge = acc.isDefault
+        ? '<span style="padding:1px 6px;border-radius:999px;font-size:10px;font-weight:600;background:rgba(37,99,235,0.14);color:#2563eb">★ Alapértelmezett</span>'
+        : '<button type="button" class="btn-secondary btn-compact" data-cloud-set-default="' + esc(acc.account) + '" style="font-size:10.5px;padding:2px 7px">Legyen alapértelmezett</button>'
+
+      html +=
+        '<div data-cloud-account="' + esc(acc.account) + '" style="padding:10px;border:1px solid ' + (acc.needsReauth ? '#dc2626' : 'var(--border)') + ';border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px;font-size:12px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+              '<code>' + esc(acc.account) + '</code>' +
+              '<strong>' + esc(acc.accountEmail || acc.label || acc.account) + '</strong>' +
+              cloudHealthBadge(acc.status) +
+              modeBadge +
+              defBadge +
+            '</div>' +
+            '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
+              '<button type="button" class="btn-primary btn-compact" data-cloud-oauth="' + esc(acc.account) + '" data-cloud-mode="' + esc(acc.accessMode) + '" style="font-size:11px;padding:3px 8px">' +
+                (acc.needsReauth ? '🔄 Újrahitelesítés' : acc.hasRefreshToken ? 'Fiók váltás (OAuth2)' : '🔗 Fiókválasztó OAuth2') +
+              '</button>' +
+              (acc.hasRefreshToken ? '<button type="button" class="btn-secondary btn-compact" data-cloud-test="' + esc(acc.account) + '" style="font-size:11px;padding:3px 8px">🔌 Teszt &amp; Kvóta</button>' : '') +
+              (acc.hasRefreshToken ? '<button type="button" class="btn-secondary btn-compact" data-cloud-disconnect="' + esc(acc.account) + '" style="font-size:11px;padding:3px 8px;color:#dc2626">Leválasztás</button>' : '') +
+            '</div>' +
+          '</div>' +
+          quotaHtml +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px;margin-top:4px;align-items:center">' +
+            '<input type="text" class="input" data-cloud-acc-root="' + esc(acc.account) + '" value="' + esc(acc.rootRef || '') + '" placeholder="Gyökérmappa (root_ref, pl. /Alfred)" style="padding:4px 7px;font-size:11.5px">' +
+            '<input type="email" class="input" data-cloud-acc-share="' + esc(acc.account) + '" value="' + esc(acc.defaultShareEmail || '') + '" placeholder="Fiók megosztási e-mail (opcionális)" style="padding:4px 7px;font-size:11.5px">' +
+            '<label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" data-cloud-acc-pub="' + esc(acc.account) + '"' + (acc.allowPublicLinks === true ? ' checked' : '') + '> Nyilvános link engedély</label>' +
+            '<button type="button" class="btn-secondary btn-compact" data-cloud-acc-save="' + esc(acc.account) + '" style="font-size:11px;padding:4px 8px">Fiók mentése</button>' +
+          '</div>' +
+        '</div>'
+    })
+    html += '</div>'
+
+    html +=
+      '<div style="padding:10px;border:1px dashed var(--border);border-radius:8px;background:var(--bg);display:flex;flex-direction:column;gap:8px">' +
+        '<div style="font-size:12px;font-weight:600">+ Új fiók összekötése (' + esc(activeProv.displayName) + ')</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+          '<input type="text" id="vpsCloudNewAccAliasInp" class="input" placeholder="Alias (pl. work, archive — üres = e-mailből)" style="flex:1;min-width:180px;padding:5px 8px;font-size:12px">' +
+          '<select id="vpsCloudNewAccModeSel" class="input" style="padding:5px 8px;font-size:12px">' +
+            '<option value="read_write">Írás-olvasás (read_write)</option>' +
+            '<option value="read_only">🔒 Csak olvasható (read_only)</option>' +
+          '</select>' +
+          '<button type="button" class="btn-primary btn-compact" id="vpsCloudAddAccountBtn">🔗 Új fiók (OAuth2)</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+          '<input type="text" id="vpsCloudManualCallbackInp" class="input" placeholder="Kézi befejezés: illeszd be a visszairányított callback URL-t (inkognitó/külön profilnál)" style="flex:1;min-width:220px;padding:5px 8px;font-size:11.5px;font-family:monospace">' +
+          '<button type="button" class="btn-secondary btn-compact" id="vpsCloudManualCompleteBtn">Összekötés befejezése</button>' +
+        '</div>' +
+      '</div>'
+
+    bodyEl.innerHTML = html
+
+    document.getElementById('vpsCloudCopyRedirectBtn')?.addEventListener('click', function () {
+      if (navigator.clipboard) navigator.clipboard.writeText(redirectUri).catch(function () {})
+      this.textContent = '✓ Másolva'
+      const self = this
+      setTimeout(function () { self.textContent = 'Másolás' }, 1500)
+    })
+
+    document.getElementById('vpsCloudSaveClientBtn')?.addEventListener('click', async function () {
+      const cid = document.getElementById('vpsCloudClientIdInp')?.value.trim() || ''
+      const csec = document.getElementById('vpsCloudClientSecretInp')?.value.trim() || ''
+      if (!cid && !csec) {
+        setCloudStatusMsg('Add meg legalább a Client ID vagy Client Secret értékét.', true)
+        return
+      }
+      this.disabled = true
+      try {
+        const res = await apiJson('/api/admin/cloud/config', {
+          method: 'POST',
+          body: JSON.stringify({ provider: activeProv.id, clientId: cid || undefined, clientSecret: csec || undefined }),
+        })
+        renderVpsCloudStorage(res)
+        setCloudStatusMsg('✓ OAuth2 kliens kulcsok elmentve a Vaultba (' + activeProv.displayName + ').', false)
+      } catch (err) {
+        setCloudStatusMsg('✕ Mentési hiba: ' + err.message, true)
+      } finally {
+        this.disabled = false
+      }
+    })
+
+    async function launchCloudOAuth(providerId, payload) {
+      setCloudStatusMsg('OAuth2 fiókválasztó indítása (' + providerId + ')...', false)
+      try {
+        const res = await apiJson('/api/admin/cloud/' + encodeURIComponent(providerId) + '/oauth/start', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+        vpsCloudPendingOAuthProvider = providerId
+        const popup = window.open(res.authUrl, 'alfred_cloud_oauth', 'width=560,height=720,noopener=no')
+        if (!popup) {
+          setCloudStatusMsg('A böngésző blokkolta a felugró ablakot. Nyisd meg manuálisan, vagy engedélyezd a popupot: ' + res.authUrl, true)
+        } else {
+          setCloudStatusMsg('Válaszd ki a dedikált fiókot a megnyílt ablakban (vagy másold vissza a callback URL-t lent).', false)
+        }
+      } catch (err) {
+        setCloudStatusMsg('✕ OAuth2 indítási hiba: ' + err.message, true)
+      }
+    }
+
+    bodyEl.querySelectorAll('[data-cloud-oauth]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const acc = btn.getAttribute('data-cloud-oauth') || 'default'
+        const mode = btn.getAttribute('data-cloud-mode') || 'read_write'
+        launchCloudOAuth(activeProv.id, { account: acc, accessMode: mode })
+      })
+    })
+
+    document.getElementById('vpsCloudAddAccountBtn')?.addEventListener('click', function () {
+      const alias = document.getElementById('vpsCloudNewAccAliasInp')?.value.trim() || ''
+      const mode = document.getElementById('vpsCloudNewAccModeSel')?.value || 'read_write'
+      launchCloudOAuth(activeProv.id, {
+        account: alias || undefined,
+        createNew: !alias,
+        accessMode: mode,
+      })
+    })
+
+    document.getElementById('vpsCloudManualCompleteBtn')?.addEventListener('click', async function () {
+      const raw = document.getElementById('vpsCloudManualCallbackInp')?.value.trim() || ''
+      if (!raw) {
+        setCloudStatusMsg('Illeszd be a visszairányított callback URL-t!', true)
+        return
+      }
+      this.disabled = true
+      try {
+        const targetProv = vpsCloudPendingOAuthProvider || activeProv.id
+        const res = await apiJson('/api/admin/cloud/' + encodeURIComponent(targetProv) + '/oauth/complete', {
+          method: 'POST',
+          body: JSON.stringify({ callbackUrl: raw }),
+        })
+        renderVpsCloudStorage(res)
+        setCloudStatusMsg('✓ Fiók sikeresen összekötve: ' + targetProv + '::' + (res.connected ? res.connected.account : ''), false)
+      } catch (err) {
+        setCloudStatusMsg('✕ OAuth2 befejezési hiba: ' + err.message, true)
+      } finally {
+        this.disabled = false
+      }
+    })
+
+    bodyEl.querySelectorAll('[data-cloud-set-default]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const acc = btn.getAttribute('data-cloud-set-default')
+        btn.disabled = true
+        try {
+          const res = await apiJson('/api/admin/cloud/config', {
+            method: 'POST',
+            body: JSON.stringify({ provider: activeProv.id, defaultAccount: acc }),
+          })
+          renderVpsCloudStorage(res)
+          setCloudStatusMsg('✓ Alapértelmezett fiók beállítva: ' + activeProv.id + '::' + acc, false)
+        } catch (err) {
+          setCloudStatusMsg('✕ Hiba: ' + err.message, true)
+          btn.disabled = false
+        }
+      })
+    })
+
+    bodyEl.querySelectorAll('[data-cloud-acc-save]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const acc = btn.getAttribute('data-cloud-acc-save')
+        const rootRef = bodyEl.querySelector('[data-cloud-acc-root="' + acc + '"]')?.value.trim() || ''
+        const shareEmail = bodyEl.querySelector('[data-cloud-acc-share="' + acc + '"]')?.value.trim() || ''
+        const allowPub = Boolean(bodyEl.querySelector('[data-cloud-acc-pub="' + acc + '"]')?.checked)
+        btn.disabled = true
+        try {
+          const res = await apiJson('/api/admin/cloud/config', {
+            method: 'POST',
+            body: JSON.stringify({
+              provider: activeProv.id,
+              account: acc,
+              rootRef: rootRef || null,
+              accountDefaultShareEmail: shareEmail || null,
+              accountAllowPublicLinks: allowPub,
+            }),
+          })
+          renderVpsCloudStorage(res)
+          setCloudStatusMsg('✓ Fiók beállítások mentve (' + activeProv.id + '::' + acc + ').', false)
+        } catch (err) {
+          setCloudStatusMsg('✕ Mentési hiba: ' + err.message, true)
+          btn.disabled = false
+        }
+      })
+    })
+
+    bodyEl.querySelectorAll('[data-cloud-test]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const acc = btn.getAttribute('data-cloud-test')
+        btn.disabled = true
+        setCloudStatusMsg('Kapcsolat és kvóta tesztelése (' + activeProv.id + '::' + acc + ')...', false)
+        try {
+          const res = await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/test', {
+            method: 'POST',
+            body: JSON.stringify({ account: acc }),
+          })
+          renderVpsCloudStorage(res)
+          const em = res.test && res.test.quota && res.test.quota.accountEmail ? ' (' + res.test.quota.accountEmail + ')' : ''
+          setCloudStatusMsg('✓ Kapcsolat OK: ' + activeProv.id + '::' + acc + em, false)
+        } catch (err) {
+          setCloudStatusMsg('✕ Teszt hiba: ' + err.message, true)
+          refreshVpsCloudStorage(false)
+        }
+      })
+    })
+
+    bodyEl.querySelectorAll('[data-cloud-disconnect]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const acc = btn.getAttribute('data-cloud-disconnect')
+        btn.disabled = true
+        try {
+          const res = await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/disconnect', {
+            method: 'POST',
+            body: JSON.stringify({ account: acc }),
+          })
+          renderVpsCloudStorage(res)
+          setCloudStatusMsg('✓ Fiók leválasztva: ' + activeProv.id + '::' + acc + ' (a felhőfájlok érintetlenek).', false)
+        } catch (err) {
+          setCloudStatusMsg('✕ Leválasztási hiba: ' + err.message, true)
+          btn.disabled = false
+        }
+      })
+    })
+
+    if (actEl) {
+      const rows = Array.isArray(data.recentActivity) ? data.recentActivity : []
+      actEl.innerHTML = rows.length === 0
+        ? '<div style="opacity:.65">Még nincs rögzített felhőtárhely-művelet.</div>'
+        : rows.map(function (r) {
+            const ts = r.ts_sec ? new Date(r.ts_sec * 1000).toISOString().slice(0, 19).replace('T', ' ') : ''
+            const col = r.status === 'ok' ? '#16a34a' : '#dc2626'
+            return (
+              '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:3px 6px;border-bottom:1px solid var(--border)">' +
+                '<span><strong style="color:' + col + '">' + (r.status === 'ok' ? '✓' : '✕') + '</strong> <code>' + esc(r.provider + '::' + r.account) + '</code> · <b>' + esc(r.action) + '</b> · ' + esc(r.target_name) + (r.bytes ? ' (' + esc(formatBytesUi(r.bytes)) + ')' : '') + '</span>' +
+                '<span style="opacity:.7">' + esc(r.agent_id) + ' · ' + esc(ts) + '</span>' +
+              '</div>'
+            )
+          }).join('')
+    }
+  }
+
+  async function refreshVpsCloudStorage(liveQuota) {
+    const bodyEl = document.getElementById('vpsCloudProviderBody')
+    if (!bodyEl) return
+    wireVpsCloudEvents()
+    try {
+      const data = await apiJson('/api/admin/cloud/status' + (liveQuota ? '?quota=1' : ''))
+      renderVpsCloudStorage(data)
+    } catch (err) {
+      setCloudStatusMsg('✕ Felhőtárhely betöltési hiba: ' + err.message, true)
+    }
+  }
+
+  function wireVpsCloudEvents() {
+    if (vpsCloudWired) return
+    vpsCloudWired = true
+
+    document.getElementById('vpsCloudRefreshBtn')?.addEventListener('click', function () {
+      refreshVpsCloudStorage(false)
+    })
+    document.getElementById('vpsCloudRefreshQuotaBtn')?.addEventListener('click', function () {
+      setCloudStatusMsg('Élő kvóták lekérdezése...', false)
+      refreshVpsCloudStorage(true).then(function () {
+        setCloudStatusMsg('✓ Kvóták frissítve.', false)
+      })
+    })
+    document.getElementById('vpsCloudOpenWizardBtn')?.addEventListener('click', function () {
+      if (typeof openModuleWizardModal === 'function') {
+        openModuleWizardModal('cloud-storage')
+      }
+    })
+    document.getElementById('vpsCloudSaveGlobalBtn')?.addEventListener('click', async function () {
+      const defProv = document.getElementById('vpsCloudDefaultProviderSel')?.value || 'gdrive'
+      const defEmail = document.getElementById('vpsCloudDefaultShareEmailInp')?.value.trim() || ''
+      const allowPub = Boolean(document.getElementById('vpsCloudAllowPublicChk')?.checked)
+      this.disabled = true
+      try {
+        const res = await apiJson('/api/admin/cloud/config', {
+          method: 'POST',
+          body: JSON.stringify({
+            defaultProvider: defProv,
+            defaultShareEmail: defEmail || null,
+            allowPublicLinks: allowPub,
+          }),
+        })
+        renderVpsCloudStorage(res)
+        setCloudStatusMsg('✓ Globális felhőtárhely alapbeállítások mentve.', false)
+      } catch (err) {
+        setCloudStatusMsg('✕ Mentési hiba: ' + err.message, true)
+      } finally {
+        this.disabled = false
+      }
+    })
+
+    window.addEventListener('message', async function (ev) {
+      if (ev.origin !== window.location.origin) return
+      const msg = ev.data
+      if (!msg || msg.type !== 'alfred:cloud-oauth-callback') return
+      if (msg.error) {
+        setCloudStatusMsg('✕ OAuth2 hiba: ' + (msg.errorDescription || msg.error), true)
+        return
+      }
+      if (!msg.code || !msg.state) return
+      const targetProv = vpsCloudPendingOAuthProvider || vpsCloudActiveTab || 'gdrive'
+      setCloudStatusMsg('OAuth2 token csere folyamatban (' + targetProv + ')...', false)
+      try {
+        const res = await apiJson('/api/admin/cloud/' + encodeURIComponent(targetProv) + '/oauth/complete', {
+          method: 'POST',
+          body: JSON.stringify({ code: msg.code, state: msg.state }),
+        })
+        renderVpsCloudStorage(res)
+        setCloudStatusMsg('✓ Fiók sikeresen összekötve: ' + targetProv + '::' + (res.connected ? res.connected.account : ''), false)
+      } catch (err) {
+        setCloudStatusMsg('✕ OAuth2 befejezési hiba: ' + err.message, true)
+      }
+    })
   }
 
   function renderMultiTests(items) {
@@ -3589,6 +4029,19 @@
       html += '<div style="display:flex;flex-direction:column;gap:10px">'
       step.fields.forEach(function (f) {
         const storageTag = f.storage === 'vault' ? 'Vault (titkosított)' : (f.storage === 'config_json' ? 'Modul konfig' : (f.storage === 'env' ? '.env' : 'Művelet'))
+        if (f.type === 'oauth_redirect') {
+          const cbUrl = window.location.origin + '/oauth-cloud-callback.html'
+          html +=
+            '<div style="display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">' +
+              '<div style="font-weight:600;font-size:12px">' + esc(f.label) + '</div>' +
+              '<div style="display:flex;gap:6px;align-items:center">' +
+                '<input type="text" readonly value="' + esc(cbUrl) + '" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:monospace;font-size:11.5px">' +
+                '<button type="button" class="btn-secondary btn-compact" data-wiz-copy-text="' + esc(cbUrl) + '">Másolás</button>' +
+              '</div>' +
+              (f.helpText ? '<div style="font-size:11px;opacity:.75;line-height:1.35">' + esc(f.helpText) + '</div>' : '') +
+            '</div>'
+          return
+        }
         if (f.type === 'boolean') {
           const checked = f.storage === 'action'
             ? wizardEnableAgent
@@ -3736,6 +4189,17 @@
     contentEl.querySelectorAll('[data-wiz-sync-models]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         syncAllModelsEverywhere(btn, null).catch(function () {})
+      })
+    })
+
+    contentEl.querySelectorAll('[data-wiz-copy-text]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const txt = btn.getAttribute('data-wiz-copy-text') || ''
+        if (txt && navigator.clipboard) {
+          navigator.clipboard.writeText(txt).catch(function () {})
+        }
+        btn.textContent = '✓ Másolva'
+        setTimeout(function () { btn.textContent = 'Másolás' }, 1500)
       })
     })
 

@@ -129,6 +129,10 @@ export async function tryHandleStatic(ctx: RouteContext, webDir: string): Promis
   const { req, res, path } = ctx
 
   if (path === '/' || path === '/index.html') { serveIndexHtml(ctx, webDir); return true }
+  if (path === '/oauth-cloud-callback.html') {
+    serveFile(req, res, join(webDir, 'oauth-cloud-callback.html'), { cacheSeconds: 0 })
+    return true
+  }
   // app.js/style.css URLs are versioned (?v=mtime-size, rewritten into
   // index.html above), so a long max-age is safe: any content change produces
   // a new URL. index.html itself stays no-cache.

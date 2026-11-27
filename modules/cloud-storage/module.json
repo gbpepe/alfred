@@ -1,0 +1,174 @@
+{
+  "id": "cloud-storage",
+  "name": "Egységes Felhőtárhely (Google Drive, OneDrive, Dropbox)",
+  "category": "storage",
+  "version": "1.0.0",
+  "description": "SDK-mentes, 8 MB-os stream-alapú Multi-Cloud és Multi-Account tárhelymotor (Google Drive v3, Microsoft OneDrive Graph v1.0, Dropbox API v2) fiókszintű izolációval, megosztási szabályzattal és worker token-kiadással.",
+  "depends": [],
+  "requiredSecrets": [],
+  "tools": [
+    "cloud_list",
+    "cloud_mkdir",
+    "cloud_upload",
+    "cloud_download",
+    "cloud_share"
+  ],
+  "uiCardIds": ["vpsCloudStorageCard"],
+  "ramImpactMb": 15,
+  "builtIn": false,
+  "defaultEnabled": false,
+  "setupWizard": {
+    "title": "Egységes Felhőtárhely beüzemelése",
+    "summary": "Állíts be legalább egy OAuth2 felhőtárhely-klienst (Google Drive, OneDrive vagy Dropbox), majd add meg az alapértelmezett megosztási és méretkorlátokat.",
+    "testAction": "cloud_storage_probe",
+    "docChapter": "07-modul-es-ugynok-katalogus.md",
+    "steps": [
+      {
+        "id": "oauth_clients",
+        "title": "OAuth2 Kliensek (Vault)",
+        "description": "Legalább egy felhőtárhely szolgáltató OAuth2 Client ID / Secret párját add meg. A kulcsok titkosítva a Vaultba kerülnek; egyetlen klienssel több fiók (default, work, archive) is összeköthető.",
+        "requirementMode": "any_one",
+        "fields": [
+          {
+            "key": "cloud_gdrive_client_id",
+            "label": "Google Drive OAuth2 Client ID",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "1234567890-xxxx.apps.googleusercontent.com"
+          },
+          {
+            "key": "cloud_gdrive_client_secret",
+            "label": "Google Drive OAuth2 Client Secret",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "GOCSPX-..."
+          },
+          {
+            "key": "cloud_onedrive_client_id",
+            "label": "Microsoft OneDrive Application (Client) ID",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          },
+          {
+            "key": "cloud_onedrive_client_secret",
+            "label": "Microsoft OneDrive Client Secret",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "Azure App Secret"
+          },
+          {
+            "key": "cloud_dropbox_client_id",
+            "label": "Dropbox App Key (Client ID)",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "dropbox_app_key"
+          },
+          {
+            "key": "cloud_dropbox_client_secret",
+            "label": "Dropbox App Secret (Client Secret)",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "dropbox_app_secret"
+          },
+          {
+            "key": "cloud_oauth_redirect_helper",
+            "label": "OAuth2 Visszatérési URL (Redirect URI)",
+            "type": "oauth_redirect",
+            "storage": "action",
+            "helpText": "Ezt a Redirect URI-t add hozzá a Google Cloud / Azure / Dropbox App Konzolban az engedélyezett visszatérési címekhez, majd a #vps kártyán indíthatod a fiókválasztós OAuth2 összekötést."
+          }
+        ]
+      },
+      {
+        "id": "defaults_and_limits",
+        "title": "Alapértelmezések & Korlátok",
+        "description": "Állítsd be az alapértelmezett tárhelyet, megosztási címet és a 2 GB-os vezérlő VPS letöltési limitjét.",
+        "requirementMode": "all_required",
+        "fields": [
+          {
+            "key": "cloud_default_provider",
+            "label": "Alapértelmezett felhőtárhely",
+            "type": "select",
+            "storage": "config_json",
+            "required": false,
+            "defaultValue": "gdrive",
+            "options": [
+              { "value": "gdrive", "label": "Google Drive (API v3)" },
+              { "value": "onedrive", "label": "Microsoft OneDrive (Graph v1.0)" },
+              { "value": "dropbox", "label": "Dropbox (API v2)" }
+            ]
+          },
+          {
+            "key": "cloud_default_share_email",
+            "label": "Alapértelmezett megosztási e-mail cím",
+            "type": "text",
+            "storage": "config_json",
+            "required": false,
+            "placeholder": "tulajdonos@domain.hu",
+            "validationRegex": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "helpText": "Ha a cloud_share nem kap explicit címzettet és fiókszintű felülírást, ezzel az e-mail címmel osztja meg a fájlt (értesítési spam nélkül)."
+          },
+          {
+            "key": "ALFRED_CLOUD_SHARE_EMAIL",
+            "label": "Környezeti megosztási e-mail fallback (.env)",
+            "type": "text",
+            "storage": "env",
+            "required": false,
+            "placeholder": "tulajdonos@domain.hu",
+            "validationRegex": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "helpText": "Opcionális .env szintű fallback megosztási cím."
+          },
+          {
+            "key": "ALFRED_CLOUD_MAX_DOWNLOAD_MB",
+            "label": "Max. letöltési fájlméret a vezérlő VPS-re (MB)",
+            "type": "number",
+            "storage": "env",
+            "required": false,
+            "defaultValue": 250,
+            "validationRegex": "^[1-9][0-9]{0,4}$",
+            "helpText": "2 GB RAM / 8.7 GB szabad SSD védelem: a nagyobb videókat a 03-as felhős munkagépek közvetlenül streamelik."
+          },
+          {
+            "key": "cloud_allow_public_links",
+            "label": "Nyilvános (anyone / anonymous) linkek globális engedélyezése",
+            "type": "boolean",
+            "storage": "config_json",
+            "defaultValue": false,
+            "helpText": "Biztonsági alapértelmezés: KI. Csak akkor kapcsold be, ha tudatosan engedélyezed a publicLink: true megosztást."
+          },
+          {
+            "key": "cloud_gdrive_root_ref",
+            "label": "Google Drive alapértelmezett gyökérmappa ID (opcionális)",
+            "type": "text",
+            "storage": "config_json",
+            "required": false,
+            "placeholder": "root vagy Drive mappa ID"
+          },
+          {
+            "key": "cloud_onedrive_root_ref",
+            "label": "OneDrive alapértelmezett gyökérmappa ID (opcionális)",
+            "type": "text",
+            "storage": "config_json",
+            "required": false,
+            "placeholder": "root vagy OneDrive item ID"
+          },
+          {
+            "key": "cloud_dropbox_root_ref",
+            "label": "Dropbox alapértelmezett gyökér útvonal (opcionális)",
+            "type": "text",
+            "storage": "config_json",
+            "required": false,
+            "placeholder": "/Alfred"
+          }
+        ]
+      },
+      {
+        "id": "verify",
+        "title": "Ellenőrzés & Aktiválás",
+        "description": "0-tokenes kapcsolatellenőrzés a konfigurált felhőtárhelyekre, majd a modul aktiválása.",
+        "type": "verify_and_activate"
+      }
+    ]
+  }
+}

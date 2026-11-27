@@ -115,6 +115,11 @@ export type AllowedToolName =
   | 'batch_status'
   | 'batch_list'
   | 'batch_cancel'
+  | 'cloud_list'
+  | 'cloud_mkdir'
+  | 'cloud_upload'
+  | 'cloud_download'
+  | 'cloud_share'
 
 export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'bash',
@@ -129,6 +134,11 @@ export const CANONICAL_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedTool
   'batch_status',
   'batch_list',
   'batch_cancel',
+  'cloud_list',
+  'cloud_mkdir',
+  'cloud_upload',
+  'cloud_download',
+  'cloud_share',
 ])
 
 const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
@@ -140,6 +150,10 @@ const MUTATING_TOOLS: ReadonlySet<AllowedToolName> = new Set<AllowedToolName>([
   'module_manage',
   'batch_submit',
   'batch_cancel',
+  'cloud_mkdir',
+  'cloud_upload',
+  'cloud_download',
+  'cloud_share',
 ])
 
 export interface AlfredAgentDefinition {

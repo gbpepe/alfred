@@ -73,6 +73,18 @@ import {
   cancelBatchJob,
   getAdminBatchesOverview,
 } from '../../alfred/batch-runner.js'
+import {
+  CloudStorageError,
+  completeCloudOAuthFlow,
+  disconnectCloudAccount,
+  getCloudAdminStatus,
+  isCloudProviderId,
+  saveCloudAdminConfig,
+  startCloudOAuthFlow,
+  testCloudConnection,
+  type CloudAccessMode,
+  type SaveCloudConfigPayload,
+} from '../../alfred/cloud-storage.js'
 import { runHousekeeping } from '../../alfred/housekeeper.js'
 import {
   disableModule,
@@ -225,6 +237,8 @@ function sanitizeOutput(text: string): string {
     .replace(/Bot\s+[A-Za-z0-9._-]+/g, 'Bot [REDACTED]')
     .replace(/Bearer\s+[A-Za-z0-9._-]+/g, 'Bearer [REDACTED]')
     .replace(/ya29\.[A-Za-z0-9._-]+/g, '[REDACTED_TOKEN]')
+    .replace(/1\/\/[0-9A-Za-z._-]{20,}/g, '[REDACTED_REFRESH_TOKEN]')
+    .replace(/sl\.[A-Za-z0-9._-]{20,}/g, '[REDACTED_CLOUD_TOKEN]')
     .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-[REDACTED]')
 }
 
@@ -372,6 +386,11 @@ function resolveTargetRuntimeDbPaths(
     } else if (s.id === 'prod' || s.id === 'ops') {
       candidates.push(s.dbPath)
     }
+  }
+  // Ensure local/prod split-DB pair (store/alfred.db <-> store/alfred-prod.db) stays synchronized when both exist.
+  if (!isTest) {
+    candidates.push(join(process.cwd(), 'store', 'alfred.db'))
+    candidates.push(join(process.cwd(), 'store', 'alfred-prod.db'))
   }
 
   const sourcePathNorm =
@@ -638,6 +657,210 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       json(res, { ok: false, error: msg }, 500)
+    }
+    return true
+  }
+
+  // --- Multi-Cloud & Multi-Account Storage Admin API ---
+  const sendCloudError = (err: unknown): void => {
+    if (err instanceof CloudStorageError) {
+      json(
+        res,
+        {
+          ok: false,
+          code: err.code,
+          error: sanitizeOutput(err.message),
+          ...(err.provider ? { provider: err.provider } : {}),
+          ...(err.account ? { account: err.account } : {}),
+          ...(err.details ? { details: err.details } : {}),
+        },
+        err.statusHttp,
+      )
+      return
+    }
+    json(res, { ok: false, error: sanitizeOutput(err instanceof Error ? err.message : String(err)) }, 500)
+  }
+
+  const resolveRequestOrigin = (): string => {
+    const xfProtoRaw = req.headers['x-forwarded-proto']
+    const xfProto = (Array.isArray(xfProtoRaw) ? xfProtoRaw[0] : xfProtoRaw)?.split(',')[0]?.trim()
+    const proto = xfProto || (req.socket && 'encrypted' in req.socket ? 'https' : 'http')
+    const xfHostRaw = req.headers['x-forwarded-host']
+    const host = (Array.isArray(xfHostRaw) ? xfHostRaw[0] : xfHostRaw)?.split(',')[0]?.trim() || req.headers.host || 'localhost:3420'
+    return `${proto}://${host}`
+  }
+
+  if (path === '/api/admin/cloud/status' && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      let activeDb: Database.Database | undefined
+      try {
+        activeDb = getDb()
+      } catch {
+        activeDb = undefined
+      }
+      syncInstalledModulesFromPrimaryRuntimeDb(activeDb, env)
+      const includeLiveQuota = url.searchParams.get('quota') === '1' || url.searchParams.get('quota') === 'true'
+      const rawProv = (url.searchParams.get('provider') ?? '').trim().toLowerCase()
+      const filterProvider = rawProv && isCloudProviderId(rawProv) ? rawProv : undefined
+      const filterAccount = (url.searchParams.get('account') ?? '').trim() || undefined
+      const status = await getCloudAdminStatus({
+        db: activeDb,
+        env,
+        includeLiveQuota,
+        filterProvider,
+        filterAccount,
+      })
+      const redirectUri = `${resolveRequestOrigin()}/oauth-cloud-callback.html`
+      json(res, { ok: true, redirectUri, ...status })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  if (path === '/api/admin/cloud/config' && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const body = await readJsonBody<SaveCloudConfigPayload>(req)
+      const db = getDb()
+      saveCloudAdminConfig(body, { db, env })
+      syncInstalledModulesToRuntimeDbs(db, env)
+      const status = await getCloudAdminStatus({ db, env, includeLiveQuota: false })
+      const redirectUri = `${resolveRequestOrigin()}/oauth-cloud-callback.html`
+      json(res, { ok: true, redirectUri, ...status })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudOAuthStartMatch = /^\/api\/admin\/cloud\/([^/]+)\/oauth\/start$/.exec(path)
+  if (cloudOAuthStartMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudOAuthStartMatch[1]).trim()
+      const body = await readJsonBody<{
+        account?: string
+        createNew?: boolean
+        label?: string
+        accessMode?: CloudAccessMode
+        redirectUri?: string
+      }>(req).catch(() => ({} as Record<string, undefined>))
+      const db = getDb()
+      const redirectUri = (body?.redirectUri ?? '').trim() || `${resolveRequestOrigin()}/oauth-cloud-callback.html`
+      const started = startCloudOAuthFlow(
+        {
+          provider,
+          redirectUri,
+          account: body?.account,
+          createNew: body?.createNew === true,
+          label: body?.label,
+          accessMode: body?.accessMode,
+        },
+        { db, env },
+      )
+      json(res, { ok: true, ...started })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudOAuthCompleteMatch = /^\/api\/admin\/cloud\/([^/]+)\/oauth\/complete$/.exec(path)
+  if (cloudOAuthCompleteMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudOAuthCompleteMatch[1]).trim()
+      const body = await readJsonBody<{ code?: string; state?: string; callbackUrl?: string }>(req)
+      const db = getDb()
+      const completed = await completeCloudOAuthFlow(
+        {
+          provider,
+          code: body?.code,
+          state: body?.state,
+          callbackUrl: body?.callbackUrl,
+        },
+        { db, env, agentId: 'dashboard' },
+      )
+      syncInstalledModulesToRuntimeDbs(db, env)
+      const status = await getCloudAdminStatus({ db, env, includeLiveQuota: false })
+      const redirectUri = `${resolveRequestOrigin()}/oauth-cloud-callback.html`
+      json(res, { ok: true, connected: completed, redirectUri, ...status })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudTestMatch = /^\/api\/admin\/cloud\/([^/]+)\/test$/.exec(path)
+  if (cloudTestMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudTestMatch[1]).trim()
+      const body = await readJsonBody<{ account?: string }>(req).catch(() => ({} as { account?: string }))
+      const db = getDb()
+      const tested = await testCloudConnection(provider, body?.account, { db, env })
+      syncInstalledModulesToRuntimeDbs(db, env)
+      const status = await getCloudAdminStatus({ db, env, includeLiveQuota: false })
+      const redirectUri = `${resolveRequestOrigin()}/oauth-cloud-callback.html`
+      json(res, { ok: true, test: tested, redirectUri, ...status })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudDisconnectMatch = /^\/api\/admin\/cloud\/([^/]+)\/disconnect$/.exec(path)
+  if (cloudDisconnectMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudDisconnectMatch[1]).trim()
+      const body = await readJsonBody<{ account?: string; purgeClientCredentials?: boolean }>(req).catch(
+        () => ({} as { account?: string; purgeClientCredentials?: boolean }),
+      )
+      const db = getDb()
+      const disconnected = disconnectCloudAccount(
+        provider,
+        { account: body?.account, purgeClientCredentials: body?.purgeClientCredentials === true },
+        { db, env, agentId: 'dashboard' },
+      )
+      syncInstalledModulesToRuntimeDbs(db, env)
+      const status = await getCloudAdminStatus({ db, env, includeLiveQuota: false })
+      const redirectUri = `${resolveRequestOrigin()}/oauth-cloud-callback.html`
+      json(res, { ok: true, disconnected, redirectUri, ...status })
+    } catch (err) {
+      sendCloudError(err)
     }
     return true
   }

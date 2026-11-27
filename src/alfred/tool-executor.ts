@@ -18,6 +18,16 @@ import {
 } from './batch-runner.js'
 import { runHousekeeping } from './housekeeper.js'
 import {
+  cloudDownload,
+  cloudList,
+  cloudMkdir,
+  cloudShare,
+  cloudUpload,
+  type CloudItemKindFilter,
+  type CloudShareRole,
+  type CloudUploadConflictMode,
+} from './cloud-storage.js'
+import {
   disableModule,
   enableModule,
   installAgentPackage,
@@ -318,6 +328,199 @@ export const TOOL_SCHEMAS: Record<AllowedToolName, OpenAiToolSchema> = {
           },
         },
         required: ['batch_id'],
+      },
+    },
+  },
+  cloud_list: {
+    type: 'function',
+    function: {
+      name: 'cloud_list',
+      description:
+        'List files/folders or run server-side search in Google Drive, Microsoft OneDrive, or Dropbox. Supports optional provider, account (alias or connected email), relative folder path or native ID, query search, and kind filter.',
+      parameters: {
+        type: 'object',
+        properties: {
+          provider: {
+            type: 'string',
+            enum: ['gdrive', 'onedrive', 'dropbox'],
+            description: 'Optional cloud provider override (defaults to configured cloud_default_provider).',
+          },
+          account: {
+            type: 'string',
+            description: 'Optional account alias (e.g. "default", "work", "archive") or connected email address.',
+          },
+          folder_ref: {
+            type: 'string',
+            description: 'Optional relative folder path (e.g. "Alfred-Brand-Kit") or native provider folder ID.',
+          },
+          query: {
+            type: 'string',
+            description: 'Optional server-side filename search query.',
+          },
+          kind: {
+            type: 'string',
+            enum: ['all', 'file', 'folder'],
+            description: 'Filter entries by type (default: "all").',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum items to return (default: 50, max: 200).',
+          },
+        },
+      },
+    },
+  },
+  cloud_mkdir: {
+    type: 'function',
+    function: {
+      name: 'cloud_mkdir',
+      description:
+        'Idempotently create a folder (or nested relative folder path like "projects/2026/renders") in Google Drive, OneDrive, or Dropbox without duplicating existing folders.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path_or_name: {
+            type: 'string',
+            description: 'Folder name or relative nested path (e.g. "Alfred-Brand-Kit" or "jobs/job-42/renders").',
+          },
+          parent_ref: {
+            type: 'string',
+            description: 'Optional parent folder ID or relative path.',
+          },
+          provider: {
+            type: 'string',
+            enum: ['gdrive', 'onedrive', 'dropbox'],
+            description: 'Optional cloud provider override.',
+          },
+          account: {
+            type: 'string',
+            description: 'Optional account alias or connected email address.',
+          },
+        },
+        required: ['path_or_name'],
+      },
+    },
+  },
+  cloud_upload: {
+    type: 'function',
+    function: {
+      name: 'cloud_upload',
+      description:
+        'Upload a local workspace file to Google Drive, OneDrive, or Dropbox using 8 MB chunked streaming. Never uploads .env, store/, vault, or private key files. Supports update_in_place versioning to preserve existing webUrl links.',
+      parameters: {
+        type: 'object',
+        properties: {
+          local_path: {
+            type: 'string',
+            description: 'Relative path inside the agent workspace to upload.',
+          },
+          remote_path_or_name: {
+            type: 'string',
+            description: 'Optional remote filename or relative path (e.g. "renders/preview-720p.mp4").',
+          },
+          parent_ref: {
+            type: 'string',
+            description: 'Optional parent folder ID or relative path.',
+          },
+          on_conflict: {
+            type: 'string',
+            enum: ['update_in_place', 'autorename', 'fail'],
+            description: 'Conflict handling when remote file exists (default: "update_in_place").',
+          },
+          provider: {
+            type: 'string',
+            enum: ['gdrive', 'onedrive', 'dropbox'],
+            description: 'Optional cloud provider override.',
+          },
+          account: {
+            type: 'string',
+            description: 'Optional account alias or connected email address.',
+          },
+        },
+        required: ['local_path'],
+      },
+    },
+  },
+  cloud_download: {
+    type: 'function',
+    function: {
+      name: 'cloud_download',
+      description:
+        'Stream-download a file from Google Drive, OneDrive, or Dropbox into the agent workspace, enforcing ALFRED_CLOUD_MAX_DOWNLOAD_MB and free SSD space. Automatically exports native Google Docs/Sheets/Slides.',
+      parameters: {
+        type: 'object',
+        properties: {
+          file_ref_or_path: {
+            type: 'string',
+            description: 'Remote file ID or relative path inside the account root_ref (e.g. "Alfred-Brand-Kit/preset.json").',
+          },
+          local_dest_path: {
+            type: 'string',
+            description: 'Destination relative path inside the agent workspace.',
+          },
+          export_format: {
+            type: 'string',
+            description: 'Optional export format for native Google Workspace files (e.g. "md", "csv", "pdf", "docx", "xlsx").',
+          },
+          provider: {
+            type: 'string',
+            enum: ['gdrive', 'onedrive', 'dropbox'],
+            description: 'Optional cloud provider override.',
+          },
+          account: {
+            type: 'string',
+            description: 'Optional account alias or connected email address.',
+          },
+        },
+        required: ['file_ref_or_path', 'local_dest_path'],
+      },
+    },
+  },
+  cloud_share: {
+    type: 'function',
+    function: {
+      name: 'cloud_share',
+      description:
+        'Share a cloud file/folder by email (default, silent without spam) or explicit public_link (only if allowPublicLinks policy is enabled) and return its webUrl.',
+      parameters: {
+        type: 'object',
+        properties: {
+          file_ref_or_path: {
+            type: 'string',
+            description: 'Remote file/folder ID or relative path to share.',
+          },
+          email: {
+            type: 'string',
+            description: 'Optional recipient email (defaults to account defaultShareEmail -> global ALFRED_CLOUD_SHARE_EMAIL).',
+          },
+          role: {
+            type: 'string',
+            enum: ['reader', 'writer'],
+            description: 'Access level (default: "reader").',
+          },
+          public_link: {
+            type: 'boolean',
+            description: 'Create an anyone/anonymous public link (default: false; requires allowPublicLinks policy enabled).',
+          },
+          notify: {
+            type: 'boolean',
+            description: 'Send email notification to recipient (default: false to avoid spam).',
+          },
+          expires_in_days: {
+            type: 'number',
+            description: 'Optional expiry in days for public links where supported.',
+          },
+          provider: {
+            type: 'string',
+            enum: ['gdrive', 'onedrive', 'dropbox'],
+            description: 'Optional cloud provider override.',
+          },
+          account: {
+            type: 'string',
+            description: 'Optional account alias or connected email address.',
+          },
+        },
+        required: ['file_ref_or_path'],
       },
     },
   },
@@ -1300,7 +1503,12 @@ export function executeWhitelistedTool(
     case 'batch_submit':
     case 'batch_status':
     case 'batch_list':
-    case 'batch_cancel': {
+    case 'batch_cancel':
+    case 'cloud_list':
+    case 'cloud_mkdir':
+    case 'cloud_upload':
+    case 'cloud_download':
+    case 'cloud_share': {
       throw new Error(`${toolName} is asynchronous; invoke executeWhitelistedToolAsync()`)
     }
   }
@@ -1534,6 +1742,106 @@ export async function executeWhitelistedToolAsync(
       env: opts?.env,
     })
     return JSON.stringify({ ok: true, job }, null, 2)
+  }
+
+  if (toolName === 'cloud_list') {
+    const res = await cloudList(
+      {
+        provider: typeof rawArgs.provider === 'string' ? rawArgs.provider : undefined,
+        account: typeof rawArgs.account === 'string' ? rawArgs.account : undefined,
+        folderRef: typeof rawArgs.folder_ref === 'string' ? rawArgs.folder_ref : undefined,
+        query: typeof rawArgs.query === 'string' ? rawArgs.query : undefined,
+        kind:
+          rawArgs.kind === 'file' || rawArgs.kind === 'folder' || rawArgs.kind === 'all'
+            ? (rawArgs.kind as CloudItemKindFilter)
+            : undefined,
+        limit: typeof rawArgs.limit === 'number' && Number.isFinite(rawArgs.limit) ? rawArgs.limit : undefined,
+      },
+      { db: ctx.db, projectRoot: ctx.projectRoot, env: opts?.env, agentId: ctx.agent.id },
+    )
+    return JSON.stringify({ ok: true, ...res, count: res.items.length }, null, 2)
+  }
+
+  if (toolName === 'cloud_mkdir') {
+    const pathOrName = typeof rawArgs.path_or_name === 'string' ? rawArgs.path_or_name.trim() : ''
+    if (!pathOrName) throw new Error('cloud_mkdir requires a non-empty "path_or_name"')
+    const res = await cloudMkdir(
+      {
+        pathOrName,
+        parentRef: typeof rawArgs.parent_ref === 'string' ? rawArgs.parent_ref : undefined,
+        provider: typeof rawArgs.provider === 'string' ? rawArgs.provider : undefined,
+        account: typeof rawArgs.account === 'string' ? rawArgs.account : undefined,
+      },
+      { db: ctx.db, projectRoot: ctx.projectRoot, env: opts?.env, agentId: ctx.agent.id },
+    )
+    return JSON.stringify({ ok: true, ...res }, null, 2)
+  }
+
+  if (toolName === 'cloud_upload') {
+    const localPath = typeof rawArgs.local_path === 'string' ? rawArgs.local_path.trim() : ''
+    if (!localPath) throw new Error('cloud_upload requires a non-empty "local_path"')
+    const onConflict =
+      rawArgs.on_conflict === 'update_in_place' ||
+      rawArgs.on_conflict === 'autorename' ||
+      rawArgs.on_conflict === 'fail'
+        ? (rawArgs.on_conflict as CloudUploadConflictMode)
+        : undefined
+    const res = await cloudUpload(
+      {
+        agent: ctx.agent,
+        localPath,
+        remotePathOrName: typeof rawArgs.remote_path_or_name === 'string' ? rawArgs.remote_path_or_name : undefined,
+        parentRef: typeof rawArgs.parent_ref === 'string' ? rawArgs.parent_ref : undefined,
+        onConflict,
+        provider: typeof rawArgs.provider === 'string' ? rawArgs.provider : undefined,
+        account: typeof rawArgs.account === 'string' ? rawArgs.account : undefined,
+      },
+      { db: ctx.db, projectRoot: ctx.projectRoot, env: opts?.env, agentId: ctx.agent.id },
+    )
+    return JSON.stringify({ ok: true, ...res }, null, 2)
+  }
+
+  if (toolName === 'cloud_download') {
+    const fileRefOrPath = typeof rawArgs.file_ref_or_path === 'string' ? rawArgs.file_ref_or_path.trim() : ''
+    const localDestPath = typeof rawArgs.local_dest_path === 'string' ? rawArgs.local_dest_path.trim() : ''
+    if (!fileRefOrPath || !localDestPath) {
+      throw new Error('cloud_download requires non-empty "file_ref_or_path" and "local_dest_path"')
+    }
+    const res = await cloudDownload(
+      {
+        agent: ctx.agent,
+        fileRefOrPath,
+        localDestPath,
+        exportFormat: typeof rawArgs.export_format === 'string' ? rawArgs.export_format : undefined,
+        provider: typeof rawArgs.provider === 'string' ? rawArgs.provider : undefined,
+        account: typeof rawArgs.account === 'string' ? rawArgs.account : undefined,
+      },
+      { db: ctx.db, projectRoot: ctx.projectRoot, env: opts?.env, agentId: ctx.agent.id },
+    )
+    return JSON.stringify({ ok: true, ...res }, null, 2)
+  }
+
+  if (toolName === 'cloud_share') {
+    const fileRefOrPath = typeof rawArgs.file_ref_or_path === 'string' ? rawArgs.file_ref_or_path.trim() : ''
+    if (!fileRefOrPath) throw new Error('cloud_share requires a non-empty "file_ref_or_path"')
+    const role: CloudShareRole = rawArgs.role === 'writer' ? 'writer' : 'reader'
+    const res = await cloudShare(
+      {
+        fileRefOrPath,
+        email: typeof rawArgs.email === 'string' ? rawArgs.email : undefined,
+        role,
+        publicLink: rawArgs.public_link === true,
+        notify: rawArgs.notify === true,
+        expiresInDays:
+          typeof rawArgs.expires_in_days === 'number' && Number.isFinite(rawArgs.expires_in_days)
+            ? rawArgs.expires_in_days
+            : undefined,
+        provider: typeof rawArgs.provider === 'string' ? rawArgs.provider : undefined,
+        account: typeof rawArgs.account === 'string' ? rawArgs.account : undefined,
+      },
+      { db: ctx.db, projectRoot: ctx.projectRoot, env: opts?.env, agentId: ctx.agent.id },
+    )
+    return JSON.stringify({ ok: true, share: res }, null, 2)
   }
 
   return executeWhitelistedTool(ctx, toolName, rawArgs)

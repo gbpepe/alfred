@@ -22,6 +22,7 @@ import {
   type ModuleWizardStep,
 } from './module-manager.js'
 import { resolveVertexEuAuth } from './vertex-auth.js'
+import { probeCloudStorageForWizard } from './cloud-storage.js'
 
 export type ModuleWizardErrorCode =
   | 'INVALID_ID'
@@ -825,6 +826,15 @@ const WIZARD_PROBE_HANDLERS: Record<string, WizardProbeHandler> = {
     }
 
     return checks
+  },
+  cloud_storage_probe: async (_mod, opts) => {
+    return probeCloudStorageForWizard({
+      db: opts.db,
+      env: readEnvMapForWizard(opts),
+      projectRoot: resolveProjectRoot(opts),
+      vaultOps: opts.vaultOps,
+      fetchImpl: opts.fetchImpl,
+    })
   },
 }
 
