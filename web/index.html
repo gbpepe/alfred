@@ -2360,6 +2360,54 @@
         <div id="vpsBatchJobsList" style="display:flex;flex-direction:column;gap:8px"></div>
         <div id="vpsBatchStatusMsg" hidden style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px"></div>
       </div>
+
+      <div id="vpsCloudStorageCard" data-module-card="cloud-storage" hidden style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <strong>Egységes Felhőtárhely (Google Drive · OneDrive · Dropbox)</strong>
+            <span id="vpsCloudDefaultBadge" style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:#2563eb">gdrive</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn-secondary btn-compact" id="vpsCloudOpenWizardBtn">⚙ Modul varázsló</button>
+            <button type="button" class="btn-secondary btn-compact" id="vpsCloudRefreshQuotaBtn">Kvóták frissítése</button>
+            <button type="button" class="btn-secondary btn-compact" id="vpsCloudRefreshBtn">Frissítés</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);margin-bottom:12px;align-items:end">
+          <div>
+            <label for="vpsCloudDefaultProviderSel" style="display:block;font-size:11px;font-weight:600;margin-bottom:4px">Alapértelmezett tárhely</label>
+            <select id="vpsCloudDefaultProviderSel" class="input" style="width:100%;padding:5px 8px;font-size:12px">
+              <option value="gdrive">Google Drive</option>
+              <option value="onedrive">Microsoft OneDrive</option>
+              <option value="dropbox">Dropbox</option>
+            </select>
+          </div>
+          <div>
+            <label for="vpsCloudDefaultShareEmailInp" style="display:block;font-size:11px;font-weight:600;margin-bottom:4px">Globális megosztási e-mail (ALFRED_CLOUD_SHARE_EMAIL)</label>
+            <input type="email" id="vpsCloudDefaultShareEmailInp" class="input" placeholder="tulajdonos@domain.hu" style="width:100%;padding:5px 8px;font-size:12px">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;cursor:pointer">
+              <input type="checkbox" id="vpsCloudAllowPublicChk">
+              <span>Nyilvános linkek (anyone) globális engedélyezése</span>
+            </label>
+            <div style="font-size:10.5px;opacity:.7" id="vpsCloudLimitsText">Max. letöltés: 250 MB · Feltöltés: 500 MB</div>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <button type="button" class="btn-primary btn-compact" id="vpsCloudSaveGlobalBtn">Alapbeállítások mentése</button>
+          </div>
+        </div>
+
+        <div id="vpsCloudProviderTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+        <div id="vpsCloudProviderBody" style="display:flex;flex-direction:column;gap:10px"></div>
+        <div id="vpsCloudStatusMsg" hidden style="margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px"></div>
+
+        <details id="vpsCloudActivityDetails" style="margin-top:12px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">
+          <summary style="font-size:12px;font-weight:600;cursor:pointer;user-select:none">📋 Legutóbbi felhőműveletek (Audit napló)</summary>
+          <div id="vpsCloudActivityList" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;font-size:11.5px"></div>
+        </details>
+      </div>
       <div id="vpsServicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px"></div>
 
       <div style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:16px">

@@ -705,14 +705,16 @@ describe('Alfred Module Manager (feat/module-manager)', () => {
   it('loads the real repository modules/ and catalog/agents/ manifests cleanly', () => {
     const db = getDb()
     const realModules = listModules({ db })
-    expect(realModules.map((m) => m.id)).toEqual(expect.arrayContaining(['batch-api', 'core-cli', 'core-ops']))
+    expect(realModules.map((m) => m.id)).toEqual(
+      expect.arrayContaining(['batch-api', 'cloud-storage', 'core-cli', 'core-ops']),
+    )
 
     const realCatalog = listAgentPackages({ db })
     expect(realCatalog.map((p) => p.id)).toEqual(
       expect.arrayContaining(['alfred-architect', 'alfred-batch', 'alfred-qa', 'alfred-self-coder', 'iris-video']),
     )
     const iris = realCatalog.find((p) => p.id === 'iris-video')!
-    expect(iris.missingModules).toEqual(['cloud-storage', 'worker-machines'])
+    expect(iris.missingModules).toEqual(['worker-machines'])
   })
 
   it('enforces admin auth (401/403/200), handles module/agent HTTP lifecycle, and syncs /api/vps/status + /api/agents', async () => {

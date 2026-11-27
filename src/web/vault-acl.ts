@@ -122,6 +122,7 @@ export function isAgentReadableDecodedVaultId(id: string): boolean {
   if (!lc || lc.includes('/')) return false
   if (['bindings', 'scan', 'sync', 'import', 'resolve'].includes(lc)) return false
   if (lc.startsWith('ssh')) return false
+  if (lc.startsWith('cloud_')) return false
   return true
 }
 

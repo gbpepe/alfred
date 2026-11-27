@@ -172,6 +172,8 @@ export function sanitizeCliText(raw: string): string {
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
     .replace(/Bot\s+[A-Za-z0-9._-]+/g, 'Bot [REDACTED]')
     .replace(/ya29\.[A-Za-z0-9._-]+/g, '[REDACTED_TOKEN]')
+    .replace(/1\/\/[0-9A-Za-z._-]{20,}/g, '[REDACTED_REFRESH_TOKEN]')
+    .replace(/sl\.[A-Za-z0-9._-]{20,}/g, '[REDACTED_CLOUD_TOKEN]')
     .replace(/AIza[A-Za-z0-9_-]{10,}/g, 'AIza[REDACTED]')
 }
 
@@ -426,6 +428,13 @@ export function buildSanitizedCliEnv(
   // Gemini CLI 0.70+ requires GEMINI_CLI_TRUST_WORKSPACE=true in headless non-interactive mode.
   if (provider === 'gemini-cli') {
     out['GEMINI_CLI_TRUST_WORKSPACE'] = 'true'
+  }
+
+  // Defensive post-filter: strictly isolate all cloud-storage keys from CLI child processes.
+  for (const key of Object.keys(out)) {
+    if (/^(?:cloud_|ALFRED_CLOUD_)/i.test(key)) {
+      delete out[key]
+    }
   }
 
   return out

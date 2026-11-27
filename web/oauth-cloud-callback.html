@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alfred — Felhőtárhely OAuth2 Visszatérés</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .box {
+      max-width: 560px;
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+    }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    p { font-size: 13px; line-height: 1.5; color: #cbd5e1; margin: 0 0 12px; }
+    .ok { color: #4ade80; font-weight: 600; }
+    .err { color: #f87171; font-weight: 600; }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 76px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 8px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+    .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    button {
+      border: 1px solid #475569;
+      background: #2563eb;
+      color: #fff;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.sec { background: #334155; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Alfred Felhőtárhely OAuth2</h1>
+    <p id="statusText">Visszatérési paraméterek feldolgozása...</p>
+    <div id="manualWrap" hidden>
+      <p>Ha külön inkognitó vagy más böngészőablakban jelentkeztél be, másold ki az alábbi visszatérési URL-t, és illeszd be az Alfred Dashboard <code>#vps</code> Felhőtárhely kártyáján a „Visszatérési URL / kód” mezőbe:</p>
+      <textarea id="callbackUrlBox" readonly></textarea>
+      <div class="row">
+        <button type="button" id="copyBtn">URL másolása</button>
+        <button type="button" class="sec" id="closeBtn">Ablak bezárása</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search)
+      var code = params.get('code') || ''
+      var state = params.get('state') || ''
+      var error = params.get('error') || ''
+      var errorDescription = params.get('error_description') || ''
+      var statusEl = document.getElementById('statusText')
+      var manualWrap = document.getElementById('manualWrap')
+      var urlBox = document.getElementById('callbackUrlBox')
+
+      if (urlBox) urlBox.value = window.location.href
+
+      if (error) {
+        statusEl.className = 'err'
+        statusEl.textContent = '✕ OAuth2 engedélyezés megszakítva vagy sikertelen: ' + (errorDescription || error)
+      }
+
+      var posted = false
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage(
+            {
+              type: 'alfred:cloud-oauth-callback',
+              code: code,
+              state: state,
+              error: error,
+              errorDescription: errorDescription,
+              callbackUrl: window.location.href,
+            },
+            window.location.origin,
+          )
+          posted = true
+        } catch (_) {
+          posted = false
+        }
+      }
+
+      if (posted && !error && code && state) {
+        statusEl.className = 'ok'
+        statusEl.textContent = '✓ Sikeres OAuth2 engedélyezés! Átadás az Alfred Dashboardnak...'
+        setTimeout(function () { window.close() }, 900)
+      } else if (!error && code && state) {
+        statusEl.className = 'ok'
+        statusEl.textContent = '✓ Kód megérkezett — másold át az Alfred Dashboardba az összekötés befejezéséhez.'
+        manualWrap.hidden = false
+      } else if (!error) {
+        statusEl.className = 'err'
+        statusEl.textContent = 'Hiányzó OAuth2 code vagy state paraméter.'
+        manualWrap.hidden = false
+      }
+
+      document.getElementById('copyBtn')?.addEventListener('click', function () {
+        if (!urlBox) return
+        urlBox.select()
+        navigator.clipboard?.writeText(urlBox.value).catch(function () {})
+        this.textContent = '✓ Másolva!'
+      })
+      document.getElementById('closeBtn')?.addEventListener('click', function () {
+        window.close()
+      })
+    })()
+  </script>
+</body>
+</html>

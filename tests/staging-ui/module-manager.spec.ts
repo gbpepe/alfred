@@ -166,7 +166,12 @@ test.describe('Alfred Staging Dashboard — Module & Specialist Agent Manager (#
 
       await page.locator('.sb-link[data-page="vps"]').click()
       await expect(page.locator('#vpsBatchCard')).toBeVisible({ timeout: 15_000 })
-      await expect(page.locator('#vpsHiddenModulesNotice')).toBeHidden({ timeout: 15_000 })
+      // Other defaultEnabled=false modules (e.g. cloud-storage) may still keep the notice visible,
+      // so assert that Batch API itself is no longer listed as hidden.
+      const hiddenNotice = page.locator('#vpsHiddenModulesNotice')
+      if (await hiddenNotice.isVisible().catch(() => false)) {
+        await expect(hiddenNotice).not.toContainText('Batch API', { timeout: 15_000 })
+      }
 
       // 10. Open chapter 07 directly from #modules header ? popover -> #docs
       await page.locator('.sb-link[data-page="modules"]').click()

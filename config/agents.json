@@ -93,6 +93,8 @@
         "src/alfred/tool-executor.ts",
         "src/alfred/agents-config.ts",
         "src/alfred/module-manager.ts",
+        "src/alfred/cloud-storage.ts",
+        "src/alfred/cloud-providers/",
         "config/agents.json",
         "modules/",
         "catalog/",
@@ -132,7 +134,9 @@
         "src/alfred/circuit-breaker.ts",
         "src/alfred/tool-executor.ts",
         "src/alfred/agents-config.ts",
-        "src/alfred/module-manager.ts"
+        "src/alfred/module-manager.ts",
+        "src/alfred/cloud-storage.ts",
+        "src/alfred/cloud-providers/"
       ],
       "allowedBashCommands": [
         "bash deploy/spinup-test.sh <self-branch>",

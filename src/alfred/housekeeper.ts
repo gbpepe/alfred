@@ -11,6 +11,7 @@ import {
   pruneToolCallLogRetention,
 } from '../db.js'
 import { runLogRotationSweep } from '../web/log-rotation.js'
+import { pruneCloudActivityLog } from './cloud-storage.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -485,6 +486,42 @@ export async function runHousekeeping(
       // ignore
     }
   }
+
+  // 3b. Clean stale `.cloud-part.*` incomplete cloud download files inside `workspaces/` (> 24h)
+  const workspacesDir = join(projectRoot, 'workspaces')
+  if (existsSync(workspacesDir)) {
+    const walkCloudParts = (dir: string, depth: number) => {
+      if (depth > 5) return
+      let entries
+      try {
+        entries = readdirSync(dir, { withFileTypes: true })
+      } catch {
+        return
+      }
+      for (const entry of entries) {
+        if (entry.isSymbolicLink()) continue
+        const fullPath = join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walkCloudParts(fullPath, depth + 1)
+          continue
+        }
+        if (!entry.isFile()) continue
+        if (!/\.cloud-part\.[a-z0-9-]+$/i.test(entry.name)) continue
+        if (isProtectedHousekeepingPath(fullPath, batchMeta.activeIdentifiers)) continue
+        try {
+          const st = statSync(fullPath)
+          if (st.mtimeMs <= tempCutoffMs) {
+            tryDeleteFile(fullPath, deletedTempFiles)
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+    walkCloudParts(workspacesDir, 0)
+  }
+
+  pruneCloudActivityLog(opts.db ?? null, retentionDays, 1000)
 
   // 4. Emergency npm cache clean when disk usage reaches ALFRED_DISK_WARN_PCT (or forced)
   const diskWarnPct = opts.diskWarnPct ?? 80
