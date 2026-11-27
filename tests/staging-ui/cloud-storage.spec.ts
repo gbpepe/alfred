@@ -103,7 +103,7 @@ test.describe('Alfred Staging Dashboard — Cloud Storage Module & Multi-Account
       const cbResp = await request.get('/oauth-cloud-callback.html')
       expect(cbResp.status()).toBe(200)
       const cbBody = await cbResp.text()
-      expect(cbBody).toContain('alfred_cloud_oauth_callback')
+      expect(cbBody).toContain('alfred:cloud-oauth-callback')
 
       expect(pageErrors).toEqual([])
     } finally {
