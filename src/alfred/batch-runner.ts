@@ -243,11 +243,19 @@ export function resolveBatchConfinedPath(
     throw new BatchPathBoundaryError('Batch path must be non-empty')
   }
   const rootAbs = existsSync(projectRoot) ? realpathSync(projectRoot) : resolve(projectRoot)
-  const batchDir = join(rootAbs, 'batch')
   const storeBatchDir = join(rootAbs, 'store', 'batch')
-  mkdirSync(batchDir, { recursive: true })
+  const batchDir = join(rootAbs, 'batch')
   mkdirSync(storeBatchDir, { recursive: true })
-  const allowedRoots = [realpathSync(batchDir), realpathSync(storeBatchDir)]
+  const allowedRoots: string[] = [realpathSync(storeBatchDir)]
+  try {
+    mkdirSync(batchDir, { recursive: true })
+  } catch {
+    // Under ProtectSystem=strict, <projectRoot>/batch may be read-only if not mounted RW;
+    // store/batch remains the primary writable root.
+  }
+  if (existsSync(batchDir)) {
+    allowedRoots.push(realpathSync(batchDir))
+  }
 
   const candidate = isAbsolute(clean) ? resolve(clean) : resolve(rootAbs, clean)
 
