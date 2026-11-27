@@ -474,6 +474,62 @@
     return '<span style="padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;color:#fff;background:#64748b">Nincs összekötve</span>'
   }
 
+  function renderCloudOAuthSetupGuideHtml(redirectUri, activeProvId) {
+    let host = window.location.hostname || 'alfred.princicol.co.uk'
+    try {
+      host = new URL(redirectUri).hostname || host
+    } catch {}
+    const linkStyle = 'color:var(--accent,#3b82f6);text-decoration:underline;font-weight:600'
+    const showAll = !activeProvId
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;font-size:11.5px;line-height:1.45">'
+    if (showAll || activeProvId === 'gdrive') {
+      html +=
+        '<div style="padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">' +
+          '<div style="font-weight:700;margin-bottom:3px">Google Drive (OAuth2)</div>' +
+          '<ol style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:2px">' +
+            '<li>Engedélyezd az API-t: <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer" style="' + linkStyle + '">Google Drive API engedélyezése ↗</a></li>' +
+            '<li>Állítsd be a beleegyezési képernyőt (Test users = saját e-mail): <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener noreferrer" style="' + linkStyle + '">OAuth Consent Screen ↗</a></li>' +
+            '<li>Hozz létre Web Application klienst: <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style="' + linkStyle + '">Google Cloud Credentials ↗</a> → <strong>Authorized redirect URIs</strong> mezőbe add meg a fenti Redirect URI-t.</li>' +
+          '</ol>' +
+        '</div>'
+    }
+    if (showAll || activeProvId === 'onedrive') {
+      html +=
+        '<div style="padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">' +
+          '<div style="font-weight:700;margin-bottom:3px">Microsoft OneDrive (Graph v1.0)</div>' +
+          '<ol style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:2px">' +
+            '<li>Regisztrálj alkalmazást: <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" style="' + linkStyle + '">Azure / Entra App Registrations ↗</a> → <strong>New registration</strong> (Personal + Org accounts).</li>' +
+            '<li><strong>Redirect URI (Web):</strong> add meg a fenti Redirect URI-t.</li>' +
+            '<li><strong>Certificates &amp; secrets:</strong> hozz létre Client Secretet (a <em>Value</em> mezőt másold ki!), és az <strong>API permissions</strong> alatt add meg: <code>Files.ReadWrite</code> (vagy <code>Files.Read</code>), <code>offline_access</code>, <code>User.Read</code>.</li>' +
+          '</ol>' +
+        '</div>'
+    }
+    if (showAll || activeProvId === 'dropbox') {
+      html +=
+        '<div style="padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface)">' +
+          '<div style="font-weight:700;margin-bottom:3px">Dropbox (API v2)</div>' +
+          '<ol style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:2px">' +
+            '<li>Hozz létre Scoped alkalmazást: <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer" style="' + linkStyle + '">Dropbox App Console ↗</a> → <strong>Create app → Scoped access</strong>.</li>' +
+            '<li><strong>Settings</strong> fül → <strong>OAuth 2 Redirect URIs:</strong> add meg a fenti Redirect URI-t; másold ki az <strong>App key</strong> és <strong>App secret</strong> értékeket.</li>' +
+            '<li><strong>Permissions</strong> fül: pipáld be <code>files.metadata.read</code>, <code>files.content.read</code>, <code>files.content.write</code>, <code>sharing.write</code>, <code>account_info.read</code> → <strong>Submit</strong>.</li>' +
+          '</ol>' +
+        '</div>'
+    }
+    html +=
+      '<div style="padding:8px 10px;border-radius:6px;border:1px solid rgba(217,119,6,0.45);background:rgba(217,119,6,0.08)">' +
+        '<div style="font-weight:700;color:#b45309;margin-bottom:3px">⚠️ Cloudflare Zero Trust kivétel (automatikus Redirect URI-hoz)</div>' +
+        '<div style="margin-bottom:4px">Ha a Dashboard Cloudflare Zero Trust Access mögött fut, a Zero Trust megállíthatja a <code>/oauth-cloud-callback.html</code> visszairányítást.</div>' +
+        '<ol style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:2px">' +
+          '<li>Nyisd meg: <a href="https://one.dash.cloudflare.com/" target="_blank" rel="noopener noreferrer" style="' + linkStyle + '">Cloudflare Zero Trust Dashboard ↗</a> → <strong>Access → Applications → Add an application → Self-hosted</strong>.</li>' +
+          '<li><strong>Domain:</strong> <code>' + esc(host) + '</code> &nbsp;·&nbsp; <strong>Path:</strong> <code>/oauth-cloud-callback.html</code></li>' +
+          '<li><strong>Policy:</strong> Action = <code>Bypass</code>, Include = <code>Everyone</code> → mentés. <em>(Biztonságos: tisztán statikus oldal, nem ér el /api/* végpontot.)</em></li>' +
+          '<li><strong>Alternatíva Bypass nélkül:</strong> az OAuth2 ablak címsorából másold ki a <code>?code=...&amp;state=...</code> URL-t, és illeszd be a lenti kézi mezőbe.</li>' +
+        '</ol>' +
+      '</div>' +
+    '</div>'
+    return html
+  }
+
   function renderVpsCloudStorage(data) {
     const tabsEl = document.getElementById('vpsCloudProviderTabs')
     const bodyEl = document.getElementById('vpsCloudProviderBody')
@@ -545,6 +601,10 @@
           '<code style="padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface)">' + esc(redirectUri) + '</code>' +
           '<button type="button" class="btn-secondary btn-compact" id="vpsCloudCopyRedirectBtn" style="font-size:11px;padding:2px 7px">Másolás</button>' +
         '</div>' +
+        '<details id="vpsCloudHelpDetails" style="margin-top:2px">' +
+          '<summary style="cursor:pointer;font-size:11.5px;font-weight:600;color:var(--accent,#3b82f6)">❓ Hol szerzem be a kulcsokat és a Cloudflare Zero Trust kivételt?</summary>' +
+          renderCloudOAuthSetupGuideHtml(redirectUri, activeProv.id) +
+        '</details>' +
       '</div>'
 
     const accounts = Array.isArray(activeProv.accounts) ? activeProv.accounts : []
@@ -4039,6 +4099,10 @@
                 '<button type="button" class="btn-secondary btn-compact" data-wiz-copy-text="' + esc(cbUrl) + '">Másolás</button>' +
               '</div>' +
               (f.helpText ? '<div style="font-size:11px;opacity:.75;line-height:1.35">' + esc(f.helpText) + '</div>' : '') +
+              '<details id="wizCloudOAuthGuideDetails" open style="margin-top:4px">' +
+                '<summary style="cursor:pointer;font-size:11.5px;font-weight:600;color:var(--accent,#3b82f6)">❓ Lépésről lépésre útmutató + linkek (Google / Azure / Dropbox / Cloudflare Zero Trust)</summary>' +
+                renderCloudOAuthSetupGuideHtml(cbUrl, '') +
+              '</details>' +
             '</div>'
           return
         }
