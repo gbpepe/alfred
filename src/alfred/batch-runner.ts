@@ -74,9 +74,20 @@ export const DEFAULT_MAX_ANTHROPIC_BATCH_BYTES = 32 * 1024 * 1024 // 32 MiB
 export const ANTHROPIC_EPHEMERAL_CACHE_MIN_CHARS = 4_096 // ~1024 tokens
 export const DEFAULT_BATCH_MODELS: Record<BatchProviderName, string> = {
   anthropic: 'claude-sonnet-4-6',
-  gemini: 'gemini-2.5-flash',
+  gemini: 'gemini-3.8-flash',
   'vertex-eu': 'gemini-2.5-flash',
   openai: 'gpt-4o-mini',
+}
+
+export function resolveDefaultBatchModel(
+  provider: BatchProviderName,
+  env?: Record<string, string | undefined>,
+): string {
+  if (provider === 'gemini') {
+    const override = (env?.['GEMINI_BATCH_MODEL'] ?? '').trim()
+    if (override) return override
+  }
+  return DEFAULT_BATCH_MODELS[provider]
 }
 
 export interface CanonicalBatchInputItem {
@@ -537,7 +548,7 @@ export function resolveBatchRuntimeEnv(
 ): Record<string, string | undefined> {
   const effective: Record<string, string | undefined> = { ...baseEnv }
 
-  // 1. `VERTEX_EU_BATCH_BUCKET`: installed_modules.config_json ('batch-api') -> env
+  // 1. `VERTEX_EU_BATCH_BUCKET` & `GEMINI_BATCH_MODEL`: installed_modules.config_json ('batch-api') -> env
   if (opts?.db) {
     try {
       const row = getInstalledModuleRow('batch-api', opts.db)
@@ -548,6 +559,12 @@ export function resolveBatchRuntimeEnv(
           : ''
         if (cfgBucket) {
           effective['VERTEX_EU_BATCH_BUCKET'] = cfgBucket
+        }
+        const cfgGeminiModel = typeof parsed['GEMINI_BATCH_MODEL'] === 'string'
+          ? parsed['GEMINI_BATCH_MODEL'].trim()
+          : ''
+        if (cfgGeminiModel) {
+          effective['GEMINI_BATCH_MODEL'] = cfgGeminiModel
         }
       }
     } catch {
@@ -1873,7 +1890,7 @@ export async function submitBatchJob(opts: SubmitBatchJobOptions): Promise<Batch
   })
 
   // 4. Pre-flight cost estimate & Budget / Circuit Breaker gate
-  const primaryModel = (opts.model ?? '').trim() || DEFAULT_BATCH_MODELS[plan.primary]
+  const primaryModel = (opts.model ?? '').trim() || resolveDefaultBatchModel(plan.primary, env)
   const est = computeBatchCostBreakdown(
     primaryModel,
     { input_tokens: scan.estimatedInputTokens, output_tokens: scan.estimatedOutputTokens },
@@ -1946,7 +1963,7 @@ export async function submitBatchJob(opts: SubmitBatchJobOptions): Promise<Batch
         const candidateModel =
           candidate === plan.primary && (opts.model ?? '').trim()
             ? opts.model!.trim()
-            : DEFAULT_BATCH_MODELS[candidate]
+            : resolveDefaultBatchModel(candidate, env)
         const adapterCtx: AdapterSubmitContext = {
           jobId,
           model: candidateModel,

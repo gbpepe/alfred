@@ -69,6 +69,16 @@
             "helpText": "Discord → Fejlesztői mód → jobb klikk a csatornán → Csatornaazonosító másolása."
           },
           {
+            "key": "GEMINI_BATCH_MODEL",
+            "label": "Gemini Batch alapértelmezett modell",
+            "type": "text",
+            "storage": "config_json",
+            "required": false,
+            "defaultValue": "gemini-3.8-flash",
+            "placeholder": "gemini-3.8-flash",
+            "helpText": "Opcionális felülírás a Gemini Batch API-hoz (alapértelmezett: gemini-3.8-flash)."
+          },
+          {
             "key": "enableAgentId",
             "label": "Alfred Batch ügynök azonnali indítása a befejezéskor",
             "type": "boolean",
