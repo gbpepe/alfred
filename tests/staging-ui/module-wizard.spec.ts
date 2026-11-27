@@ -20,14 +20,14 @@ test.describe('Alfred Staging Dashboard — Declarative Module Setup Wizard (#mo
     const initialWizardResp = await request.get('/api/admin/modules/batch-api/wizard', { headers: authHeaders })
     expect(initialWizardResp.status()).toBe(200)
     const initialWizardJson = (await initialWizardResp.json()) as {
-      wizard?: {
+      state?: {
         steps?: Array<{
           id: string
           fields?: Array<{ key: string; isSet?: boolean; value?: string | null }>
         }>
       }
     }
-    const discordStep = initialWizardJson.wizard?.steps?.find((s) => s.id === 'discord')
+    const discordStep = initialWizardJson.state?.steps?.find((s) => s.id === 'discord')
     const discordField = discordStep?.fields?.find((f) => f.key === 'DISCORD_CHANNEL_ALFRED_BATCH')
     const originalDiscordChannel = typeof discordField?.value === 'string' ? discordField.value : ''
 

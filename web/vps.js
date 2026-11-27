@@ -3387,7 +3387,7 @@
 
     try {
       const data = await apiJson('/api/admin/modules/' + encodeURIComponent(modId) + '/wizard')
-      wizardState = data.wizard || data
+      wizardState = data.state || data.wizard || data
       // Initialize default enableAgent from action boolean field if declared
       ;(wizardState.steps || []).forEach(function (st) {
         ;(st.fields || []).forEach(function (f) {
@@ -3754,7 +3754,7 @@
             clearKeys: clearKeys.length > 0 ? clearKeys : undefined,
           }),
         })
-        if (data.wizard) wizardState = data.wizard
+        if (data.state || data.wizard) wizardState = data.state || data.wizard
         if (data.restartRequired) wizardRestartRequired = true
         // Clear saved drafts for this step
         ;(step.fields || []).forEach(function (f) {
@@ -3810,7 +3810,8 @@
           restartRequired: Boolean(wizardRestartRequired),
         }),
       })
-      if (data.wizard) wizardState = data.wizard
+      if (data.result && data.result.state) wizardState = data.result.state
+      else if (data.state || data.wizard) wizardState = data.state || data.wizard
       if (data.restartRequired) wizardRestartRequired = true
       wizardDirty = false
       await syncAfterModuleMutation(data)
