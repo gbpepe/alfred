@@ -42,10 +42,11 @@ test.describe('Alfred Staging Dashboard — Cloud Storage Module & Multi-Account
       await expect(modal).toBeVisible({ timeout: 10_000 })
       await expect(page.locator('#moduleWizardStepper [data-wiz-jump]')).toHaveCount(3)
 
-      // Step 1 (credentials): verify oauth_redirect copy box renders callback URL
-      const copyRedirectBtn = page.locator('#moduleWizardStepContent [data-wiz-copy-redirect]')
+      // Step 1 (oauth_clients): verify oauth_redirect copy box renders callback URL
+      const copyRedirectBtn = page.locator('#moduleWizardStepContent [data-wiz-copy-text]')
       await expect(copyRedirectBtn).toBeVisible({ timeout: 10_000 })
-      await expect(page.locator('#moduleWizardStepContent')).toContainText('/oauth-cloud-callback.html')
+      const redirectAttr = await copyRedirectBtn.getAttribute('data-wiz-copy-text')
+      expect(redirectAttr).toContain('/oauth-cloud-callback.html')
 
       // Jump to Step 3 (verify_and_activate) and run cloud_storage_probe
       await page.locator('#moduleWizardStepper [data-wiz-jump="2"]').click()
