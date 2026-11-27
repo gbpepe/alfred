@@ -19,7 +19,7 @@
     "steps": [
       {
         "id": "providers",
-        "title": "1. Batch szolgáltatók",
+        "title": "Batch szolgáltatók",
         "description": "Elég egyetlen szolgáltató kulcsát megadni — az auto router automatikusan a beállítottakat használja.",
         "requirementMode": "any_one",
         "fields": [
@@ -55,7 +55,7 @@
       },
       {
         "id": "discord",
-        "title": "2. Discord csatorna & koordinátor",
+        "title": "Discord csatorna & koordinátor",
         "description": "Kapcsold össze a #alfred-batch csatornát az Alfred Batch koordinátorral.",
         "requirementMode": "all_required",
         "fields": [
@@ -80,7 +80,7 @@
       },
       {
         "id": "verify",
-        "title": "3. Ellenőrzés & Aktiválás",
+        "title": "Ellenőrzés & Aktiválás",
         "description": "Gyors konfiguráció- és kapcsolatellenőrzés aktiválás előtt.",
         "type": "verify_and_activate"
       }

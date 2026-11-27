@@ -1778,22 +1778,33 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         })
         return true
       }
+      if ((env['ALFRED_ENV'] || '').trim().toLowerCase() === 'test') {
+        json(res, {
+          ok: true,
+          action,
+          restarted: [],
+          output: 'Teszt (staging) környezetben az alfred-prod újraindítása tiltva van.',
+        })
+        return true
+      }
       try {
-        await execFileAsync('sudo', ['-n', 'systemctl', 'restart', 'alfred-prod'], { timeout: 15_000 })
+        const prodDir = (env['ALFRED_PROD_DIR'] || '/opt/alfred-prod').trim() || '/opt/alfred-prod'
+        const triggerPath = join(prodDir, 'store', '.restart-prod.trigger')
+        atomicWriteFileSync(triggerPath, `${new Date().toISOString()}\n`)
         json(res, {
           ok: true,
           action,
           restarted: ['alfred-prod'],
-          output: 'alfred-prod szolgáltatás sikeresen újraindítva.',
+          output: 'alfred-prod újraindítás elindítva (systemd trigger).',
         })
       } catch (err) {
-        const e = err as { stdout?: string; stderr?: string; message?: string }
+        const e = err as { message?: string }
         json(
           res,
           {
             ok: false,
             action,
-            error: sanitizeOutput([e.stderr, e.stdout, e.message].filter(Boolean).join('\n') || 'Újraindítás sikertelen.'),
+            error: sanitizeOutput(e.message || 'Újraindítási trigger írása sikertelen.'),
           },
           500,
         )

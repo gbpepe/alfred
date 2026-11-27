@@ -1,0 +1,7 @@
+[Unit]
+Description=Restart alfred-prod service on Dashboard trigger file
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'rm -f /opt/alfred-prod/store/.restart-prod.trigger && /bin/systemctl restart alfred-prod'

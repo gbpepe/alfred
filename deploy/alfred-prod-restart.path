@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch trigger file for passwordless alfred-prod restart (NoNewPrivileges-safe)
+
+[Path]
+PathExists=/opt/alfred-prod/store/.restart-prod.trigger
+Unit=alfred-prod-restart.service
+
+[Install]
+WantedBy=multi-user.target
