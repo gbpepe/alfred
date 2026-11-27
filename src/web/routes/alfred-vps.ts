@@ -84,6 +84,14 @@ import {
   toggleAgentPackage,
   uninstallAgentPackage,
 } from '../../alfred/module-manager.js'
+import {
+  completeModuleWizard,
+  getModuleWizardState,
+  ModuleWizardError,
+  saveModuleWizardStep,
+  testModuleWizardConfig,
+  type SaveWizardPayload,
+} from '../../alfred/module-wizard.js'
 import { collectSystemTelemetry } from '../../alfred/system-monitor.js'
 import { json, readBody } from '../http-helpers.js'
 import type { RouteContext } from './types.js'
@@ -97,7 +105,7 @@ async function readJsonBody<T>(req: RouteContext['req'], maxBytes?: number): Pro
 }
 
 const ALLOWED_LOG_UNITS = new Set(['alfred-prod', 'alfred-ops', 'alfred-test', 'alfred-web'])
-const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'spinup-test', 'reload-test', 'teardown-test'])
+const ALLOWED_OPS_ACTIONS = new Set(['check-health', 'spinup-test', 'reload-test', 'teardown-test', 'restart-prod'])
 const SAFE_BRANCH_RE = /^[a-zA-Z0-9._/-]{1,80}$/
 
 function validateOpsBranch(branch: string): boolean {
@@ -684,7 +692,7 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
   }
 
   const sendModuleError = (err: unknown): void => {
-    if (err instanceof ModuleManagerError) {
+    if (err instanceof ModuleManagerError || err instanceof ModuleWizardError) {
       json(
         res,
         {
@@ -715,6 +723,126 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         activeDb = undefined
       }
       json(res, { ok: true, ...buildModulesSnapshot(env, activeDb) })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const modWizardGetMatch = /^\/api\/admin\/modules\/([^/]+)\/wizard$/.exec(path)
+  if (modWizardGetMatch && method === 'GET') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const id = decodeURIComponent(modWizardGetMatch[1]).trim()
+      let activeDb: Database.Database | undefined
+      try {
+        activeDb = getDb()
+      } catch {
+        activeDb = undefined
+      }
+      syncInstalledModulesFromPrimaryRuntimeDb(activeDb, env)
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const state = getModuleWizardState(id, {
+        ...(activeDb ? { db: activeDb } : {}),
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+      })
+      json(res, { ok: true, state })
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const modWizardSaveMatch = /^\/api\/admin\/modules\/([^/]+)\/wizard\/save$/.exec(path)
+  if (modWizardSaveMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const id = decodeURIComponent(modWizardSaveMatch[1]).trim()
+      const body = await readJsonBody<SaveWizardPayload>(req).catch(() => ({} as SaveWizardPayload))
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const targetDbPaths = resolveTargetRuntimeDbPaths(db, env)
+      const result = saveModuleWizardStep(id, body, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+        targetDbPaths,
+      })
+      syncInstalledModulesToRuntimeDbs(db, env)
+      json(res, result)
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const modWizardTestMatch = /^\/api\/admin\/modules\/([^/]+)\/wizard\/test$/.exec(path)
+  if (modWizardTestMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const id = decodeURIComponent(modWizardTestMatch[1]).trim()
+      const db = getDb()
+      syncInstalledModulesFromPrimaryRuntimeDb(db, env)
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const testRes = await testModuleWizardConfig(id, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+      })
+      json(res, testRes)
+    } catch (err) {
+      sendModuleError(err)
+    }
+    return true
+  }
+
+  const modWizardCompleteMatch = /^\/api\/admin\/modules\/([^/]+)\/wizard\/complete$/.exec(path)
+  if (modWizardCompleteMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const id = decodeURIComponent(modWizardCompleteMatch[1]).trim()
+      const body = await readJsonBody<{ enableAgent?: boolean; restartRequired?: boolean }>(req).catch(
+        () => ({} as { enableAgent?: boolean; restartRequired?: boolean }),
+      )
+      const db = getDb()
+      const writablePaths = resolveWritableAgentConfigPaths()
+      const targetDbPaths = resolveTargetRuntimeDbPaths(db, env)
+      const result = completeModuleWizard(id, {
+        db,
+        env,
+        ...(writablePaths.length > 0 ? { configPaths: writablePaths } : {}),
+        targetDbPaths,
+        ...(typeof body?.enableAgent === 'boolean' ? { enableAgent: body.enableAgent } : {}),
+        restartRequired: body?.restartRequired === true,
+      })
+      syncInstalledModulesToRuntimeDbs(db, env)
+      json(res, {
+        ok: true,
+        result,
+        restartRequired: result.restartRequired,
+        ...buildModulesSnapshot(env, db),
+      })
     } catch (err) {
       sendModuleError(err)
     }
@@ -1632,6 +1760,44 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
     const branch = typeof body?.branch === 'string' ? body.branch.trim() : ''
     if (!ALLOWED_OPS_ACTIONS.has(action)) {
       json(res, { error: `Unsupported ops action: ${action}` }, 400)
+      return true
+    }
+    if (action === 'restart-prod') {
+      const env = { ...readEnvFile(), ...process.env }
+      const authCheck = authorizeAdminCliRequest(ctx, env)
+      if (!authCheck.ok) {
+        json(res, { ok: false, error: authCheck.error }, authCheck.status)
+        return true
+      }
+      if (process.platform !== 'linux') {
+        json(res, {
+          ok: true,
+          action,
+          restarted: [],
+          output: 'Fejlesztői környezet: systemd nem elérhető ezen a platformon.',
+        })
+        return true
+      }
+      try {
+        await execFileAsync('sudo', ['-n', 'systemctl', 'restart', 'alfred-prod'], { timeout: 15_000 })
+        json(res, {
+          ok: true,
+          action,
+          restarted: ['alfred-prod'],
+          output: 'alfred-prod szolgáltatás sikeresen újraindítva.',
+        })
+      } catch (err) {
+        const e = err as { stdout?: string; stderr?: string; message?: string }
+        json(
+          res,
+          {
+            ok: false,
+            action,
+            error: sanitizeOutput([e.stderr, e.stdout, e.message].filter(Boolean).join('\n') || 'Újraindítás sikertelen.'),
+          },
+          500,
+        )
+      }
       return true
     }
     if (action === 'spinup-test' && !branch) {

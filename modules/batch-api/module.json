@@ -10,5 +10,80 @@
   "uiCardIds": ["vpsBatchCard"],
   "ramImpactMb": 15,
   "builtIn": false,
-  "defaultEnabled": true
+  "defaultEnabled": true,
+  "setupWizard": {
+    "title": "Batch API beüzemelése",
+    "summary": "Állíts be legalább egy 50%-os Batch szolgáltatót és a #alfred-batch Discord csatornát.",
+    "testAction": "batch_provider_probe",
+    "docChapter": "06-batch-feldolgozas-es-koltsegoptimalizalas.md",
+    "steps": [
+      {
+        "id": "providers",
+        "title": "1. Batch szolgáltatók",
+        "description": "Elég egyetlen szolgáltató kulcsát megadni — az auto router automatikusan a beállítottakat használja.",
+        "requirementMode": "any_one",
+        "fields": [
+          {
+            "key": "GEMINI_API_KEY",
+            "label": "Google Gemini API kulcs",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "AIza..."
+          },
+          {
+            "key": "ANTHROPIC_API_KEY",
+            "label": "Anthropic API kulcs (Claude Batch)",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "sk-ant-..."
+          },
+          {
+            "key": "OPENAI_API_KEY",
+            "label": "OpenAI API kulcs",
+            "type": "secret",
+            "storage": "vault",
+            "placeholder": "sk-..."
+          },
+          {
+            "key": "VERTEX_EU_BATCH_BUCKET",
+            "label": "Vertex EU GCS vödör (GDPR / EU-only)",
+            "type": "text",
+            "storage": "config_json",
+            "placeholder": "gs://alfred-batch-eu"
+          }
+        ]
+      },
+      {
+        "id": "discord",
+        "title": "2. Discord csatorna & koordinátor",
+        "description": "Kapcsold össze a #alfred-batch csatornát az Alfred Batch koordinátorral.",
+        "requirementMode": "all_required",
+        "fields": [
+          {
+            "key": "DISCORD_CHANNEL_ALFRED_BATCH",
+            "label": "#alfred-batch csatorna ID",
+            "type": "discord_channel",
+            "storage": "env",
+            "required": false,
+            "validationRegex": "^[0-9]{17,20}$",
+            "helpText": "Discord → Fejlesztői mód → jobb klikk a csatornán → Csatornaazonosító másolása."
+          },
+          {
+            "key": "enableAgentId",
+            "label": "Alfred Batch ügynök azonnali indítása a befejezéskor",
+            "type": "boolean",
+            "storage": "action",
+            "targetAgentId": "alfred-batch",
+            "defaultValue": true
+          }
+        ]
+      },
+      {
+        "id": "verify",
+        "title": "3. Ellenőrzés & Aktiválás",
+        "description": "Gyors konfiguráció- és kapcsolatellenőrzés aktiválás előtt.",
+        "type": "verify_and_activate"
+      }
+    ]
+  }
 }

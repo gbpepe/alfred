@@ -4282,6 +4282,48 @@
     </div>
   </div>
 
+  <!-- Modal: Declarative Module Setup Wizard (Stepper) -->
+  <div class="modal-overlay" id="moduleWizardModalOverlay" hidden>
+    <div class="modal modal-wide" style="max-width:680px;width:94vw;max-height:88vh;display:flex;flex-direction:column">
+      <div class="modal-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="min-width:0;flex:1">
+          <h2 id="moduleWizardTitle" style="margin:0;font-size:16px">Modul telepítő varázsló</h2>
+          <div id="moduleWizardSummary" style="font-size:12px;opacity:.75;margin-top:2px"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <button type="button" class="btn-secondary btn-compact" id="moduleWizardHelpBtn" title="Súgó a tárolási rétegekről és beállításról" style="font-size:12px;padding:3px 8px">?</button>
+          <button type="button" class="btn-secondary btn-compact" id="moduleWizardDocsBtn" title="Kézikönyv megnyitása (#docs)" style="font-size:12px;padding:3px 8px">📖 Kézikönyv</button>
+          <button type="button" class="modal-close" id="moduleWizardClose" aria-label="Bezárás">&times;</button>
+        </div>
+      </div>
+      <div id="moduleWizardHelpBox" hidden style="margin:0 16px 8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.45">
+        <div style="font-weight:600;margin-bottom:4px">Hova kerülnek az itt megadott adatok?</div>
+        <ul style="margin:0 0 8px 16px;padding:0">
+          <li><b>Vault (titkosított):</b> API-kulcsok (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) — soha nem látszanak vissza nyersen. Üresen hagyva a meglévő kulcs megmarad.</li>
+          <li><b>Modul konfig (`config_json`):</b> nem titkos beállítások (pl. `VERTEX_EU_BATCH_BUCKET`), azonnal életbe lépnek.</li>
+          <li><b>Környezeti változó (`.env`):</b> pl. Discord csatorna ID — mentés után a záró lépésben egyetlen kattintással újraindítható az <code>alfred-prod</code>.</li>
+        </ul>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn-secondary btn-compact" id="moduleWizardOpenBatchDocsBtn" style="font-size:11px">6. fejezet: Batch feldolgozás →</button>
+          <button type="button" class="btn-secondary btn-compact" id="moduleWizardOpenModDocsBtn" style="font-size:11px">7. fejezet: Modul- és Ügynökkatalógus →</button>
+        </div>
+      </div>
+      <div id="moduleWizardStepper" style="display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 10px;border-bottom:1px solid var(--border)"></div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;font-size:13px;overflow:auto;flex:1;padding-top:12px">
+        <div id="moduleWizardError" hidden style="padding:8px 10px;border-radius:8px;border:1px solid #dc2626;background:rgba(220,38,38,0.08);color:#dc2626;font-size:12px"></div>
+        <div id="moduleWizardStepContent" style="display:flex;flex-direction:column;gap:12px"></div>
+      </div>
+      <div id="moduleWizardFooter" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap">
+        <button type="button" class="btn-secondary btn-compact" id="moduleWizardPrevBtn" hidden>&larr; Vissza</button>
+        <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
+          <button type="button" class="btn-secondary btn-compact" id="moduleWizardCancelBtn">Bezárás</button>
+          <button type="button" class="btn-primary btn-compact" id="moduleWizardNextBtn">Mentés és Tovább &rarr;</button>
+          <button type="button" class="btn-primary btn-compact" id="moduleWizardCompleteBtn" hidden>Mentés és Aktiválás</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Simulated Alfred Core Live Terminal modal -->
   <div class="modal-overlay" id="agentCoreTerminalOverlay" hidden>
     <div class="modal terminal-modal" style="max-width:860px;width:95vw;max-height:85vh;display:flex;flex-direction:column">

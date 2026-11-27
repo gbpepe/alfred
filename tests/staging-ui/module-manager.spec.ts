@@ -147,9 +147,21 @@ test.describe('Alfred Staging Dashboard — Module & Specialist Agent Manager (#
       // 9. Re-enable batch-api + alfred-batch via #modules UI and verify #vpsBatchCard returns
       await page.goto(buildTargetUrl('modules'), { waitUntil: 'domcontentloaded' })
       await expect(page.locator('#modulesPage')).toBeVisible({ timeout: 20_000 })
-      await page.locator('[data-module-item="batch-api"] [data-mod-action="enable"]').click()
+      const directEnableBtn = page.locator('[data-module-item="batch-api"] [data-mod-action="enable"]')
+      if (await directEnableBtn.isVisible().catch(() => false)) {
+        await directEnableBtn.click()
+      } else {
+        await page.locator('[data-module-item="batch-api"] [data-mod-wizard="batch-api"]').click()
+        await expect(page.locator('#moduleWizardModalOverlay')).toBeVisible({ timeout: 10_000 })
+        await page.locator('#moduleWizardStepper [data-wiz-jump]').last().click()
+        await page.locator('#moduleWizardCompleteBtn').click()
+        await expect(page.locator('#moduleWizardModalOverlay')).toBeHidden({ timeout: 15_000 })
+      }
       await expect(page.locator('[data-module-item="batch-api"]')).toContainText('Aktív', { timeout: 15_000 })
-      await page.locator('[data-agent-package="alfred-batch"] [data-pkg-action="enable"]').click()
+      const enableBatchAgentBtn = page.locator('[data-agent-package="alfred-batch"] [data-pkg-action="enable"]')
+      if (await enableBatchAgentBtn.isVisible().catch(() => false)) {
+        await enableBatchAgentBtn.click()
+      }
       await expect(page.locator('[data-agent-package="alfred-batch"]')).toContainText('Aktív', { timeout: 15_000 })
 
       await page.locator('.sb-link[data-page="vps"]').click()
