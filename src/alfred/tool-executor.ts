@@ -229,13 +229,15 @@ export const TOOL_SCHEMAS: Record<AllowedToolName, OpenAiToolSchema> = {
     type: 'function',
     function: {
       name: 'batch_submit',
-      description: 'Submit a canonical JSONL file (under batch/ or store/batch/) to the Multi-Provider Async Batch API (50% API discount). Supports auto provider selection, GDPR eu_only routing, secret-gate scanning, and pre-flight budget checks.',
+      description:
+        'Submit a canonical JSONL input file from the batch/ directory (e.g. "batch/<slug>.jsonl") to the Multi-Provider Async Batch API (50% API discount). Always stage agent-created inputs under batch/ — never under protected store/. Supports auto provider selection, GDPR eu_only routing, secret-gate scanning, and pre-flight budget checks.',
       parameters: {
         type: 'object',
         properties: {
           input_path: {
             type: 'string',
-            description: 'Relative path to canonical JSONL input file inside batch/ or store/batch/.',
+            description:
+              'Relative path to canonical JSONL input file inside batch/ (e.g. "batch/my-job.jsonl"). Do NOT write agent inputs to store/ or store/batch/.',
           },
           provider: {
             type: 'string',
