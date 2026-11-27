@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSyn
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type Database from 'better-sqlite3'
 import { MAIN_AGENT_ID } from '../config.js'
-import type { AlfredAgentDefinition, AllowedToolName } from './agents-config.js'
+import { loadAlfredAgentsConfig, type AlfredAgentDefinition, type AllowedToolName } from './agents-config.js'
 import { getCliInventory, installOrUpdateCli, removeCli } from './cli-manager.js'
 import type { CliProcessRunner } from './cli-runner.js'
 import {
@@ -1492,11 +1492,21 @@ export async function executeWhitelistedToolAsync(
     const batchId = typeof rawArgs.batch_id === 'string' ? rawArgs.batch_id.trim() : ''
     if (!batchId) throw new Error('batch_status requires a non-empty "batch_id"')
     if (rawArgs.poll === true) {
+      let agentsConfig: ReturnType<typeof loadAlfredAgentsConfig> | undefined
+      try {
+        agentsConfig = loadAlfredAgentsConfig({
+          env: opts?.env,
+          provisionWorkspaces: false,
+        })
+      } catch {
+        // Non-fatal: continue polling even if agents config is unavailable in isolated tests
+      }
       const res = await pollBatchJob({
         db: ctx.db,
         batchId,
         projectRoot: ctx.agent.workspaceAbsPath,
         env: opts?.env,
+        agentsConfig,
       })
       return JSON.stringify({ ok: true, ...res }, null, 2)
     }

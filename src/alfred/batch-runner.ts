@@ -1087,11 +1087,17 @@ async function cancelAnthropicBatch(
 // --- 2. Google Gemini Batch API Adapter ---
 
 export function toGeminiBatchLine(item: CanonicalBatchInputItem): string {
+  const isReasoning = item.task_type === 'reasoning'
+  const genConfig: Record<string, unknown> = {
+    maxOutputTokens: isReasoning ? Math.max(item.max_tokens ?? 1024, 2048) : (item.max_tokens ?? 1024),
+  }
+  if (!isReasoning) {
+    // Prevent Gemini 2.5/3.x thinking models from consuming maxOutputTokens on bulk non-reasoning jobs
+    genConfig.thinkingConfig = { thinkingBudget: 0 }
+  }
   const request: Record<string, unknown> = {
     contents: [{ role: 'user', parts: [{ text: item.prompt }] }],
-    generationConfig: {
-      maxOutputTokens: item.max_tokens ?? 1024,
-    },
+    generationConfig: genConfig,
   }
   if (item.system && item.system.trim()) {
     request.system_instruction = { parts: [{ text: item.system }] }
@@ -1290,11 +1296,17 @@ async function cancelGeminiBatch(
 // --- 3. Google Vertex AI EU (GCS + Batch Prediction) Adapter ---
 
 export function toVertexEuBatchLine(item: CanonicalBatchInputItem): string {
+  const isReasoning = item.task_type === 'reasoning'
+  const genConfig: Record<string, unknown> = {
+    maxOutputTokens: isReasoning ? Math.max(item.max_tokens ?? 1024, 2048) : (item.max_tokens ?? 1024),
+  }
+  if (!isReasoning) {
+    // Prevent Gemini 2.5/3.x thinking models from consuming maxOutputTokens on bulk non-reasoning jobs
+    genConfig.thinkingConfig = { thinkingBudget: 0 }
+  }
   const request: Record<string, unknown> = {
     contents: [{ role: 'user', parts: [{ text: item.prompt }] }],
-    generationConfig: {
-      maxOutputTokens: item.max_tokens ?? 1024,
-    },
+    generationConfig: genConfig,
   }
   if (item.system && item.system.trim()) {
     request.systemInstruction = { parts: [{ text: item.system }] }
@@ -2011,7 +2023,7 @@ export async function submitBatchJob(opts: SubmitBatchJobOptions): Promise<Batch
         { input_tokens: scan.estimatedInputTokens, output_tokens: scan.estimatedOutputTokens },
         prices,
       )
-      const outputRelPath = `store/batch/${jobId}.output.jsonl`
+      const outputRelPath = `batch/outputs/${jobId}.output.jsonl`
 
       opts.db
         .prepare(
