@@ -662,7 +662,8 @@
             '</div>' +
           '</div>' +
           quotaHtml +
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px;margin-top:4px;align-items:center">' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-top:4px;align-items:center">' +
+            '<input type="text" class="input" data-cloud-acc-label="' + esc(acc.account) + '" value="' + esc(acc.label || '') + '" placeholder="Fiók neve / címke" style="padding:4px 7px;font-size:11.5px">' +
             '<input type="text" class="input" data-cloud-acc-root="' + esc(acc.account) + '" value="' + esc(acc.rootRef || '') + '" placeholder="Gyökérmappa (root_ref, pl. /Alfred)" style="padding:4px 7px;font-size:11.5px">' +
             '<input type="email" class="input" data-cloud-acc-share="' + esc(acc.account) + '" value="' + esc(acc.defaultShareEmail || '') + '" placeholder="Fiók megosztási e-mail (opcionális)" style="padding:4px 7px;font-size:11.5px">' +
             '<label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" data-cloud-acc-pub="' + esc(acc.account) + '"' + (acc.allowPublicLinks === true ? ' checked' : '') + '> Nyilvános link engedély</label>' +
@@ -704,8 +705,10 @@
               '<input type="text" id="vpsCloudBrowserSearchInp" class="input" value="' + esc(vpsCloudBrowser.query || '') + '" placeholder="Keresés fájlnévre vagy tartalomra..." style="flex:1;min-width:170px;padding:4px 8px;font-size:11.5px">' +
               '<button type="button" class="btn-secondary btn-compact" id="vpsCloudBrowserSearchBtn" style="font-size:11px;padding:4px 8px">🔍 Keresés</button>' +
               (activeBrowserAcc && activeBrowserAcc.accessMode !== 'read_only'
-                ? '<input type="text" id="vpsCloudBrowserNewDirInp" class="input" placeholder="Új mappa neve..." style="width:150px;padding:4px 8px;font-size:11.5px">' +
-                  '<button type="button" class="btn-secondary btn-compact" id="vpsCloudBrowserMkdirBtn" style="font-size:11px;padding:4px 8px">➕ Új mappa</button>'
+                ? '<input type="text" id="vpsCloudBrowserNewDirInp" class="input" placeholder="Új mappa neve..." style="width:140px;padding:4px 8px;font-size:11.5px">' +
+                  '<button type="button" class="btn-secondary btn-compact" id="vpsCloudBrowserMkdirBtn" style="font-size:11px;padding:4px 8px">➕ Új mappa</button>' +
+                  '<input type="file" id="vpsCloudBrowserFileInp" hidden>' +
+                  '<button type="button" class="btn-primary btn-compact" id="vpsCloudBrowserUploadBtn" style="font-size:11px;padding:4px 8px">⬆ Feltöltés / Frissítés</button>'
                 : '') +
             '</div>' +
             '<div id="vpsCloudBrowserBreadcrumb" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;font-size:11.5px"></div>' +
@@ -841,6 +844,7 @@
     bodyEl.querySelectorAll('[data-cloud-acc-save]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         const acc = btn.getAttribute('data-cloud-acc-save')
+        const accLabel = bodyEl.querySelector('[data-cloud-acc-label="' + acc + '"]')?.value.trim() || ''
         const rootRef = bodyEl.querySelector('[data-cloud-acc-root="' + acc + '"]')?.value.trim() || ''
         const shareEmail = bodyEl.querySelector('[data-cloud-acc-share="' + acc + '"]')?.value.trim() || ''
         const allowPub = Boolean(bodyEl.querySelector('[data-cloud-acc-pub="' + acc + '"]')?.checked)
@@ -851,6 +855,7 @@
             body: JSON.stringify({
               provider: activeProv.id,
               account: acc,
+              label: accLabel || undefined,
               rootRef: rootRef || null,
               accountDefaultShareEmail: shareEmail || null,
               accountAllowPublicLinks: allowPub,
@@ -925,21 +930,101 @@
         const modStr = it.modifiedAt ? new Date(it.modifiedAt).toLocaleString('hu-HU', { dateStyle: 'short', timeStyle: 'short' }) : ''
         const openRef = activeProv.id === 'dropbox' ? (it.pathDisplay || it.id) : it.id
         return (
-          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:11.5px;flex-wrap:wrap">' +
-            '<div style="display:flex;align-items:center;gap:6px;min-width:180px;flex:1">' +
-              '<span>' + (isDir ? '📁' : '📄') + '</span>' +
-              (isDir
-                ? '<button type="button" data-cloud-open-dir="' + esc(openRef) + '" data-cloud-dir-name="' + esc(it.name) + '" style="background:none;border:none;padding:0;color:var(--accent,#3b82f6);font-weight:600;cursor:pointer;text-align:left;font-size:11.5px">' + esc(it.name) + '</button>'
-                : '<span style="font-weight:500;word-break:break-word">' + esc(it.name) + '</span>') +
+          '<div data-cloud-row="' + esc(openRef) + '" style="display:flex;flex-direction:column;gap:5px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:11.5px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+              '<div style="display:flex;align-items:center;gap:6px;min-width:180px;flex:1">' +
+                '<span>' + (isDir ? '📁' : '📄') + '</span>' +
+                (isDir
+                  ? '<button type="button" data-cloud-open-dir="' + esc(openRef) + '" data-cloud-dir-name="' + esc(it.name) + '" style="background:none;border:none;padding:0;color:var(--accent,#3b82f6);font-weight:600;cursor:pointer;text-align:left;font-size:11.5px">' + esc(it.name) + '</button>'
+                  : '<span style="font-weight:500;word-break:break-word">' + esc(it.name) + '</span>') +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+                '<span style="opacity:.7;font-size:11px">' + esc(sizeStr) + (modStr ? ' · ' + esc(modStr) : '') + '</span>' +
+                (it.webUrl ? '<a href="' + esc(it.webUrl) + '" target="_blank" rel="noopener noreferrer" class="btn-secondary btn-compact" style="font-size:10.5px;padding:2px 6px;text-decoration:none">↗ Megnyitás</a>' : '') +
+                (!isReadOnly ? '<button type="button" class="btn-secondary btn-compact" data-cloud-rename-toggle="' + esc(openRef) + '" data-cloud-rename-cur="' + esc(it.name) + '" style="font-size:10.5px;padding:2px 6px">✏️ Átnevezés</button>' : '') +
+                (!isReadOnly ? '<button type="button" class="btn-secondary btn-compact" data-cloud-share-item="' + esc(openRef) + '" data-cloud-share-name="' + esc(it.name) + '" style="font-size:10.5px;padding:2px 6px">🔗 Megosztás</button>' : '') +
+                (!isReadOnly ? '<button type="button" class="btn-secondary btn-compact" data-cloud-del-toggle="' + esc(openRef) + '" data-cloud-del-name="' + esc(it.name) + '" style="font-size:10.5px;padding:2px 6px;color:#dc2626">🗑️ Törlés</button>' : '') +
+              '</div>' +
             '</div>' +
-            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-              '<span style="opacity:.7;font-size:11px">' + esc(sizeStr) + (modStr ? ' · ' + esc(modStr) : '') + '</span>' +
-              (it.webUrl ? '<a href="' + esc(it.webUrl) + '" target="_blank" rel="noopener noreferrer" class="btn-secondary btn-compact" style="font-size:10.5px;padding:2px 6px;text-decoration:none">↗ Megnyitás</a>' : '') +
-              (!isReadOnly ? '<button type="button" class="btn-secondary btn-compact" data-cloud-share-item="' + esc(openRef) + '" data-cloud-share-name="' + esc(it.name) + '" style="font-size:10.5px;padding:2px 6px">🔗 Megosztás</button>' : '') +
-            '</div>' +
+            (!isReadOnly
+              ? '<div data-cloud-inline-action="' + esc(openRef) + '" hidden style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border)"></div>'
+              : '') +
           '</div>'
         )
       }).join('')
+
+      listEl.querySelectorAll('[data-cloud-rename-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const ref = btn.getAttribute('data-cloud-rename-toggle') || ''
+          const curName = btn.getAttribute('data-cloud-rename-cur') || ''
+          const row = btn.closest('[data-cloud-row]')
+          const box = row ? row.querySelector('[data-cloud-inline-action]') : null
+          if (!box) return
+          box.hidden = false
+          box.innerHTML =
+            '<input type="text" class="input" data-cloud-rename-inp value="' + esc(curName) + '" style="flex:1;min-width:160px;padding:3px 7px;font-size:11.5px">' +
+            '<button type="button" class="btn-primary btn-compact" data-cloud-rename-save style="font-size:11px;padding:3px 8px">Mentés</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-cloud-inline-cancel style="font-size:11px;padding:3px 8px">Mégse</button>'
+          const inp = box.querySelector('[data-cloud-rename-inp]')
+          if (inp) { inp.focus(); inp.select() }
+          box.querySelector('[data-cloud-inline-cancel]')?.addEventListener('click', function () {
+            box.hidden = true
+            box.innerHTML = ''
+          })
+          box.querySelector('[data-cloud-rename-save]')?.addEventListener('click', async function () {
+            const nextName = inp ? inp.value.trim() : ''
+            if (!nextName || nextName === curName) {
+              box.hidden = true
+              return
+            }
+            this.disabled = true
+            try {
+              await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/rename', {
+                method: 'POST',
+                body: JSON.stringify({ account: vpsCloudBrowser.account || undefined, itemRef: ref, newName: nextName }),
+              })
+              setCloudStatusMsg('✓ Átnevezve: ' + curName + ' → ' + nextName, false)
+              await loadVpsCloudBrowserFolder()
+            } catch (err) {
+              setCloudStatusMsg('✕ Átnevezési hiba: ' + err.message, true)
+              this.disabled = false
+            }
+          })
+        })
+      })
+
+      listEl.querySelectorAll('[data-cloud-del-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const ref = btn.getAttribute('data-cloud-del-toggle') || ''
+          const name = btn.getAttribute('data-cloud-del-name') || ref
+          const row = btn.closest('[data-cloud-row]')
+          const box = row ? row.querySelector('[data-cloud-inline-action]') : null
+          if (!box) return
+          box.hidden = false
+          box.innerHTML =
+            '<span style="font-size:11.5px;color:#dc2626;font-weight:600">Biztosan kukába helyezed: „' + esc(name) + '”?</span>' +
+            '<button type="button" class="btn-primary btn-compact" data-cloud-del-confirm style="font-size:11px;padding:3px 8px;background:#dc2626;border-color:#dc2626">Igen, törlés (kukába)</button>' +
+            '<button type="button" class="btn-secondary btn-compact" data-cloud-inline-cancel style="font-size:11px;padding:3px 8px">Mégse</button>'
+          box.querySelector('[data-cloud-inline-cancel]')?.addEventListener('click', function () {
+            box.hidden = true
+            box.innerHTML = ''
+          })
+          box.querySelector('[data-cloud-del-confirm]')?.addEventListener('click', async function () {
+            this.disabled = true
+            try {
+              await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/delete', {
+                method: 'POST',
+                body: JSON.stringify({ account: vpsCloudBrowser.account || undefined, itemRef: ref }),
+              })
+              setCloudStatusMsg('✓ Kukába helyezve: ' + name, false)
+              await loadVpsCloudBrowserFolder()
+            } catch (err) {
+              setCloudStatusMsg('✕ Törlési hiba: ' + err.message, true)
+              this.disabled = false
+            }
+          })
+        })
+      })
 
       listEl.querySelectorAll('[data-cloud-open-dir]').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1040,6 +1125,49 @@
         setCloudStatusMsg('✕ Mappa létrehozási hiba: ' + err.message, true)
       } finally {
         this.disabled = false
+      }
+    })
+    document.getElementById('vpsCloudBrowserUploadBtn')?.addEventListener('click', function () {
+      document.getElementById('vpsCloudBrowserFileInp')?.click()
+    })
+    document.getElementById('vpsCloudBrowserFileInp')?.addEventListener('change', async function () {
+      const file = this.files && this.files[0]
+      if (!file) return
+      if (file.size > 20 * 1024 * 1024) {
+        setCloudStatusMsg('✕ A böngészős feltöltés maximuma 20 MB (választott fájl: ' + formatBytesUi(file.size) + ').', true)
+        this.value = ''
+        return
+      }
+      const upBtn = document.getElementById('vpsCloudBrowserUploadBtn')
+      if (upBtn) upBtn.disabled = true
+      setCloudStatusMsg('Fájl feltöltése: ' + file.name + ' (' + formatBytesUi(file.size) + ')...', false)
+      try {
+        const buf = await file.arrayBuffer()
+        const bytes = new Uint8Array(buf)
+        let bin = ''
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
+        }
+        const b64 = btoa(bin)
+        const curFolder = vpsCloudBrowser.stack.length > 0 ? vpsCloudBrowser.stack[vpsCloudBrowser.stack.length - 1].id : undefined
+        await apiJson('/api/admin/cloud/' + encodeURIComponent(activeProv.id) + '/upload', {
+          method: 'POST',
+          body: JSON.stringify({
+            account: vpsCloudBrowser.account || undefined,
+            parentRef: curFolder,
+            fileName: file.name,
+            mimeType: file.type || undefined,
+            contentBase64: b64,
+            onConflict: 'update_in_place',
+          }),
+        })
+        setCloudStatusMsg('✓ Feltöltve / frissítve: ' + file.name, false)
+        await loadVpsCloudBrowserFolder()
+      } catch (err) {
+        setCloudStatusMsg('✕ Feltöltési hiba (' + file.name + '): ' + err.message, true)
+      } finally {
+        this.value = ''
+        if (upBtn) upBtn.disabled = false
       }
     })
     if (connectedAccounts.length > 0) {

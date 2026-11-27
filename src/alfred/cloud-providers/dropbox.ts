@@ -590,4 +590,46 @@ export const dropboxProvider: CloudStorageProvider = {
       notified: params.notify,
     }
   },
+
+  async rename(ctx, itemRef, newName): Promise<CloudItem> {
+    const fromPath = normalizeDropboxConfinedPath(ctx.rootRef, itemRef)
+    if (!fromPath) {
+      throw new CloudStorageError('CLOUD_API_ERROR', 'A Dropbox gyökérmappa nem nevezhető át.', {
+        statusHttp: 400,
+        provider: 'dropbox',
+        account: ctx.account,
+      })
+    }
+    const lastSlash = fromPath.lastIndexOf('/')
+    const parentPath = lastSlash > 0 ? fromPath.slice(0, lastSlash) : ''
+    const toPath = `${parentPath}/${newName}`
+    const moved = await dropboxRpc<{ metadata?: DropboxEntryRaw }>(ctx, '/files/move_v2', {
+      from_path: fromPath,
+      to_path: toPath,
+      autorename: false,
+    })
+    if (!moved.metadata) {
+      throw new CloudStorageError('CLOUD_API_ERROR', 'Dropbox átnevezés válaszból hiányzik a metadata.', {
+        statusHttp: 502,
+        provider: 'dropbox',
+        account: ctx.account,
+      })
+    }
+    return mapDropboxEntry(moved.metadata)
+  },
+
+  async deleteItem(ctx, itemRef): Promise<{ deleted: boolean; trashed: boolean }> {
+    const targetPath = normalizeDropboxConfinedPath(ctx.rootRef, itemRef)
+    if (!targetPath) {
+      throw new CloudStorageError('CLOUD_API_ERROR', 'A Dropbox gyökérmappa nem törölhető.', {
+        statusHttp: 400,
+        provider: 'dropbox',
+        account: ctx.account,
+      })
+    }
+    await dropboxRpc<{ metadata?: DropboxEntryRaw }>(ctx, '/files/delete_v2', {
+      path: targetPath,
+    })
+    return { deleted: true, trashed: true }
+  },
 }

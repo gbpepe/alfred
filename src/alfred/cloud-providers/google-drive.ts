@@ -572,4 +572,33 @@ export const googleDriveProvider: CloudStorageProvider = {
       notified: params.publicLink ? false : params.notify,
     }
   },
+
+  async rename(ctx, itemRef, newName): Promise<CloudItem> {
+    const fileId = assertDriveId(itemRef, 'itemRef')
+    const fields = encodeURIComponent('id,name,mimeType,size,modifiedTime,webViewLink,parents')
+    const updated = await driveJsonFetch<GoogleDriveFileRaw>(
+      ctx,
+      `${GOOGLE_DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=${fields}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      },
+    )
+    return mapDriveFile(updated)
+  },
+
+  async deleteItem(ctx, itemRef): Promise<{ deleted: boolean; trashed: boolean }> {
+    const fileId = assertDriveId(itemRef, 'itemRef')
+    await driveJsonFetch<GoogleDriveFileRaw>(
+      ctx,
+      `${GOOGLE_DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=id,trashed`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trashed: true }),
+      },
+    )
+    return { deleted: true, trashed: true }
+  },
 }

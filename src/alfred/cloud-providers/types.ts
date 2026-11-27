@@ -231,6 +231,8 @@ export interface CloudStorageProvider {
   uploadStream(ctx: CloudAdapterCallContext, params: CloudUploadParams): Promise<CloudItem>
   downloadStream(ctx: CloudAdapterCallContext, params: CloudDownloadParams): Promise<CloudDownloadResult>
   share(ctx: CloudAdapterCallContext, params: CloudShareParams): Promise<CloudShareResult>
+  rename(ctx: CloudAdapterCallContext, itemRef: string, newName: string): Promise<CloudItem>
+  deleteItem(ctx: CloudAdapterCallContext, itemRef: string): Promise<{ deleted: boolean; trashed: boolean }>
 }
 
 export function isCloudProviderId(raw: string): raw is CloudProviderId {

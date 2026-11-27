@@ -551,4 +551,34 @@ export const oneDriveProvider: CloudStorageProvider = {
       notified: params.notify,
     }
   },
+
+  async rename(ctx, itemRef, newName): Promise<CloudItem> {
+    const itemId = assertGraphItemId(itemRef, 'itemRef')
+    const updated = await graphJsonFetch<GraphDriveItemRaw>(ctx, itemBaseUrl(itemId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    return mapGraphItem(updated)
+  },
+
+  async deleteItem(ctx, itemRef): Promise<{ deleted: boolean; trashed: boolean }> {
+    const itemId = assertGraphItemId(itemRef, 'itemRef')
+    const resp = await ctx.fetchImpl(itemBaseUrl(itemId), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${ctx.accessToken}` },
+    })
+    if (!resp.ok && resp.status !== 204) {
+      const errText = await resp.text().catch(() => '')
+      if (isInvalidGrantError(resp.status, errText)) {
+        throw new CloudReauthRequiredError('onedrive', ctx.account, `HTTP ${resp.status}`)
+      }
+      throw new CloudStorageError(
+        'CLOUD_API_ERROR',
+        `OneDrive törlés sikertelen (HTTP ${resp.status}): ${errText.slice(0, 220)}`,
+        { statusHttp: resp.status, provider: 'onedrive', account: ctx.account },
+      )
+    }
+    return { deleted: true, trashed: true }
+  },
 }

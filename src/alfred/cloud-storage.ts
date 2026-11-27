@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, relative, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import type Database from 'better-sqlite3'
 import { PROJECT_ROOT } from '../config.js'
 import { getDb, getInstalledModuleRow, upsertInstalledModuleRow } from '../db.js'
@@ -1391,6 +1392,182 @@ export async function cloudShare(
       detail: err instanceof Error ? err.message : String(err),
     })
     throw err
+  }
+}
+
+export async function cloudRename(
+  params: {
+    itemRef: string
+    newName: string
+    provider?: string
+    account?: string
+  },
+  opts?: CloudStorageOptions,
+): Promise<{ provider: CloudProviderId; account: string; item: CloudItem }> {
+  const cleanName = String(params.newName ?? '').trim()
+  if (!cleanName || cleanName === '.' || cleanName === '..' || /[/\\]/.test(cleanName)) {
+    throw new CloudStorageError(
+      'CLOUD_API_ERROR',
+      'Érvénytelen új név: nem lehet üres és nem tartalmazhat perjelet (/ vagy \\) vagy ".." elemet.',
+      { statusHttp: 400 },
+    )
+  }
+  const target = resolveCloudTarget({ provider: params.provider, account: params.account }, opts)
+  assertAccountWritable(target, params.itemRef)
+  const adapter = getCloudAdapter(target.provider)
+  const db = resolveOptionalDb(opts)
+  try {
+    const ctx = await buildAdapterContext(target, opts)
+    const item = await adapter.rename(ctx, params.itemRef, cleanName)
+    pathIdCache.clear()
+    recordCloudActivity(db, {
+      agentId: opts?.agentId ?? 'dashboard',
+      provider: target.provider,
+      account: target.account,
+      action: 'rename',
+      targetName: cleanName,
+      status: 'ok',
+      detail: params.itemRef,
+    })
+    return { provider: target.provider, account: target.account, item }
+  } catch (err) {
+    if (err instanceof CloudReauthRequiredError) {
+      markAccountReauthState(target.provider, target.account, true, err.message, opts)
+    }
+    recordCloudActivity(db, {
+      agentId: opts?.agentId ?? 'dashboard',
+      provider: target.provider,
+      account: target.account,
+      action: 'rename',
+      targetName: cleanName,
+      status: 'error',
+      detail: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+}
+
+export async function cloudDelete(
+  params: {
+    itemRef: string
+    provider?: string
+    account?: string
+  },
+  opts?: CloudStorageOptions,
+): Promise<{ provider: CloudProviderId; account: string; deleted: boolean; trashed: boolean }> {
+  const target = resolveCloudTarget({ provider: params.provider, account: params.account }, opts)
+  assertAccountWritable(target, params.itemRef)
+  const adapter = getCloudAdapter(target.provider)
+  const db = resolveOptionalDb(opts)
+  try {
+    const ctx = await buildAdapterContext(target, opts)
+    const res = await adapter.deleteItem(ctx, params.itemRef)
+    pathIdCache.clear()
+    recordCloudActivity(db, {
+      agentId: opts?.agentId ?? 'dashboard',
+      provider: target.provider,
+      account: target.account,
+      action: 'delete',
+      targetName: params.itemRef,
+      status: 'ok',
+      detail: res.trashed ? 'trashed' : 'deleted',
+    })
+    return { provider: target.provider, account: target.account, ...res }
+  } catch (err) {
+    if (err instanceof CloudReauthRequiredError) {
+      markAccountReauthState(target.provider, target.account, true, err.message, opts)
+    }
+    recordCloudActivity(db, {
+      agentId: opts?.agentId ?? 'dashboard',
+      provider: target.provider,
+      account: target.account,
+      action: 'delete',
+      targetName: params.itemRef,
+      status: 'error',
+      detail: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+}
+
+const MAX_DASHBOARD_BROWSER_UPLOAD_BYTES = 20 * 1024 * 1024 // 20 MiB cap for 256 MB web heap
+
+export async function cloudUploadBuffer(
+  params: {
+    fileName: string
+    buffer: Buffer
+    mimeType?: string
+    parentRef?: string
+    onConflict?: CloudUploadConflictMode
+    provider?: string
+    account?: string
+  },
+  opts?: CloudStorageOptions,
+): Promise<{ provider: CloudProviderId; account: string; item: CloudItem }> {
+  const cleanName = basename(String(params.fileName ?? '').trim())
+  if (!cleanName || cleanName === '.' || cleanName === '..') {
+    throw new CloudStorageError('CLOUD_API_ERROR', 'Érvénytelen fájlnév.', { statusHttp: 400 })
+  }
+  if (params.buffer.byteLength > MAX_DASHBOARD_BROWSER_UPLOAD_BYTES) {
+    throw new CloudStorageError(
+      'CLOUD_UPLOAD_LIMIT_EXCEEDED',
+      `A böngészős feltöltés maximuma 20 MB (kapott: ${Math.round((params.buffer.byteLength / 1_048_576) * 10) / 10} MB). Nagy fájlokhoz használd a VPS/ügynök stream feltöltést.`,
+      { statusHttp: 413 },
+    )
+  }
+  const target = resolveCloudTarget({ provider: params.provider, account: params.account }, opts)
+  const effectiveRel = params.parentRef ? `${params.parentRef.replace(/\/+$/, '')}/${cleanName}` : cleanName
+  assertAccountWritable(target, effectiveRel)
+  assertAccountWritable(target, cleanName)
+  const adapter = getCloudAdapter(target.provider)
+  const db = resolveOptionalDb(opts)
+  const tmpFile = join(tmpdir(), `alfred-web-up-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}.cloud-part.tmp`)
+  try {
+    writeFileSync(tmpFile, params.buffer)
+    const ctx = await buildAdapterContext(target, opts)
+    const parentId = params.parentRef
+      ? await resolveFolderPathOrId(adapter, ctx, params.parentRef, { createMissing: false })
+      : undefined
+    const item = await adapter.uploadStream(ctx, {
+      localFilePath: tmpFile,
+      fileSizeBytes: params.buffer.byteLength,
+      remoteName: cleanName,
+      parentRef: parentId,
+      mimeType: params.mimeType || guessMimeTypeFromFilename(cleanName),
+      onConflict: params.onConflict ?? 'update_in_place',
+    })
+    recordCloudActivity(db, {
+      agentId: opts?.agentId ?? 'dashboard',
+      provider: target.provider,
+      account: target.account,
+      action: 'upload',
+      targetName: cleanName,
+      bytes: params.buffer.byteLength,
+      status: 'ok',
+      detail: item.id,
+    })
+    return { provider: target.provider, account: target.account, item }
+  } catch (err) {
+    if (err instanceof CloudReauthRequiredError) {
+      markAccountReauthState(target.provider, target.account, true, err.message, opts)
+    }
+    recordCloudActivity(db, {
+      agentId: opts?.agentId ?? 'dashboard',
+      provider: target.provider,
+      account: target.account,
+      action: 'upload',
+      targetName: cleanName,
+      bytes: params.buffer.byteLength,
+      status: 'error',
+      detail: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  } finally {
+    try {
+      if (existsSync(tmpFile)) unlinkSync(tmpFile)
+    } catch {
+      // ignore cleanup error
+    }
   }
 }
 

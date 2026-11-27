@@ -74,10 +74,13 @@ import {
   getAdminBatchesOverview,
 } from '../../alfred/batch-runner.js'
 import {
+  cloudDelete,
   cloudList,
   cloudMkdir,
+  cloudRename,
   cloudShare,
   CloudStorageError,
+  cloudUploadBuffer,
   completeCloudOAuthFlow,
   disconnectCloudAccount,
   getCloudAdminStatus,
@@ -965,6 +968,108 @@ export async function tryHandleAlfredVps(ctx: RouteContext): Promise<boolean> {
         { db, env, agentId: 'dashboard' },
       )
       json(res, { ok: true, share: shared })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudRenameMatch = /^\/api\/admin\/cloud\/([^/]+)\/rename$/.exec(path)
+  if (cloudRenameMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudRenameMatch[1]).trim()
+      const body = await readJsonBody<{ account?: string; itemRef?: string; newName?: string }>(req)
+      const itemRef = String(body?.itemRef ?? '').trim()
+      const newName = String(body?.newName ?? '').trim()
+      if (!itemRef || !newName) {
+        json(res, { ok: false, error: 'Az itemRef és newName mező kötelező.' }, 400)
+        return true
+      }
+      const db = getDb()
+      const renamed = await cloudRename(
+        { provider, account: body?.account?.trim() || undefined, itemRef, newName },
+        { db, env, agentId: 'dashboard' },
+      )
+      json(res, { ok: true, ...renamed })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudDeleteMatch = /^\/api\/admin\/cloud\/([^/]+)\/delete$/.exec(path)
+  if (cloudDeleteMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudDeleteMatch[1]).trim()
+      const body = await readJsonBody<{ account?: string; itemRef?: string }>(req)
+      const itemRef = String(body?.itemRef ?? '').trim()
+      if (!itemRef) {
+        json(res, { ok: false, error: 'Az itemRef mező kötelező.' }, 400)
+        return true
+      }
+      const db = getDb()
+      const removed = await cloudDelete(
+        { provider, account: body?.account?.trim() || undefined, itemRef },
+        { db, env, agentId: 'dashboard' },
+      )
+      json(res, { ok: true, ...removed })
+    } catch (err) {
+      sendCloudError(err)
+    }
+    return true
+  }
+
+  const cloudUploadMatch = /^\/api\/admin\/cloud\/([^/]+)\/upload$/.exec(path)
+  if (cloudUploadMatch && method === 'POST') {
+    const env = { ...readEnvFile(), ...process.env }
+    const authCheck = authorizeAdminCliRequest(ctx, env)
+    if (!authCheck.ok) {
+      json(res, { ok: false, error: authCheck.error }, authCheck.status)
+      return true
+    }
+    try {
+      const provider = decodeURIComponent(cloudUploadMatch[1]).trim()
+      const body = await readJsonBody<{
+        account?: string
+        parentRef?: string
+        fileName?: string
+        contentBase64?: string
+        mimeType?: string
+        onConflict?: 'update_in_place' | 'autorename' | 'fail'
+      }>(req, 30 * 1024 * 1024)
+      const fileName = String(body?.fileName ?? '').trim()
+      const b64 = String(body?.contentBase64 ?? '')
+      if (!fileName) {
+        json(res, { ok: false, error: 'A fileName mező kötelező.' }, 400)
+        return true
+      }
+      const buffer = Buffer.from(b64, 'base64')
+      const db = getDb()
+      const uploaded = await cloudUploadBuffer(
+        {
+          provider,
+          account: body?.account?.trim() || undefined,
+          parentRef: body?.parentRef?.trim() || undefined,
+          fileName,
+          buffer,
+          mimeType: body?.mimeType?.trim() || undefined,
+          onConflict: body?.onConflict ?? 'update_in_place',
+        },
+        { db, env, agentId: 'dashboard' },
+      )
+      json(res, { ok: true, ...uploaded })
     } catch (err) {
       sendCloudError(err)
     }

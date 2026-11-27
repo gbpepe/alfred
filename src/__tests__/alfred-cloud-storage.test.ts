@@ -18,11 +18,14 @@ import { buildSanitizedCliEnv, sanitizeCliText } from '../alfred/cli-runner.js'
 import {
   assertSafeCloudUploadPath,
   clearCloudStorageInMemoryCaches,
+  cloudDelete,
   cloudDownload,
   cloudList,
   cloudMkdir,
+  cloudRename,
   cloudShare,
   cloudUpload,
+  cloudUploadBuffer,
   cloudVaultKey,
   completeCloudOAuthFlow,
   disconnectCloudAccount,
@@ -1109,6 +1112,69 @@ describe('Cloud Storage Module (feat/cloud-storage)', () => {
       const handledBrowse = await tryHandleAlfredVps(unauthBrowse.ctx)
       expect(handledBrowse).toBe(true)
       expect([401, 403]).toContain(unauthBrowse.getResult().status)
+    })
+
+    it('supports cloudRename, cloudDelete (soft-trash), and cloudUploadBuffer while enforcing read_only guard', async () => {
+      const { ops } = createInMemoryVault()
+      ops.setSecret('cloud_gdrive_client_id', 'gd id', 'cid_gd')
+      ops.setSecret('cloud_gdrive_client_secret', 'gd sec', 'csec_gd')
+      ops.setSecret('cloud_gdrive_refresh_token', 'gd rt', 'ref_gd_1')
+      ops.setSecret(cloudVaultKey('gdrive', 'refresh_token', 'ro'), 'gd ro rt', 'ref_gd_ro')
+      saveCloudAdminConfig({ provider: 'gdrive', account: 'ro', accessMode: 'read_only' }, { db, projectRoot: tmpRoot, vaultOps: ops, env: {} })
+
+      const calls: Array<{ method: string; url: string; body?: string }> = []
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        const body = typeof init?.body === 'string' ? init.body : undefined
+        calls.push({ method, url, body })
+        if (url.includes('oauth2.googleapis.com/token')) {
+          return jsonResponse({ access_token: 'acc_gd_1', expires_in: 3600 })
+        }
+        if (url.includes('/upload/drive/v3/files')) {
+          return new Response('', { status: 200, headers: { Location: 'https://gd-upload.example/buf1' } })
+        }
+        if (url === 'https://gd-upload.example/buf1') {
+          return jsonResponse({ id: 'file_buf_1234', name: 'note.txt', mimeType: 'text/plain', size: '5' })
+        }
+        if (url.includes('/drive/v3/files?')) {
+          return jsonResponse({ files: [] })
+        }
+        if (url.includes('/drive/v3/files/file_buf_1234') && method === 'PATCH') {
+          const parsed = JSON.parse(body || '{}') as { name?: string; trashed?: boolean }
+          if (parsed.trashed) return jsonResponse({ id: 'file_buf_1234', trashed: true })
+          return jsonResponse({ id: 'file_buf_1234', name: parsed.name || 'renamed.txt', mimeType: 'text/plain' })
+        }
+        return jsonResponse({}, 404)
+      })
+      const opts: CloudStorageOptions = {
+        db,
+        projectRoot: tmpRoot,
+        vaultOps: ops,
+        env: {},
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        skipDiskSpaceCheck: true,
+      }
+
+      // read_only account rejects rename & delete
+      await expect(
+        cloudRename({ provider: 'gdrive', account: 'ro', itemRef: 'file_buf_1234', newName: 'x.txt' }, opts),
+      ).rejects.toMatchObject({ code: 'CLOUD_ACCOUNT_READONLY' })
+      await expect(
+        cloudDelete({ provider: 'gdrive', account: 'ro', itemRef: 'file_buf_1234' }, opts),
+      ).rejects.toMatchObject({ code: 'CLOUD_ACCOUNT_READONLY' })
+
+      // Upload buffer, rename, and soft-delete (trashed=true)
+      const up = await cloudUploadBuffer({ provider: 'gdrive', fileName: 'note.txt', buffer: Buffer.from('hello') }, opts)
+      expect(up.item.id).toBe('file_buf_1234')
+
+      const ren = await cloudRename({ provider: 'gdrive', itemRef: 'file_buf_1234', newName: 'renamed.txt' }, opts)
+      expect(ren.item.name).toBe('renamed.txt')
+
+      const del = await cloudDelete({ provider: 'gdrive', itemRef: 'file_buf_1234' }, opts)
+      expect(del.deleted).toBe(true)
+      expect(del.trashed).toBe(true)
+      expect(calls.some((c) => c.method === 'PATCH' && c.body?.includes('"trashed":true'))).toBe(true)
     })
   })
 })
