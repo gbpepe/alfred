@@ -53,12 +53,14 @@ class GcpTokenProvider:
         http_client: httpx.AsyncClient | None = None,
         refresh_margin_sec: int = 120,
         clock: Callable[[], float] | None = None,
+        monotonic_clock: Callable[[], float] | None = None,
     ) -> None:
         self.credentials = credentials
         self.scopes = scopes
         self._http_client = http_client
         self._refresh_margin_sec = refresh_margin_sec
         self._clock = clock or time.time
+        self._mono_clock = monotonic_clock or (clock if clock is not None else time.monotonic)
         self._lock = asyncio.Lock()
         self._cached: _CachedAccessToken | None = None
         loaded_key = serialization.load_pem_private_key(
@@ -92,14 +94,14 @@ class GcpTokenProvider:
     async def get_access_token(self) -> str:
         """Return valid cached OAuth2 access token or exchange a fresh RS256 JWT via `httpx`."""
         async with self._lock:
-            now = self._clock()
+            mono_now = self._mono_clock()
             if (
                 self._cached is not None
-                and self._cached.expires_at - now > self._refresh_margin_sec
+                and self._cached.expires_at - mono_now > self._refresh_margin_sec
             ):
                 return self._cached.access_token
 
-            assertion = self.build_signed_jwt(now=now)
+            assertion = self.build_signed_jwt(now=self._clock())
             owns_client = self._http_client is None
             client = self._http_client or httpx.AsyncClient(timeout=15.0)
             try:
@@ -122,11 +124,15 @@ class GcpTokenProvider:
                 )
             payload = resp.json()
             token = payload.get("access_token")
-            expires_in = int(payload.get("expires_in", 3600))
+            expires_in_raw = payload.get("expires_in", 3600)
+            try:
+                expires_in = max(60, min(int(expires_in_raw), 86400))
+            except (TypeError, ValueError):
+                expires_in = 3600
             if not isinstance(token, str) or not token:
                 raise GcpAuthError("GCP OAuth2 response omitted access_token")
             self._cached = _CachedAccessToken(
                 access_token=token,
-                expires_at=now + expires_in,
+                expires_at=mono_now + expires_in,
             )
             return token

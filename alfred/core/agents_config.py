@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from alfred.core.config import AgentConfig, AgentsConfig
 from alfred.core.env_file import atomic_write_text
+from alfred.kernel.errors import ModuleSecurityError
 from alfred.kernel.loader import discover_manifests
 
 BUILTIN_HTTP_PROVIDERS: Final[frozenset[str]] = frozenset(
@@ -41,8 +42,19 @@ def _expand_env_ref(raw: str | None, env_lookup: Mapping[str, str]) -> str | Non
     return raw.strip() or None
 
 
+def resolve_confined_workspace(project_root: Path, workspace: str) -> Path:
+    """Resolve `workspace` under `project_root` and fail closed on path escapes."""
+    root = project_root.resolve()
+    target = (root / Path(workspace)).resolve()
+    if not target.is_relative_to(root):
+        raise ModuleSecurityError(
+            f"Agent workspace '{workspace}' escapes project root '{root}'"
+        )
+    return target
+
+
 class AgentsConfigManager:
-    """Thread-safe `mtime_ns` cache + role inheritance + manifest-validated agent resolver."""
+    """Single-event-loop `mtime_ns` cache + role inheritance + manifest-validated agent resolver."""
 
     def __init__(
         self,

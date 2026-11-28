@@ -87,6 +87,16 @@ class DiscordRestError(Exception):
     """Raised when Discord REST delivery fails after retries."""
 
 
+def _parse_retry_after_header(header_val: str | None) -> float:
+    if not header_val:
+        return 1.0
+    try:
+        parsed = float(header_val.strip())
+    except ValueError:
+        return 1.0
+    return parsed if parsed >= 0.0 else 1.0
+
+
 class DiscordRestClient:
     """Async `httpx` Discord REST v10 message sender with `429` retry_after backoff."""
 
@@ -150,8 +160,18 @@ class DiscordRestClient:
                 raise DiscordRestError(f"Discord REST network failure: {exc}") from exc
 
             if resp.status_code == 429 and attempt < self._max_retries:
-                data = resp.json() if resp.content else {}
-                retry_after = float(data.get("retry_after", 1.0)) if isinstance(data, dict) else 1.0
+                retry_after = 1.0
+                if resp.content:
+                    try:
+                        data = resp.json()
+                        if isinstance(data, dict) and "retry_after" in data:
+                            retry_after = float(data["retry_after"])
+                    except (ValueError, TypeError):
+                        data = None
+                    if not isinstance(data, dict) or "retry_after" not in data:
+                        retry_after = _parse_retry_after_header(resp.headers.get("Retry-After"))
+                else:
+                    retry_after = _parse_retry_after_header(resp.headers.get("Retry-After"))
                 await self._sleep(max(0.0, min(retry_after, 30.0)))
                 continue
 

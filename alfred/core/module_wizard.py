@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import UTC, datetime
 from typing import Final
@@ -23,16 +24,49 @@ FORBIDDEN_WIZARD_ENV_KEYS: Final[frozenset[str]] = frozenset(
         "LD_LIBRARY_PATH",
         "PYTHONPATH",
         "PYTHONHOME",
+        "PYTHONSTARTUP",
+        "PYTHONINSPECT",
+        "PYTHONUSERBASE",
         "NODE_OPTIONS",
+        "ALFRED_ENV",
+        "ALFRED_PROJECT_ROOT",
+        "ALFRED_DB_FILENAME",
         "ALFRED_DASHBOARD_TOKEN",
         "DASHBOARD_TOKEN",
         "VAULT_MASTER_KEY",
+        "ALLOWED_USER_IDS",
+        "DISCORD_BOT_TOKEN",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "SSL_CERT_FILE",
+        "REQUESTS_CA_BUNDLE",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
         "HOME",
         "USER",
         "SHELL",
         "SSH_AUTH_SOCK",
     }
 )
+
+FORBIDDEN_WIZARD_ENV_PREFIXES: Final[tuple[str, ...]] = (
+    "LD_",
+    "DYLD_",
+    "PYTHON",
+    "ALFRED_ENV",
+    "ALFRED_PROJECT_",
+    "ALFRED_DB_",
+    "ALFRED_DASHBOARD_",
+)
+
+
+def is_forbidden_wizard_key(key: str) -> bool:
+    """Return True if a normalized Wizard/env key matches a forbidden key or prefix."""
+    norm = key.strip().upper()
+    if not norm:
+        return True
+    if norm in FORBIDDEN_WIZARD_ENV_KEYS:
+        return True
+    return any(norm.startswith(prefix) for prefix in FORBIDDEN_WIZARD_ENV_PREFIXES)
 
 
 class WizardFieldStatusDTO(BaseModel):
@@ -214,7 +248,7 @@ class ModuleWizardService:
         saved_keys: list[str] = []
 
         for key, raw_val in payload.values.items():
-            if key.upper() in FORBIDDEN_WIZARD_ENV_KEYS or key in FORBIDDEN_WIZARD_ENV_KEYS:
+            if is_forbidden_wizard_key(key):
                 raise ModuleSecurityError(
                     f"Environment/system key '{key}' is forbidden in module Setup Wizard",
                     module_id=module_id,
@@ -250,7 +284,7 @@ class ModuleWizardService:
         for key, secret_val, label in vault_writes:
             await self.vault.set_secret(key, secret_val, label=label)
         if env_updates:
-            update_env_file(self.settings.env_path, env_updates)
+            await asyncio.to_thread(update_env_file, self.settings.env_path, env_updates)
         if config_patch:
             now_iso = datetime.now(tz=UTC).isoformat()
             await self.db.update_module_config(module_id, config_patch, now_iso)

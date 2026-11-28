@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import math
 import re
 import time
 from datetime import UTC, datetime
@@ -12,6 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from alfred.core.db import SqlitePool
 from alfred.kernel.registry import ModuleRegistry
 from alfred.kernel.types import ComputeUsageRecord
+
+_logger = logging.getLogger("alfred.circuit_breaker")
 
 BUILTIN_ZERO_COST_PREFIXES: Final[tuple[str, ...]] = (
     r"^claude-cli:",
@@ -35,7 +40,7 @@ class TokenUsageRecord(BaseModel):
     cache_read_tokens: int = Field(default=0, ge=0)
     cache_creation_tokens: int = Field(default=0, ge=0)
     thinking_tokens: int = Field(default=0, ge=0)
-    cost_usd: float = Field(default=0.0, ge=0.0)
+    cost_usd: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     content_preview: str | None = None
     tool_name: str | None = None
     task_title: str | None = None
@@ -70,6 +75,8 @@ class CircuitBreaker:
     def __init__(self, db: SqlitePool, registry: ModuleRegistry | None = None) -> None:
         self._db = db
         self._registry = registry
+        self._budget_lock = asyncio.Lock()
+        self._in_flight_usd: dict[str, float] = {}
 
     def zero_cost_patterns(self) -> tuple[str, ...]:
         """Return built-in plus active-plugin `$0.00` regex prefixes."""
@@ -79,11 +86,14 @@ class CircuitBreaker:
     def is_zero_cost_model(self, model: str) -> bool:
         """Check whether `model` matches any subscription / `$0.00` quota prefix."""
         for pattern in self.zero_cost_patterns():
-            if re.search(pattern, model):
-                return True
+            try:
+                if re.match(pattern, model):
+                    return True
+            except re.error:
+                _logger.warning("Ignoring invalid zero-cost regex pattern: %r", pattern)
         return False
 
-    async def check_budget(
+    async def _evaluate_budget_unlocked(
         self,
         *,
         agent_id: str,
@@ -92,10 +102,17 @@ class CircuitBreaker:
         global_daily_limit_usd: float,
         now_ts: int | None = None,
     ) -> BudgetCheckResult:
-        """Check whether an agent invocation fits within combined token+compute daily budgets."""
+        if not math.isfinite(agent_daily_limit_usd) or not math.isfinite(global_daily_limit_usd):
+            raise ValueError("Budget limits must be finite numbers")
+
         since = utc_day_start_sec(now_ts)
-        agent_spend = await self._db.get_daily_spend_usd(since_ts=since, agent=agent_id)
-        global_spend = await self._db.get_daily_spend_usd(since_ts=since)
+        db_agent_spend = await self._db.get_daily_spend_usd(since_ts=since, agent=agent_id)
+        db_global_spend = await self._db.get_daily_spend_usd(since_ts=since)
+
+        in_flight_agent = self._in_flight_usd.get(agent_id, 0.0)
+        in_flight_global = sum(self._in_flight_usd.values())
+        agent_spend = db_agent_spend + in_flight_agent
+        global_spend = db_global_spend + in_flight_global
 
         if self.is_zero_cost_model(model):
             return BudgetCheckResult(
@@ -122,7 +139,7 @@ class CircuitBreaker:
                 ),
             )
 
-        if global_daily_limit_usd > 0 and global_spend >= global_daily_limit_usd:
+        if global_daily_limit_usd >= 0 and global_spend >= global_daily_limit_usd:
             return BudgetCheckResult(
                 allowed=False,
                 zero_cost=False,
@@ -145,6 +162,64 @@ class CircuitBreaker:
             global_limit_usd=global_daily_limit_usd,
         )
 
+    async def check_budget(
+        self,
+        *,
+        agent_id: str,
+        model: str,
+        agent_daily_limit_usd: float,
+        global_daily_limit_usd: float,
+        now_ts: int | None = None,
+    ) -> BudgetCheckResult:
+        """Check whether an agent invocation fits within combined token+compute daily budgets."""
+        async with self._budget_lock:
+            return await self._evaluate_budget_unlocked(
+                agent_id=agent_id,
+                model=model,
+                agent_daily_limit_usd=agent_daily_limit_usd,
+                global_daily_limit_usd=global_daily_limit_usd,
+                now_ts=now_ts,
+            )
+
+    async def reserve_budget(
+        self,
+        *,
+        agent_id: str,
+        model: str,
+        agent_daily_limit_usd: float,
+        global_daily_limit_usd: float,
+        estimated_cost_usd: float = 0.01,
+        now_ts: int | None = None,
+    ) -> tuple[BudgetCheckResult, float]:
+        """Atomically evaluate daily budget and reserve estimated in-flight USD if allowed."""
+        if not math.isfinite(estimated_cost_usd) or estimated_cost_usd < 0.0:
+            raise ValueError("estimated_cost_usd must be finite and non-negative")
+        async with self._budget_lock:
+            decision = await self._evaluate_budget_unlocked(
+                agent_id=agent_id,
+                model=model,
+                agent_daily_limit_usd=agent_daily_limit_usd,
+                global_daily_limit_usd=global_daily_limit_usd,
+                now_ts=now_ts,
+            )
+            if not decision.allowed or decision.zero_cost or estimated_cost_usd == 0.0:
+                return decision, 0.0
+            self._in_flight_usd[agent_id] = (
+                self._in_flight_usd.get(agent_id, 0.0) + estimated_cost_usd
+            )
+            return decision, estimated_cost_usd
+
+    async def release_reservation(self, agent_id: str, reserved_usd: float) -> None:
+        """Release previously reserved in-flight USD budget after request completion."""
+        if reserved_usd <= 0.0:
+            return
+        async with self._budget_lock:
+            remaining = self._in_flight_usd.get(agent_id, 0.0) - reserved_usd
+            if remaining <= 1e-12:
+                self._in_flight_usd.pop(agent_id, None)
+            else:
+                self._in_flight_usd[agent_id] = remaining
+
     async def record_token_usage(
         self,
         record: TokenUsageRecord,
@@ -152,6 +227,8 @@ class CircuitBreaker:
         now_ts: int | None = None,
     ) -> None:
         """Persist LLM token & USD usage row."""
+        if not math.isfinite(record.cost_usd):
+            raise ValueError("Token cost_usd must be finite")
         ts = now_ts if now_ts is not None else int(time.time())
         cost = 0.0 if self.is_zero_cost_model(record.model) else record.cost_usd
         await self._db.record_token_usage(
@@ -178,6 +255,8 @@ class CircuitBreaker:
         now_ts: int | None = None,
     ) -> None:
         """Persist non-token compute billing entry to `compute_usage`."""
+        if not math.isfinite(record.cost_usd):
+            raise ValueError("Compute cost_usd must be finite")
         ts = now_ts if now_ts is not None else int(time.time())
         await self._db.record_compute_usage(
             module_id=record.module_id,

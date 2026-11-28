@@ -18,6 +18,7 @@ from alfred.core.auth import AuthService
 from alfred.core.circuit_breaker import CircuitBreaker
 from alfred.core.config import CoreSettings
 from alfred.core.db import SqlitePool
+from alfred.core.gcp_auth import GcpTokenProvider, ServiceAccountCredentials
 from alfred.core.model_router import ModelRouter
 from alfred.core.module_manager import ModuleManager
 from alfred.core.module_wizard import ModuleWizardService
@@ -74,7 +75,24 @@ def _resolve_admin_token(settings: CoreSettings, explicit_token: str | None) -> 
         loaded = token_file.read_text(encoding="utf-8").strip()
         if loaded:
             return loaded
+    if settings.environment == "prod":
+        raise RuntimeError(
+            "ALFRED_DASHBOARD_TOKEN or store/.dashboard-token is required when ALFRED_ENV=prod"
+        )
     return secrets.token_urlsafe(32)
+
+
+def _build_optional_gcp_token_provider(
+    http_client: httpx.AsyncClient | None,
+) -> GcpTokenProvider | None:
+    creds_raw = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    if not creds_raw:
+        return None
+    creds_path = Path(creds_raw)
+    if not creds_path.is_file():
+        return None
+    creds = ServiceAccountCredentials.model_validate_json(creds_path.read_text(encoding="utf-8"))
+    return GcpTokenProvider(creds, http_client=http_client)
 
 
 def build_core_container(
@@ -107,12 +125,16 @@ def build_core_container(
     )
     agents = AgentsConfigManager(settings.agents_config_path, modules_dir=settings.modules_dir)
     circuit_breaker = CircuitBreaker(db, registry=registry)
+    gcp_token_provider = _build_optional_gcp_token_provider(http_client=http_client)
     router = ModelRouter(
         db=db,
         circuit_breaker=circuit_breaker,
         registry=registry,
         http_client=http_client,
         vault=vault,
+        gcp_token_provider=gcp_token_provider,
+        vertex_project_id=os.environ.get("GOOGLE_CLOUD_PROJECT") or None,
+        vertex_location=os.environ.get("VERTEX_LOCATION", "europe-west1"),
     )
     tool_executor = ToolExecutor(registry=registry)
     module_manager = ModuleManager(

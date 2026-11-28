@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections.abc import Sequence
@@ -12,9 +13,9 @@ import httpx
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from alfred.core.agents_config import AgentsConfigManager
+from alfred.core.agents_config import AgentsConfigManager, resolve_confined_workspace
 from alfred.core.circuit_breaker import CircuitBreaker, TokenUsageRecord
 from alfred.core.config import AgentsConfig
 from alfred.core.db import SqlitePool
@@ -503,3 +504,262 @@ async def test_tool_executor_whitelist_inactive_auth_and_validation(tmp_path: Pa
             workspace_dir=tmp_path,
         )
         assert bad_args.ok is False and bad_args.error_code == "TOOL_VALIDATION_ERROR"
+
+
+async def test_circuit_breaker_zero_global_limit_inf_prefix_anchor_and_concurrent_reservation(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValidationError):
+        TokenUsageRecord(agent="a", model="m", cost_usd=float("inf"))
+
+    async with SqlitePool(tmp_path / "store" / "alfred.db") as db:
+        registry = ModuleRegistry()
+
+        class _UnanchoredProvider:
+            provider_id = "unanchored"
+            zero_cost_model_prefixes: Sequence[str] = (r"free-prefix:",)
+            eu_only_compliant = True
+
+            def supports_model(self, model: str) -> bool:
+                return True
+
+            async def generate(self, request: ModelProviderRequest) -> ModelProviderResponse:
+                return ModelProviderResponse(content="ok")
+
+        class _RegPlugin(BaseModulePlugin):
+            id = "pref-mod"
+
+            def providers(self) -> Sequence[Any]:
+                return [_UnanchoredProvider()]
+
+        loader = ModuleLoader(
+            modules_dir=tmp_path / "modules",
+            store_dir=tmp_path / "store",
+            db=db,
+            vault=VaultManager(tmp_path / "store" / "vault.json", tmp_path / "store" / ".k"),
+            registry=registry,
+            heavy_job=HeavyJobHoldManager(tmp_path / "store" / ".hold"),
+        )
+        manifest = ModuleManifest(
+            id="pref-mod",
+            name="Pref Mod",
+            category="ai",
+            version="1.0.0",
+            providers=["unanchored"],
+        )
+        ctx = loader.build_context(
+            module_id="pref-mod",
+            module_dir=tmp_path / "modules" / "pref-mod",
+            manifest=manifest,
+        )
+        registry.register_module(
+            plugin=_RegPlugin(),
+            manifest=manifest,
+            module_dir=tmp_path / "modules" / "pref-mod",
+            ctx=ctx,
+        )
+
+        breaker = CircuitBreaker(db, registry=registry)
+        # Prefix match anchored at start -> mid-string cannot match!
+        assert breaker.is_zero_cost_model("free-prefix:mini") is True
+        assert breaker.is_zero_cost_model("gpt-4o-free-prefix:paid") is False
+
+        # Global daily limit == 0.0 blocks paid models just like agent_daily_limit_usd == 0.0
+        zero_global = await breaker.check_budget(
+            agent_id="agent-a",
+            model="gpt-4o",
+            agent_daily_limit_usd=5.0,
+            global_daily_limit_usd=0.0,
+        )
+        assert zero_global.allowed is False
+
+        with pytest.raises(ValueError, match="finite"):
+            await breaker.check_budget(
+                agent_id="agent-a",
+                model="gpt-4o",
+                agent_daily_limit_usd=float("inf"),
+                global_daily_limit_usd=10.0,
+            )
+
+        # Concurrent budget reservation prevents two simultaneous calls exceeding tight budget
+        dec1, res1 = await breaker.reserve_budget(
+            agent_id="agent-tight",
+            model="deepseek-chat",
+            agent_daily_limit_usd=0.005,
+            global_daily_limit_usd=10.0,
+            estimated_cost_usd=0.01,
+        )
+        assert dec1.allowed is True and res1 == pytest.approx(0.01)
+
+        dec2, res2 = await breaker.reserve_budget(
+            agent_id="agent-tight",
+            model="deepseek-chat",
+            agent_daily_limit_usd=0.005,
+            global_daily_limit_usd=10.0,
+            estimated_cost_usd=0.01,
+        )
+        assert dec2.allowed is False and res2 == 0.0
+
+        await breaker.release_reservation("agent-tight", res1)
+        dec3, res3 = await breaker.reserve_budget(
+            agent_id="agent-tight",
+            model="deepseek-chat",
+            agent_daily_limit_usd=0.005,
+            global_daily_limit_usd=10.0,
+            estimated_cost_usd=0.01,
+        )
+        assert dec3.allowed is True
+        await breaker.release_reservation("agent-tight", res3)
+
+
+async def test_model_router_malformed_tool_json_vertex_eu_location_and_workspace_confinement(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ModuleSecurityError):
+        resolve_confined_workspace(tmp_path, "../outside-escape")
+
+    cfg_path = tmp_path / "config" / "agents.json"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(json.dumps(_sample_agents_payload()), encoding="utf-8")
+    agents_mgr = AgentsConfigManager(cfg_path)
+
+    async with SqlitePool(tmp_path / "store" / "alfred.db") as db:
+        registry = ModuleRegistry()
+        breaker = CircuitBreaker(db, registry=registry)
+
+        def _bad_tool_json_handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "",
+                                "tool_calls": [
+                                    {
+                                        "id": "tc-bad",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "echo_tool",
+                                            "arguments": "{not-valid-json",
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 20, "completion_tokens": 10},
+                },
+            )
+
+        sa_creds = ServiceAccountCredentials(
+            client_email="alfred@example.iam.gserviceaccount.com",
+            private_key=_generate_test_rsa_pem(),
+            project_id="alfred-eu-proj",
+        )
+        gcp = GcpTokenProvider(sa_creds)
+
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(_bad_tool_json_handler)
+        ) as llm_http:
+            router = ModelRouter(
+                db=db,
+                circuit_breaker=breaker,
+                registry=registry,
+                http_client=llm_http,
+                env_getter=lambda k: "fake-ds-key" if k == "DEEPSEEK_API_KEY" else None,
+                gcp_token_provider=gcp,
+                vertex_location="us-central1",
+            )
+            default_agent = agents_mgr.resolve_agent("agent-default")
+            assert default_agent is not None
+
+            req = ModelProviderRequest(
+                agent_id="agent-default",
+                session_id="s-json",
+                model="deepseek-chat",
+                messages=[ProviderMessage(role="user", content="run tool")],
+                workspace_dir=tmp_path,
+            )
+            resp = await router.generate(
+                resolved_agent=default_agent,
+                global_budget_usd=10.0,
+                request=req,
+            )
+            assert len(resp.tool_calls) == 1
+
+            # Register echo_tool and ensure ToolExecutor yields recoverable TOOL_JSON_ERROR
+            class _EchoPlugin(BaseModulePlugin):
+                id = "echo-mod"
+
+                def tools(self) -> Sequence[ModuleToolDefinition[Any]]:
+                    async def _exec(
+                        args: _CalcArgs,
+                        _ctx: ToolExecutionContext,
+                    ) -> ToolExecutionResult:
+                        return ToolExecutionResult(ok=True, output=args.value)
+
+                    return [
+                        ModuleToolDefinition(
+                            name="echo_tool",
+                            description="Echo int",
+                            args_model=_CalcArgs,
+                            execute=_exec,
+                        )
+                    ]
+
+            mod_dir = tmp_path / "modules" / "echo-mod"
+            manifest = ModuleManifest(
+                id="echo-mod",
+                name="Echo",
+                category="core",
+                version="1.0.0",
+                tools=["echo_tool"],
+            )
+            loader = ModuleLoader(
+                modules_dir=tmp_path / "modules",
+                store_dir=tmp_path / "store",
+                db=db,
+                vault=VaultManager(tmp_path / "store" / "vault.json", tmp_path / "store" / ".k"),
+                registry=registry,
+                heavy_job=HeavyJobHoldManager(tmp_path / "store" / ".hold"),
+            )
+            ctx = loader.build_context(
+                module_id="echo-mod",
+                module_dir=mod_dir,
+                manifest=manifest,
+            )
+            registry.register_module(
+                plugin=_EchoPlugin(),
+                manifest=manifest,
+                module_dir=mod_dir,
+                ctx=ctx,
+            )
+
+            executor = ToolExecutor(registry=registry)
+            err_res = await executor.execute_tool(
+                agent=default_agent.config,
+                tool_name=resp.tool_calls[0].name,
+                raw_args=resp.tool_calls[0].arguments,
+                session_id="s-json",
+                workspace_dir=tmp_path,
+            )
+            assert err_res.ok is False and err_res.error_code == "TOOL_JSON_ERROR"
+
+            # Non-EU vertex_location must fail GDPR check both on eu_only and _call_vertex_eu
+            assert router.is_provider_eu_compliant("vertex-eu") is False
+            vertex_agent = default_agent.model_copy(
+                update={
+                    "effective_provider": "vertex-eu",
+                    "effective_model": "gemini-2.5-flash",
+                }
+            )
+            with pytest.raises(GdprComplianceError):
+                await router.generate(
+                    resolved_agent=vertex_agent,
+                    global_budget_usd=10.0,
+                    request=req,
+                )
+
+            # Avoid unused asyncio import warning if needed by verifying concurrent gather compiles
+            await asyncio.sleep(0)

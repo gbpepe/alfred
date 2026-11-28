@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import random
 import time
+import weakref
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Final, Protocol, runtime_checkable
@@ -72,26 +74,33 @@ class DiscordGatewayClient:
         db: SqlitePool,
         on_message: InboundHandler,
         allowed_user_ids: frozenset[str] = frozenset(),
+        allow_all_users: bool = False,
         intents: int = DEFAULT_INTENTS,
         gateway_url: str = DISCORD_GATEWAY_URL,
         connect_fn: ConnectFactory | None = None,
         sleep_fn: Callable[[float], Awaitable[None]] | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         self._bot_token = bot_token
         self._db = db
         self._on_message = on_message
         self.allowed_user_ids = allowed_user_ids
+        self.allow_all_users = allow_all_users
         self._intents = intents
         self._gateway_url = gateway_url
         self._connect_fn: ConnectFactory = connect_fn or _default_connect
         self._sleep = sleep_fn or asyncio.sleep
+        self._logger = logger or logging.getLogger("alfred.discord_gateway")
 
         self.session_id: str | None = None
         self.resume_gateway_url: str | None = None
         self.seq: int | None = None
         self._stop_event = asyncio.Event()
-        self._channel_locks: dict[str, asyncio.Lock] = {}
+        self._channel_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+            weakref.WeakValueDictionary()
+        )
         self._inflight_tasks: set[asyncio.Task[None]] = set()
+        self._heartbeat_ack_received: bool = True
 
     def stop(self) -> None:
         """Signal the Gateway loop to terminate cleanly."""
@@ -103,6 +112,35 @@ class DiscordGatewayClient:
             lock = asyncio.Lock()
             self._channel_locks[channel_id] = lock
         return lock
+
+    def _on_task_done(self, task: asyncio.Task[None]) -> None:
+        self._inflight_tasks.discard(task)
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            self._logger.exception(
+                "Unhandled exception in Discord inbound message handler",
+                exc_info=exc,
+            )
+
+    async def _run_inbound_task(
+        self,
+        lock: asyncio.Lock,
+        inbound: DiscordInboundMessage,
+    ) -> None:
+        async with lock:
+            await self._on_message(inbound)
+
+    async def drain_inflight(self, *, cancel: bool = False) -> None:
+        """Wait for (or cancel) all background inbound message tasks."""
+        tasks = list(self._inflight_tasks)
+        if not tasks:
+            return
+        if cancel:
+            for task in tasks:
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _send_identify_or_resume(self, ws: WebSocketConnection) -> None:
         if self.session_id and self.seq is not None:
@@ -136,10 +174,25 @@ class DiscordGatewayClient:
         interval_sec = max(1.0, interval_ms / 1000.0)
         # Discord recommends jitter in (0, 1) before first heartbeat
         jitter = 0.1 + 0.8 * (random.SystemRandom().random())
-        await self._sleep(interval_sec * jitter)
-        while not self._stop_event.is_set():
-            await self._send_heartbeat(ws)
-            await self._sleep(interval_sec)
+        try:
+            await self._sleep(interval_sec * jitter)
+            while not self._stop_event.is_set():
+                if not self._heartbeat_ack_received:
+                    self._logger.warning(
+                        "Discord Gateway zombie heartbeat timeout (no op=11 ACK); closing socket"
+                    )
+                    with contextlib.suppress(Exception):
+                        await ws.close(code=4000, reason="Zombie heartbeat timeout")
+                    return
+                self._heartbeat_ack_received = False
+                await self._send_heartbeat(ws)
+                await self._sleep(interval_sec)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._logger.exception("Discord Gateway heartbeat loop failed: %s", exc)
+            with contextlib.suppress(Exception):
+                await ws.close(code=4000, reason="Heartbeat loop error")
 
     async def handle_payload(self, ws: WebSocketConnection, data: dict[str, Any]) -> str | None:
         """Process one decoded Gateway JSON frame; returns lifecycle signal if any."""
@@ -148,9 +201,14 @@ class DiscordGatewayClient:
             self.seq = int(data["s"])
 
         if op == 10:  # HELLO
+            self._heartbeat_ack_received = True
             interval_ms = int((data.get("d") or {}).get("heartbeat_interval", 41250))
             await self._send_identify_or_resume(ws)
             return f"hello:{interval_ms}"
+
+        if op == 11:  # HEARTBEAT_ACK
+            self._heartbeat_ack_received = True
+            return None
 
         if op == 1:  # HEARTBEAT request
             await self._send_heartbeat(ws)
@@ -193,8 +251,17 @@ class DiscordGatewayClient:
 
         if not author_id or not channel_id or not message_id:
             return
-        if self.allowed_user_ids and author_id not in self.allowed_user_ids:
-            return
+        if not self.allow_all_users:
+            if not self.allowed_user_ids:
+                self._logger.warning(
+                    "Dropping Discord message %s from user %s: allowed_user_ids is empty "
+                    "(fail-closed)",
+                    message_id,
+                    author_id,
+                )
+                return
+            if author_id not in self.allowed_user_ids:
+                return
 
         now_sec = int(time.time())
         inserted = await self._db.log_conversation_message(
@@ -221,12 +288,14 @@ class DiscordGatewayClient:
         )
 
         lock = self._get_channel_lock(channel_id)
-        async with lock:
-            await self._on_message(inbound)
+        task = asyncio.create_task(self._run_inbound_task(lock, inbound))
+        self._inflight_tasks.add(task)
+        task.add_done_callback(self._on_task_done)
 
     async def run_once(self, ws: WebSocketConnection) -> str:
         """Drive a single connected Gateway session until close or reconnect signal."""
         hb_task: asyncio.Task[None] | None = None
+        self._heartbeat_ack_received = True
         try:
             while not self._stop_event.is_set():
                 try:
@@ -248,6 +317,8 @@ class DiscordGatewayClient:
                     interval_ms = int(signal.split(":", 1)[1])
                     if hb_task is not None:
                         hb_task.cancel()
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await hb_task
                     hb_task = asyncio.create_task(self._heartbeat_loop(ws, interval_ms))
                 elif signal == "reconnect":
                     return "reconnect"
@@ -256,6 +327,7 @@ class DiscordGatewayClient:
                 hb_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await hb_task
+            await self.drain_inflight(cancel=self._stop_event.is_set())
         return "stopped"
 
     async def run_forever(self) -> None:

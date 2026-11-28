@@ -86,6 +86,16 @@ class ToolExecutor:
         if mod_ctx is None:
             raise ModuleDisabledError(tool_def.module_id or tool_name)
 
+        if isinstance(raw_args, dict) and "_alfred_json_parse_error" in raw_args:
+            return ToolExecutionResult(
+                ok=False,
+                error_code="TOOL_JSON_ERROR",
+                error=(
+                    f"Malformed tool JSON arguments for '{tool_name}': "
+                    f"{raw_args['_alfred_json_parse_error']}. Fix JSON formatting and retry."
+                ),
+            )
+
         ctx = ToolExecutionContext(
             agent_id=agent.id,
             session_id=session_id,

@@ -134,11 +134,26 @@ class ModuleManager:
             if not self.registry.is_active(dep_id):
                 raise MissingDependencyError(dep_id, module_id=module_id)
 
+        prev_row = await self.db.get_module_row(module_id)
+        prev_state: ModuleState = prev_row.state if prev_row is not None else "available"
         now_iso = datetime.now(tz=UTC).isoformat()
         await self.db.set_module_state(module_id, "active", now_iso)
 
         target_active = set(self.registry.active_module_ids()) | {module_id}
-        loaded = await self.loader.load_active_modules(active_ids=target_active)
+        try:
+            loaded = await self.loader.load_active_modules(active_ids=target_active)
+        except Exception as exc:
+            await self.db.set_module_state(
+                module_id,
+                prev_state,
+                datetime.now(tz=UTC).isoformat(),
+            )
+            if isinstance(exc, ModuleError):
+                raise
+            raise ModuleLoadError(
+                f"Failed to load module '{module_id}': {exc}",
+                module_id=module_id,
+            ) from exc
         gen_ns = self.touch_generation()
         return ModuleLifecycleResult(
             module_id=module_id,
@@ -181,7 +196,6 @@ class ModuleManager:
         if current_token is not None:
             if not force and self._last_generation_token == current_token:
                 return False
-            self._last_generation_token = current_token
         elif not force and self._last_generation_token is not None:
             return False
 
@@ -195,6 +209,7 @@ class ModuleManager:
         }
         current_active = set(self.registry.active_module_ids())
         if desired_active == current_active:
+            self._last_generation_token = current_token
             return False
 
         # Unload removed modules in reverse dependency order first
@@ -208,4 +223,5 @@ class ModuleManager:
         # Load newly activated modules in topological order
         if desired_active:
             await self.loader.load_active_modules(active_ids=desired_active)
+        self._last_generation_token = current_token
         return True

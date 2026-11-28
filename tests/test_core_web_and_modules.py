@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -25,6 +26,7 @@ from alfred.core.web_app import build_core_container, create_app
 from alfred.kernel import (
     ModuleError,
     ModuleLoader,
+    ModuleLoadError,
     ModuleRegistry,
     ModuleSecurityError,
     module_package_name,
@@ -138,6 +140,13 @@ def _setup_workspace(
                                         "label": "Opt Mode",
                                         "type": "text",
                                         "storage": "config_json",
+                                    },
+                                    {
+                                        "key": "OPT_PORT",
+                                        "label": "Opt Port",
+                                        "type": "text",
+                                        "storage": "env",
+                                        "validationRegex": r"^\d+$",
                                     },
                                     {
                                         "key": "PATH",
@@ -409,3 +418,245 @@ async def test_daemon_startup_heartbeat_and_shutdown(tmp_path: Path) -> None:
     finally:
         for mid in ("core-base", "opt-ext"):
             sys.modules.pop(module_package_name(mid), None)
+
+
+async def test_wizard_forbidden_variants_regex_and_route_secret_redaction_and_errors(
+    tmp_path: Path,
+) -> None:
+    root = _setup_workspace(tmp_path / "wizweb", include_modules=True)
+    settings = CoreSettings.from_project_root(root, environment="test")
+    app = create_app(settings, admin_token="wiz-tok")
+    try:
+        async with app.router.lifespan_context(app):
+            container = app.state.container
+            # Forbidden key case/whitespace and prefix variants
+            for bad_key in (" pythonstartup ", "ALFRED_ENV", "path", "PYTHON_CUSTOM"):
+                with pytest.raises(ModuleSecurityError):
+                    await container.module_wizard.save_wizard_values(
+                        "opt-ext",
+                        WizardSaveRequest(values={bad_key: "evil"}),
+                    )
+
+            # Regex validation error -> 400 WIZARD_VALIDATION_ERROR
+            with pytest.raises(ModuleError) as regex_err:
+                await container.module_wizard.save_wizard_values(
+                    "opt-ext",
+                    WizardSaveRequest(values={"OPT_PORT": "not-digits"}),
+                )
+            assert regex_err.value.status_code == 400
+            assert regex_err.value.code == "WIZARD_VALIDATION_ERROR"
+
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                headers={"Authorization": "Bearer wiz-tok"},
+            ) as client:
+                # Vault ValidationError MUST NOT echo input secret value
+                vault_bad = await client.post(
+                    "/api/vault",
+                    json={"keyId": "", "value": "TOP-SECRET-VAULT-INPUT-777"},
+                )
+                assert vault_bad.status_code == 400
+                assert "TOP-SECRET-VAULT-INPUT-777" not in vault_bad.text
+
+                # Wizard ValidationError MUST NOT echo input secret value
+                wiz_bad = await client.post(
+                    "/api/modules/opt-ext/wizard",
+                    json={"values": {"OPT_API_KEY": ["TOP-SECRET-WIZARD-999"]}},
+                )
+                assert wiz_bad.status_code == 400
+                assert "TOP-SECRET-WIZARD-999" not in wiz_bad.text
+
+                # Missing agents.json returns clean 404 instead of unhandled 500
+                settings.agents_config_path.unlink()
+                assert (await client.get("/api/agents")).status_code == 404
+                assert (await client.get("/api/overview")).status_code == 404
+    finally:
+        for mid in ("core-base", "opt-ext"):
+            sys.modules.pop(module_package_name(mid), None)
+
+
+async def test_testsim_maps_gdpr_budget_and_provider_errors_to_http_codes(tmp_path: Path) -> None:
+    root = _setup_workspace(tmp_path / "simerr", include_modules=False)
+    (root / "config" / "agents.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "global": {
+                    "defaultProvider": "deepseek",
+                    "defaultModel": "deepseek-chat",
+                    "dailyBudgetUsd": 10.0,
+                },
+                "roles": {
+                    "planner": {
+                        "label": "Planner",
+                        "description": "Planning",
+                        "provider": "deepseek",
+                        "model": "deepseek-chat",
+                    }
+                },
+                "agents": [
+                    {
+                        "id": "eu-blocked",
+                        "displayName": "EU Blocked",
+                        "role": "planner",
+                        "provider": "deepseek",
+                        "euOnly": True,
+                        "dailyBudgetUsd": 5.0,
+                    },
+                    {
+                        "id": "budget-zero",
+                        "displayName": "Budget Zero",
+                        "role": "planner",
+                        "provider": "deepseek",
+                        "dailyBudgetUsd": 0.0,
+                    },
+                    {
+                        "id": "missing-prov",
+                        "displayName": "Missing Prov",
+                        "role": "planner",
+                        "provider": "nonexistent-provider",
+                        "dailyBudgetUsd": 5.0,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = CoreSettings.from_project_root(root, environment="test")
+    app = create_app(settings, admin_token="sim-tok")
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            headers={"Authorization": "Bearer sim-tok"},
+        ) as client:
+            r_gdpr = await client.post(
+                "/api/testsim/send",
+                json={"agentId": "eu-blocked", "message": "hi"},
+            )
+            assert r_gdpr.status_code == 403
+            assert r_gdpr.json()["error"] == "GDPR_COMPLIANCE_ERROR"
+
+            r_budget = await client.post(
+                "/api/testsim/send",
+                json={"agentId": "budget-zero", "message": "hi"},
+            )
+            assert r_budget.status_code == 429
+            assert r_budget.json()["error"] == "BUDGET_EXCEEDED"
+
+            r_prov = await client.post(
+                "/api/testsim/send",
+                json={"agentId": "missing-prov", "message": "hi"},
+            )
+            assert r_prov.status_code == 400
+            assert r_prov.json()["error"] == "PROVIDER_NOT_FOUND"
+
+
+async def test_module_manager_activate_rollback_on_load_failure(tmp_path: Path) -> None:
+    root = _setup_workspace(tmp_path / "rollback", include_modules=True)
+    broken_dir = root / "modules" / "broken-mod"
+    broken_dir.mkdir(parents=True, exist_ok=True)
+    (broken_dir / "module.json").write_text(
+        json.dumps(
+            {
+                "id": "broken-mod",
+                "name": "Broken Mod",
+                "category": "ai",
+                "version": "1.0.0",
+                "builtIn": False,
+                "defaultEnabled": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (broken_dir / "plugin.py").write_text(
+        "from alfred.kernel.types import BaseModulePlugin\n"
+        "class BrokenPlugin(BaseModulePlugin):\n"
+        "    id = 'broken-mod'\n"
+        "    async def on_load(self, ctx):\n"
+        "        raise RuntimeError('plugin init boom')\n"
+        "plugin = BrokenPlugin()\n",
+        encoding="utf-8",
+    )
+    settings = CoreSettings.from_project_root(root)
+    try:
+        async with SqlitePool(settings.db_path) as db:
+            vault = VaultManager(settings.vault_path, settings.vault_key_path)
+            registry = ModuleRegistry()
+            loader = ModuleLoader(
+                modules_dir=settings.modules_dir,
+                store_dir=settings.store_dir,
+                db=db,
+                vault=vault,
+                registry=registry,
+                heavy_job=HeavyJobHoldManager(settings.heavy_job_lock_path),
+                project_root=settings.project_root,
+            )
+            mgr = ModuleManager(
+                settings=settings,
+                db=db,
+                vault=vault,
+                registry=registry,
+                loader=loader,
+            )
+            with pytest.raises(ModuleLoadError):
+                await mgr.activate_module("broken-mod")
+            row = await db.get_module_row("broken-mod")
+            assert row is not None and row.state == "available"
+    finally:
+        for mid in ("core-base", "opt-ext", "broken-mod"):
+            sys.modules.pop(module_package_name(mid), None)
+
+
+async def test_daemon_run_until_stopped_graceful_order_with_inflight_heartbeat(
+    tmp_path: Path,
+) -> None:
+    root = _setup_workspace(tmp_path / "graceful", include_modules=True)
+    hb_started = asyncio.Event()
+    hb_db_ok = False
+    (root / "modules" / "core-base" / "plugin.py").write_text(
+        "from alfred.kernel.types import BaseModulePlugin\n"
+        "class CoreBasePlugin(BaseModulePlugin):\n"
+        "    id = 'core-base'\n"
+        "plugin = CoreBasePlugin()\n",
+        encoding="utf-8",
+    )
+    settings = CoreSettings.from_project_root(root, environment="test")
+    try:
+        container = build_core_container(settings, admin_token="g-tok")
+
+        class _SlowHbDaemon(AlfredDaemon):
+            async def run_heartbeat_tick(self, now_ms: int | None = None) -> dict[str, Any]:
+                nonlocal hb_db_ok
+                hb_started.set()
+                try:
+                    await asyncio.sleep(0.5)
+                finally:
+                    # DB must remain open while background tasks unwind before shutdown()
+                    await self.container.db.list_module_rows()
+                    hb_db_ok = True
+                return await super().run_heartbeat_tick(now_ms=now_ms)
+
+        daemon = _SlowHbDaemon(container, heartbeat_interval_sec=60.0)
+        runner = asyncio.create_task(daemon.run_until_stopped())
+        await asyncio.wait_for(hb_started.wait(), timeout=2.0)
+        daemon.stop()
+        await asyncio.wait_for(runner, timeout=2.0)
+        assert hb_db_ok is True
+    finally:
+        for mid in ("core-base", "opt-ext"):
+            sys.modules.pop(module_package_name(mid), None)
+
+
+def test_create_app_prod_requires_admin_token(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ALFRED_DASHBOARD_TOKEN", raising=False)
+    root = _setup_workspace(tmp_path / "prodtok", include_modules=False)
+    prod_settings = CoreSettings.from_project_root(root, environment="prod")
+    with pytest.raises(RuntimeError, match="ALFRED_DASHBOARD_TOKEN"):
+        create_app(prod_settings)

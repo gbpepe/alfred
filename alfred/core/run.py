@@ -9,18 +9,18 @@ import logging
 import os
 import signal
 import time
-from pathlib import Path
 from typing import Any
 
-from alfred.core.agents_config import ResolvedAgent
+from alfred.core.agents_config import ResolvedAgent, resolve_confined_workspace
 from alfred.core.config import CoreSettings
 from alfred.core.discord_adapter import DiscordRestClient
 from alfred.core.discord_gateway import DiscordGatewayClient, DiscordInboundMessage
 from alfred.core.logging_setup import configure_logging
 from alfred.core.security.prompt_safety import wrap_untrusted
 from alfred.core.web_app import CoreAppContainer, build_core_container
+from alfred.kernel.errors import ModuleError
 from alfred.kernel.loader import resolve_load_order
-from alfred.kernel.types import ModelProviderRequest, ProviderMessage
+from alfred.kernel.types import ModelProviderRequest, ProviderMessage, ToolExecutionResult
 
 
 class AlfredDaemon:
@@ -32,12 +32,16 @@ class AlfredDaemon:
         *,
         gateway: DiscordGatewayClient | None = None,
         rest_client: DiscordRestClient | None = None,
+        allowed_user_ids: frozenset[str] = frozenset(),
+        allow_all_users: bool = False,
         heartbeat_interval_sec: float = 30.0,
         logger: logging.Logger | None = None,
     ) -> None:
         self.container = container
         self.gateway = gateway
         self.rest_client = rest_client
+        self.allowed_user_ids = allowed_user_ids
+        self.allow_all_users = allow_all_users
         self.heartbeat_interval_sec = heartbeat_interval_sec
         self.logger = logger or logging.getLogger("alfred.daemon")
         self._stop_event = asyncio.Event()
@@ -66,11 +70,28 @@ class AlfredDaemon:
         if resolved is None:
             return None
         agent = resolved.config
-        if agent.allowed_user_ids and inbound.author_id not in agent.allowed_user_ids:
-            return None
+        effective_allowed = (
+            frozenset(agent.allowed_user_ids)
+            if agent.allowed_user_ids
+            else self.allowed_user_ids
+        )
+        if not self.allow_all_users:
+            if not effective_allowed:
+                self.logger.warning(
+                    "Dropping inbound Discord message %s for agent '%s': "
+                    "no allowed_user_ids configured (fail-closed)",
+                    inbound.message_id,
+                    agent.id,
+                )
+                return None
+            if inbound.author_id not in effective_allowed:
+                return None
 
         cfg = self.container.agents.load()
-        workspace_dir = (self.container.settings.project_root / Path(agent.workspace)).resolve()
+        workspace_dir = resolve_confined_workspace(
+            self.container.settings.project_root,
+            agent.workspace,
+        )
         tools = self.container.tool_executor.get_schemas_for_agent(agent)
         messages: list[ProviderMessage] = [
             ProviderMessage(
@@ -103,13 +124,27 @@ class AlfredDaemon:
 
             messages.append(ProviderMessage(role="assistant", content=resp.content or ""))
             for tc in resp.tool_calls:
-                tool_res = await self.container.tool_executor.execute_tool(
-                    agent=agent,
-                    tool_name=tc.name,
-                    raw_args=tc.arguments,
-                    session_id=f"discord:{inbound.channel_id}",
-                    workspace_dir=workspace_dir,
-                )
+                try:
+                    tool_res = await self.container.tool_executor.execute_tool(
+                        agent=agent,
+                        tool_name=tc.name,
+                        raw_args=tc.arguments,
+                        session_id=f"discord:{inbound.channel_id}",
+                        workspace_dir=workspace_dir,
+                    )
+                except ModuleError as exc:
+                    self.logger.warning(
+                        "Tool '%s' failed for agent '%s' (%s): %s",
+                        tc.name,
+                        agent.id,
+                        exc.code,
+                        exc.message,
+                    )
+                    tool_res = ToolExecutionResult(
+                        ok=False,
+                        error=exc.message,
+                        error_code=exc.code,
+                    )
                 messages.append(
                     ProviderMessage(
                         role="tool",
@@ -188,11 +223,13 @@ class AlfredDaemon:
         try:
             await self._stop_event.wait()
         finally:
-            await self.shutdown()
+            self.stop()
             for task in tasks:
                 task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
+            await asyncio.gather(*tasks, return_exceptions=True)
+            if self.gateway is not None:
+                await self.gateway.drain_inflight(cancel=True)
+            await self.shutdown()
 
 
 async def run_daemon(settings: CoreSettings | None = None) -> None:
@@ -203,11 +240,21 @@ async def run_daemon(settings: CoreSettings | None = None) -> None:
         await container.vault.get_secret("DISCORD_BOT_TOKEN")
         or os.environ.get("DISCORD_BOT_TOKEN", "").strip()
     )
+    allowed_raw = os.environ.get("ALLOWED_USER_IDS", "")
+    allowed_ids = frozenset(uid.strip() for uid in allowed_raw.split(",") if uid.strip())
+    allow_all = os.environ.get("ALFRED_ALLOW_ALL_USERS", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     rest_client = DiscordRestClient(bot_token=bot_token) if bot_token else None
-    daemon = AlfredDaemon(container, rest_client=rest_client)
+    daemon = AlfredDaemon(
+        container,
+        rest_client=rest_client,
+        allowed_user_ids=allowed_ids,
+        allow_all_users=allow_all,
+    )
     if bot_token:
-        allowed_raw = os.environ.get("ALLOWED_USER_IDS", "")
-        allowed_ids = frozenset(uid.strip() for uid in allowed_raw.split(",") if uid.strip())
 
         async def _dispatch_inbound(msg: DiscordInboundMessage) -> None:
             await daemon.handle_inbound_message(msg)
@@ -217,6 +264,7 @@ async def run_daemon(settings: CoreSettings | None = None) -> None:
             db=container.db,
             on_message=_dispatch_inbound,
             allowed_user_ids=allowed_ids,
+            allow_all_users=allow_all,
         )
 
     loop = asyncio.get_running_loop()

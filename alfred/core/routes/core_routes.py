@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
@@ -12,6 +13,12 @@ from starlette.responses import JSONResponse, Response
 
 from alfred.core.auth import AuthError, AuthLevel
 from alfred.core.circuit_breaker import utc_day_start_sec
+from alfred.core.model_router import (
+    BudgetExceededError,
+    GdprComplianceError,
+    ProviderNotFoundError,
+    RouterError,
+)
 from alfred.core.module_manager import ModuleLifecycleResult, ModuleSummaryDTO
 from alfred.core.module_wizard import WizardSaveRequest, WizardSaveResponse, WizardStateResponse
 from alfred.core.test_simulator import TestSimRequest, TestSimResponse
@@ -171,6 +178,20 @@ def _error_json(status_code: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status_code, content={"error": code, "message": message})
 
 
+def _agents_missing_error() -> JSONResponse:
+    return _error_json(404, "AGENTS_CONFIG_NOT_FOUND", "Agent configuration file is missing")
+
+
+def format_validation_error(exc: ValidationError) -> str:
+    """Format Pydantic `ValidationError` safely without echoing raw `input_value` secrets."""
+    parts: list[str] = []
+    for err in exc.errors(include_url=False, include_input=False):
+        loc = ".".join(str(part) for part in err.get("loc", ())) or "<root>"
+        msg = str(err.get("msg", "Invalid value"))
+        parts.append(f"{loc}: {msg}")
+    return "; ".join(parts) if parts else "Validation failed"
+
+
 def _list_docs_sync(docs_dir: Path) -> list[str]:
     if not docs_dir.exists() or not docs_dir.is_dir():
         return []
@@ -188,7 +209,10 @@ def _read_doc_sync(docs_dir: Path, filename: str) -> str | None:
     target = (root / filename).resolve()
     if not target.is_relative_to(root) or not target.is_file():
         return None
-    return target.read_text(encoding="utf-8")
+    try:
+        return target.read_text(encoding="utf-8")
+    except OSError:
+        return None
 
 
 def create_core_router(container: CoreAppContainer) -> APIRouter:
@@ -218,7 +242,10 @@ def create_core_router(container: CoreAppContainer) -> APIRouter:
         denied = _require_auth(request, "dashboard")
         if denied is not None:
             return denied
-        cfg = container.agents.load()
+        try:
+            cfg = container.agents.load()
+        except FileNotFoundError:
+            return _agents_missing_error()
         since = utc_day_start_sec()
         spend = await container.db.get_daily_spend_usd(since_ts=since)
         modules = await container.module_manager.list_modules()
@@ -240,7 +267,10 @@ def create_core_router(container: CoreAppContainer) -> APIRouter:
         denied = _require_auth(request, "dashboard")
         if denied is not None:
             return denied
-        resolved_list = container.agents.list_resolved_agents()
+        try:
+            resolved_list = container.agents.list_resolved_agents()
+        except FileNotFoundError:
+            return _agents_missing_error()
         items = [
             AgentViewDTO(
                 id=item.config.id,
@@ -267,10 +297,19 @@ def create_core_router(container: CoreAppContainer) -> APIRouter:
             return denied
         try:
             patch = AgentPatchRequest.model_validate(await request.json())
-        except (ValueError, ValidationError) as exc:
-            return _error_json(400, "INVALID_REQUEST", f"Invalid agent patch payload: {exc}")
+        except ValidationError as exc:
+            return _error_json(
+                400,
+                "INVALID_REQUEST",
+                f"Invalid agent patch payload: {format_validation_error(exc)}",
+            )
+        except ValueError:
+            return _error_json(400, "INVALID_REQUEST", "Malformed JSON request body")
 
-        cfg = container.agents.load(validate_manifests=False)
+        try:
+            cfg = container.agents.load(validate_manifests=False)
+        except FileNotFoundError:
+            return _agents_missing_error()
         target = cfg.get_agent(agent_id)
         if target is None:
             return _error_json(404, "AGENT_NOT_FOUND", f"Unknown agent '{agent_id}'")
@@ -327,7 +366,15 @@ def create_core_router(container: CoreAppContainer) -> APIRouter:
                 body.value,
                 label=body.label,
             )
-        except (ValueError, ValidationError, VaultError) as exc:
+        except ValidationError as exc:
+            return _error_json(
+                400,
+                "VAULT_SET_ERROR",
+                f"Invalid Vault payload: {format_validation_error(exc)}",
+            )
+        except json.JSONDecodeError:
+            return _error_json(400, "VAULT_SET_ERROR", "Malformed JSON request body")
+        except (ValueError, VaultError) as exc:
             return _error_json(400, "VAULT_SET_ERROR", str(exc))
         return _json_dto(VaultSetResponse(ok=True, metadata=metadata))
 
@@ -397,8 +444,14 @@ def create_core_router(container: CoreAppContainer) -> APIRouter:
             )
         except ModuleError as mod_err:
             return JSONResponse(status_code=mod_err.status_code, content=mod_err.to_payload())
-        except (ValueError, ValidationError) as exc:
-            return _error_json(400, "INVALID_WIZARD_PAYLOAD", str(exc))
+        except ValidationError as exc:
+            return _error_json(
+                400,
+                "INVALID_WIZARD_PAYLOAD",
+                f"Invalid wizard payload: {format_validation_error(exc)}",
+            )
+        except ValueError:
+            return _error_json(400, "INVALID_WIZARD_PAYLOAD", "Malformed JSON request body")
         return _json_dto(saved)
 
     @router.post("/api/modules/{module_id}/probe")
@@ -443,8 +496,24 @@ def create_core_router(container: CoreAppContainer) -> APIRouter:
             resp: TestSimResponse = await container.test_simulator.simulate(req)
         except ModuleError as mod_err:
             return JSONResponse(status_code=mod_err.status_code, content=mod_err.to_payload())
-        except (ValueError, ValidationError) as exc:
-            return _error_json(400, "INVALID_TESTSIM_REQUEST", str(exc))
+        except GdprComplianceError as exc:
+            return _error_json(403, "GDPR_COMPLIANCE_ERROR", str(exc))
+        except BudgetExceededError as exc:
+            return _error_json(429, "BUDGET_EXCEEDED", str(exc))
+        except ProviderNotFoundError as exc:
+            return _error_json(400, "PROVIDER_NOT_FOUND", str(exc))
+        except RouterError as exc:
+            return _error_json(502, "ROUTER_ERROR", str(exc))
+        except FileNotFoundError:
+            return _agents_missing_error()
+        except ValidationError as exc:
+            return _error_json(
+                400,
+                "INVALID_TESTSIM_REQUEST",
+                f"Invalid testsim payload: {format_validation_error(exc)}",
+            )
+        except ValueError:
+            return _error_json(400, "INVALID_TESTSIM_REQUEST", "Malformed JSON request body")
         return _json_dto(resp)
 
     return router

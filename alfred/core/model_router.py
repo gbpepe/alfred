@@ -64,6 +64,11 @@ class ProviderNotFoundError(RouterError):
     """Raised when neither built-in adapters nor active plugin providers match `provider_id`."""
 
 
+def is_eu_vertex_location(location: str) -> bool:
+    """Return True only when Vertex AI location targets an European (`europe-*`) region."""
+    return location.strip().lower().startswith("europe-")
+
+
 def estimate_cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
     """Estimate USD cost using per-1M token rates."""
     in_rate, out_rate = _MODEL_RATES_PER_M.get(model, (0.50, 1.50))
@@ -94,10 +99,12 @@ class ModelRouter:
         self._env_getter = env_getter or os.environ.get
         self._gcp_token_provider = gcp_token_provider
         self._vertex_project_id = vertex_project_id
-        self._vertex_location = vertex_location
+        self._vertex_location = vertex_location.strip() or "europe-west1"
 
     def is_provider_eu_compliant(self, provider_id: str) -> bool:
         """Return whether `provider_id` is GDPR / EU-residency compliant."""
+        if provider_id == "vertex-eu":
+            return is_eu_vertex_location(self._vertex_location)
         if provider_id in BUILTIN_PROVIDER_EU_COMPLIANCE:
             return BUILTIN_PROVIDER_EU_COMPLIANCE[provider_id]
         plugin_provider = self._registry.get_provider(provider_id) if self._registry else None
@@ -143,7 +150,7 @@ class ModelRouter:
                 f"blocked non-EU provider '{provider_id}'"
             )
 
-        budget = await self._circuit_breaker.check_budget(
+        budget, reserved_usd = await self._circuit_breaker.reserve_budget(
             agent_id=resolved_agent.config.id,
             model=model,
             agent_daily_limit_usd=resolved_agent.config.daily_budget_usd,
@@ -153,42 +160,51 @@ class ModelRouter:
             raise BudgetExceededError(budget.reason)
 
         norm_request = request.model_copy(update={"model": model})
-        if plugin_provider is not None:
-            response = await plugin_provider.generate(norm_request)
-        elif provider_id in _OPENAI_COMPAT_ENDPOINTS:
-            response = await self._call_openai_compat(provider_id, norm_request)
-        elif provider_id == "gemini":
-            response = await self._call_gemini(norm_request)
-        elif provider_id == "vertex-eu":
-            response = await self._call_vertex_eu(norm_request)
-        else:  # pragma: no cover - defensive fallback
-            raise ProviderNotFoundError(f"Unsupported provider '{provider_id}'")
+        try:
+            if plugin_provider is not None:
+                response = await plugin_provider.generate(norm_request)
+            elif provider_id in _OPENAI_COMPAT_ENDPOINTS:
+                response = await self._call_openai_compat(provider_id, norm_request)
+            elif provider_id == "gemini":
+                response = await self._call_gemini(norm_request)
+            elif provider_id == "vertex-eu":
+                response = await self._call_vertex_eu(norm_request)
+            else:  # pragma: no cover - defensive fallback
+                raise ProviderNotFoundError(f"Unsupported provider '{provider_id}'")
 
-        computed_cost = (
-            0.0
-            if self._circuit_breaker.is_zero_cost_model(model)
-            else (
-                response.cost_usd
-                if response.cost_usd > 0
-                else estimate_cost_usd(model, response.input_tokens, response.output_tokens)
+            computed_cost = (
+                0.0
+                if self._circuit_breaker.is_zero_cost_model(model)
+                else (
+                    response.cost_usd
+                    if response.cost_usd > 0
+                    else estimate_cost_usd(model, response.input_tokens, response.output_tokens)
+                )
             )
-        )
-        final_response = response.model_copy(update={"cost_usd": computed_cost})
-        await self._circuit_breaker.record_token_usage(
-            TokenUsageRecord(
-                agent=resolved_agent.config.id,
-                session_id=request.session_id,
-                model=model,
-                input_tokens=final_response.input_tokens,
-                output_tokens=final_response.output_tokens,
-                cache_read_tokens=final_response.cache_read_tokens,
-                cache_creation_tokens=final_response.cache_creation_tokens,
-                thinking_tokens=final_response.thinking_tokens,
-                cost_usd=final_response.cost_usd,
-                content_preview=final_response.content[:160] if final_response.content else None,
+            final_response = response.model_copy(update={"cost_usd": computed_cost})
+            await self._circuit_breaker.record_token_usage(
+                TokenUsageRecord(
+                    agent=resolved_agent.config.id,
+                    session_id=request.session_id,
+                    model=model,
+                    input_tokens=final_response.input_tokens,
+                    output_tokens=final_response.output_tokens,
+                    cache_read_tokens=final_response.cache_read_tokens,
+                    cache_creation_tokens=final_response.cache_creation_tokens,
+                    thinking_tokens=final_response.thinking_tokens,
+                    cost_usd=final_response.cost_usd,
+                    content_preview=(
+                        final_response.content[:160] if final_response.content else None
+                    ),
+                )
             )
-        )
-        return final_response
+            return final_response
+        finally:
+            if reserved_usd > 0.0:
+                await self._circuit_breaker.release_reservation(
+                    resolved_agent.config.id,
+                    reserved_usd,
+                )
 
     async def _post_json(
         self,
@@ -257,12 +273,23 @@ class ModelRouter:
         for idx, tc in enumerate(message.get("tool_calls") or []):
             fn = tc.get("function", {})
             raw_args = fn.get("arguments", "{}")
-            parsed_args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
+            parsed_args: dict[str, Any]
+            if isinstance(raw_args, str):
+                try:
+                    loaded_args = json.loads(raw_args)
+                except json.JSONDecodeError as exc:
+                    parsed_args = {"_alfred_json_parse_error": exc.msg}
+                else:
+                    parsed_args = loaded_args if isinstance(loaded_args, dict) else {}
+            elif isinstance(raw_args, dict):
+                parsed_args = dict(raw_args)
+            else:
+                parsed_args = {}
             tool_calls.append(
                 ProviderToolCall(
                     id=str(tc.get("id") or f"call_{idx}"),
                     name=str(fn.get("name") or ""),
-                    arguments=parsed_args if isinstance(parsed_args, dict) else {},
+                    arguments=parsed_args,
                 )
             )
         usage = data.get("usage") or {}
@@ -295,6 +322,10 @@ class ModelRouter:
         return _parse_google_generate_response(data)
 
     async def _call_vertex_eu(self, request: ModelProviderRequest) -> ModelProviderResponse:
+        if not is_eu_vertex_location(self._vertex_location):
+            raise GdprComplianceError(
+                f"Vertex EU provider requires an 'europe-*' region, got '{self._vertex_location}'"
+            )
         if self._gcp_token_provider is None:
             raise RouterError("Vertex EU requires configured GcpTokenProvider")
         project_id = (

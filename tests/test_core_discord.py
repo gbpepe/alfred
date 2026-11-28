@@ -195,3 +195,208 @@ async def test_discord_gateway_filter_dedup_channel_lock_resume_and_fatal_close(
         assert ws2.sent[0]["op"] == 6  # RESUME
         assert ws2.sent[0]["d"]["session_id"] == "sess-123"
         assert ws2.sent[0]["d"]["seq"] == 14
+
+
+async def test_discord_rest_client_handles_non_json_429_retry_after_header() -> None:
+    attempts = 0
+    sleeps: list[float] = []
+
+    def _handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return httpx.Response(
+                429,
+                text="<html><body>Cloudflare 429</body></html>",
+                headers={"Retry-After": "0.5", "Content-Type": "text/html"},
+            )
+        return httpx.Response(200, json={"id": "msg-html-recovered"})
+
+    async def _fake_sleep(sec: float) -> None:
+        sleeps.append(sec)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_handler)) as http_client:
+        rest = DiscordRestClient(
+            bot_token="test-bot-token",
+            http_client=http_client,
+            sleep_fn=_fake_sleep,
+        )
+        ids = await rest.send_message("chan-1", "Retry after HTML")
+        assert ids == ["msg-html-recovered"]
+        assert sleeps == [0.5]
+
+
+async def test_discord_gateway_fail_closed_when_allowed_users_empty(tmp_path: Path) -> None:
+    received: list[str] = []
+
+    async def _on_message(msg: DiscordInboundMessage) -> None:
+        received.append(msg.message_id)
+
+    async with SqlitePool(tmp_path / "store" / "alfred.db") as db:
+        gateway = DiscordGatewayClient(
+            bot_token="bot-secret",
+            db=db,
+            on_message=_on_message,
+            allowed_user_ids=frozenset(),
+            sleep_fn=lambda _s: asyncio.sleep(0),
+        )
+        ws: WebSocketConnection = _FakeWebSocket(
+            [
+                {"op": 10, "d": {"heartbeat_interval": 30000}},
+                {
+                    "op": 0,
+                    "s": 1,
+                    "t": "MESSAGE_CREATE",
+                    "d": {
+                        "id": "m-unauth",
+                        "channel_id": "ch-1",
+                        "author": {"id": "random-user", "username": "eve"},
+                        "content": "should be dropped",
+                    },
+                },
+                {"op": 7, "d": None},
+            ]
+        )
+        assert await gateway.run_once(ws) == "reconnect"
+        assert received == []
+
+
+async def test_discord_gateway_non_blocking_across_channels_and_serialized_per_channel(
+    tmp_path: Path,
+) -> None:
+    ch1_started = asyncio.Event()
+    release_ch1 = asyncio.Event()
+    ch2_finished = asyncio.Event()
+    order: list[str] = []
+    active_ch1 = 0
+    max_active_ch1 = 0
+
+    async def _on_message(msg: DiscordInboundMessage) -> None:
+        nonlocal active_ch1, max_active_ch1
+        if msg.channel_id == "ch-1":
+            active_ch1 += 1
+            max_active_ch1 = max(max_active_ch1, active_ch1)
+            if msg.message_id == "m1-a":
+                ch1_started.set()
+                await release_ch1.wait()
+            order.append(msg.message_id)
+            active_ch1 -= 1
+        else:
+            order.append(msg.message_id)
+            ch2_finished.set()
+
+    class _QueueWebSocket:
+        def __init__(self) -> None:
+            self.queue: asyncio.Queue[dict[str, Any] | Exception] = asyncio.Queue()
+            self.sent: list[dict[str, Any]] = []
+
+        async def send(self, message: str) -> None:
+            self.sent.append(json.loads(message))
+
+        async def recv(self) -> str:
+            item = await self.queue.get()
+            if isinstance(item, Exception):
+                raise item
+            return json.dumps(item)
+
+        async def close(self, code: int = 1000, reason: str = "") -> None:
+            await self.queue.put(ConnectionClosed(Close(code, reason), None))
+
+    qws = _QueueWebSocket()
+    await qws.queue.put({"op": 10, "d": {"heartbeat_interval": 30000}})
+    await qws.queue.put(
+        {
+            "op": 0,
+            "s": 1,
+            "t": "MESSAGE_CREATE",
+            "d": {
+                "id": "m1-a",
+                "channel_id": "ch-1",
+                "author": {"id": "owner-1", "username": "peter"},
+                "content": "slow ch1 first",
+            },
+        }
+    )
+    await qws.queue.put(
+        {
+            "op": 0,
+            "s": 2,
+            "t": "MESSAGE_CREATE",
+            "d": {
+                "id": "m1-b",
+                "channel_id": "ch-1",
+                "author": {"id": "owner-1", "username": "peter"},
+                "content": "ch1 second",
+            },
+        }
+    )
+    await qws.queue.put(
+        {
+            "op": 0,
+            "s": 3,
+            "t": "MESSAGE_CREATE",
+            "d": {
+                "id": "m2-fast",
+                "channel_id": "ch-2",
+                "author": {"id": "owner-1", "username": "peter"},
+                "content": "fast ch2",
+            },
+        }
+    )
+
+    async with SqlitePool(tmp_path / "store" / "alfred.db") as db:
+        gateway = DiscordGatewayClient(
+            bot_token="bot-secret",
+            db=db,
+            on_message=_on_message,
+            allowed_user_ids=frozenset({"owner-1"}),
+        )
+        run_task = asyncio.create_task(gateway.run_once(qws))
+        await asyncio.wait_for(ch1_started.wait(), timeout=2.0)
+        # While ch-1 is still blocked, ch-2 MUST finish cleanly (recv() not stalled!)
+        await asyncio.wait_for(ch2_finished.wait(), timeout=2.0)
+        assert order == ["m2-fast"]
+
+        release_ch1.set()
+        await qws.queue.put({"op": 7, "d": None})
+        assert await asyncio.wait_for(run_task, timeout=2.0) == "reconnect"
+        assert order == ["m2-fast", "m1-a", "m1-b"]
+        assert max_active_ch1 == 1
+
+
+async def test_discord_gateway_zombie_heartbeat_closes_for_reconnect(tmp_path: Path) -> None:
+    close_codes: list[int] = []
+
+    class _ZombieWebSocket:
+        def __init__(self) -> None:
+            self.queue: asyncio.Queue[dict[str, Any] | Exception] = asyncio.Queue()
+            self.sent: list[dict[str, Any]] = []
+
+        async def send(self, message: str) -> None:
+            self.sent.append(json.loads(message))
+
+        async def recv(self) -> str:
+            item = await self.queue.get()
+            if isinstance(item, Exception):
+                raise item
+            return json.dumps(item)
+
+        async def close(self, code: int = 1000, reason: str = "") -> None:
+            close_codes.append(code)
+            await self.queue.put(ConnectionClosed(Close(code, reason), None))
+
+    ws = _ZombieWebSocket()
+    await ws.queue.put({"op": 10, "d": {"heartbeat_interval": 1000}})
+
+    async with SqlitePool(tmp_path / "store" / "alfred.db") as db:
+        gateway = DiscordGatewayClient(
+            bot_token="bot-secret",
+            db=db,
+            on_message=lambda _m: asyncio.sleep(0),
+            allowed_user_ids=frozenset({"owner-1"}),
+            sleep_fn=lambda _s: asyncio.sleep(0.01),
+        )
+        outcome = await asyncio.wait_for(gateway.run_once(ws), timeout=2.0)
+        assert outcome == "reconnect"
+        assert close_codes == [4000]
+        assert any(frame.get("op") == 1 for frame in ws.sent)

@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from alfred.core.agents_config import AgentsConfigManager, ResolvedAgent
+from alfred.core.agents_config import (
+    AgentsConfigManager,
+    ResolvedAgent,
+    resolve_confined_workspace,
+)
 from alfred.core.config import CoreSettings
 from alfred.core.model_router import ModelRouter
 from alfred.core.security.prompt_safety import wrap_untrusted
 from alfred.core.tool_executor import ToolExecutor
 from alfred.kernel.errors import ModuleError
-from alfred.kernel.types import ModelProviderRequest, ProviderMessage
+from alfred.kernel.types import ModelProviderRequest, ProviderMessage, ToolExecutionResult
 
 
 class TestSimRequest(BaseModel):
@@ -103,7 +106,10 @@ class TestSimulator:
                 status_code=409,
             )
 
-        workspace_dir = (self._settings.project_root / Path(agent.workspace)).resolve()
+        workspace_dir = resolve_confined_workspace(
+            self._settings.project_root,
+            agent.workspace,
+        )
         tools = self._tool_executor.get_schemas_for_agent(agent)
         messages: list[ProviderMessage] = [
             ProviderMessage(
@@ -145,13 +151,20 @@ class TestSimulator:
 
             messages.append(ProviderMessage(role="assistant", content=resp.content or ""))
             for tc in resp.tool_calls:
-                tool_res = await self._tool_executor.execute_tool(
-                    agent=agent,
-                    tool_name=tc.name,
-                    raw_args=tc.arguments,
-                    session_id=req.session_id,
-                    workspace_dir=workspace_dir,
-                )
+                try:
+                    tool_res = await self._tool_executor.execute_tool(
+                        agent=agent,
+                        tool_name=tc.name,
+                        raw_args=tc.arguments,
+                        session_id=req.session_id,
+                        workspace_dir=workspace_dir,
+                    )
+                except ModuleError as exc:
+                    tool_res = ToolExecutionResult(
+                        ok=False,
+                        error=exc.message,
+                        error_code=exc.code,
+                    )
                 traces.append(
                     TestSimToolTrace(
                         tool_name=tc.name,
