@@ -99,6 +99,7 @@ class ModuleManifest(BaseModel):
     required_secrets: list[str] = Field(default_factory=list, alias="requiredSecrets")
     allowed_vault_keys: list[str] = Field(default_factory=list, alias="allowedVaultKeys")
     allowed_vault_prefixes: list[str] = Field(default_factory=list, alias="allowedVaultPrefixes")
+    providers: list[str] = Field(default_factory=list)
     tools: list[str] = Field(default_factory=list)
     ui_card_ids: list[str] = Field(default_factory=list, alias="uiCardIds")
     ram_impact_mb: int = Field(default=0, alias="ramImpactMb", ge=0)
@@ -279,6 +280,7 @@ class ModuleToolDefinition[TArgs: BaseModel]:
     args_model: type[TArgs]
     execute: Callable[[TArgs, ToolExecutionContext], Awaitable[ToolExecutionResult]]
     module_id: str = ""
+    authorized_agent_ids: tuple[str, ...] | None = None
 
     def json_schema(self) -> dict[str, Any]:
         """Generate LLM JSON Schema directly from `args_model` (single source of truth)."""
@@ -345,6 +347,12 @@ class ModuleModelProvider(Protocol):
 
     @property
     def provider_id(self) -> str: ...
+
+    @property
+    def zero_cost_model_prefixes(self) -> Sequence[str]: ...
+
+    @property
+    def eu_only_compliant(self) -> bool: ...
 
     def supports_model(self, model: str) -> bool: ...
 

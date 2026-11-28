@@ -64,6 +64,7 @@ class AgentConfig(BaseModel):
     soul_file: str | None = Field(default=None, alias="soulFile")
     system_prompt: str = Field(default="", alias="systemPrompt")
     enabled: bool = True
+    eu_only: bool = Field(default=False, alias="euOnly")
     response_mode: Literal["text", "voice", "auto"] | None = Field(
         default=None,
         alias="responseMode",
@@ -105,7 +106,17 @@ class CoreSettings(BaseModel):
     vault_key_path: Path
     env_path: Path
     heavy_job_lock_path: Path
-    environment: Literal["prod", "staging", "dev"] = "dev"
+    environment: Literal["prod", "staging", "test", "dev"] = "dev"
+
+    @property
+    def docs_dir(self) -> Path:
+        """Directory containing markdown user handbook chapters."""
+        return self.project_root / "docs"
+
+    @property
+    def modules_generation_path(self) -> Path:
+        """Cross-process module activation generation marker file."""
+        return self.store_dir / ".modules-generation"
 
     @classmethod
     def from_project_root(
@@ -113,7 +124,7 @@ class CoreSettings(BaseModel):
         project_root: Path,
         *,
         db_filename: str = "alfred.db",
-        environment: Literal["prod", "staging", "dev"] = "dev",
+        environment: Literal["prod", "staging", "test", "dev"] = "dev",
     ) -> CoreSettings:
         """Construct standard Alfred v2 paths relative to a project root."""
         root = project_root.resolve()

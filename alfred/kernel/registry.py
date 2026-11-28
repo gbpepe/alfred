@@ -159,6 +159,22 @@ class ModuleRegistry:
         """List all pluggable AI/compute providers registered by active modules."""
         return [provider for _, provider in self._providers.values()]
 
+    def get_provider(self, provider_id: str) -> ModuleModelProvider | None:
+        """Look up a registered pluggable provider by id."""
+        pair = self._providers.get(provider_id)
+        return pair[1] if pair is not None else None
+
+    def list_zero_cost_model_prefixes(self) -> tuple[str, ...]:
+        """Collect zero-cost model regex prefixes registered by active module providers."""
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for _, provider in self._providers.values():
+            for prefix in provider.zero_cost_model_prefixes:
+                if prefix and prefix not in seen:
+                    seen.add(prefix)
+                    ordered.append(prefix)
+        return tuple(ordered)
+
     def find_provider_for_model(self, model: str) -> ModuleModelProvider | None:
         """Find first active module provider supporting the requested model id."""
         for _, provider in self._providers.values():

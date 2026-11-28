@@ -50,6 +50,7 @@ _CORE_SCHEMA_STATEMENTS: tuple[str, ...] = (
         cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
         thinking_tokens INTEGER NOT NULL DEFAULT 0,
         model TEXT NOT NULL,
+        cost_usd REAL NOT NULL DEFAULT 0,
         content_preview TEXT,
         tool_name TEXT,
         task_title TEXT,
@@ -419,6 +420,122 @@ class SqlitePool:
             )
 
         await self.write(_insert)
+
+    async def record_token_usage(
+        self,
+        *,
+        agent: str,
+        session_id: str | None,
+        timestamp_sec: int,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_tokens: int,
+        cache_creation_tokens: int,
+        thinking_tokens: int,
+        model: str,
+        cost_usd: float,
+        content_preview: str | None = None,
+        tool_name: str | None = None,
+        task_title: str | None = None,
+        project: str | None = None,
+    ) -> None:
+        """Record LLM token and USD spend into `token_usage`."""
+
+        def _insert(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                "INSERT INTO token_usage "
+                "(agent, session_id, timestamp, input_tokens, output_tokens, "
+                "cache_read_tokens, cache_creation_tokens, thinking_tokens, model, "
+                "cost_usd, content_preview, tool_name, task_title, project) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    agent,
+                    session_id,
+                    timestamp_sec,
+                    input_tokens,
+                    output_tokens,
+                    cache_read_tokens,
+                    cache_creation_tokens,
+                    thinking_tokens,
+                    model,
+                    cost_usd,
+                    content_preview,
+                    tool_name,
+                    task_title,
+                    project,
+                ),
+            )
+
+        await self.write(_insert)
+
+    async def get_daily_spend_usd(
+        self,
+        *,
+        since_ts: int,
+        agent: str | None = None,
+    ) -> float:
+        """Sum combined USD cost across `token_usage` and `compute_usage` since `since_ts`."""
+
+        def _query(conn: sqlite3.Connection) -> float:
+            if agent is not None:
+                tok_row = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0.0) FROM token_usage "
+                    "WHERE timestamp >= ? AND agent = ?",
+                    (since_ts, agent),
+                ).fetchone()
+                comp_row = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0.0) FROM compute_usage "
+                    "WHERE timestamp >= ? AND agent = ?",
+                    (since_ts, agent),
+                ).fetchone()
+            else:
+                tok_row = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0.0) FROM token_usage WHERE timestamp >= ?",
+                    (since_ts,),
+                ).fetchone()
+                comp_row = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0.0) FROM compute_usage WHERE timestamp >= ?",
+                    (since_ts,),
+                ).fetchone()
+            tok_sum = float(tok_row[0]) if tok_row is not None else 0.0
+            comp_sum = float(comp_row[0]) if comp_row is not None else 0.0
+            return tok_sum + comp_sum
+
+        return await self.read(_query)
+
+    async def log_conversation_message(
+        self,
+        *,
+        agent_id: str,
+        chat_id: str,
+        direction: str,
+        message_id: str | None,
+        author_id: str | None,
+        author_name: str | None,
+        content: str,
+        timestamp_sec: int,
+    ) -> bool:
+        """Idempotently log an inbound/outbound message; returns `False` on duplicate."""
+
+        def _insert(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute(
+                "INSERT OR IGNORE INTO conversation_log "
+                "(agent_id, chat_id, direction, message_id, author_id, author_name, "
+                "content, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    agent_id,
+                    chat_id,
+                    direction,
+                    message_id,
+                    author_id,
+                    author_name,
+                    content,
+                    timestamp_sec,
+                ),
+            )
+            return cursor.rowcount > 0
+
+        return await self.write(_insert)
 
 
 def _row_to_module_record(row: sqlite3.Row) -> InstalledModuleRecord:

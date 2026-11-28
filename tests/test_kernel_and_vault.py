@@ -360,6 +360,8 @@ class _EchoToolArgs(BaseModel):
 
 class _StubModelProvider:
     provider_id = "stub-provider"
+    zero_cost_model_prefixes: tuple[str, ...] = ()
+    eu_only_compliant = False
 
     def supports_model(self, model: str) -> bool:
         return model == "stub-1"

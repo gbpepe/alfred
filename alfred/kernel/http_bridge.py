@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import weakref
 from pathlib import Path
 from typing import Final
 
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from starlette.responses import JSONResponse, Response
-from starlette.types import Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from alfred.core.auth import AuthError, AuthService
 from alfred.kernel.errors import ModuleError
 from alfred.kernel.registry import ModuleRegistry
+
+_PREV_ROUTER_DEFAULTS: dict[int, ASGIApp] = {}
 
 _ALLOWED_UI_EXTENSIONS: Final[dict[str, str]] = {
     ".js": "application/javascript; charset=utf-8",
@@ -133,8 +136,11 @@ def mount_module_dispatcher(
     auth_service: AuthService,
 ) -> None:
     """Attach ASGI fallback dispatcher preserving FastAPI `405` and streaming request bodies."""
-    prev_default = getattr(app.router, "_alfred_prev_default", None) or app.router.default
-    app.router._alfred_prev_default = prev_default  # type: ignore[attr-defined]
+    router_key = id(app.router)
+    if router_key not in _PREV_ROUTER_DEFAULTS:
+        _PREV_ROUTER_DEFAULTS[router_key] = app.router.default
+        weakref.finalize(app.router, _PREV_ROUTER_DEFAULTS.pop, router_key, None)
+    prev_default: ASGIApp = _PREV_ROUTER_DEFAULTS[router_key]
 
     async def _module_asgi_fallback(scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
