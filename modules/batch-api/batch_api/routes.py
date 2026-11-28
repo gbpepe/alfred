@@ -199,14 +199,22 @@ def build_batch_routes(
         job_id = _get_path_param(request, "job_id")
         if not job_id:
             return _error_json(400, "INVALID_REQUEST", "Missing path parameter 'job_id'")
-        poll_flag = (request.query_params.get("poll") or "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
         runner = require_runner()
         try:
-            return await runner.get_job(job_id, poll=poll_flag)
+            return await runner.get_job(job_id, poll=False)
+        except ModuleError as exc:
+            return JSONResponse(status_code=exc.status_code, content=exc.to_payload())
+
+    async def poll_job_handler(request: Request) -> RouteReturn:
+        job_id = _get_path_param(request, "job_id")
+        if not job_id:
+            return _error_json(400, "INVALID_REQUEST", "Missing path parameter 'job_id'")
+        _, err = await _parse_json_object(request, allow_empty=True)
+        if err is not None:
+            return err
+        runner = require_runner()
+        try:
+            return await runner.get_job(job_id, poll=True)
         except ModuleError as exc:
             return JSONResponse(status_code=exc.status_code, content=exc.to_payload())
 
@@ -245,7 +253,15 @@ def build_batch_routes(
             methods=("GET",),
             handler=get_job_handler,
             auth="dashboard",
-            summary="Get batch job status and optional live poll",
+            summary="Get batch job status without external side effects",
+            module_id="batch-api",
+        ),
+        ModuleRouteDefinition(
+            path="/api/batch/jobs/{job_id}/poll",
+            methods=("POST",),
+            handler=poll_job_handler,
+            auth="admin",
+            summary="Trigger live remote poll for an active batch job",
             module_id="batch-api",
         ),
         ModuleRouteDefinition(

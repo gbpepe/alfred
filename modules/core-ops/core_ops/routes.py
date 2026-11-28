@@ -124,7 +124,9 @@ def build_ops_routes(get_ctx: Callable[[], ModuleContext]) -> tuple[ModuleRouteD
 
         svc = require_core_cli_service(ctx.modules)
         result = await svc.switch_profile(req_dto.provider_id, req_dto.profile_id)
-        return JSONResponse(status_code=200, content=serialize_service_result(result))
+        payload = serialize_service_result(result)
+        status_code = 200 if payload.get("ok", True) else 404
+        return JSONResponse(status_code=status_code, content=payload)
 
     return (
         ModuleRouteDefinition(

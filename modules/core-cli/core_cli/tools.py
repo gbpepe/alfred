@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import fnmatch
 import hashlib
 import os
@@ -44,7 +45,7 @@ _SAFE_PLACEHOLDER_ARG_RE: Final[re.Pattern[str]] = re.compile(
     r"^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$"
 )
 _ENV_BASENAME_RE: Final[re.Pattern[str]] = re.compile(
-    r"^\.env(?:\.(?!example$).+|~)?$",
+    r"^(?:\.env(?:\.(?!example$).+|~)?|\.dashboard-token|\.vault-key(?:\.migrated)?|vault\.json)$",
     re.IGNORECASE,
 )
 _FORBIDDEN_GIT_BRANCH_RE: Final[re.Pattern[str]] = re.compile(r"^(?:main|master)$", re.IGNORECASE)
@@ -281,6 +282,12 @@ def _write_file_sync(target: Path, content: str) -> int:
 
 async def execute_fs_read(args: FsReadArgs, ctx: ToolExecutionContext) -> ToolExecutionResult:
     """Read a UTF-8 text file or list a directory confined inside `ctx.workspace_dir`."""
+    if ctx.workspace_dir.is_symlink():
+        return ToolExecutionResult(
+            ok=False,
+            error_code="WORKSPACE_BOUNDARY_VIOLATION",
+            error="Symlinked workspace directory is forbidden",
+        )
     if not ctx.workspace_dir.exists():
         return ToolExecutionResult(
             ok=False,
@@ -332,6 +339,12 @@ async def execute_fs_read(args: FsReadArgs, ctx: ToolExecutionContext) -> ToolEx
 
 async def execute_fs_write(args: FsWriteArgs, ctx: ToolExecutionContext) -> ToolExecutionResult:
     """Write a UTF-8 file inside `ctx.workspace_dir` after protected-path & secret-gate checks."""
+    if ctx.workspace_dir.is_symlink():
+        return ToolExecutionResult(
+            ok=False,
+            error_code="WORKSPACE_BOUNDARY_VIOLATION",
+            error="Symlinked workspace directory is forbidden",
+        )
     ctx.workspace_dir.mkdir(parents=True, exist_ok=True)
     resolved_pair = _resolve_in_workspace(ctx.workspace_dir, args.path)
     if resolved_pair is None:
@@ -393,6 +406,42 @@ def is_valid_self_dev_branch(branch: str) -> bool:
     )
 
 
+def _check_dangerous_exec_flags(argv: Sequence[str]) -> str | None:
+    """Reject inline-code, find-exec, and git config-injection flags across bash commands."""
+    if not argv:
+        return None
+    exe = Path(argv[0]).stem.lower()
+    args_tail = argv[1:]
+
+    if exe in {"python", "python3", "py"} or exe.startswith(("python2", "python3")):
+        for arg in args_tail:
+            if arg == "-c" or arg.startswith("-c") or re.match(r"^-[A-Za-z]*c", arg):
+                return "Inline Python execution ('-c') is forbidden"
+    elif exe in {"node", "nodejs"}:
+        for arg in args_tail:
+            if arg in {"-e", "--eval", "-p", "--print"} or arg.startswith(("--eval=", "--print=")):
+                return "Inline Node.js execution ('-e'/'--eval') is forbidden"
+    elif exe in {"perl", "ruby", "php"}:
+        for arg in args_tail:
+            if arg in {"-e", "-E", "-r"} or arg.startswith(("-e", "-r")):
+                return f"Inline {exe} execution flag '{arg}' is forbidden"
+    elif exe in {"bash", "sh", "zsh", "dash", "ash"}:
+        for arg in args_tail:
+            if arg == "-c" or arg.startswith("-c") or re.match(r"^-[A-Za-z]*c", arg):
+                return f"Inline shell execution ('{arg}') is forbidden"
+    elif exe == "find":
+        for arg in args_tail:
+            if arg.lower() in {"-exec", "-execdir", "-ok", "-okdir", "-delete"}:
+                return f"Dangerous find action '{arg}' is forbidden"
+    elif exe == "git":
+        for arg in args_tail:
+            if arg in {"-c", "--config-env", "--exec-path"} or arg.startswith(
+                ("-c", "--config-env=", "--exec-path=")
+            ):
+                return f"Dangerous git flag '{arg}' is forbidden"
+    return None
+
+
 def _match_bash_whitelist(argv: list[str], allowed_commands: Sequence[str]) -> bool:
     for template in allowed_commands:
         try:
@@ -402,8 +451,10 @@ def _match_bash_whitelist(argv: list[str], allowed_commands: Sequence[str]) -> b
         if not tmpl_tokens or len(tmpl_tokens) != len(argv):
             continue
         matched = True
+        has_placeholder = False
         for tmpl_tok, arg_tok in zip(tmpl_tokens, argv, strict=True):
             if tmpl_tok.startswith("<") and tmpl_tok.endswith(">") and len(tmpl_tok) > 2:
+                has_placeholder = True
                 if tmpl_tok == "<self-branch>":
                     if not is_valid_self_dev_branch(arg_tok):
                         matched = False
@@ -420,6 +471,8 @@ def _match_bash_whitelist(argv: list[str], allowed_commands: Sequence[str]) -> b
                 matched = False
                 break
         if matched:
+            if has_placeholder and _check_dangerous_exec_flags(argv) is not None:
+                return False
             return True
     return False
 
@@ -429,11 +482,18 @@ def _check_unwhitelisted_bash_policy(
     argv: list[str],
     ctx: ToolExecutionContext,
 ) -> ToolExecutionResult | None:
-    if argv and Path(argv[0]).name.lower() == "sudo":
+    if argv and Path(argv[0]).stem.lower() == "sudo":
         return ToolExecutionResult(
             ok=False,
             error_code="BASH_POLICY_VIOLATION",
             error="Privilege escalation via 'sudo' is forbidden",
+        )
+    flag_err = _check_dangerous_exec_flags(argv)
+    if flag_err is not None:
+        return ToolExecutionResult(
+            ok=False,
+            error_code="BASH_POLICY_VIOLATION",
+            error=flag_err,
         )
     norm_cmd = command.replace("\\", "/")
     if re.search(
@@ -501,18 +561,21 @@ async def _run_exec_with_timeout(
         stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
     except TimeoutError:
         timed_out = True
-        try:
+        with contextlib.suppress(ProcessLookupError):
             proc.terminate()
-        except ProcessLookupError:
-            pass
         try:
             stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=0.5)
         except TimeoutError:
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 proc.kill()
-            except ProcessLookupError:
-                pass
             stdout_b, stderr_b = await proc.communicate()
+    except BaseException:
+        if proc.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            with contextlib.suppress(OSError):
+                await proc.wait()
+        raise
 
     stdout = stdout_b.decode("utf-8", errors="replace")
     stderr = stderr_b.decode("utf-8", errors="replace")
@@ -555,6 +618,13 @@ def _parse_safe_bash_argv(raw_cmd: str) -> tuple[list[str] | None, str | None, s
 
 async def execute_bash(args: BashArgs, ctx: ToolExecutionContext) -> ToolExecutionResult:
     """Execute a shell-less command parsed by `shlex.split` inside `ctx.workspace_dir`."""
+    if ctx.workspace_dir.is_symlink():
+        return ToolExecutionResult(
+            ok=False,
+            error_code="WORKSPACE_BOUNDARY_VIOLATION",
+            error="Symlinked workspace directory is forbidden",
+        )
+
     raw_cmd = args.command.strip()
     if not raw_cmd:
         return ToolExecutionResult(
@@ -576,6 +646,18 @@ async def execute_bash(args: BashArgs, ctx: ToolExecutionContext) -> ToolExecuti
             error=parse_err or "Invalid command",
         )
 
+    ws_root = ctx.workspace_dir.resolve()
+    project_root = ctx.module_ctx.project_root.resolve()
+    if not ctx.allowed_bash_commands and ws_root == project_root:
+        return ToolExecutionResult(
+            ok=False,
+            error_code="BASH_POLICY_VIOLATION",
+            error=(
+                "Unwhitelisted bash execution is forbidden in project root workspace; "
+                "configure allowed_bash_commands"
+            ),
+        )
+
     if ctx.allowed_bash_commands:
         if not _match_bash_whitelist(argv, ctx.allowed_bash_commands):
             return ToolExecutionResult(
@@ -588,13 +670,23 @@ async def execute_bash(args: BashArgs, ctx: ToolExecutionContext) -> ToolExecuti
         if policy_err is not None:
             return policy_err
 
-    ws_root = ctx.workspace_dir.resolve()
     ws_root.mkdir(parents=True, exist_ok=True)
     exec_argv = [_resolve_executable(argv[0]), *argv[1:]]
     env = build_sanitized_env(
         module_sanitize_keys=ctx.module_ctx.modules.list_cli_env_sanitize_keys(),
     )
     timeout_sec = max(ctx.bash_timeout_ms, 10) / 1000.0
+    snapshot = await asyncio.to_thread(
+        _snapshot_protected_paths_sync,
+        ws_root,
+        ctx.protected_paths,
+    )
+    timed_out = False
+    returncode: int | None = None
+    stdout = ""
+    stderr = ""
+    exec_exc: Exception | None = None
+    violations: list[dict[str, str]] = []
 
     try:
         timed_out, returncode, stdout, stderr = await _run_exec_with_timeout(
@@ -603,17 +695,38 @@ async def execute_bash(args: BashArgs, ctx: ToolExecutionContext) -> ToolExecuti
             env=env,
             timeout_sec=timeout_sec,
         )
-    except FileNotFoundError:
+    except Exception as exc:
+        exec_exc = exc
+    finally:
+        violations = await asyncio.to_thread(
+            _verify_and_rollback_snapshot_sync,
+            snapshot,
+            ctx.protected_paths,
+        )
+
+    if violations:
+        paths_repr = ", ".join(v["path"] for v in violations)
+        return ToolExecutionResult(
+            ok=False,
+            error_code="PROTECTED_PATH_VIOLATION",
+            error=(
+                f"Command modified protected path(s) [{paths_repr}]; "
+                "reverted automatically via SHA-256 snapshot"
+            ),
+            metadata={"violations": violations},
+        )
+
+    if isinstance(exec_exc, FileNotFoundError):
         return ToolExecutionResult(
             ok=False,
             error_code="BINARY_NOT_FOUND",
             error=f"Executable not found: {argv[0]}",
         )
-    except OSError as exc:
+    if exec_exc is not None:
         return ToolExecutionResult(
             ok=False,
             error_code="BASH_EXEC_ERROR",
-            error=mask_secrets(str(exc)),
+            error=mask_secrets(str(exec_exc)),
         )
 
     safe_out = _cap_and_mask(stdout.strip())
@@ -662,6 +775,14 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _sha256_file_sync(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(65_536):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _collect_dir_files_sync(root_dir: Path, ws_root: Path) -> list[tuple[str, Path]]:
     out: list[tuple[str, Path]] = []
     for cur_root, dirnames, filenames in os.walk(root_dir):
@@ -687,17 +808,23 @@ def _snapshot_protected_paths_sync(
             return
         try:
             st = abs_path.stat()
-            if not abs_path.is_file() or st.st_size > MAX_SNAPSHOT_FILE_BYTES:
+            if not abs_path.is_file():
                 return
-            data = abs_path.read_bytes()
+            if st.st_size <= MAX_SNAPSHOT_FILE_BYTES:
+                data = abs_path.read_bytes()
+                digest = _sha256_bytes(data)
+                backup_bytes: bytes | None = data
+            else:
+                digest = _sha256_file_sync(abs_path)
+                backup_bytes = None
         except OSError:
             return
         snap.file_snaps[rel_path] = _ProtectedFileSnap(
             rel_path=rel_path,
             abs_path=abs_path,
             rule=rule,
-            sha256=_sha256_bytes(data),
-            backup_bytes=data,
+            sha256=digest,
+            backup_bytes=backup_bytes,
         )
 
     for rule in protected_paths:
@@ -744,14 +871,15 @@ def _verify_and_rollback_snapshot_sync(
             changed = True
         else:
             try:
-                cur_hash = _sha256_bytes(entry.abs_path.read_bytes())
+                cur_hash = _sha256_file_sync(entry.abs_path)
                 if cur_hash != entry.sha256:
                     changed = True
             except OSError:
                 changed = True
         if changed:
+            action = "restored" if entry.backup_bytes is not None else "modified_large_file"
             if rel_path not in recorded_rels:
-                violations.append({"path": rel_path, "rule": entry.rule, "action": "restored"})
+                violations.append({"path": rel_path, "rule": entry.rule, "action": action})
                 recorded_rels.add(rel_path)
             if entry.backup_bytes is not None:
                 entry.abs_path.parent.mkdir(parents=True, exist_ok=True)
@@ -798,6 +926,10 @@ def _validate_git_args(args: Sequence[str]) -> str | None:
         if (
             tok == "-C"
             or tok.startswith("-C")
+            or tok == "-c"
+            or tok.startswith("-c")
+            or tok == "--config-env"
+            or tok.startswith("--config-env=")
             or tok.startswith("--git-dir")
             or tok.startswith("--work-tree")
             or tok.startswith("--exec-path")
@@ -876,6 +1008,12 @@ def _validate_git_args(args: Sequence[str]) -> str | None:
 
 async def execute_git(args: GitArgs, ctx: ToolExecutionContext) -> ToolExecutionResult:
     """Execute git inside `ctx.workspace_dir` with protected-path SHA-256 snapshot & rollback."""
+    if ctx.workspace_dir.is_symlink():
+        return ToolExecutionResult(
+            ok=False,
+            error_code="WORKSPACE_BOUNDARY_VIOLATION",
+            error="Symlinked workspace directory is forbidden",
+        )
     policy_err = _validate_git_args(args.args)
     if policy_err is not None:
         return ToolExecutionResult(

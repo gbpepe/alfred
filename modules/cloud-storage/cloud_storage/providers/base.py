@@ -295,6 +295,7 @@ async def stream_download_to_path(
     max_download_bytes: int,
     expected_size_bytes: int | None,
     provider: CloudProviderId,
+    expected_size_from_headers: Callable[[httpx.Headers], int | None] | None = None,
 ) -> tuple[int, httpx.Headers]:
     """Stream response via `aiter_bytes(65536)` to atomic `.part` file with disk & size gates."""
     if expected_size_bytes is not None and expected_size_bytes > max_download_bytes:
@@ -387,6 +388,18 @@ async def stream_download_to_path(
                     provider=provider,
                     account=ctx.account,
                 )
+
+            if expected_size_from_headers is not None:
+                meta_len = expected_size_from_headers(resp.headers)
+                if meta_len is not None and bytes_written != meta_len:
+                    raise CloudStorageError(
+                        f"Download metadata integrity mismatch: expected {meta_len} B, "
+                        f"wrote {bytes_written} B",
+                        code="CLOUD_INTEGRITY_MISMATCH",
+                        status_code=502,
+                        provider=provider,
+                        account=ctx.account,
+                    )
 
             if bytes_written == 0:
                 await asyncio.to_thread(_touch_part_sync, part_path)

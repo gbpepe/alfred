@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import re
@@ -132,21 +133,24 @@ async def default_subprocess_runner(req: CliSubprocessRequest) -> CliSubprocessR
         )
     except TimeoutError:
         timed_out = True
-        try:
+        with contextlib.suppress(ProcessLookupError):
             proc.terminate()
-        except ProcessLookupError:
-            pass
         try:
             stdout_b, stderr_b = await asyncio.wait_for(
                 proc.communicate(),
                 timeout=DEFAULT_KILL_GRACE_SEC,
             )
         except TimeoutError:
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 proc.kill()
-            except ProcessLookupError:
-                pass
             stdout_b, stderr_b = await proc.communicate()
+    except BaseException:
+        if proc.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            with contextlib.suppress(OSError):
+                await proc.wait()
+        raise
 
     return CliSubprocessResult(
         stdout=stdout_b.decode("utf-8", errors="replace"),

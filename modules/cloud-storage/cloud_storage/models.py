@@ -494,3 +494,16 @@ class CloudOAuthCallbackResult(BaseModel):
     account_email: str | None = Field(default=None, alias="accountEmail")
     access_mode: CloudAccessMode = Field(alias="accessMode")
     message: str
+
+
+class CloudShortLivedToken(BaseModel):
+    """Scoped ephemeral OAuth2 access token DTO minted via Service Bus (never exposes secrets)."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    provider: CloudProviderId
+    account: str
+    access_token: str = Field(alias="accessToken")
+    expires_in_sec: int = Field(alias="expiresInSec", ge=1)
+    root_ref: str | None = Field(default=None, alias="rootRef")
+    access_mode: CloudAccessMode = Field(alias="accessMode")

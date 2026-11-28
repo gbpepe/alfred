@@ -40,6 +40,7 @@ CUSTOM_ID_RE: Final[re.Pattern[str]] = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 DEFAULT_MAX_ANTHROPIC_REQUESTS: Final[int] = 10_000
 DEFAULT_MAX_ANTHROPIC_BYTES: Final[int] = 32 * 1024 * 1024
 ANTHROPIC_EPHEMERAL_CACHE_MIN_CHARS: Final[int] = 4_096
+MAX_BATCH_OUTPUT_BYTES: Final[int] = 64 * 1024 * 1024
 
 DEFAULT_BATCH_MODELS: Final[dict[BatchProviderName, str]] = {
     "anthropic": "claude-sonnet-4-6",
@@ -296,8 +297,16 @@ class BaseBatchAdapter(ABC):
 
     provider_id: BatchProviderName
 
-    def __init__(self, *, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        http_client: httpx.AsyncClient | None = None,
+        timeout_sec: float = 60.0,
+        max_output_bytes: int = MAX_BATCH_OUTPUT_BYTES,
+    ) -> None:
         self._http_client = http_client
+        self._timeout_sec = max(1.0, float(timeout_sec))
+        self._max_output_bytes = max(1, int(max_output_bytes))
 
     async def _request(
         self,
@@ -311,7 +320,7 @@ class BaseBatchAdapter(ABC):
         files: dict[str, tuple[str, bytes, str]] | None = None,
     ) -> httpx.Response:
         owns_client = self._http_client is None
-        client = self._http_client or httpx.AsyncClient(timeout=60.0)
+        client = self._http_client or httpx.AsyncClient(timeout=self._timeout_sec)
         try:
             return await client.request(
                 method,
@@ -321,10 +330,65 @@ class BaseBatchAdapter(ABC):
                 content=content,
                 data=data,
                 files=files,
+                timeout=self._timeout_sec,
             )
         except httpx.HTTPError as exc:
             raise BatchAdapterError(
                 f"{self.provider_id} HTTP request failed: {exc}",
+                code="BATCH_HTTP_ERROR",
+                status_code=502,
+            ) from exc
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    async def _download_bounded_text(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        max_bytes: int | None = None,
+        error_prefix: str = "output download error",
+    ) -> tuple[str, int]:
+        limit = max(1, self._max_output_bytes if max_bytes is None else max_bytes)
+        owns_client = self._http_client is None
+        client = self._http_client or httpx.AsyncClient(timeout=self._timeout_sec)
+        try:
+            async with client.stream(
+                "GET",
+                url,
+                headers=headers,
+                timeout=self._timeout_sec,
+            ) as resp:
+                if resp.status_code >= 400:
+                    await resp.aread()
+                    raise BatchAdapterError(f"{error_prefix} {resp.status_code}")
+
+                raw_cl = resp.headers.get("content-length")
+                if raw_cl and not resp.headers.get("content-encoding"):
+                    try:
+                        declared_len = int(raw_cl.strip())
+                    except ValueError:
+                        declared_len = -1
+                    if declared_len > limit:
+                        raise BatchPayloadLimitError(
+                            f"{self.provider_id} batch output ({declared_len} B) exceeds "
+                            f"{limit} byte limit"
+                        )
+
+                buf = bytearray()
+                async for chunk in resp.aiter_bytes(65_536):
+                    if not chunk:
+                        continue
+                    if len(buf) + len(chunk) > limit:
+                        raise BatchPayloadLimitError(
+                            f"{self.provider_id} streamed batch output exceeds {limit} byte limit"
+                        )
+                    buf.extend(chunk)
+                return bytes(buf).decode("utf-8", errors="replace"), len(buf)
+        except httpx.HTTPError as exc:
+            raise BatchAdapterError(
+                f"{self.provider_id} output stream failed: {exc}",
                 code="BATCH_HTTP_ERROR",
                 status_code=502,
             ) from exc
@@ -358,8 +422,14 @@ class AnthropicBatchAdapter(BaseBatchAdapter):
         http_client: httpx.AsyncClient | None = None,
         max_requests: int = DEFAULT_MAX_ANTHROPIC_REQUESTS,
         max_bytes: int = DEFAULT_MAX_ANTHROPIC_BYTES,
+        timeout_sec: float = 60.0,
+        max_output_bytes: int = MAX_BATCH_OUTPUT_BYTES,
     ) -> None:
-        super().__init__(http_client=http_client)
+        super().__init__(
+            http_client=http_client,
+            timeout_sec=timeout_sec,
+            max_output_bytes=max_output_bytes,
+        )
         clean_key = api_key.strip()
         if not clean_key:
             raise BatchProviderAuthError("ANTHROPIC_API_KEY is missing")
@@ -474,18 +544,14 @@ class AnthropicBatchAdapter(BaseBatchAdapter):
                 error_message="Anthropic batch ended without results_url",
             )
 
-        res_resp = await self._request(
-            "GET",
+        res_text, _ = await self._download_bounded_text(
             results_url,
             headers=self._headers(with_json=False),
+            error_prefix="Anthropic results download error",
         )
-        if res_resp.status_code >= 400:
-            raise BatchAdapterError(
-                f"Anthropic results download error {res_resp.status_code}"
-            )
 
         output_items: list[CanonicalBatchOutputItem] = []
-        for raw_line in res_resp.text.splitlines():
+        for raw_line in res_text.splitlines():
             trimmed = raw_line.strip()
             if not trimmed:
                 continue
@@ -644,8 +710,14 @@ class GeminiBatchAdapter(BaseBatchAdapter):
         api_key: str,
         base_url: str = "https://generativelanguage.googleapis.com",
         http_client: httpx.AsyncClient | None = None,
+        timeout_sec: float = 60.0,
+        max_output_bytes: int = MAX_BATCH_OUTPUT_BYTES,
     ) -> None:
-        super().__init__(http_client=http_client)
+        super().__init__(
+            http_client=http_client,
+            timeout_sec=timeout_sec,
+            max_output_bytes=max_output_bytes,
+        )
         clean_key = api_key.strip()
         if not clean_key:
             raise BatchProviderAuthError("GEMINI_API_KEY is missing")
@@ -755,16 +827,14 @@ class GeminiBatchAdapter(BaseBatchAdapter):
             )
 
         clean_out = output_file.lstrip("/")
-        dl_resp = await self._request(
-            "GET",
+        dl_text, _ = await self._download_bounded_text(
             f"{self._base_url}/download/v1beta/{clean_out}:download?alt=media",
             headers={"x-goog-api-key": self._api_key},
+            error_prefix="Gemini batch output download error",
         )
-        if dl_resp.status_code >= 400:
-            raise BatchAdapterError(f"Gemini batch output download error {dl_resp.status_code}")
 
         output_items: list[CanonicalBatchOutputItem] = []
-        for raw_line in dl_resp.text.splitlines():
+        for raw_line in dl_text.splitlines():
             trimmed = raw_line.strip()
             if not trimmed:
                 continue
@@ -830,8 +900,14 @@ class VertexEuBatchAdapter(BaseBatchAdapter):
         gcs_base_url: str = "https://storage.googleapis.com",
         vertex_base_url: str | None = None,
         verify_bucket_location: bool = False,
+        timeout_sec: float = 60.0,
+        max_output_bytes: int = MAX_BATCH_OUTPUT_BYTES,
     ) -> None:
-        super().__init__(http_client=http_client)
+        super().__init__(
+            http_client=http_client,
+            timeout_sec=timeout_sec,
+            max_output_bytes=max_output_bytes,
+        )
         self._location = _assert_eu_vertex_location(location)
         clean_bucket = bucket.strip().removeprefix("gs://").strip("/")
         if not clean_bucket:
@@ -1024,18 +1100,21 @@ class VertexEuBatchAdapter(BaseBatchAdapter):
         )
 
         output_items: list[CanonicalBatchOutputItem] = []
+        remaining_budget = self._max_output_bytes
         for shard_name in shards:
-            dl_resp = await self._request(
-                "GET",
+            if remaining_budget <= 0:
+                raise BatchPayloadLimitError(
+                    f"Vertex EU batch output exceeds {self._max_output_bytes} byte limit"
+                )
+            shard_text, shard_bytes = await self._download_bounded_text(
                 f"{self._gcs_base_url}/storage/v1/b/{quote(out_bucket, safe='')}/o/"
                 f"{quote(shard_name, safe='')}?alt=media",
                 headers={"Authorization": f"Bearer {token}"},
+                max_bytes=remaining_budget,
+                error_prefix=f"Vertex EU GCS shard download error for {shard_name}:",
             )
-            if dl_resp.status_code >= 400:
-                raise BatchAdapterError(
-                    f"Vertex EU GCS shard download error {dl_resp.status_code} for {shard_name}"
-                )
-            for raw_line in dl_resp.text.splitlines():
+            remaining_budget -= shard_bytes
+            for raw_line in shard_text.splitlines():
                 trimmed = raw_line.strip()
                 if not trimmed:
                     continue
@@ -1089,8 +1168,14 @@ class OpenAiBatchAdapter(BaseBatchAdapter):
         api_key: str,
         base_url: str = "https://api.openai.com/v1",
         http_client: httpx.AsyncClient | None = None,
+        timeout_sec: float = 60.0,
+        max_output_bytes: int = MAX_BATCH_OUTPUT_BYTES,
     ) -> None:
-        super().__init__(http_client=http_client)
+        super().__init__(
+            http_client=http_client,
+            timeout_sec=timeout_sec,
+            max_output_bytes=max_output_bytes,
+        )
         clean_key = api_key.strip()
         if not clean_key:
             raise BatchProviderAuthError("OPENAI_API_KEY is missing")
@@ -1254,35 +1339,35 @@ class OpenAiBatchAdapter(BaseBatchAdapter):
         output_file_id = _as_str(data.get("output_file_id"))
         error_file_id = _as_str(data.get("error_file_id"))
 
+        remaining_budget = self._max_output_bytes
         if output_file_id:
-            out_resp = await self._request(
-                "GET",
+            out_text, out_bytes = await self._download_bounded_text(
                 f"{self._base_url}/files/{quote(output_file_id, safe='')}/content",
                 headers=self._auth_headers(),
+                max_bytes=remaining_budget,
+                error_prefix="OpenAI output file download error",
             )
-            if out_resp.status_code >= 400:
-                raise BatchAdapterError(
-                    f"OpenAI output file download error {out_resp.status_code}"
-                )
+            remaining_budget -= out_bytes
             self._parse_openai_jsonl(
-                out_resp.text,
+                out_text,
                 model=model,
                 force_error=False,
                 output_items=output_items,
             )
 
         if error_file_id:
-            err_resp = await self._request(
-                "GET",
+            if remaining_budget <= 0:
+                raise BatchPayloadLimitError(
+                    f"OpenAI batch output exceeds {self._max_output_bytes} byte limit"
+                )
+            err_text, _ = await self._download_bounded_text(
                 f"{self._base_url}/files/{quote(error_file_id, safe='')}/content",
                 headers=self._auth_headers(),
+                max_bytes=remaining_budget,
+                error_prefix="OpenAI error file download error",
             )
-            if err_resp.status_code >= 400:
-                raise BatchAdapterError(
-                    f"OpenAI error file download error {err_resp.status_code}"
-                )
             self._parse_openai_jsonl(
-                err_resp.text,
+                err_text,
                 model=model,
                 force_error=True,
                 output_items=output_items,

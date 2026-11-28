@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
@@ -107,6 +108,7 @@ def _isolate_kernel_modules(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     _cleanup_module_sys_modules()
 
 
+@functools.lru_cache(maxsize=1)
 def _generate_test_rsa_pem() -> str:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     pem = key.private_bytes(
@@ -1063,5 +1065,195 @@ async def test_tools_routes_auth_csrf_validation_and_ui_serving(tmp_path: Path) 
                 assert contribs["vpsBatchCard"]["slot"] == "vps-card"
                 assert contribs["vpsBatchCard"]["entryFile"] == "batch-card.js"
                 assert contribs["vpsBatchCard"]["order"] == 50
+    finally:
+        await container.db.close()
+
+
+async def test_batch_get_read_only_admin_poll_route_output_limit_and_bucket_verify(
+    tmp_path: Path,
+) -> None:
+    """Verify GET ?poll=true is read-only, POST /poll runs, output cap & bucket verify work."""
+    settings = _make_settings(tmp_path)
+    poll_http_hits = 0
+    bucket_verify_hits = 0
+    poll_state = {"done": False}
+
+    def _mock_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal poll_http_hits, bucket_verify_hits
+        if request.method == "POST" and request.url.path == "/upload/v1beta/files":
+            return httpx.Response(200, json={"file": {"name": "files/f_ro"}})
+        if request.method == "POST" and request.url.path.endswith(":batchGenerateContent"):
+            return httpx.Response(200, json={"name": "batches/ro_1"})
+        if request.method == "GET" and request.url.path == "/v1beta/batches/ro_1":
+            poll_http_hits += 1
+            if not poll_state["done"]:
+                return httpx.Response(
+                    200,
+                    json={"done": False, "metadata": {"state": "BATCH_STATE_RUNNING"}},
+                )
+            return httpx.Response(
+                200,
+                json={
+                    "done": True,
+                    "metadata": {"state": "BATCH_STATE_SUCCEEDED"},
+                    "response": {"responsesFile": "files/f_ro_out"},
+                },
+            )
+        if (
+            request.method == "GET"
+            and request.url.path == "/download/v1beta/files/f_ro_out:download"
+        ):
+            row = json.dumps(
+                {
+                    "key": "r_1",
+                    "response": {
+                        "candidates": [{"content": {"parts": [{"text": "polled-ok"}]}}],
+                        "usageMetadata": {"promptTokenCount": 50, "candidatesTokenCount": 10},
+                    },
+                }
+            )
+            return httpx.Response(200, text=row + "\n")
+        if request.url.host == "oauth2.googleapis.com":
+            return httpx.Response(200, json={"access_token": "ya29.bkt", "expires_in": 3600})
+        if request.url.host == "storage.googleapis.com":
+            if request.method == "GET" and request.url.path == "/storage/v1/b/eu-verified-bkt":
+                bucket_verify_hits += 1
+                return httpx.Response(200, json={"location": "EU"})
+            if request.method == "POST" and "/upload/storage/v1/b/" in request.url.path:
+                return httpx.Response(200, json={"name": "input.jsonl"})
+        if "aiplatform.googleapis.com" in request.url.host and request.method == "POST":
+            return httpx.Response(
+                200,
+                json={"name": "projects/eu-proj/locations/europe-west1/batchPredictionJobs/55"},
+            )
+        # Oversized stream test endpoint
+        if (
+            request.method == "GET"
+            and request.url.path == "/download/v1beta/files/oversized:download"
+        ):
+            return httpx.Response(200, content=b"X" * 512)
+        if request.method == "GET" and request.url.path == "/v1beta/batches/big_1":
+            return httpx.Response(
+                200,
+                json={
+                    "done": True,
+                    "metadata": {"state": "BATCH_STATE_SUCCEEDED"},
+                    "response": {"responsesFile": "files/oversized"},
+                },
+            )
+        return httpx.Response(404)
+
+    container = build_core_container(settings, admin_token="batch-hardening-tok")
+    await container.db.initialize()
+    await container.vault.initialize()
+    await container.vault.set_secret("GEMINI_API_KEY", "AIzaHardeningKey12345")
+
+    app = FastAPI()
+    app.state.container = container
+    mount_module_ui_routes(app, container.registry)
+    app.include_router(create_core_router(container))
+    mount_module_dispatcher(app, container.registry, container.auth)
+
+    try:
+        await container.loader.load_active_modules(active_ids={"core-cli", "batch-api"})
+        batch_ctx = container.registry.get_context("batch-api")
+        assert batch_ctx is not None
+        pem = _generate_test_rsa_pem()
+        creds = ServiceAccountCredentials(
+            client_email="b@eu.iam.gserviceaccount.com",
+            private_key=pem,
+            project_id="eu-proj",
+        )
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(_mock_handler)) as mock_http:
+            batch_ctx.extra["http_client"] = mock_http
+            batch_ctx.extra["gcp_token_provider"] = GcpTokenProvider(creds, http_client=mock_http)
+
+            transport = httpx.ASGITransport(app=app)
+            dash_cookie, dash_csrf = container.auth.issue_dashboard_session(role="dashboard")
+            admin_cookie, admin_csrf = container.auth.issue_dashboard_session(role="admin")
+
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                cookies={"alfred_session": admin_cookie},
+            ) as admin:
+                sub = await admin.post(
+                    "/api/batch/jobs",
+                    headers={"X-CSRF-Token": admin_csrf},
+                    json={"provider": "gemini", "items": [{"custom_id": "r_1", "prompt": "Hi"}]},
+                )
+                assert sub.status_code == 201
+                job_id = sub.json()["id"]
+
+            # 1. Dashboard GET /api/batch/jobs/{id}?poll=true must NOT trigger remote poll or POST
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                cookies={"alfred_session": dash_cookie},
+            ) as dash:
+                ro_get = await dash.get(f"/api/batch/jobs/{job_id}?poll=true")
+                assert ro_get.status_code == 200
+                assert ro_get.json()["status"] == "submitted"
+                assert poll_http_hits == 0
+
+                deny_poll = await dash.post(
+                    f"/api/batch/jobs/{job_id}/poll",
+                    headers={"X-CSRF-Token": dash_csrf},
+                )
+                assert deny_poll.status_code == 403
+
+            # 2. Admin POST /api/batch/jobs/{id}/poll requires CSRF & executes poll
+            poll_state["done"] = True
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                cookies={"alfred_session": admin_cookie},
+            ) as admin:
+                no_csrf_poll = await admin.post(f"/api/batch/jobs/{job_id}/poll")
+                assert no_csrf_poll.status_code == 403
+                ok_poll = await admin.post(
+                    f"/api/batch/jobs/{job_id}/poll",
+                    headers={"X-CSRF-Token": admin_csrf},
+                )
+                assert ok_poll.status_code == 200
+                assert ok_poll.json()["status"] == "completed"
+                assert poll_http_hits == 1
+
+            # 3. Adapter max_output_bytes limit aborts oversized download before buffering
+            limited_gem = GeminiBatchAdapter(
+                api_key="AIzaLimit",
+                http_client=mock_http,
+                max_output_bytes=128,
+            )
+            with pytest.raises(BatchPayloadLimitError):
+                await limited_gem.poll("batches/big_1", "gemini-3.8-flash")
+
+            # 4. VERTEX_EU_VERIFY_BUCKET_LOCATION wired via module config
+            await batch_ctx.security.config.update(
+                {
+                    "VERTEX_EU_BATCH_BUCKET": "eu-verified-bkt",
+                    "VERTEX_EU_BATCH_LOCATION": "europe-west1",
+                    "VERTEX_EU_VERIFY_BUCKET_LOCATION": "true",
+                }
+            )
+            runner = container.registry.get_service("batch-api")
+            assert runner is not None
+            mod_runner = sys.modules[f"{module_package_name('batch-api')}.runner"]
+            mod_adapters = sys.modules[f"{module_package_name('batch-api')}.adapters"]
+            await runner.submit_job(
+                mod_runner.BatchSubmitInput(
+                    provider="vertex-eu",
+                    eu_only=True,
+                    items=[
+                        mod_adapters.CanonicalBatchRequestItem(
+                            custom_id="v1",
+                            prompt="Verify bkt",
+                            eu_only=True,
+                        )
+                    ],
+                )
+            )
+            assert bucket_verify_hits == 1
     finally:
         await container.db.close()

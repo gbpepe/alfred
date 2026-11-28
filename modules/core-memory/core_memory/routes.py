@@ -203,7 +203,7 @@ def build_memory_routes(
                 category=category,
                 limit=limit,
                 include_archived=include_archived,
-                track_use=True,
+                track_use=False,
                 agent_id=_principal_subject(request),
             )
         return await engine.list_memories(
@@ -233,7 +233,7 @@ def build_memory_routes(
         return await engine.get_memory(
             memory_id,
             namespace=namespace,
-            track_use=True,
+            track_use=False,
             agent_id=_principal_subject(request),
         )
 

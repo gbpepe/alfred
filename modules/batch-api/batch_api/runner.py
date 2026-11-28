@@ -325,6 +325,8 @@ def _parse_and_scan_jsonl_sync(
             "Batch JSONL input contains 0 items",
             code="EMPTY_BATCH_INPUT",
         )
+    if size > 2 * 1024 * 1024:
+        _scan_items_secrets(items, display_ref)
     return items
 
 
@@ -623,7 +625,12 @@ class BatchRunner:
             )
         return configured
 
-    async def _build_adapter(self, provider: BatchProviderName) -> BaseBatchAdapter:
+    async def _build_adapter(
+        self,
+        provider: BatchProviderName,
+        *,
+        timeout_sec: float = 60.0,
+    ) -> BaseBatchAdapter:
         http_client = self._effective_http_client()
         if provider == "anthropic":
             api_key = await self._resolve_secret("ANTHROPIC_API_KEY")
@@ -632,6 +639,7 @@ class BatchRunner:
                 api_key=api_key,
                 base_url=base_url,
                 http_client=http_client,
+                timeout_sec=timeout_sec,
             )
         if provider == "gemini":
             api_key = await self._resolve_secret("GEMINI_API_KEY")
@@ -643,6 +651,7 @@ class BatchRunner:
                 api_key=api_key,
                 base_url=base_url,
                 http_client=http_client,
+                timeout_sec=timeout_sec,
             )
         if provider == "openai":
             api_key = await self._resolve_secret("OPENAI_API_KEY")
@@ -651,9 +660,21 @@ class BatchRunner:
                 api_key=api_key,
                 base_url=base_url,
                 http_client=http_client,
+                timeout_sec=timeout_sec,
             )
 
         bucket, location, proj_id, tp, static_tok = await self._get_vertex_settings()
+        cfg = await self.ctx.security.config.get()
+        raw_verify = cfg.get("VERTEX_EU_VERIFY_BUCKET_LOCATION")
+        if raw_verify is None:
+            raw_verify = self._effective_env_str("VERTEX_EU_VERIFY_BUCKET_LOCATION")
+        verify_bucket = (
+            raw_verify is True
+            or (
+                isinstance(raw_verify, str)
+                and raw_verify.strip().lower() in ("1", "true", "yes")
+            )
+        )
         gcs_base = self._effective_env_str("GCS_BASE_URL") or "https://storage.googleapis.com"
         vertex_base = self._effective_env_str("VERTEX_BASE_URL") or None
         return VertexEuBatchAdapter(
@@ -665,6 +686,8 @@ class BatchRunner:
             http_client=http_client,
             gcs_base_url=gcs_base,
             vertex_base_url=vertex_base,
+            verify_bucket_location=verify_bucket,
+            timeout_sec=timeout_sec,
         )
 
     async def _default_model_for(self, provider: BatchProviderName) -> str:
@@ -704,7 +727,6 @@ class BatchRunner:
                 display_ref,
                 self.ctx,
             )
-            await asyncio.to_thread(_scan_items_secrets, items, display_ref)
         else:
             raise BatchValidationError("Either 'input_path' or 'items' must be provided")
 
@@ -965,7 +987,7 @@ class BatchRunner:
             "cleaned_temp_files": cleaned_temps,
         }
 
-    async def poll_single_job(self, job_id: str) -> str:
+    async def poll_single_job(self, job_id: str, *, timeout_sec: float = 60.0) -> str:
         """Poll one active job with atomic DB lock, output persistence, CostOps & QA mark."""
         if job_id in self._in_flight_polls:
             return "skipped"
@@ -986,7 +1008,7 @@ class BatchRunner:
                 )
                 return "failed"
 
-            adapter = await self._build_adapter(job.provider)
+            adapter = await self._build_adapter(job.provider, timeout_sec=timeout_sec)
             poll_res = await adapter.poll(job.external_job_id, job.model)
             now_sec = self._clock()
             now_iso = _now_iso(now_sec)
@@ -1118,7 +1140,7 @@ class BatchRunner:
             self._in_flight_polls.discard(job_id)
 
     async def poll_active_jobs(self, *, now_ms: int | None = None) -> dict[str, Any]:
-        """Non-blocking heartbeat sweep polling up to 25 active batch jobs."""
+        """Non-blocking heartbeat sweep polling up to 25 active batch jobs (`Semaphore(3)`)."""
         del now_ms
 
         def _list_active_ids(conn: sqlite3.Connection) -> list[str]:
@@ -1130,26 +1152,36 @@ class BatchRunner:
             return [str(r["id"]) for r in rows]
 
         active_ids = await self.ctx.db.read(_list_active_ids)
+        sem = asyncio.Semaphore(3)
+
+        async def _poll_one(jid: str) -> tuple[str, str | None, str | None]:
+            async with sem:
+                try:
+                    outcome = await self.poll_single_job(jid, timeout_sec=20.0)
+                    return jid, outcome, None
+                except Exception as exc:
+                    return jid, None, str(exc)
+
+        results = await asyncio.gather(*(_poll_one(jid) for jid in active_ids))
         polled = 0
         completed = 0
         failed = 0
         cancelled = 0
         errors: list[dict[str, str]] = []
 
-        for jid in active_ids:
-            try:
-                outcome = await self.poll_single_job(jid)
-                if outcome != "skipped":
-                    polled += 1
-                if outcome == "completed":
-                    completed += 1
-                elif outcome == "failed":
-                    failed += 1
-                elif outcome == "cancelled":
-                    cancelled += 1
-            except Exception as exc:
-                errors.append({"job_id": jid, "error": str(exc)})
-                self.ctx.logger.warning("Heartbeat batch poll error for %s: %s", jid, exc)
+        for jid, outcome, err_msg in results:
+            if err_msg is not None:
+                errors.append({"job_id": jid, "error": err_msg})
+                self.ctx.logger.warning("Heartbeat batch poll error for %s: %s", jid, err_msg)
+                continue
+            if outcome is not None and outcome != "skipped":
+                polled += 1
+            if outcome == "completed":
+                completed += 1
+            elif outcome == "failed":
+                failed += 1
+            elif outcome == "cancelled":
+                cancelled += 1
 
         return {
             "polled": polled,

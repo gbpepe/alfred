@@ -501,7 +501,7 @@ async def test_gdrive_resumable_308_patch_in_place_and_native_export(tmp_path: P
             content_range = request.headers["Content-Range"]
             chunk_len = len(request.content)
             chunk_ranges.append((content_range, chunk_len))
-            if content_range.startswith("bytes 0-8388607/"):
+            if content_range.startswith("bytes 0-262143/"):
                 return httpx.Response(308)
             return httpx.Response(
                 200,
@@ -509,7 +509,7 @@ async def test_gdrive_resumable_308_patch_in_place_and_native_export(tmp_path: P
                     "id": "existing-doc-99",
                     "name": "report.txt",
                     "mimeType": "text/plain",
-                    "size": str(8_388_608 + chunk_len),
+                    "size": str(262_144 + chunk_len),
                 },
             )
         if url.startswith("https://www.googleapis.com/drive/v3/files/gdoc-123?"):
@@ -529,6 +529,10 @@ async def test_gdrive_resumable_308_patch_in_place_and_native_export(tmp_path: P
     async with httpx.AsyncClient(transport=httpx.MockTransport(_mock_gdrive)) as mock_http:
         container, ctx, engine = await _setup_active_cloud(tmp_path, http_client=mock_http)
         engine.skip_disk_space_check = True
+        mod_pkg = module_package_name("cloud-storage")
+        models_mod = sys.modules[f"{mod_pkg}.models"]
+        assert models_mod.DEFAULT_CLOUD_CHUNK_BYTES == 8_388_608
+        assert models_mod.ONEDRIVE_CHUNK_BYTES == 8_192_000
         try:
             await ctx.security.vault.set_secret("cloud_gdrive_client_id", "gd-cid")
             await ctx.security.vault.set_secret("cloud_gdrive_client_secret", "gd-csec")
@@ -537,29 +541,25 @@ async def test_gdrive_resumable_308_patch_in_place_and_native_export(tmp_path: P
             ws_dir = tmp_path / "ws"
             ws_dir.mkdir(parents=True, exist_ok=True)
             upload_file = ws_dir / "report.txt"
-            # 9 MiB clean UTF-8 file -> 8_388_608 B + 1_048_576 B
-            total_size = 8_388_608 + 1_048_576
-            line = b"clean documentation line 0123456789abcdef0123456789abcdef01234\n"
-            with upload_file.open("wb") as handle:
-                written = 0
-                while written < total_size:
-                    part = line[: min(len(line), total_size - written)]
-                    handle.write(part)
-                    written += len(part)
+            # 300 KiB clean UTF-8 file uploaded in 256 KiB aligned chunks (fast test)
+            total_size = 262_144 + 45_056
+            block = b"clean documentation line 0123456789abcdef0123456789abcdef01234\n"
+            upload_file.write_bytes((block * ((total_size // len(block)) + 1))[:total_size])
 
             prov, acc, uploaded = await engine.upload_file(
                 local_path="report.txt",
                 workspace_dir=ws_dir,
                 on_conflict="update_in_place",
                 provider="gdrive",
+                chunk_bytes=262_144,
             )
             assert prov == "gdrive" and acc == "default"
             assert uploaded.id == "existing-doc-99"
             assert init_calls[0][0] == "PATCH"
             assert "uploadType=resumable" in init_calls[0][1]
             assert chunk_ranges == [
-                (f"bytes 0-8388607/{total_size}", 8_388_608),
-                (f"bytes 8388608-{total_size - 1}/{total_size}", 1_048_576),
+                (f"bytes 0-262143/{total_size}", 262_144),
+                (f"bytes 262144-{total_size - 1}/{total_size}", 45_056),
             ]
 
             _, _, dl_res = await engine.download_file(
@@ -594,14 +594,14 @@ async def test_onedrive_strict_8192000_chunks_and_dropbox_confinement(tmp_path: 
         if url == "https://od-upload.example/sess-1":
             cr = request.headers["Content-Range"]
             onedrive_chunks.append((cr, len(request.content)))
-            if cr.startswith("bytes 0-8191999/"):
-                return httpx.Response(202, json={"nextExpectedRanges": ["8192000-"]})
+            if cr.startswith("bytes 0-327679/"):
+                return httpx.Response(202, json={"nextExpectedRanges": ["327680-"]})
             return httpx.Response(
                 201,
                 json={
                     "id": "od-item-1",
                     "name": "video.txt",
-                    "size": 8_192_000 + len(request.content),
+                    "size": 327_680 + len(request.content),
                 },
             )
 
@@ -662,27 +662,23 @@ async def test_onedrive_strict_8192000_chunks_and_dropbox_confinement(tmp_path: 
 
             ws_dir = tmp_path / "ws"
             ws_dir.mkdir(parents=True, exist_ok=True)
-            # 8_192_000 + 500_000 bytes (tests OneDrive exact 8_192_000 B chunk + Dropbox 8_388_608)
+            # 400_000 bytes (tests OneDrive 320 KiB alignment & Dropbox chunking quickly)
             file_path = ws_dir / "payload.txt"
-            total_size = 8_692_000
-            block = (b"Clean UTF8 text block 1234567890\n") * 256
-            with file_path.open("wb") as handle:
-                written = 0
-                while written < total_size:
-                    piece = block[: min(len(block), total_size - written)]
-                    handle.write(piece)
-                    written += len(piece)
+            total_size = 327_680 + 72_320
+            block = b"Clean UTF8 text block 1234567890\n"
+            file_path.write_bytes((block * ((total_size // len(block)) + 1))[:total_size])
 
             _, _, od_item = await engine.upload_file(
                 local_path="payload.txt",
                 workspace_dir=ws_dir,
                 remote_path_or_name="video.txt",
                 provider="onedrive",
+                chunk_bytes=327_680,
             )
             assert od_item.id == "od-item-1"
             assert onedrive_chunks == [
-                (f"bytes 0-8191999/{total_size}", 8_192_000),
-                (f"bytes 8192000-{total_size - 1}/{total_size}", 500_000),
+                (f"bytes 0-327679/{total_size}", 327_680),
+                (f"bytes 327680-{total_size - 1}/{total_size}", 72_320),
             ]
             assert onedrive_chunks[0][1] % (320 * 1024) == 0
 
@@ -691,9 +687,10 @@ async def test_onedrive_strict_8192000_chunks_and_dropbox_confinement(tmp_path: 
                 workspace_dir=ws_dir,
                 remote_path_or_name="árvíz.txt",
                 provider="dropbox",
+                chunk_bytes=262_144,
             )
             assert dbx_item.id == "id:dbx-1"
-            assert dropbox_offsets == [0, 8_388_608]
+            assert dropbox_offsets == [0, 262_144]
             assert dropbox_commit_paths == ["/Alfred/árvíz.txt"]
         finally:
             await container.registry.unregister_module("cloud-storage", force=True)
@@ -704,7 +701,7 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verify disk space gate, .part cleanup on overflow/error, secret gate & 16 MiB hold."""
+    """Verify disk space gate, .part cleanup on overflow/error, secret gate & heavy hold."""
     http_calls: list[str] = []
     hold_observed_during_upload = False
     engine_ref: list[Any] = []
@@ -739,9 +736,9 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
         if url.startswith("https://www.googleapis.com/upload/drive/v3/files"):
             return httpx.Response(
                 200,
-                headers={"Location": "https://upload.example/heavy-16m"},
+                headers={"Location": "https://upload.example/heavy-hold"},
             )
-        if url == "https://upload.example/heavy-16m":
+        if url == "https://upload.example/heavy-hold":
             nonlocal hold_observed_during_upload
             holds_file = engine_ref[0].ctx.heavy_job.lock_path
             if holds_file.exists() and "cloud:upload:gdrive:big_clean.txt" in holds_file.read_text(
@@ -749,7 +746,7 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
             ):
                 hold_observed_during_upload = True
             cr = request.headers["Content-Range"]
-            if cr.startswith("bytes 0-8388607/") or cr.startswith("bytes 8388608-16777215/"):
+            if cr.startswith("bytes 0-262143/"):
                 return httpx.Response(308)
             return httpx.Response(
                 200,
@@ -757,7 +754,7 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
                     "id": "heavy-id-1",
                     "name": "big_clean.txt",
                     "mimeType": "text/plain",
-                    "size": str(16 * 1024 * 1024 + 512),
+                    "size": str(262_144 + len(request.content)),
                 },
             )
         return httpx.Response(404)
@@ -767,6 +764,7 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
         engine_ref.append(engine)
         mod_pkg = module_package_name("cloud-storage")
         models_mod = sys.modules[f"{mod_pkg}.models"]
+        engine_mod = sys.modules[f"{mod_pkg}.engine"]
         try:
             await ctx.security.vault.set_secret("cloud_gdrive_client_id", "gd-cid")
             await ctx.security.vault.set_secret("cloud_gdrive_client_secret", "gd-csec")
@@ -837,7 +835,7 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
             assert sec_err.value.code == "CLOUD_SECRET_GATE_BLOCKED"
             assert http_calls == []
 
-            # Binary file (< 2 MiB) fails closed via scan_file_for_secrets
+            # Unknown binary file (< 2 MiB) still fails closed via Tier 3 scan_file_for_secrets
             bin_file = ws_dir / "small.bin"
             bin_file.write_bytes(b"\x00\x01\x02\x03")
             with pytest.raises(models_mod.CloudStorageError) as bin_err:
@@ -860,16 +858,15 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
                         provider="gdrive",
                     )
 
-            # 5) 16+ MiB clean UTF-8 upload acquires heavy_job.hold & streams without read_bytes()
+            # 5) Heavy transfer hold & streaming upload without read_bytes() (256 KiB threshold)
+            assert models_mod.HEAVY_TRANSFER_HOLD_MIN_BYTES == 16 * 1024 * 1024
+            monkeypatch.setattr(engine_mod, "HEAVY_TRANSFER_HOLD_MIN_BYTES", 256 * 1024)
+            monkeypatch.setattr(engine_mod, "_STREAM_SCAN_THRESHOLD_BYTES", 256 * 1024)
+            monkeypatch.setattr(engine_mod, "_LARGE_SCAN_CHUNK_BYTES", 128 * 1024)
             big_clean = ws_dir / "big_clean.txt"
-            target_bytes = 16 * 1024 * 1024 + 512
+            target_bytes = 262_144 + 512
             line = b"Clean large payload line 0123456789abcdef0123456789abcdef0123456\n"
-            with big_clean.open("wb") as handle:
-                w = 0
-                while w < target_bytes:
-                    part = line[: min(len(line), target_bytes - w)]
-                    handle.write(part)
-                    w += len(part)
+            big_clean.write_bytes((line * ((target_bytes // len(line)) + 1))[:target_bytes])
 
             orig_read_bytes = Path.read_bytes
 
@@ -884,23 +881,21 @@ async def test_download_disk_check_limit_part_cleanup_and_upload_secret_gate_and
                 local_path="big_clean.txt",
                 workspace_dir=ws_dir,
                 provider="gdrive",
+                chunk_bytes=262_144,
             )
             assert heavy_item.id == "heavy-id-1"
             assert hold_observed_during_upload is True
             assert await ctx.heavy_job.active_holds() == []
 
-            # Large > 2 MiB file containing a secret past 3 MiB boundary MUST be blocked!
+            # Large streaming file containing a secret past chunk boundary MUST be blocked!
             http_calls.clear()
-            big_secret = ws_dir / "big_secret.txt"
-            with big_secret.open("wb") as handle:
-                w = 0
-                while w < 3 * 1024 * 1024:
-                    handle.write(line)
-                    w += len(line)
-                handle.write(f"\nleaked={fake_stripe}\n".encode())
+            big_secret = ws_dir / "big_over_limit.txt"
+            base_len = 265_000
+            prefix = (line * ((base_len // len(line)) + 1))[:base_len]
+            big_secret.write_bytes(prefix + f"\nleaked={fake_stripe}\n".encode())
             with pytest.raises(models_mod.CloudStorageError) as big_sec_err:
                 await engine.upload_file(
-                    local_path="big_secret.txt",
+                    local_path="big_over_limit.txt",
                     workspace_dir=ws_dir,
                     provider="gdrive",
                 )
@@ -1146,6 +1141,321 @@ async def test_share_policy_all_providers_tools_and_housekeeping(tmp_path: Path)
             assert hk_stats.freed_bytes == 5
             assert not stale_part.exists()
             assert fresh_part.exists()
+        finally:
+            await container.registry.unregister_module("cloud-storage", force=True)
+            await container.db.close()
+
+
+async def test_binary_uploads_disguised_secrets_and_dropbox_integrity_before_rename(
+    tmp_path: Path,
+) -> None:
+    """Verify real binary PDF/PNG/MP4/ZIP upload while disguised files & DBX mismatch fail."""
+    uploaded_names: list[str] = []
+
+    def _mock_bin_handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url == "https://api.dropboxapi.com/oauth2/token":
+            return httpx.Response(200, json={"access_token": "dbx-bin-tok", "expires_in": 14400})
+        if url == "https://content.dropboxapi.com/2/files/upload_session/start":
+            return httpx.Response(200, json={"session_id": "dbx-bin-sess"})
+        if url == "https://content.dropboxapi.com/2/files/upload_session/append_v2":
+            return httpx.Response(200)
+        if url == "https://content.dropboxapi.com/2/files/upload_session/finish":
+            arg = json.loads(request.headers["Dropbox-API-Arg"])
+            commit_path = str(arg["commit"]["path"])
+            name = commit_path.rsplit("/", 1)[-1]
+            uploaded_names.append(name)
+            return httpx.Response(
+                200,
+                json={
+                    ".tag": "file",
+                    "id": f"id:{name}",
+                    "name": name,
+                    "path_display": commit_path,
+                    "size": int(arg["cursor"]["offset"]),
+                },
+            )
+        if url == "https://content.dropboxapi.com/2/files/download":
+            meta = json.dumps(
+                {".tag": "file", "id": "id:bad", "name": "target.txt", "size": 999}
+            )
+            return httpx.Response(
+                200,
+                headers={"Dropbox-API-Result": meta},
+                content=b"truncated",
+            )
+        return httpx.Response(404)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_mock_bin_handler)) as mock_http:
+        container, ctx, engine = await _setup_active_cloud(tmp_path, http_client=mock_http)
+        engine.skip_disk_space_check = True
+        mod_pkg = module_package_name("cloud-storage")
+        models_mod = sys.modules[f"{mod_pkg}.models"]
+        try:
+            await ctx.security.vault.set_secret("cloud_dropbox_client_id", "dbx-cid")
+            await ctx.security.vault.set_secret("cloud_dropbox_client_secret", "dbx-csec")
+            await ctx.security.vault.set_secret("cloud_dropbox_refresh_token", "dbx-rt")
+
+            ws_dir = tmp_path / "ws"
+            ws_dir.mkdir(parents=True, exist_ok=True)
+
+            # 1. Valid magic-header binaries (with NUL/non-UTF-8 bytes) upload cleanly
+            binaries: list[tuple[str, bytes]] = [
+                ("doc.pdf", b"%PDF-1.7\n1 0 obj\n<<>>\x00\xff\xfe%%EOF"),
+                ("img.png", b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\xff\xfe"),
+                ("clip.mp4", b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00mp42\xff"),
+                ("bundle.zip", b"PK\x03\x04\x14\x00\x00\x00\x08\x00\x00\xff\xfe"),
+            ]
+            for fname, data in binaries:
+                (ws_dir / fname).write_bytes(data)
+                _, _, item = await engine.upload_file(
+                    local_path=fname,
+                    workspace_dir=ws_dir,
+                    provider="dropbox",
+                )
+                assert item.name == fname
+            assert uploaded_names == ["doc.pdf", "img.png", "clip.mp4", "bundle.zip"]
+
+            # 2. Disguised secret key renamed to .png (fails magic header -> Tier 3 blocks!)
+            fake_stripe = "sk_live_" + "AbCdEfGhIjKlMnOpQrSt1234"
+            (ws_dir / "leak.png").write_text(
+                f"OPENAI_OR_STRIPE={fake_stripe}\n",
+                encoding="utf-8",
+            )
+            with pytest.raises(models_mod.CloudStorageError) as dis_err:
+                await engine.upload_file(
+                    local_path="leak.png",
+                    workspace_dir=ws_dir,
+                    provider="dropbox",
+                )
+            assert dis_err.value.code == "CLOUD_SECRET_GATE_BLOCKED"
+
+            # Real PNG magic header with embedded secret literal -> Tier 2 ASCII scan blocks!
+            (ws_dir / "secret_inside.png").write_bytes(
+                b"\x89PNG\r\n\x1a\n\x00\x00" + fake_stripe.encode("ascii") + b"\x00\xff"
+            )
+            # Name matches `_SENSITIVE_BASENAME_RE` (`secret`) AND embedded literal in Tier 2
+            with pytest.raises(models_mod.CloudStorageError) as inside_err:
+                await engine.upload_file(
+                    local_path="secret_inside.png",
+                    workspace_dir=ws_dir,
+                    provider="dropbox",
+                )
+            assert inside_err.value.code == "CLOUD_SECRET_GATE_BLOCKED"
+
+            (ws_dir / "real_img_embedded.png").write_bytes(
+                b"\x89PNG\r\n\x1a\n\x00\x00" + fake_stripe.encode("ascii") + b"\x00\xff"
+            )
+            with pytest.raises(models_mod.CloudStorageError) as emb_err:
+                await engine.upload_file(
+                    local_path="real_img_embedded.png",
+                    workspace_dir=ws_dir,
+                    provider="dropbox",
+                )
+            assert emb_err.value.code == "CLOUD_SECRET_GATE_BLOCKED"
+
+            # Tier 1 blocked file categories (.pem, .sqlite3, my_secret.pdf) even with valid headers
+            from alfred.kernel.errors import ModuleError
+
+            (ws_dir / "priv.pem").write_text("clean-text", encoding="utf-8")
+            (ws_dir / "data.sqlite3").write_bytes(b"SQLite format 3\x00")
+            (ws_dir / "my_secret.pdf").write_bytes(b"%PDF-1.7\n\x00")
+            for blocked_name in ("priv.pem", "data.sqlite3", "my_secret.pdf"):
+                with pytest.raises(ModuleError) as blk:
+                    await engine.upload_file(
+                        local_path=blocked_name,
+                        workspace_dir=ws_dir,
+                        provider="dropbox",
+                    )
+                assert blk.value.status_code == 403
+
+            # 3. Dropbox integrity mismatch leaves pre-existing dest_path intact and cleans .part
+            dest = ws_dir / "existing.txt"
+            dest.write_text("good-existing-data", encoding="utf-8")
+            with pytest.raises(models_mod.CloudStorageError) as integ_err:
+                await engine.download_file(
+                    file_ref_or_path="/target.txt",
+                    local_dest_path="existing.txt",
+                    workspace_dir=ws_dir,
+                    provider="dropbox",
+                )
+            assert integ_err.value.code == "CLOUD_INTEGRITY_MISMATCH"
+            assert dest.read_text(encoding="utf-8") == "good-existing-data"
+            assert list(ws_dir.glob("*.part")) == []
+        finally:
+            await container.registry.unregister_module("cloud-storage", force=True)
+            await container.db.close()
+
+
+async def test_mint_short_lived_token_and_zero_trust_manual_oauth_routes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify `mint_short_lived_token()`, `POST /api/admin/cloud/oauth/callback` & HTML."""
+    refresh_calls = 0
+
+    def _mock_oauth(request: httpx.Request) -> httpx.Response:
+        nonlocal refresh_calls
+        url = str(request.url)
+        if url == "https://oauth2.googleapis.com/token":
+            parsed = parse_qs(request.content.decode("utf-8"))
+            grant = parsed.get("grant_type", [""])[0]
+            if grant == "authorization_code":
+                return httpx.Response(
+                    200,
+                    json={
+                        "access_token": "FRESH-OAUTH-ACCESS-1",
+                        "refresh_token": "SECRET-GDRIVE-RT-1",
+                        "expires_in": 3600,
+                    },
+                )
+            if grant == "refresh_token":
+                refresh_calls += 1
+                return httpx.Response(
+                    200,
+                    json={"access_token": "MINTED-ACCESS-2", "expires_in": 3600},
+                )
+        if url.startswith("https://www.googleapis.com/drive/v3/about"):
+            return httpx.Response(
+                200,
+                json={"user": {"emailAddress": "zt@example.com"}},
+            )
+        return httpx.Response(404)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_mock_oauth)) as mock_http:
+        container, ctx, engine = await _setup_active_cloud(tmp_path, http_client=mock_http)
+        app = FastAPI()
+        app.state.container = container
+        mount_module_ui_routes(app, container.registry)
+        app.include_router(create_core_router(container))
+        mount_module_dispatcher(app, container.registry, container.auth)
+
+        try:
+            await ctx.security.vault.set_secret("cloud_gdrive_client_id", "gd-cid")
+            await ctx.security.vault.set_secret(
+                "cloud_gdrive_client_secret",
+                "SECRET-GDRIVE-CLIENT-SEC",
+            )
+            await engine.save_config(
+                provider="gdrive",
+                account="work",
+                root_ref="folder-root-1",
+                access_mode="read_only",
+            )
+
+            admin_cookie, admin_csrf = container.auth.issue_dashboard_session(role="admin")
+            dash_cookie, dash_csrf = container.auth.issue_dashboard_session(role="dashboard")
+            transport = httpx.ASGITransport(app=app)
+
+            # 1. GET /oauth-cloud-callback.html renders safe postMessage HTML without reflecting XSS
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as pub:
+                xss_probe = "<script>alert(1)</script>"
+                html_res = await pub.get(
+                    "/oauth-cloud-callback.html",
+                    params={"code": xss_probe, "state": "s1"},
+                )
+                assert html_res.status_code == 200
+                assert "alfred:cloud-oauth-callback" in html_res.text
+                assert xss_probe not in html_res.text
+
+                # Anonymous POST to admin OAuth callback rejected (401)
+                anon_cb = await pub.post(
+                    "/api/admin/cloud/oauth/callback",
+                    json={"code": "c1", "state": "s1"},
+                )
+                assert anon_cb.status_code == 401
+
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                cookies={"alfred_session": dash_cookie},
+            ) as dash:
+                deny_cb = await dash.post(
+                    "/api/admin/cloud/oauth/callback",
+                    headers={"X-CSRF-Token": dash_csrf},
+                    json={"code": "c1", "state": "s1"},
+                )
+                assert deny_cb.status_code == 403
+
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                cookies={"alfred_session": admin_cookie},
+            ) as admin:
+                # Flow A: manual callbackUrl paste (Zero Trust / SSH tunnel)
+                start1 = await admin.get(
+                    "/api/cloud/oauth/start",
+                    params={"provider": "gdrive", "account": "work", "accessMode": "read_only"},
+                )
+                assert start1.status_code == 200
+                state1 = start1.json()["state"]
+
+                no_csrf = await admin.post(
+                    "/api/admin/cloud/oauth/callback",
+                    json={"callbackUrl": f"https://alfred.test/oauth-cloud-callback.html?code=c1&state={state1}"},
+                )
+                assert no_csrf.status_code == 403
+
+                ok_url_cb = await admin.post(
+                    "/api/admin/cloud/oauth/callback",
+                    headers={"X-CSRF-Token": admin_csrf},
+                    json={"callbackUrl": f"https://alfred.test/oauth-cloud-callback.html?code=c1&state={state1}"},
+                )
+                assert ok_url_cb.status_code == 200
+                assert ok_url_cb.json()["account"] == "work"
+                assert "SECRET-GDRIVE-RT-1" not in ok_url_cb.text
+                assert "FRESH-OAUTH-ACCESS-1" not in ok_url_cb.text
+
+                # Replay of same state fails
+                replay_cb = await admin.post(
+                    "/api/admin/cloud/oauth/callback",
+                    headers={"X-CSRF-Token": admin_csrf},
+                    json={"code": "c1", "state": state1},
+                )
+                assert replay_cb.status_code == 400
+
+                # Flow B: direct {code, state} JSON body
+                start2 = await admin.get(
+                    "/api/cloud/oauth/start",
+                    params={"provider": "gdrive", "account": "work"},
+                )
+                state2 = start2.json()["state"]
+                ok_code_cb = await admin.post(
+                    "/api/admin/cloud/oauth/callback",
+                    headers={"X-CSRF-Token": admin_csrf},
+                    json={"code": "c2", "state": state2},
+                )
+                assert ok_code_cb.status_code == 200
+
+            # 2. mint_short_lived_token() via Service Bus (cached -> 0 Vault decrypts on cache hit!)
+            svc = container.registry.get_service("cloud-storage")
+            assert svc is engine
+            get_secret_calls = 0
+            orig_get_secret = ctx.security.vault.get_secret
+
+            async def _spy_get_secret(key_id: str) -> str | None:
+                nonlocal get_secret_calls
+                get_secret_calls += 1
+                return await orig_get_secret(key_id)
+
+            monkeypatch.setattr(ctx.security.vault, "get_secret", _spy_get_secret)
+
+            tok1 = await svc.mint_short_lived_token(provider="gdrive", account="work")
+            assert tok1.provider == "gdrive"
+            assert tok1.account == "work"
+            assert tok1.access_token == "FRESH-OAUTH-ACCESS-1"
+            assert tok1.expires_in_sec >= 1
+            assert tok1.root_ref == "folder-root-1"
+            assert "refresh_token" not in tok1.model_dump()
+            assert "SECRET-GDRIVE-RT-1" not in tok1.model_dump_json()
+            assert get_secret_calls == 0
+
+            # Cold cache mints fresh token via Vault + refresh_token grant
+            engine._access_token_cache.clear()
+            tok2 = await svc.mint_short_lived_token(provider="gdrive", account="work")
+            assert tok2.access_token == "MINTED-ACCESS-2"
+            assert refresh_calls == 1
+            assert get_secret_calls > 0
         finally:
             await container.registry.unregister_module("cloud-storage", force=True)
             await container.db.close()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from collections.abc import Mapping
@@ -15,8 +16,19 @@ from alfred.core.env_file import atomic_write_text
 from alfred.kernel.errors import ModuleSecurityError
 from alfred.kernel.loader import discover_manifests
 
+logger = logging.getLogger(__name__)
+
 BUILTIN_HTTP_PROVIDERS: Final[frozenset[str]] = frozenset(
     {"deepseek", "vertex-eu", "gemini", "openai", "xai"}
+)
+OPTIONAL_MODULE_TOOL_PREFIXES: Final[tuple[str, ...]] = (
+    "batch_",
+    "cloud_",
+    "worker_",
+    "video_",
+    "iris_",
+    "browser_",
+    "voice_",
 )
 _ENV_PLACEHOLDER_RE: Final[re.Pattern[str]] = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
@@ -95,9 +107,22 @@ class AgentsConfigManager:
                 )
             unknown_tools = [tool for tool in agent.tools if tool not in known_tools]
             if unknown_tools:
-                raise ValueError(
-                    f"Agent '{agent.id}' references unknown tool(s): {', '.join(unknown_tools)}"
-                )
+                optional_missing = [
+                    t for t in unknown_tools if t.startswith(OPTIONAL_MODULE_TOOL_PREFIXES)
+                ]
+                truly_unknown = [
+                    t for t in unknown_tools if not t.startswith(OPTIONAL_MODULE_TOOL_PREFIXES)
+                ]
+                if optional_missing:
+                    logger.warning(
+                        "Agent '%s' references inactive/uninstalled optional module tool(s): %s",
+                        agent.id,
+                        ", ".join(optional_missing),
+                    )
+                if truly_unknown:
+                    raise ValueError(
+                        f"Agent '{agent.id}' references unknown tool(s): {', '.join(truly_unknown)}"
+                    )
 
     @staticmethod
     def _resolve_raw_provider(cfg: AgentsConfig, agent: AgentConfig) -> str:

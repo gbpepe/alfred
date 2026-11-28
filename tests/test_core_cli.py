@@ -263,6 +263,8 @@ async def test_bash_tool_confinement_whitelist_env_sanitization_and_timeout(
     monkeypatch.setenv("CUSTOM_FOO_API_KEY", "foo-api-secret")
     monkeypatch.setenv("CUSTOM_BAR_SECRET", "bar-secret")
     monkeypatch.setenv("CUSTOM_BAZ_TOKEN", "baz-token")
+    monkeypatch.setenv("cloud_gdrive__work_client_id", "cloud-work-cid")
+    monkeypatch.setenv("cloud_gdrive__work_refresh_token", "cloud-work-rt")
 
     try:
         async with SqlitePool(store_dir / "alfred.db") as db:
@@ -305,27 +307,33 @@ async def test_bash_tool_confinement_whitelist_env_sanitization_and_timeout(
                 res = await bash_tool.invoke({"command": bad_cmd}, ctx)
                 assert res.ok is False
 
-            # Env sanitization & output secret masking
+            # Env sanitization & output secret masking via workspace scripts
             py = sys.executable
-            env_code = (
-                "import os; "
+            (ws_dir / "check_env.py").write_text(
+                "import os\n"
                 "keys = ['DISCORD_BOT_TOKEN','ALFRED_DASHBOARD_TOKEN',"
                 "'VAULT_MASTER_KEY','GOOGLE_APPLICATION_CREDENTIALS',"
                 "'ANTHROPIC_API_KEY','CUSTOM_FOO_API_KEY',"
-                "'CUSTOM_BAR_SECRET','CUSTOM_BAZ_TOKEN']; "
-                "print([k for k in keys if k in os.environ])"
+                "'CUSTOM_BAR_SECRET','CUSTOM_BAZ_TOKEN',"
+                "'cloud_gdrive__work_client_id','cloud_gdrive__work_refresh_token']\n"
+                "print([k for k in keys if k in os.environ])\n",
+                encoding="utf-8",
             )
             env_res = await bash_tool.invoke(
-                {"command": f'"{py}" -c "{env_code}"'},
+                {"command": f'"{py}" check_env.py'},
                 ctx,
             )
             assert env_res.ok is True
             assert env_res.output == "[]"
 
             # Secret masking in stdout
+            (ws_dir / "echo_arg.py").write_text(
+                "import sys\nprint(sys.argv[1])\n",
+                encoding="utf-8",
+            )
             fake_key = "sk-proj-" + "AbCdEfGhIjKlMnOpQrStUvWxYz"
             mask_res = await bash_tool.invoke(
-                {"command": f'"{py}" -c "print(\'{fake_key}\')"'},
+                {"command": f'"{py}" echo_arg.py {fake_key}'},
                 ctx,
             )
             assert mask_res.ok is True
@@ -333,8 +341,12 @@ async def test_bash_tool_confinement_whitelist_env_sanitization_and_timeout(
             assert "[REDACTED" in str(mask_res.output)
 
             # Output length cap
+            (ws_dir / "emit_cap.py").write_text(
+                "print('x' * 40000)\n",
+                encoding="utf-8",
+            )
             cap_res = await bash_tool.invoke(
-                {"command": f'"{py}" -c "print(\'x\' * 40000)"'},
+                {"command": f'"{py}" emit_cap.py'},
                 ctx,
             )
             assert cap_res.ok is True
@@ -342,13 +354,17 @@ async def test_bash_tool_confinement_whitelist_env_sanitization_and_timeout(
             assert len(str(cap_res.output)) <= 32_100
 
             # Whitelist enforcement with <self-branch> and generic <env> placeholder
+            (ws_dir / "run_deploy.py").write_text(
+                "import sys\nprint(sys.argv[1])\n",
+                encoding="utf-8",
+            )
             wl_ctx = ToolExecutionContext(
                 agent_id="alfred-ops",
                 session_id="s-wl",
                 workspace_dir=ws_dir,
                 module_ctx=mod_ctx,
                 allowed_bash_commands=(
-                    f'"{py}" -c <self-branch>',
+                    f'"{py}" run_deploy.py <self-branch>',
                     "bash deploy/spinup-test.sh <self-branch>",
                     f'"{py}" -V <env>',
                 ),
@@ -368,12 +384,16 @@ async def test_bash_tool_confinement_whitelist_env_sanitization_and_timeout(
             assert denied_flag.error_code == "BASH_WHITELIST_VIOLATION"
 
             ok_wl = await bash_tool.invoke(
-                {"command": f'"{py}" -c feat/self-42'},
+                {"command": f'"{py}" run_deploy.py feat/self-42'},
                 wl_ctx,
             )
             assert ok_wl.error_code != "BASH_WHITELIST_VIOLATION"
 
             # Timeout termination
+            (ws_dir / "sleep_long.py").write_text(
+                "import time\ntime.sleep(5)\n",
+                encoding="utf-8",
+            )
             fast_timeout_ctx = ToolExecutionContext(
                 agent_id="test-coder",
                 session_id="s-to",
@@ -382,7 +402,7 @@ async def test_bash_tool_confinement_whitelist_env_sanitization_and_timeout(
                 bash_timeout_ms=150,
             )
             to_res = await bash_tool.invoke(
-                {"command": f'"{py}" -c "import time; time.sleep(5)"'},
+                {"command": f'"{py}" sleep_long.py'},
                 fast_timeout_ctx,
             )
             assert to_res.ok is False
@@ -909,5 +929,186 @@ async def test_service_skill_scan_and_http_routes_auth_csrf_and_ui(tmp_path: Pat
                 # wizard_probe succeeds cleanly
                 probe_res = await container.module_wizard.loader.probe_inactive_module("core-cli")
                 assert probe_res.ok is True
+    finally:
+        _cleanup_core_cli_modules()
+
+
+async def test_core_cli_hardening_git_c_bash_flags_symlinks_large_snapshot_and_cancel(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Negative security gates: git -c, bash inline exec/rollback, symlinks, cancel kill."""
+    store_dir = tmp_path / "store"
+    ws_dir = tmp_path / "ws"
+    ws_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(CORE_CLI_MOD_DIR, tmp_path / "modules" / "core-cli")
+
+    try:
+        async with SqlitePool(store_dir / "alfred.db") as db:
+            vault = VaultManager(store_dir / "vault.json", store_dir / ".vault-key")
+            registry = ModuleRegistry()
+            loader = ModuleLoader(
+                modules_dir=tmp_path / "modules",
+                store_dir=store_dir,
+                db=db,
+                vault=vault,
+                registry=registry,
+                heavy_job=HeavyJobHoldManager(store_dir / ".heavy-job.lock"),
+                project_root=tmp_path,
+            )
+            await loader.load_active_modules(active_ids={"core-cli"})
+            mod_ctx = registry.get_context("core-cli")
+            assert mod_ctx is not None
+            tools_mod = sys.modules[f"{module_package_name('core-cli')}.tools"]
+            runner_mod = sys.modules[f"{module_package_name('core-cli')}.cli_runner"]
+
+            fs_read = registry.get_tool("fs_read")
+            fs_write = registry.get_tool("fs_write")
+            bash_tool = registry.get_tool("bash")
+            git_tool = registry.get_tool("git")
+            assert fs_read and fs_write and bash_tool and git_tool
+
+            (ws_dir / ".env").write_text("SECRET_ENV=1\n", encoding="utf-8")
+            (ws_dir / "protected.txt").write_text("original-content", encoding="utf-8")
+
+            ctx = ToolExecutionContext(
+                agent_id="test-coder",
+                session_id="s-hardening",
+                workspace_dir=ws_dir,
+                module_ctx=mod_ctx,
+                protected_paths=(".env", "protected.txt", "large_protected.txt"),
+            )
+
+            # 1. git -c / --config-env / --exec-path blocked
+            for bad_git_args in (
+                ["-c", "core.sshCommand=echo pwned", "status"],
+                ["-ccore.fsmonitor=evil", "status"],
+                ["--config-env=core.sshCommand=X", "status"],
+                ["--config-env", "core.sshCommand=X", "status"],
+            ):
+                gres = await git_tool.invoke({"args": bad_git_args}, ctx)
+                assert gres.ok is False and gres.error_code == "GIT_POLICY_VIOLATION"
+
+            # 2. bash dangerous inline execution flags blocked without whitelist
+            for bad_bash in (
+                f'"{sys.executable}" -c "print(1)"',
+                'node -e "console.log(1)"',
+                'perl -e "print 1"',
+                'find . -name *.py -exec echo {} +',
+                'find . -name "*.tmp" -delete',
+                'git -c core.sshCommand=x status',
+                'bash -c "cat .env"',
+            ):
+                bres = await bash_tool.invoke({"command": bad_bash}, ctx)
+                assert bres.ok is False and bres.error_code == "BASH_POLICY_VIOLATION"
+
+            # 3. Unwhitelisted bash in project_root (workspace == ".") rejected
+            root_ctx = ToolExecutionContext(
+                agent_id="alfred-self-coder",
+                session_id="s-root",
+                workspace_dir=tmp_path,
+                module_ctx=mod_ctx,
+                protected_paths=(".env", "config/agents.json"),
+            )
+            root_res = await bash_tool.invoke({"command": f'"{sys.executable}" -V'}, root_ctx)
+            assert root_res.ok is False and root_res.error_code == "BASH_POLICY_VIOLATION"
+
+            # 4. bash modification to protected_paths rolled back via SHA-256 snapshot
+            (ws_dir / "tamper.py").write_text(
+                "from pathlib import Path\n"
+                "Path('protected.txt').write_text('pwned', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            tamper_res = await bash_tool.invoke(
+                {"command": f'"{sys.executable}" tamper.py'},
+                ctx,
+            )
+            assert tamper_res.ok is False
+            assert tamper_res.error_code == "PROTECTED_PATH_VIOLATION"
+            assert (ws_dir / "protected.txt").read_text(encoding="utf-8") == "original-content"
+
+            # 5. Protected file > MAX_SNAPSHOT_FILE_BYTES still detected via streaming SHA-256
+            monkeypatch.setattr(tools_mod, "MAX_SNAPSHOT_FILE_BYTES", 64)
+            (ws_dir / "large_protected.txt").write_text("L" * 200, encoding="utf-8")
+            (ws_dir / "tamper_large.py").write_text(
+                "from pathlib import Path\n"
+                "Path('large_protected.txt').write_text('X' * 200, encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            large_res = await bash_tool.invoke(
+                {"command": f'"{sys.executable}" tamper_large.py'},
+                ctx,
+            )
+            assert large_res.ok is False
+            assert large_res.error_code == "PROTECTED_PATH_VIOLATION"
+
+            # 6. Workspace-internal symlinks targeting .env or protected files
+            sym_env = _try_create_symlink(ws_dir / "alias.txt", ws_dir / ".env")
+            sym_prot = _try_create_symlink(ws_dir / "prot_alias.txt", ws_dir / "protected.txt")
+            if sym_env is not None and sym_prot is not None:
+                s_read = await fs_read.invoke({"path": "alias.txt"}, ctx)
+                assert s_read.ok is False and s_read.error_code == "PROTECTED_PATH_VIOLATION"
+                s_write = await fs_write.invoke({"path": "prot_alias.txt", "content": "x"}, ctx)
+                assert s_write.ok is False and s_write.error_code == "PROTECTED_PATH_VIOLATION"
+                assert (ws_dir / "protected.txt").read_text(encoding="utf-8") == "original-content"
+
+            # Symlinked workspace root rejected
+            sym_ws = _try_create_symlink(tmp_path / "ws_symlink", ws_dir)
+            if sym_ws is not None:
+                sw_ctx = ToolExecutionContext(
+                    agent_id="test-coder",
+                    session_id="s-symws",
+                    workspace_dir=sym_ws,
+                    module_ctx=mod_ctx,
+                )
+                assert (
+                    await fs_read.invoke({"path": "."}, sw_ctx)
+                ).error_code == "WORKSPACE_BOUNDARY_VIOLATION"
+                assert (
+                    await bash_tool.invoke({"command": f'"{sys.executable}" -V'}, sw_ctx)
+                ).error_code == "WORKSPACE_BOUNDARY_VIOLATION"
+
+            # 7. asyncio.CancelledError kills & reaps spawned subprocesses cleanly
+            spawned: list[Any] = []
+            orig_spawn = asyncio.create_subprocess_exec
+
+            async def _spy_spawn(*args: Any, **kwargs: Any) -> Any:
+                proc = await orig_spawn(*args, **kwargs)
+                spawned.append(proc)
+                return proc
+
+            monkeypatch.setattr(asyncio, "create_subprocess_exec", _spy_spawn)
+
+            t1 = asyncio.create_task(
+                tools_mod._run_exec_with_timeout(
+                    [sys.executable, "-c", "import time; time.sleep(30)"],
+                    cwd=ws_dir,
+                    env=dict(os.environ),
+                    timeout_sec=30.0,
+                )
+            )
+            await asyncio.sleep(0.08)
+            t1.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await t1
+            assert len(spawned) == 1 and spawned[0].returncode is not None
+
+            t2 = asyncio.create_task(
+                runner_mod.default_subprocess_runner(
+                    runner_mod.CliSubprocessRequest(
+                        provider_id="claude-cli",
+                        command=sys.executable,
+                        args=("-c", "import time; time.sleep(30)"),
+                        cwd=ws_dir,
+                        env=dict(os.environ),
+                        timeout_sec=30.0,
+                    )
+                )
+            )
+            await asyncio.sleep(0.08)
+            t2.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await t2
+            assert len(spawned) == 2 and spawned[1].returncode is not None
     finally:
         _cleanup_core_cli_modules()

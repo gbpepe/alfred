@@ -726,7 +726,7 @@ async def test_http_routes_auth_crud_versions_isolation_and_ui(tmp_path: Path) -
                 )
                 assert bad_json.status_code == 400
 
-                # Search via GET /api/memories?namespace=ns-a&q=...&category=hot&limit=5
+                # Search via GET /api/memories?namespace=ns-a&q=...&category=hot&limit=5 (read-only)
                 search_res = await client.get(
                     "/api/memories",
                     params={
@@ -740,7 +740,7 @@ async def test_http_routes_auth_crud_versions_isolation_and_ui(tmp_path: Path) -
                 search_body = search_res.json()
                 assert search_body["total"] == 1
                 assert search_body["memories"][0]["id"] == mem_id
-                assert search_body["memories"][0]["use_count"] == 1
+                assert search_body["memories"][0]["use_count"] == 0
 
                 # Tricky FTS query via HTTP
                 tricky_http = await client.get(
@@ -749,7 +749,7 @@ async def test_http_routes_auth_crud_versions_isolation_and_ui(tmp_path: Path) -
                 )
                 assert tricky_http.status_code == 200
 
-                # Single GET requires matching namespace
+                # Single GET requires matching namespace & remains read-only (use_count stays 0)
                 assert (await client.get(f"/api/memories/{mem_id}")).status_code == 400
                 assert (
                     await client.get(f"/api/memories/{mem_id}", params={"namespace": "ns-b"})
@@ -759,7 +759,7 @@ async def test_http_routes_auth_crud_versions_isolation_and_ui(tmp_path: Path) -
                     params={"namespace": "ns-a"},
                 )
                 assert single_ok.status_code == 200
-                assert single_ok.json()["use_count"] == 2
+                assert single_ok.json()["use_count"] == 0
 
                 # PATCH creates version 2; cross-namespace PATCH -> 404; empty PATCH -> 400
                 assert (

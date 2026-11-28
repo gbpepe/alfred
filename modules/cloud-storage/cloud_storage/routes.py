@@ -6,6 +6,7 @@ import html
 import json
 from collections.abc import Callable, Sequence
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -23,6 +24,16 @@ from .models import (
     CloudShareRole,
     CloudStorageError,
 )
+
+
+class CloudAdminOAuthCallbackRequest(BaseModel):
+    """Validated JSON payload for `POST /api/admin/cloud/oauth/callback`."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    callback_url: str | None = Field(default=None, alias="callbackUrl")
+    code: str | None = None
+    state: str | None = None
 
 
 class CloudOAuthStartQuery(BaseModel):
@@ -377,7 +388,86 @@ def build_cloud_routes(
             account=payload.account,
         )
 
+    async def handle_admin_oauth_callback(request: Request) -> RouteReturn:
+        engine = _require_engine(request, engine_getter)
+        raw, err = await _parse_json_object(request)
+        if err is not None:
+            return err
+        if raw is None:
+            return _error_json(400, "INVALID_REQUEST", "Request body is required")
+        try:
+            payload = CloudAdminOAuthCallbackRequest.model_validate(raw)
+        except ValidationError as exc:
+            return _error_json(400, "VALIDATION_ERROR", format_validation_error(exc))
+
+        code = (payload.code or "").strip()
+        state = (payload.state or "").strip()
+        if payload.callback_url and payload.callback_url.strip():
+            raw_cb = payload.callback_url.strip()
+            cb_url = raw_cb if "://" in raw_cb else f"https://localhost/?{raw_cb.lstrip('?')}"
+            parsed_url = urlparse(cb_url)
+            qs_map = parse_qs(parsed_url.query)
+            cb_err = (qs_map.get("error") or [""])[0].strip()
+            if cb_err:
+                desc = (qs_map.get("error_description") or [cb_err])[0].strip()
+                return _error_json(400, "CLOUD_OAUTH_DENIED", f"OAuth2 denied: {desc[:200]}")
+            code = (qs_map.get("code") or [code])[0].strip()
+            state = (qs_map.get("state") or [state])[0].strip()
+
+        if not code or not state:
+            return _error_json(
+                400,
+                "CLOUD_OAUTH_STATE_INVALID",
+                "Missing required OAuth2 'code' or 'state' parameter",
+            )
+        return await engine.complete_oauth_callback(code=code, state=state)
+
+    async def handle_oauth_popup_html(_request: Request) -> RouteReturn:
+        body = (
+            "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
+            "<title>Alfred Cloud OAuth2 Callback</title></head>"
+            "<body style='font-family:system-ui,sans-serif;background:#0f172a;color:#f8fafc;"
+            "display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0'>"
+            "<div style='max-width:520px;padding:24px;border-radius:12px;background:#1e293b;"
+            "border:1px solid #334155'>"
+            "<h1 style='margin:0 0 8px;font-size:18px;color:#38bdf8'>Alfred OAuth2 Callback</h1>"
+            "<p id='msg' style='margin:0;font-size:14px;color:#cbd5e1'>"
+            "Completing authorization... If this tab stays open (Zero Trust / SSH tunnel), "
+            "copy the full address bar URL and paste it into the "
+            "Alfred Dashboard Manual OAuth2 Callback box."
+            "</p>"
+            "</div>"
+            "<script>"
+            "(function(){"
+            "try{"
+            "var p=new URLSearchParams(window.location.search);"
+            "var payload={"
+            "type:'alfred:cloud-oauth-callback',"
+            "code:p.get('code')||'',"
+            "state:p.get('state')||'',"
+            "error:p.get('error')||'',"
+            "errorDescription:p.get('error_description')||''"
+            "};"
+            "if(window.opener&&typeof window.opener.postMessage==='function'){"
+            "window.opener.postMessage(payload,window.location.origin);"
+            "document.getElementById('msg').textContent="
+            "'Authorization delivered to Alfred Dashboard. You may close this window.';"
+            "}"
+            "}catch(_e){}"
+            "})();"
+            "</script></body></html>"
+        )
+        return HTMLResponse(content=body, status_code=200)
+
     return (
+        ModuleRouteDefinition(
+            path="/oauth-cloud-callback.html",
+            methods=("GET",),
+            handler=handle_oauth_popup_html,
+            auth="public_oauth_callback",
+            summary="OAuth2 browser popup landing helper delivering code/state via postMessage",
+            module_id=MODULE_ID,
+        ),
         ModuleRouteDefinition(
             path="/api/cloud/oauth/start",
             methods=("GET",),
@@ -392,6 +482,14 @@ def build_cloud_routes(
             handler=handle_oauth_callback,
             auth="public_oauth_callback",
             summary="Verify single-use PKCE state, exchange OAuth2 code, and store tokens in Vault",
+            module_id=MODULE_ID,
+        ),
+        ModuleRouteDefinition(
+            path="/api/admin/cloud/oauth/callback",
+            methods=("POST",),
+            handler=handle_admin_oauth_callback,
+            auth="admin",
+            summary="Admin CSRF-gated manual OAuth2 callback URL or code/state completion",
             module_id=MODULE_ID,
         ),
         ModuleRouteDefinition(

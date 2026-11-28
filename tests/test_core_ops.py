@@ -1092,7 +1092,7 @@ async def test_http_routes_auth_csrf_validation_redaction_and_ui_card(tmp_path: 
                 headers={"X-CSRF-Token": admin_csrf},
                 json={"providerId": "unknown-cli", "profileId": "default"},
             )
-            assert unknown_switch.status_code == 200
+            assert unknown_switch.status_code == 404
             assert unknown_switch.json()["ok"] is False
 
         # Unload core-cli -> core-ops CLI route returns 409 MISSING_DEPENDENCY

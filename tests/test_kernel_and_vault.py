@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
 
+from alfred.core import vault as vault_mod
 from alfred.core.auth import AuthService
 from alfred.core.config import AgentsConfig
 from alfred.core.db import SqlitePool
@@ -167,15 +168,23 @@ async def test_vault_aad_tamper_corrupt_concurrency_and_fail_closed(
     with pytest.raises(VaultKeyError):
         await vault.get_secret("OPENAI_API_KEY")
 
-    # Restore valid key + verify concurrent writes lose 0 keys
+    # Restore valid key + delete check still under production SCRYPT_N=16384
     key_path.write_bytes(saved_key)
-    await asyncio.gather(
-        *(vault.set_secret(f"CONC_{idx}", f"val-{idx}") for idx in range(10))
-    )
-    for idx in range(10):
-        assert await vault.get_secret(f"CONC_{idx}") == f"val-{idx}"
+    assert vault_mod.SCRYPT_N == 16384
     assert await vault.delete_secret("OPENAI_API_KEY") is True
     assert await vault.get_secret("OPENAI_API_KEY") is None
+
+    # Verify concurrent writes lose 0 keys on a fresh vault (with fast SCRYPT_N=16)
+    monkeypatch.setattr(vault_mod, "SCRYPT_N", 16)
+    conc_vault = VaultManager(
+        tmp_path / "conc_store" / "vault.json",
+        tmp_path / "conc_store" / ".vault-key",
+    )
+    await asyncio.gather(
+        *(conc_vault.set_secret(f"CONC_{idx}", f"val-{idx}") for idx in range(10))
+    )
+    for idx in range(10):
+        assert await conc_vault.get_secret(f"CONC_{idx}") == f"val-{idx}"
 
 
 def test_repo_manifests_and_agents_config_parse_strictly() -> None:

@@ -92,8 +92,51 @@ export function mount(container, ctx = {}) {
     activeProvider: "gdrive",
     activeAccount: "default",
     statusData: null,
+    lastOAuthState: "",
   };
   mountedInstances.set(container, state);
+
+  if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener(
+      "message",
+      async (event) => {
+        if (state.disposed) {
+          return;
+        }
+        const expectedOrigin = globalThis.location?.origin;
+        if (expectedOrigin && event.origin !== expectedOrigin) {
+          return;
+        }
+        const payload = event.data;
+        if (!payload || payload.type !== "alfred:cloud-oauth-callback") {
+          return;
+        }
+        if (payload.error) {
+          setStatus(`OAuth2 denied: ${payload.errorDescription || payload.error}`);
+          return;
+        }
+        if (!payload.code || !payload.state) {
+          return;
+        }
+        try {
+          const res = await requestJson(
+            "/api/admin/cloud/oauth/callback",
+            {
+              method: "POST",
+              body: JSON.stringify({ code: payload.code, state: payload.state }),
+            },
+            ctx,
+            signal,
+          );
+          setStatus(`Connected ${res.provider}::${res.account}`);
+          await renderAll();
+        } catch (err) {
+          setStatus(`OAuth2 callback error: ${err.message}`);
+        }
+      },
+      { signal },
+    );
+  }
 
   const card = el("section", "alfred-card");
   card.id = "vpsCloudStorageCard";
@@ -143,6 +186,66 @@ export function mount(container, ctx = {}) {
   bodyWrap.style.flexDirection = "column";
   bodyWrap.style.gap = "10px";
 
+  const manualBox = el("div", "alfred-cloud-manual-oauth");
+  manualBox.style.border = "1px solid var(--border, #334155)";
+  manualBox.style.borderRadius = "8px";
+  manualBox.style.padding = "10px";
+  manualBox.style.display = "flex";
+  manualBox.style.flexDirection = "column";
+  manualBox.style.gap = "6px";
+  manualBox.appendChild(el("strong", null, "Manual OAuth2 Callback (Zero Trust / Headless)"));
+  const manualRow = el("div");
+  manualRow.style.display = "flex";
+  manualRow.style.gap = "6px";
+  manualRow.style.flexWrap = "wrap";
+  const manualInput = el("input");
+  manualInput.type = "text";
+  manualInput.style.flex = "1";
+  manualInput.placeholder = "Paste callback URL (?code=...&state=...)";
+  const manualStateInput = el("input");
+  manualStateInput.type = "text";
+  manualStateInput.placeholder = "Optional state (if pasting raw code)";
+  const manualBtn = el("button", "btn-secondary", "Complete OAuth2");
+  manualBtn.type = "button";
+  manualBtn.addEventListener("click", async () => {
+    const rawVal = manualInput.value.trim();
+    const rawState = manualStateInput.value.trim();
+    if (!rawVal) {
+      setStatus("Paste the OAuth2 redirect URL or authorization code first.");
+      return;
+    }
+    manualBtn.disabled = true;
+    try {
+      const bodyPayload =
+        rawState && !rawVal.includes("://") && !rawVal.includes("code=")
+          ? { code: rawVal, state: rawState }
+          : { callbackUrl: rawVal };
+      const res = await requestJson(
+        "/api/admin/cloud/oauth/callback",
+        {
+          method: "POST",
+          body: JSON.stringify(bodyPayload),
+        },
+        ctx,
+        signal,
+      );
+      manualInput.value = "";
+      manualStateInput.value = "";
+      setStatus(`Connected ${res.provider}::${res.account}`);
+      await renderAll();
+    } catch (err) {
+      setStatus(`Manual OAuth2 error: ${err.message}`);
+    } finally {
+      if (!state.disposed) {
+        manualBtn.disabled = false;
+      }
+    }
+  });
+  manualRow.appendChild(manualInput);
+  manualRow.appendChild(manualStateInput);
+  manualRow.appendChild(manualBtn);
+  manualBox.appendChild(manualRow);
+
   const browserBox = el("div", "alfred-cloud-browser");
   browserBox.style.border = "1px solid var(--border, #334155)";
   browserBox.style.borderRadius = "8px";
@@ -163,6 +266,7 @@ export function mount(container, ctx = {}) {
   card.appendChild(metaLine);
   card.appendChild(tabsRow);
   card.appendChild(bodyWrap);
+  card.appendChild(manualBox);
   card.appendChild(browserBox);
   card.appendChild(statusMsg);
   card.appendChild(activityBox);
@@ -347,12 +451,19 @@ export function mount(container, ctx = {}) {
             provider: activeProv.id,
             account: acc.account,
           });
+          const origin = globalThis.location?.origin;
+          if (origin && origin.startsWith("http")) {
+            qs.set("redirectUri", `${origin}/oauth-cloud-callback.html`);
+          }
           const res = await requestJson(
             `/api/cloud/oauth/start?${qs.toString()}`,
             { method: "GET" },
             ctx,
             signal,
           );
+          if (res.state) {
+            state.lastOAuthState = res.state;
+          }
           if (res.authUrl && typeof globalThis.open === "function") {
             globalThis.open(res.authUrl, "alfred_cloud_oauth", "width=560,height=720");
           }

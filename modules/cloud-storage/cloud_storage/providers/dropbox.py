@@ -109,6 +109,35 @@ def normalize_dropbox_confined_path(
     return f"{normalized_root}{joined_req}"
 
 
+def _parse_dropbox_result_header(
+    headers: httpx.Headers,
+    *,
+    account: str,
+) -> dict[str, Any] | None:
+    raw_header = headers.get("dropbox-api-result")
+    if not raw_header:
+        return None
+    try:
+        parsed = json.loads(raw_header)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise CloudStorageError(
+            f"Malformed Dropbox-API-Result metadata header: {exc}",
+            code="CLOUD_API_ERROR",
+            status_code=502,
+            provider="dropbox",
+            account=account,
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise CloudStorageError(
+            "Dropbox-API-Result metadata header must be a JSON object",
+            code="CLOUD_API_ERROR",
+            status_code=502,
+            provider="dropbox",
+            account=account,
+        )
+    return parsed
+
+
 def _map_dropbox_entry(raw: dict[str, Any]) -> CloudItem:
     is_folder = raw.get(".tag") == "folder"
     raw_size = raw.get("size")
@@ -567,6 +596,16 @@ class DropboxProvider:
     ) -> CloudDownloadResult:
         del export_format
         target_ref = normalize_dropbox_confined_path(ctx.root_ref, file_ref)
+
+        def _expected_size_from_dropbox_headers(hdrs: httpx.Headers) -> int | None:
+            meta = _parse_dropbox_result_header(hdrs, account=ctx.account)
+            if meta is None:
+                return None
+            raw_size = meta.get("size")
+            if isinstance(raw_size, int) and not isinstance(raw_size, bool):
+                return raw_size
+            return None
+
         bytes_written, resp_headers = await stream_download_to_path(
             ctx,
             method="POST",
@@ -579,23 +618,15 @@ class DropboxProvider:
             max_download_bytes=max_download_bytes,
             expected_size_bytes=None,
             provider="dropbox",
+            expected_size_from_headers=_expected_size_from_dropbox_headers,
         )
-        raw_header = resp_headers.get("dropbox-api-result")
-        raw_meta: dict[str, Any] = {".tag": "file", "path_display": target_ref}
-        if raw_header:
-            parsed = json.loads(raw_header)
-            if isinstance(parsed, dict):
-                raw_meta = parsed
+        parsed_meta = _parse_dropbox_result_header(resp_headers, account=ctx.account)
+        raw_meta: dict[str, Any] = (
+            parsed_meta
+            if parsed_meta is not None
+            else {".tag": "file", "path_display": target_ref}
+        )
         item = _map_dropbox_entry(raw_meta)
-        if item.size_bytes is not None and bytes_written != item.size_bytes:
-            raise CloudStorageError(
-                f"Dropbox download size mismatch: expected {item.size_bytes} B, "
-                f"wrote {bytes_written} B",
-                code="CLOUD_INTEGRITY_MISMATCH",
-                status_code=502,
-                provider="dropbox",
-                account=ctx.account,
-            )
         return CloudDownloadResult(
             item=item,
             bytes_written=bytes_written,

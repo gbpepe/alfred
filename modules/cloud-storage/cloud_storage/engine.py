@@ -17,7 +17,14 @@ from typing import Any, Final
 
 import httpx
 
-from alfred.core.security.secret_gate import SecretGateResult, SecretScanInput, scan_inputs
+from alfred.core.security.secret_gate import (
+    DENIED_PATH_PATTERNS,
+    SECRET_PATTERNS,
+    SecretFinding,
+    SecretGateResult,
+    SecretScanInput,
+    scan_inputs,
+)
 from alfred.kernel.errors import ModuleSecurityError
 from alfred.kernel.types import HousekeepingStats, ModuleContext
 
@@ -48,6 +55,7 @@ from .models import (
     CloudReauthRequiredError,
     CloudShareResponse,
     CloudShareRole,
+    CloudShortLivedToken,
     CloudStatusResponse,
     CloudStorageError,
     CloudUploadConflictMode,
@@ -70,32 +78,65 @@ _PATH_CACHE_TTL_SEC: Final[float] = 60.0
 _PATH_CACHE_MAX_ENTRIES: Final[int] = 500
 _LARGE_SCAN_CHUNK_BYTES: Final[int] = 1024 * 1024  # 1 MiB
 _LARGE_SCAN_OVERLAP_CHARS: Final[int] = 1024
+_STREAM_SCAN_THRESHOLD_BYTES: int = 2 * 1024 * 1024  # 2 MiB
 _FILE_EXCEEDS_SCAN_LIMIT_PREFIX: Final[str] = "file exceeds scan limit"
 
-_SENSITIVE_BASENAME_RE: Final[re.Pattern[str]] = re.compile(
+_CONFINE_SENSITIVE_BASENAME_RE: Final[re.Pattern[str]] = re.compile(
     r"^(?:\.env(?:\.(?!example$).+|~)?|\.dashboard-token|\.vault-key(?:\.migrated)?|"
     r"vault\.json|id_rsa(?:\..*)?|id_ed25519(?:\..*)?|id_ecdsa(?:\..*)?|id_dsa(?:\..*)?|"
     r"vertex-eu-sa\.json|.*(?:service[-_]?account|credentials).*\.json|"
-    r".*\.(?:pem|key|p12|pfx|ppk|sqlite3?|db|db-wal|db-shm|db-journal))$",
+    r"\.npmrc|\.pypirc|\.netrc|kubeconfig|"
+    r".*\.(?:pem|key|p8|p12|pfx|ppk|jks|keystore|sqlite3?|db|db-wal|db-shm|db-journal))$",
+    re.IGNORECASE,
+)
+_SENSITIVE_BASENAME_RE: Final[re.Pattern[str]] = re.compile(
+    r"^(?:\.env(?:\.(?!example$).+|~)?|\.dashboard-token|\.vault-key(?:\.migrated)?|"
+    r"vault\.json|id_rsa(?:\..*)?|id_ed25519(?:\..*)?|id_ecdsa(?:\..*)?|id_dsa(?:\..*)?|"
+    r"vertex-eu-sa\.json|\.pre-ship-evidence.*|"
+    r".*(?:secret|token|credential|service[-_]?account).*|"
+    r"\.npmrc|\.pypirc|\.netrc|kubeconfig|"
+    r".*\.(?:pem|key|p8|p12|pfx|ppk|jks|keystore|sqlite3?|db|db-wal|db-shm|db-journal))$",
     re.IGNORECASE,
 )
 _SENSITIVE_DIR_RE: Final[re.Pattern[str]] = re.compile(
-    r"(?:^|/)(?:store|\.cli-profiles|\.claude|\.gemini|\.codex|\.ssh|\.config/gcloud)(?:/|$)",
+    r"(?:^|/)(?:store|\.cli-profiles|\.claude|\.gemini|\.codex|\.ssh|\.config/gcloud|"
+    r"\.pre-ship-evidence|evidence|\.evidence|transcripts?|\.session-capture)(?:/|$)",
     re.IGNORECASE,
 )
+_SAFE_BINARY_EXTENSIONS: Final[frozenset[str]] = frozenset(
+    {
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".gif",
+        ".mp4",
+        ".mov",
+        ".webm",
+        ".mp3",
+        ".wav",
+        ".ogg",
+        ".zip",
+        ".docx",
+        ".xlsx",
+        ".pptx",
+    }
+)
+_ASCII_RUN_RE: Final[re.Pattern[bytes]] = re.compile(rb"[\x20-\x7e\t\r\n]{16,}")
 _BEARER_REDACT_RE: Final[re.Pattern[str]] = re.compile(r"Bearer\s+\S+", re.IGNORECASE)
 
 
 @dataclass(slots=True)
 class ResolvedCloudTarget:
-    """Validated provider + account target with decrypted Vault credentials."""
+    """Validated provider + account target (Vault secrets loaded lazily on token refresh)."""
 
     provider: CloudProviderId
     account: str
     meta: dict[str, Any]
-    client_id: str
-    client_secret: str
-    refresh_token: str
+    client_id: str | None = None
+    client_secret: str | None = None
+    refresh_token: str | None = None
 
 
 def _make_providers() -> dict[CloudProviderId, CloudStorageProvider]:
@@ -104,6 +145,95 @@ def _make_providers() -> dict[CloudProviderId, CloudStorageProvider]:
         "onedrive": OneDriveProvider(),
         "dropbox": DropboxProvider(),
     }
+
+
+def _read_magic_header_sync(path: Path, size: int = 16) -> bytes:
+    with path.open("rb") as handle:
+        return handle.read(size)
+
+
+def _has_valid_binary_magic(ext: str, header: bytes) -> bool:
+    if ext == ".pdf":
+        return header.startswith(b"%PDF-")
+    if ext == ".png":
+        return header.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext in (".jpg", ".jpeg"):
+        return header.startswith(b"\xff\xd8\xff")
+    if ext == ".webp":
+        return len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP"
+    if ext == ".gif":
+        return header.startswith((b"GIF87a", b"GIF89a"))
+    if ext in (".mp4", ".mov"):
+        return len(header) >= 12 and header[4:8] == b"ftyp"
+    if ext == ".webm":
+        return header.startswith(b"\x1a\x45\xdf\xa3")
+    if ext == ".mp3":
+        return header.startswith(b"ID3") or (
+            len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
+        )
+    if ext == ".wav":
+        return len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE"
+    if ext == ".ogg":
+        return header.startswith(b"OggS")
+    if ext in (".zip", ".docx", ".xlsx", ".pptx"):
+        return header.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"))
+    return False
+
+
+def _scan_verified_binary_ascii_sync(path: Path, display_path: str) -> SecretGateResult:
+    """Enforce path deny rules and scan printable ASCII runs inside verified binary payloads."""
+    norm_path = display_path.replace("\\", "/")
+    findings: list[SecretFinding] = []
+    for pat, reason in DENIED_PATH_PATTERNS:
+        if pat.search(norm_path):
+            findings.append(
+                SecretFinding(
+                    file=display_path,
+                    detector="path",
+                    severity="blocked",
+                    reason=f"denied path category: {reason}",
+                )
+            )
+    if findings:
+        return SecretGateResult(ok=False, findings=findings, scanned_count=1)
+
+    overlap_bytes = b""
+    chunks_scanned = 0
+    try:
+        with path.open("rb") as handle:
+            while True:
+                raw = handle.read(_LARGE_SCAN_CHUNK_BYTES)
+                if not raw:
+                    break
+                chunks_scanned += 1
+                window = overlap_bytes + raw
+                runs = [
+                    m.group(0).decode("ascii", errors="ignore")
+                    for m in _ASCII_RUN_RE.finditer(window)
+                ]
+                if runs:
+                    extracted = "\n".join(runs)
+                    for rule_name, rx in SECRET_PATTERNS:
+                        if rx.search(extracted):
+                            return SecretGateResult(
+                                ok=False,
+                                findings=[
+                                    SecretFinding(
+                                        file=display_path,
+                                        detector="content",
+                                        severity="blocked",
+                                        reason=f"matched secret pattern in binary: {rule_name}",
+                                    )
+                                ],
+                                scanned_count=chunks_scanned,
+                            )
+                overlap_bytes = window[-_LARGE_SCAN_OVERLAP_CHARS:]
+    except OSError as exc:
+        return scan_inputs(
+            [SecretScanInput(path=display_path, unreadable_reason=f"os read error: {exc}")]
+        )
+
+    return SecretGateResult(ok=True, findings=[], scanned_count=max(1, chunks_scanned))
 
 
 def _split_complete_utf8_prefix(raw: bytes, *, at_eof: bool) -> tuple[bytes, bytes]:
@@ -400,7 +530,7 @@ class CloudStorageEngine:
             matched_root = base_root
 
         rel_posix = _normalize_rel_posix(resolved.relative_to(matched_root).as_posix())
-        if _SENSITIVE_BASENAME_RE.match(resolved.name):
+        if _CONFINE_SENSITIVE_BASENAME_RE.match(resolved.name):
             raise ModuleSecurityError(
                 f"Access to sensitive file '{resolved.name}' is forbidden",
                 module_id=MODULE_ID,
@@ -423,7 +553,61 @@ class CloudStorageEngine:
         self,
         local_path: Path,
         display_path: str,
+        *,
+        file_size: int | None = None,
     ) -> None:
+        # Tier 1: Enforce sensitive filename/directory deny-list across ALL files
+        norm_display = display_path.replace("\\", "/")
+        if (
+            _SENSITIVE_BASENAME_RE.match(local_path.name)
+            or _SENSITIVE_DIR_RE.search(norm_display)
+            or any(pat.search(norm_display) for pat, _ in DENIED_PATH_PATTERNS)
+        ):
+            raise CloudStorageError(
+                "Upload blocked by secret gate (denied sensitive filename or directory)",
+                code="CLOUD_SECRET_GATE_BLOCKED",
+                status_code=403,
+            )
+
+        # Tier 2: Safe binary media/document formats verified by magic header + ASCII scan
+        ext = local_path.suffix.lower()
+        if ext in _SAFE_BINARY_EXTENSIONS:
+            header = await asyncio.to_thread(_read_magic_header_sync, local_path)
+            if _has_valid_binary_magic(ext, header):
+                bin_res = await asyncio.to_thread(
+                    _scan_verified_binary_ascii_sync,
+                    local_path,
+                    display_path,
+                )
+                if bin_res.ok:
+                    return
+                reasons = "; ".join(f"{f.detector}: {f.reason}" for f in bin_res.findings)
+                raise CloudStorageError(
+                    f"Upload blocked by secret gate ({reasons})",
+                    code="CLOUD_SECRET_GATE_BLOCKED",
+                    status_code=403,
+                )
+
+        # Tier 3: Strict fail-closed UTF-8 text secret_gate scan (stream files > threshold)
+        if file_size is None:
+            _, _, resolved_size = await asyncio.to_thread(_stat_file_sync, local_path)
+        else:
+            resolved_size = file_size
+        if resolved_size > _STREAM_SCAN_THRESHOLD_BYTES:
+            chunk_res = await asyncio.to_thread(
+                _stream_scan_large_file_sync,
+                local_path,
+                display_path,
+            )
+            if chunk_res.ok:
+                return
+            reasons = "; ".join(f"{f.detector}: {f.reason}" for f in chunk_res.findings)
+            raise CloudStorageError(
+                f"Upload blocked by secret gate ({reasons})",
+                code="CLOUD_SECRET_GATE_BLOCKED",
+                status_code=403,
+            )
+
         scan_res = await asyncio.to_thread(
             self.ctx.security.scan_file_for_secrets,
             local_path,
@@ -540,14 +724,22 @@ class CloudStorageEngine:
                 str(meta.get("last_error") or "needs_reauth"),
             )
 
-        client_id, client_secret = await self._read_client_credentials(prov, resolved_acc)
-        refresh_token = (
-            await self.ctx.security.vault.get_secret(
-                cloud_vault_key(prov, "refresh_token", resolved_acc)
+        has_client_id = (
+            (
+                resolved_acc != DEFAULT_CLOUD_ACCOUNT
+                and cloud_vault_key(prov, "client_id", resolved_acc) in vault_ids
             )
-            or ""
-        ).strip()
-        if not client_id or not client_secret or not refresh_token:
+            or cloud_vault_key(prov, "client_id", DEFAULT_CLOUD_ACCOUNT) in vault_ids
+        )
+        has_client_secret = (
+            (
+                resolved_acc != DEFAULT_CLOUD_ACCOUNT
+                and cloud_vault_key(prov, "client_secret", resolved_acc) in vault_ids
+            )
+            or cloud_vault_key(prov, "client_secret", DEFAULT_CLOUD_ACCOUNT) in vault_ids
+        )
+        has_refresh = cloud_vault_key(prov, "refresh_token", resolved_acc) in vault_ids
+        if not has_client_id or not has_client_secret or not has_refresh:
             raise CloudStorageError(
                 f"Cloud account '{prov}::{resolved_acc}' is not configured or not connected",
                 code="CLOUD_NOT_CONFIGURED",
@@ -560,9 +752,6 @@ class CloudStorageEngine:
             provider=prov,
             account=resolved_acc,
             meta=meta,
-            client_id=client_id,
-            client_secret=client_secret,
-            refresh_token=refresh_token,
         )
 
     async def _update_account_meta(
@@ -615,20 +804,48 @@ class CloudStorageEngine:
             {"needs_reauth": needs_reauth, "last_error": last_error},
         )
 
-    async def _get_valid_access_token(self, target: ResolvedCloudTarget) -> str:
+    async def _get_valid_access_token_with_ttl(
+        self,
+        target: ResolvedCloudTarget,
+    ) -> tuple[str, int]:
         cache_key = (target.provider, target.account)
         cached = self._access_token_cache.get(cache_key)
         now_mono = time.monotonic()
         if cached is not None and cached[1] - 60.0 > now_mono:
-            return cached[0]
+            return cached[0], max(1, int(cached[1] - now_mono))
+
+        client_id = target.client_id
+        client_secret = target.client_secret
+        refresh_token = target.refresh_token
+        if not client_id or not client_secret:
+            client_id, client_secret = await self._read_client_credentials(
+                target.provider,
+                target.account,
+            )
+        if not refresh_token:
+            refresh_token = (
+                await self.ctx.security.vault.get_secret(
+                    cloud_vault_key(target.provider, "refresh_token", target.account)
+                )
+                or ""
+            ).strip()
+        if not client_id or not client_secret or not refresh_token:
+            raise CloudStorageError(
+                f"Cloud account '{target.provider}::{target.account}' "
+                "is not configured or not connected",
+                code="CLOUD_NOT_CONFIGURED",
+                status_code=400,
+                provider=target.provider,
+                account=target.account,
+            )
 
         adapter = self.get_provider(target.provider)
         try:
             refreshed = await adapter.refresh_access_token(
                 self.http_client,
-                client_id=target.client_id,
-                client_secret=target.client_secret,
-                refresh_token=target.refresh_token,
+                client_id=client_id,
+                client_secret=client_secret,
+                refresh_token=refresh_token,
                 account=target.account,
             )
         except CloudReauthRequiredError as exc:
@@ -647,9 +864,45 @@ class CloudStorageEngine:
                 label=f"Cloud {target.provider} ({target.account}) Refresh Token",
             )
 
-        expires_mono = now_mono + max(60, refreshed.expires_in_sec)
+        ttl_sec = max(60, refreshed.expires_in_sec)
+        expires_mono = now_mono + ttl_sec
         self._access_token_cache[cache_key] = (refreshed.access_token, expires_mono)
-        return refreshed.access_token
+        return refreshed.access_token, ttl_sec
+
+    async def _get_valid_access_token(self, target: ResolvedCloudTarget) -> str:
+        token, _ = await self._get_valid_access_token_with_ttl(target)
+        return token
+
+    async def mint_short_lived_token(
+        self,
+        *,
+        provider: CloudProviderId | str | None = None,
+        account: str | None = None,
+    ) -> CloudShortLivedToken:
+        """Mint an ephemeral OAuth2 access token via Service Bus without exposing secrets."""
+        target = await self.resolve_target(provider=provider, account=account)
+        access_token, ttl_sec = await self._get_valid_access_token_with_ttl(target)
+        raw_root = target.meta.get("root_ref")
+        root_ref = str(raw_root) if isinstance(raw_root, str) and raw_root.strip() else None
+        access_mode: CloudAccessMode = (
+            "read_only" if target.meta.get("access_mode") == "read_only" else "read_write"
+        )
+        await self.record_activity(
+            action="token_mint",
+            provider=target.provider,
+            account=target.account,
+            remote_ref=root_ref or "root",
+            status="ok",
+            detail=f"ttl={ttl_sec}s;mode={access_mode}",
+        )
+        return CloudShortLivedToken(
+            provider=target.provider,
+            account=target.account,
+            access_token=access_token,
+            expires_in_sec=ttl_sec,
+            root_ref=root_ref,
+            access_mode=access_mode,
+        )
 
     async def _build_call_ctx(self, target: ResolvedCloudTarget) -> CloudCallContext:
         token = await self._get_valid_access_token(target)
@@ -1423,7 +1676,11 @@ class CloudStorageEngine:
                 status_code=413,
             )
 
-        await self._scan_upload_file_fail_closed(resolved_local, rel_display)
+        await self._scan_upload_file_fail_closed(
+            resolved_local,
+            rel_display,
+            file_size=file_size,
+        )
 
         target = await self.resolve_target(provider=provider, account=account)
         self._assert_writable(target)

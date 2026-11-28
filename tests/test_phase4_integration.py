@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import ast
 import re
+import shutil
 import sqlite3
 import sys
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import httpx
 import pytest
@@ -564,7 +564,10 @@ async def test_live_activation_migrations_tools_routes_sanitize_ui_and_deactivat
         )
         assert ("batch-api", 1) in mig_rows
         assert ("cloud-storage", 1) in mig_rows
-        assert await apply_module_migrations(container.db, "batch-api", batch_plugin.migrations()) == []
+        assert (
+            await apply_module_migrations(container.db, "batch-api", batch_plugin.migrations())
+            == []
+        )
         assert (
             await apply_module_migrations(
                 container.db, "cloud-storage", cloud_plugin.migrations()
@@ -835,3 +838,95 @@ async def test_live_activation_migrations_tools_routes_sanitize_ui_and_deactivat
             assert re_ui.status_code == 200
     finally:
         await container.db.close()
+
+
+async def test_delete_optional_modules_physical_isolation_gate(tmp_path: Path) -> None:
+    """Physically delete `batch-api` and `cloud-storage` dirs: app & config still boot cleanly."""
+    import ctypes
+    import os
+    import stat
+    import time as _time
+    from collections.abc import Callable
+
+    def _clear_readonly(p: str | os.PathLike[str]) -> None:
+        if os.name == "nt":
+            try:
+                ctypes.windll.kernel32.SetFileAttributesW(str(p), 0x80)
+            except OSError:
+                pass
+        try:
+            os.chmod(p, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+        except OSError:
+            pass
+
+    def _onexc(func: Callable[[str], object], path: str, exc: BaseException) -> None:
+        if isinstance(exc, PermissionError):
+            _clear_readonly(path)
+            func(path)
+        else:
+            raise exc
+
+    def _rmtree_win_safe(target: Path) -> None:
+        _clear_readonly(target)
+        for attempt in range(10):
+            try:
+                shutil.rmtree(target, onexc=_onexc)
+                return
+            except PermissionError:
+                _clear_readonly(target)
+                for root_p, dirs_p, files_p in os.walk(target, topdown=False):
+                    for fname in files_p:
+                        _clear_readonly(os.path.join(root_p, fname))
+                    for dname in dirs_p:
+                        _clear_readonly(os.path.join(root_p, dname))
+                if attempt == 9:
+                    raise
+                _time.sleep(0.05)
+
+    iso_root = tmp_path / "isolated-app"
+    shutil.copytree(REPO_ROOT / "config", iso_root / "config")
+    shutil.copytree(
+        MODULES_DIR,
+        iso_root / "modules",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+    _rmtree_win_safe(iso_root / "modules" / "batch-api")
+    _rmtree_win_safe(iso_root / "modules" / "cloud-storage")
+
+    settings = CoreSettings.from_project_root(iso_root, environment="test")
+    app = create_app(settings, admin_token="delete-gate-token")
+    async with app.router.lifespan_context(app):
+        container: CoreAppContainer = app.state.container
+        agents_cfg = container.agents.load(validate_manifests=True)
+        batch_agent = agents_cfg.get_agent("alfred-batch")
+        assert batch_agent is not None
+
+        # Runtime execution of missing optional module tools remains strictly fail-closed
+        with pytest.raises(ModuleDisabledError):
+            await container.tool_executor.execute_tool(
+                agent=batch_agent,
+                tool_name="batch_list",
+                raw_args={},
+                session_id="iso-gate-check",
+                workspace_dir=iso_root,
+            )
+
+        transport = httpx.ASGITransport(app=app)
+        admin_cookie, _ = container.auth.issue_dashboard_session(role="admin")
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            cookies={"alfred_session": admin_cookie},
+        ) as client:
+            health = await client.get("/api/core/health")
+            assert health.status_code == 200
+            assert set(health.json()["activeModules"]) == set(BUILTIN_MODULE_IDS)
+
+            assert (
+                await client.get("/api/modules/batch-api/ui/batch-card.js")
+            ).status_code == 404
+            assert (
+                await client.get("/api/modules/cloud-storage/ui/cloud-card.js")
+            ).status_code == 404
+            assert (await client.get("/api/batch/jobs")).status_code == 404
+            assert (await client.get("/api/cloud/status")).status_code == 404
