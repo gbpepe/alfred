@@ -173,3 +173,11 @@ local-hooks/
 
 # VOICETOKENLEAK1101 PR-A1 (Dani 64941/2): the main agent's dashboard-API payload files (written in the project root)
 /api-*.txt
+
+/audit-report.md
+
+# Python v2 (.venv & tool caches)
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
