@@ -126,6 +126,14 @@ class InstalledModuleRecord(BaseModel):
     config_json: dict[str, Any] = Field(default_factory=dict)
 
 
+_WAL_CHECKPOINT_SQL: dict[Literal["PASSIVE", "FULL", "RESTART", "TRUNCATE"], str] = {
+    "PASSIVE": "PRAGMA wal_checkpoint(PASSIVE);",
+    "FULL": "PRAGMA wal_checkpoint(FULL);",
+    "RESTART": "PRAGMA wal_checkpoint(RESTART);",
+    "TRUNCATE": "PRAGMA wal_checkpoint(TRUNCATE);",
+}
+
+
 class SqlitePool:
     """Thread-isolated SQLite WAL pool with `asyncio.Lock` write serialization."""
 
@@ -222,6 +230,27 @@ class SqlitePool:
                 raise RuntimeError("SqlitePool is already closed")
             loop = asyncio.get_running_loop()
             return await loop.run_in_executor(self._executor, self._write_sync, fn)
+
+    async def wal_checkpoint(
+        self,
+        mode: Literal["PASSIVE", "FULL", "RESTART", "TRUNCATE"] = "TRUNCATE",
+    ) -> tuple[int, int, int]:
+        """Run `PRAGMA wal_checkpoint(<mode>)` outside `BEGIN IMMEDIATE` and return page counts."""
+        sql = _WAL_CHECKPOINT_SQL[mode]
+
+        def _checkpoint_sync() -> tuple[int, int, int]:
+            conn = self._ensure_conn_sync()
+            row = conn.execute(sql).fetchone()
+            self._tighten_file_permissions_sync()
+            if row is None:
+                return (0, 0, 0)
+            return (int(row[0]), int(row[1]), int(row[2]))
+
+        async with self._write_lock:
+            if self._closed:
+                raise RuntimeError("SqlitePool is already closed")
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(self._executor, _checkpoint_sync)
 
     async def close(self) -> None:
         """Serialize shutdown under `_write_lock` before closing connection and executor."""

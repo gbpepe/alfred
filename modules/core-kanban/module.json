@@ -1,0 +1,15 @@
+{
+  "id": "core-kanban",
+  "name": "Kanban Board",
+  "category": "core",
+  "version": "1.0.0",
+  "description": "SQLite-backed Kanban project, column, label, card, and comment management module.",
+  "depends": [],
+  "requiredSecrets": [],
+  "tools": [],
+  "uiCardIds": ["kanban"],
+  "ramImpactMb": 0,
+  "builtIn": true,
+  "defaultEnabled": true,
+  "entry": "core_kanban/plugin.py"
+}

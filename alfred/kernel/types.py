@@ -269,6 +269,10 @@ class ToolExecutionContext:
     session_id: str
     workspace_dir: Path
     module_ctx: ModuleContext
+    protected_paths: tuple[str, ...] = ()
+    allowed_bash_commands: tuple[str, ...] = ()
+    bash_timeout_ms: int = 30_000
+    memory_namespace: str | None = None
 
 
 @dataclass(slots=True)
@@ -366,6 +370,18 @@ class ServiceBus(Protocol):
     def require_service(self, module_id: str) -> Any: ...
 
     def get_service(self, module_id: str) -> Any | None: ...
+
+    def list_cli_env_sanitize_keys(self) -> tuple[str, ...]: ...
+
+    def list_active_module_ids(self) -> list[str]: ...
+
+    async def run_all_housekeeping(
+        self,
+        *,
+        retention_days: int,
+        disk_used_pct: float,
+        exclude_module_ids: frozenset[str] = frozenset(),
+    ) -> list[HousekeepingStats]: ...
 
 
 @dataclass(slots=True)

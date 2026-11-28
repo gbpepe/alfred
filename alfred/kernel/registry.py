@@ -10,6 +10,7 @@ from typing import Any
 from alfred.kernel.errors import MissingDependencyError, ModuleError, ModuleLoadError
 from alfred.kernel.types import (
     AlfredModulePlugin,
+    HousekeepingStats,
     ModuleContext,
     ModuleManifest,
     ModuleModelProvider,
@@ -102,6 +103,42 @@ class ScopedServiceBus(ServiceBus):
         if not self._registry.is_active(module_id):
             return None
         return self._registry.get_service(module_id)
+
+    def list_cli_env_sanitize_keys(self) -> tuple[str, ...]:
+        """Return deduplicated env keys collected from all active modules."""
+        return self._registry.list_cli_env_sanitize_keys()
+
+    def list_active_module_ids(self) -> list[str]:
+        """Return active module ids registered in the kernel."""
+        return self._registry.active_module_ids()
+
+    async def run_all_housekeeping(
+        self,
+        *,
+        retention_days: int,
+        disk_used_pct: float,
+        exclude_module_ids: frozenset[str] = frozenset(),
+    ) -> list[HousekeepingStats]:
+        """Invoke `on_housekeeping` across active modules, isolating per-module errors."""
+        results: list[HousekeepingStats] = []
+        for mod_id in self._registry.active_module_ids():
+            if mod_id in exclude_module_ids:
+                continue
+            plugin = self._registry.get_plugin(mod_id)
+            ctx = self._registry.get_context(mod_id)
+            if plugin is None or ctx is None:
+                continue
+            try:
+                stats = await plugin.on_housekeeping(ctx, retention_days, disk_used_pct)
+                results.append(stats)
+            except Exception as exc:
+                results.append(
+                    HousekeepingStats(
+                        module_id=mod_id,
+                        notes=f"error: {exc}",
+                    )
+                )
+        return results
 
 
 class ModuleRegistry:

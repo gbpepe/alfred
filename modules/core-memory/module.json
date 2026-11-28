@@ -1,0 +1,15 @@
+{
+  "id": "core-memory",
+  "name": "Központi Memória Motor",
+  "category": "core",
+  "version": "1.0.0",
+  "description": "Névtér-izolált, FTS5 teljes szöveges kereséssel, verziótörténettel és használatkövetéssel rendelkező központi memóriamodul.",
+  "depends": [],
+  "requiredSecrets": [],
+  "tools": ["memory"],
+  "uiCardIds": ["memories"],
+  "ramImpactMb": 0,
+  "builtIn": true,
+  "defaultEnabled": true,
+  "entry": "core_memory/plugin.py"
+}

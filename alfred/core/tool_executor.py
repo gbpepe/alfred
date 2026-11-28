@@ -101,5 +101,9 @@ class ToolExecutor:
             session_id=session_id,
             workspace_dir=workspace_dir,
             module_ctx=mod_ctx,
+            protected_paths=tuple(agent.protected_paths),
+            allowed_bash_commands=tuple(agent.allowed_bash_commands),
+            bash_timeout_ms=agent.bash_timeout_ms or 30_000,
+            memory_namespace=agent.memory_namespace,
         )
         return await tool_def.invoke(raw_args, ctx)

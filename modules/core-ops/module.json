@@ -4,6 +4,7 @@
   "category": "core",
   "version": "1.0.0",
   "description": "Valós idejű 2 GB RAM/SSD telemetria, SQLite WAL housekeeping, headless CLI életciklus és modulkezelés az alfred-ops számára.",
+  "entry": "core_ops/plugin.py",
   "depends": ["core-cli"],
   "requiredSecrets": [],
   "tools": ["cli_manage", "system_storage", "module_manage"],

@@ -202,7 +202,9 @@ def load_module_entrypoint(
     spec = importlib.util.spec_from_file_location(
         safe_pkg,
         entry_path,
-        submodule_search_locations=[str(module_dir.resolve())],
+        submodule_search_locations=list(
+            dict.fromkeys([str(entry_path.parent.resolve()), str(module_dir.resolve())])
+        ),
     )
     if spec is None or spec.loader is None:
         raise ModuleLoadError(
