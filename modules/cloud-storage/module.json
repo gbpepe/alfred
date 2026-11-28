@@ -6,6 +6,7 @@
   "description": "SDK-mentes, 8 MB-os stream-alapú Multi-Cloud és Multi-Account tárhelymotor (Google Drive v3, Microsoft OneDrive Graph v1.0, Dropbox API v2) fiókszintű izolációval, megosztási szabályzattal és worker token-kiadással.",
   "depends": [],
   "requiredSecrets": [],
+  "allowedVaultPrefixes": ["cloud_"],
   "tools": [
     "cloud_list",
     "cloud_mkdir",
@@ -17,6 +18,8 @@
   "ramImpactMb": 15,
   "builtIn": false,
   "defaultEnabled": false,
+  "entry": "cloud_storage/plugin.py",
+  "probeEntry": "cloud_storage/probe.py",
   "setupWizard": {
     "title": "Egységes Felhőtárhely beüzemelése",
     "summary": "Állíts be legalább egy OAuth2 felhőtárhely-klienst (Google Drive, OneDrive vagy Dropbox), majd add meg az alapértelmezett megosztási és méretkorlátokat.",
